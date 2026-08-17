@@ -1,41 +1,63 @@
 # huangrx6 / skills
 
-个人 skills 集合。所有 skill 在这里集中维护，跨机器通过 [pi-coding-agent](https://github.com/earendil-works/pi-coding-agent) 的 skill loader 加载使用。
+个人 skills 集合，覆盖工程实践设计、skill 创建流程、视觉理解工具三个领域。每个 skill 是给 AI Coding Agent 读的"专业领域提示词 + 工作流"，由 Agent 根据 `SKILL.md` 第一段 `description` 字段自动决定是否触发。
 
-> Skills 是给 AI Coding Agent（pi / Claude Code / Cursor 等）读的"专业领域提示词 + 工作流"，由 Agent 根据 SKILL.md 第一段 `description` 字段自动决定是否触发。
+> **跨 Agent 通用**：兼容 Claude Code / pi / OpenCode / Cursor / Codex 等任意支持 `SKILL.md` frontmatter 约定的 Agent。
 
-## 安装
+## 快速安装
+
+使用 skills 生态的**事实标准 CLI** [`vercel-labs/skills`](https://github.com/vercel-labs/skills)（支持 75+ Agent）：
 
 ```sh
-# 直接 clone 到 pi 默认加载路径
-git clone https://github.com/huangrx6/skills.git ~/.agents
+# 交互式安装：让选 skill / agent / 全局或项目级 / symlink 或 copy
+npx skills add huangrx6/skills
 
-# 或者已有 ~/.agents/，把 skills 子目录拉下来
-# cd ~/.agents && git clone https://github.com/huangrx6/skills.git _skills_tmp \
-#   && rsync -a _skills_tmp/skills/ ./skills/ && rm -rf _skills_tmp
+# 精确指定：只装某个 skill 到某个 agent 的全局目录，跳过确认
+npx skills add huangrx6/skills \
+  --skill design-api-contracts \
+  --agent claude-code --global --yes
+
+# 一次装全部到指定 agent
+npx skills add huangrx6/skills --skill '*' --agent claude-code
+
+# 列出本仓库所有 skill（不装）
+npx skills add huangrx6/skills --list
+```
+
+### 完整 flag 速查
+
+| Flag | 作用 | 例子 |
+|---|---|---|
+| `-s, --skill <name>` | 选择性安装（可多次；`'*'` 代表全部）| `--skill design-api-contracts` |
+| `-a, --agent <name>` | 目标 agent（可多次；`'*'` 代表全部）| `-a claude-code -a opencode` |
+| `-g, --global` | 装到用户目录而不是项目目录 | `--global` |
+| `-y, --yes` | 跳过所有确认提示 | `--yes` |
+| `--all` | 装全部 skill 到全部 agent，无提示 | `--all` |
+| `--copy` | 拷贝而不是 symlink | `--copy` |
+| `-l, --list` | 只列出不装 | `--list` |
+
+### 不依赖 `npx skills` 的备选
+
+任何能读 `SKILL.md` 的 Agent 都能直接 git clone 后用：
+
+```sh
+git clone https://github.com/huangrx6/skills.git
+
+# 把 skills/<想装的>/ 软链或拷贝到你的 Agent 加载目录，例如：
+#   Claude Code 项目级：./.claude/skills/<name>
+#   Claude Code 全局级：~/.claude/skills/<name>
+#   pi 全局级：       ~/.agents/skills/<name>
+#   OpenCode 全局级：  ~/.opencode/skills/<name>
+#   Codex 全局级：    ~/.codex/skills/<name>
 ```
 
 ## 目录结构
 
 ```
 skills/
-├── design-*                       # 设计类（13 个，按工程领域切分）
-│   ├── design-api-contracts/
-│   ├── design-application-logging/
-│   ├── design-code-writing-standards/
-│   ├── design-configuration-management/
-│   ├── design-database-standards/
-│   ├── design-engineering-documentation/
-│   ├── design-exception-handling/
-│   ├── design-git-workflows/
-│   ├── design-observability/
-│   ├── design-performance-capacity/
-│   ├── design-secure-coding/
-│   ├── design-service-resilience/
-│   └── design-software-architecture/
-├── skill-creator/                 # 流程类：新建 / 改进 / 评估 skill
-├── visual-image-understanding/    # 工具类：本地图片 → 远端视觉模型 → Markdown
-└── visual-ui-layout-spec/         # 工具类：UI 截图 / 设计稿 → 前端可交付布局规格
+├── design-* (13 个)                       ← 设计类：按工程领域切分
+├── skill-creator/                         ← 流程类：新建/改进/评估 skill
+└── visual-{image-understanding,ui-layout-spec}/   ← 工具类：视觉相关
 ```
 
 每个 skill 目录内统一结构（参考 [skill-creator](./skills/skill-creator) 的"Anatomy of a Skill"）：
@@ -96,3 +118,9 @@ skills/
 - **设计类** 内容相对稳定（按工程领域沉淀），**工具类**（visual-*）会因上游依赖变动需要跟进
 - 新增 skill：参考 `skill-creator/SKILL.md` 的"Anatomy of a Skill"和"Writing Patterns"
 - 仓库根的 `.skill-lock.json` 已被 `.gitignore` 排除——那是 pi 工具的本地 lock，每台机器自己生成
+
+## 仓库布局遵循
+
+- [`vercel-labs/agent-skills`](https://github.com/vercel-labs/agent-skills) — skills 生态参考仓库
+- [Anthropic — Equipping agents for the real world with agent skills](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills) — SKILL.md frontmatter 约定
+- [`vercel-labs/skills`](https://github.com/vercel-labs/skills) — `npx skills` CLI（支持 75+ Agent）
