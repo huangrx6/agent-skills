@@ -1,0 +1,14 @@
+﻿checkId,category,requirement,severity,automatable,evidence
+SR-001,INPUT,所有新增外部输入有类型、长度、范围和资源限制,BLOCKER,partly,schema/tests
+SR-002,INJECTION,无不可信字符串直接进入 SQL/command/template/eval,BLOCKER,partly,SAST/review
+SR-003,AUTHZ,受保护操作有资源/租户级服务端授权,BLOCKER,partly,negative tests
+SR-004,SECRETS,无新 Secret/Token/生产数据进入仓库或日志,BLOCKER,true,secret scan
+SR-005,NETWORK,用户可控 URL 不能访问未授权内网/metadata,BLOCKER,partly,SSRF tests
+SR-006,FILES,文件和路径处理限制类型/大小/位置并防 traversal,BLOCKER,partly,file tests
+SR-007,DESERIALIZATION,无不可信 native object deserialization 或动态代码执行,BLOCKER,partly,SAST/review
+SR-008,BROWSER,XSS/CSRF/CORS/CSP/Cookie 与浏览器认证模型一致,BLOCKER,partly,web tests
+SR-009,CRYPTO,无自制 crypto、弱随机或 TLS verify bypass,BLOCKER,partly,review
+SR-010,DEPENDENCY,新增依赖来源、名称和安全状态已验证,BLOCKER,partly,dependency review
+SR-011,AI,AI 生成高风险改动已查看最终 diff 而非只看对话计划,BLOCKER,false,review
+SR-012,LIMITS,集合/文件/解析/网络/并发均有硬上限,MAJOR,partly,limits tests
+SR-013,EXCEPTION,安全 suppress/bypass 有解释、Owner 和退出条件,BLOCKER,partly,exception record

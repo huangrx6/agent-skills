@@ -1,0 +1,5 @@
+﻿priority,source,allowedFor,notes
+10,CODE_DEFAULT,safe_defaults,universally safe only
+20,VERSIONED_CONFIG,application_config,reviewed with code
+30,DEPLOYMENT_CONFIG,environment_specific,deployment owned
+40,DYNAMIC_CONFIG,approved_dynamic_keys,runtime controlled

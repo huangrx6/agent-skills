@@ -1,0 +1,4 @@
+﻿riskId,category,risk,likelihood,impact,mitigation,owner,status,revisitTrigger
+AR-001,COUPLING,多个服务共享写数据库,HIGH,HIGH,明确单一数据 Owner 并逐步移除跨服务写入,Architecture,OPEN,新增第三个共享写入服务
+AR-002,RELIABILITY,核心同步调用链过长,MEDIUM,HIGH,减少 hop；非关键步骤异步化；分配超时预算,Platform,OPEN,P99 或依赖错误率超阈值
+AR-003,OPERABILITY,采用事件驱动但无重放和 DLQ 运维能力,MEDIUM,HIGH,先补消息治理和运行手册,Platform,OPEN,事件消费者数量>3

@@ -1,0 +1,20 @@
+﻿pathPattern,documentAreas,reason,requiredAction
+AGENTS.md,AGENT_CONTEXT,Agent behavior changed,Review instruction scope and size
+PROJECT_CONTEXT.md,PROJECT_CONTEXT,project bootstrap changed,Validate links and stable-fact scope
+src/**,PROJECT_CONTEXT|PROJECT_OVERVIEW,behavior/module changes may affect docs,Inspect only if user-visible behavior or module responsibility changed
+**/api/*.yaml,CONTRACTS,API machine contract (OpenAPI/AsyncAPI YAML) changed,Verify machine contract and contract docs
+**/api/*.json,CONTRACTS,API machine contract (OpenAPI/AsyncAPI JSON) changed,Verify machine contract and contract docs
+openapi*.yaml,CONTRACTS,OpenAPI spec changed,Verify machine contract and contract docs
+openapi*.json,CONTRACTS,OpenAPI spec changed,Verify machine contract and contract docs
+asyncapi*.yaml,CONTRACTS,AsyncAPI spec changed,Verify machine contract and contract docs
+**/*.proto,CONTRACTS|PROJECT_CONTEXT,RPC/event contract changed,Verify compatibility and generated docs
+**/*.graphql,CONTRACTS,GraphQL contract changed,Verify schema docs and compatibility
+migrations/**,DATA|OPERATIONS,database schema/data migration changed,Verify migration/runbook/data ownership docs
+db/**,DATA,database behavior changed,Verify data docs if ownership/lifecycle changed
+infra/**,ARCHITECTURE|OPERATIONS|PROJECT_CONTEXT,deployment/topology changed,Update architecture/operations when durable
+deploy/**,OPERATIONS|PROJECT_CONTEXT,deployment workflow changed,Update setup/runbook/context commands
+config/**,DEVELOPMENT|OPERATIONS,configuration changed,Document new/changed operator/developer settings
+scripts/**,DEVELOPMENT,developer automation changed,Update workflow docs if command surface changed
+.github/workflows/**,DEVELOPMENT|OPERATIONS,CI/CD changed,Update workflow/release docs if behavior changed
+docs/architecture/**,PROJECT_CONTEXT|DOC_INDEX,architecture docs changed,Check context summary and index
+docs/**,DOC_INDEX,documentation set changed,Ensure discoverable from an index

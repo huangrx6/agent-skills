@@ -1,0 +1,7 @@
+﻿checkId,requirement,severity
+CFG-001,新增配置有 Schema、类型、单位和 Owner,BLOCKER
+CFG-002,来源和优先级无歧义,BLOCKER
+CFG-003,Secret 未进入普通配置,BLOCKER
+CFG-004,动态更新失败保留最后有效配置,BLOCKER
+CFG-005,高风险配置支持灰度和回滚,MAJOR
+CFG-006,Feature Flag 有删除条件,MAJOR

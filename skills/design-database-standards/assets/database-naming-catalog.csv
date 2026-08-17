@@ -1,0 +1,9 @@
+﻿ruleId,objectType,convention,example,severity,notes
+DBN-001,table,统一使用小写 snake_case 领域名词,order_items,MUST,单复数由组织统一选择
+DBN-002,column,小写 snake_case，表达业务语义,created_at,MUST,时间/单位明确
+DBN-003,primary_key,统一命名 id 或 <entity>_id,id,SHOULD,外键使用 entity_id
+DBN-004,boolean,命题式名称,is_active,MUST,使用真正 BOOLEAN 类型
+DBN-005,index,名称包含表和关键字段/用途,idx_orders_customer_created,SHOULD,便于报错和执行计划定位
+DBN-006,unique_constraint,名称表达业务唯一性,uq_users_email_normalized,SHOULD,业务唯一性必须数据库约束
+DBN-007,foreign_key,名称表达来源和目标,fk_orders_customer,SHOULD,删除行为显式定义
+DBN-008,migration,可排序、稳定且不重复,V20260807_001__add_order_note.sql,MUST,按迁移工具规则

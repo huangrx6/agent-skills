@@ -1,0 +1,8 @@
+﻿checkId,requirement,severity
+UI-001,§1–§10 全部存在,BLOCKER
+UI-002,所有区域有 bbox 与 Evidence ID,BLOCKER
+UI-003,设计令牌区分 observed/normalized/recommended,BLOCKER
+UI-004,所有 Low Confidence 项进入 §9,BLOCKER
+UI-005,图中可见文字逐字登记,MAJOR
+UI-006,Evidence Ledger 仅保存可重跑命令，不依赖临时文件,BLOCKER
+UI-007,未编造图中不存在的功能/状态,BLOCKER

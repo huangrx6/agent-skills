@@ -1,0 +1,9 @@
+strategy,command,when,producesMergeCommit,preservesHistory,recommendedFor
+fast-forward,git merge <branch>,能 ff 时默认,否,线性,简单更新/个人分支
+no-fast-forward,git merge --no-ff <branch>,保留分支历史,是,保留分支结构,功能分支合并到主干
+squash,git merge --squash <branch>,压缩多个 WIP commit,否（需手动 commit）,压缩成单 commit,整理杂乱历史
+rebase,git rebase <base> + merge ff,线性历史,否,线性,个人分支同步主干
+rebase -i squash,git rebase -i <base>,整理提交,否,线性,提交前清理
+ours,git merge -s ours,保留当前分支忽略对方,是,丢弃对方,极少用（通常错误）
+theirs,merge -X theirs,冲突时选对方,依情况,可能丢己方,慎用
+octopus,git merge -s octopus,多分支合并,是,保留,多分支同时合并

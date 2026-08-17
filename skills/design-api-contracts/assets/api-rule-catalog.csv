@@ -1,0 +1,22 @@
+﻿ruleId,category,requirement,severity,automatable,evidence
+API-000,风格选择,主协议由交互模型决定，不默认 REST；复杂协议有明确收益,MUST,false,协议选择说明
+API-001,资源,URI 标识资源且不泄露内部存储实现,MUST,partly,OpenAPI lint 与评审
+API-002,HTTP,方法安全性和幂等性符合 HTTP 语义,MUST,partly,契约测试
+API-003,HTTP,失败不得使用 HTTP 200 包装,MUST,true,响应契约扫描
+API-004,Schema,请求和响应均有机器可读 Schema,MUST,true,OpenAPI 验证
+API-005,Schema,时间、金额、单位、可空和默认值语义明确,MUST,partly,Schema 与评审
+API-006,集合,分页具有稳定排序和最大页大小,MUST,partly,契约测试
+API-007,幂等,可重试写操作定义幂等保护,MUST,false,设计与集成测试
+API-008,并发,更新操作定义版本或条件请求策略,SHOULD,partly,OpenAPI 与并发测试
+API-009,兼容,契约变更执行自动兼容性差异检查,MUST,true,CI 差异报告
+API-010,弃用,弃用提供替代方案、时间表和调用量观测,MUST,partly,弃用计划
+API-011,安全,每个操作声明认证、授权和数据分类,MUST,partly,安全评审
+API-012,契约,OpenAPI/Proto/AsyncAPI 与部署行为一致,MUST,partly,提供方契约测试
+API-013,文档,主要操作和错误提供可校验脱敏示例,SHOULD,true,示例验证
+API-014,治理,生产 API 有 Owner、生命周期和契约位置,MUST,true,API 目录
+API-015,异步,长耗时操作返回 202 与操作资源，不无限占用同步请求,MUST,partly,异步契约测试
+API-016,实时,流式/长连接定义生命周期、消息边界、顺序、重复、恢复、背压和限额,MUST,partly,实时协议测试
+API-017,GraphQL,定义查询复杂度、深度、分页、部分数据和未知枚举策略,MUST,partly,Schema lint 与成本测试
+API-018,gRPC,定义 Deadline、取消、状态、消息大小、Streaming 和 Protobuf 兼容规则,MUST,partly,跨版本契约测试
+API-019,事件,事件/Webhook 假设重复投递，定义幂等、顺序和重放行为,MUST,partly,事件契约测试
+API-020,JSON-RPC,method、notification、batch 和错误语义一致,SHOULD,partly,RPC 契约测试

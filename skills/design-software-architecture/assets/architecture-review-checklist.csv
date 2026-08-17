@@ -1,0 +1,14 @@
+﻿checkId,category,requirement,severity,automatable,evidence
+ARCH-001,DRIVERS,核心质量属性有可测场景,BLOCKER,partly,quality attribute scenarios
+ARCH-002,BOUNDARY,模块/服务职责和数据 Owner 明确,BLOCKER,partly,container/context map
+ARCH-003,SIMPLICITY,复杂架构选择有明确收益证据,BLOCKER,false,ADR
+ARCH-004,DEPENDENCY,不存在未批准循环依赖和私有存储跨界访问,BLOCKER,partly,dependency scan
+ARCH-005,CONSISTENCY,跨边界一致性和失败恢复语义明确,BLOCKER,false,workflow/ADR
+ARCH-006,FAILURE,关键依赖和故障域有失败模式与恢复路径,BLOCKER,false,failure analysis
+ARCH-007,SECURITY,信任边界、数据分类和威胁模型完整,BLOCKER,partly,threat model
+ARCH-008,DEPLOYMENT,部署、灰度、回滚和 Schema 兼容路径明确,BLOCKER,partly,deployment plan
+ARCH-009,OPERABILITY,SLO、观测和 Runbook 责任明确,MAJOR,partly,SLO/runbook
+ARCH-010,COST,关键基础设施和扩展成本已评估,MAJOR,false,cost model
+ARCH-011,ADR,重大不可逆决策有 ADR 和重新评估条件,MAJOR,partly,ADR log
+ARCH-012,DOCS,Context/Container 图与当前实现一致,MAJOR,partly,architecture docs
+ARCH-013,EVOLUTION,遗留迁移按增量步骤执行且有退出条件,BLOCKER,false,migration plan

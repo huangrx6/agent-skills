@@ -1,0 +1,4 @@
+﻿key,type,unit,required,default,dynamic,secret,owner,description
+http.client.payment.timeout_ms,INTEGER,ms,true,800,true,false,payments,payment timeout
+worker.order.concurrency,INTEGER,count,true,16,true,false,orders,worker concurrency
+database.password_secret_ref,STRING,,true,,false,true,platform,secret reference

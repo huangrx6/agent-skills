@@ -1,0 +1,11 @@
+policyId,fileType,field,requirement,sourceOfTruth,example,notes
+HDR-001,普通源文件,SPDX-License-Identifier,CONDITIONAL,法务/仓库许可证策略,SPDX-License-Identifier: Apache-2.0,需要文件级许可证时使用
+HDR-002,普通源文件,Author,PROHIBITED,Git 历史与代码所有者配置,,默认不记录个人作者
+HDR-003,普通源文件,Created,PROHIBITED,Git 历史,,默认不手工记录创建时间
+HDR-004,普通源文件,Last Modified,PROHIBITED,Git 历史与构建元数据,,容易过期且与事实冲突
+HDR-005,普通源文件,Version,PROHIBITED,包清单、发布标签、构建系统,,普通文件不维护独立版本
+HDR-006,合规/受控源文件,Owner-Team,OPTIONAL,代码所有者或团队目录,Owner-Team: Payment Platform,优先团队而非个人；与 HDR-010 同属受控文件范畴
+HDR-007,生成代码,Generated Marker,REQUIRED,代码生成器,由 schema-codegen/2.4.1 自动生成，请勿手工修改,必须可重复生成
+HDR-008,生成代码,Source,REQUIRED,生成配置或 Schema,Source: schemas/order.proto,使用稳定相对路径
+HDR-009,生成代码,Generator Version,REQUIRED,生成器发布版本,Generator: schema-codegen/2.4.1,便于复现和诊断
+HDR-010,合规/受控源文件,Classification,CONDITIONAL,信息分类策略,Classification: Internal,仅策略要求时使用；与 HDR-006 同属受控文件范畴

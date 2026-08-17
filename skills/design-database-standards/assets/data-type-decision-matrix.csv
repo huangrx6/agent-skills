@@ -1,0 +1,10 @@
+﻿businessData,preferredType,avoid,keyDecision
+主键/内部 ID,BIGINT/UUID 等稳定标识,可变业务字段,跨库生成、局部性、暴露风险
+金额,NUMERIC/DECIMAL 或最小货币单位整数,FLOAT/DOUBLE,精度、scale、货币代码和舍入
+时间点,timezone-aware timestamp 或统一 UTC timestamp,本地化字符串,绝对时间与显示时区分离
+仅日期,DATE,午夜 timestamp,不包含虚假时区
+布尔,BOOLEAN,Y/N 字符串、魔法整数,三态需求才允许 NULL
+状态,受约束字符串/ENUM/参考表,自由文本,变化频率和迁移成本
+长文本,TEXT/数据库大文本类型,随意 varchar(255),业务最大长度仍需应用/API 限制
+结构化扩展,JSON/JSONB 等,逗号分隔字符串,核心关系和唯一性不要藏进 JSON
+比例/精确小数,NUMERIC/DECIMAL,FLOAT,明确 0-1 或 0-100

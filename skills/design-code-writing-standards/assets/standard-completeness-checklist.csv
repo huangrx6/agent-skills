@@ -1,0 +1,11 @@
+checkId,section,requirement,severity,guidance
+STD-001,元要求,明确适用范围（语言/模块/发布方式）与规范强度分级（必须/应/可）,BLOCKER,引用 SKILL.md §输出结构
+STD-002,命名与术语,命名规则覆盖标识符/文件/包/模块/数据库/测试，且同一概念术语统一,MAJOR,参照 naming-and-api.md §标识符命名/布尔值集合与单位
+STD-003,格式化与文件,指定唯一格式化器与 .editorconfig，机械格式不依赖评审,MAJOR,参照 formatting-and-files.md §自动化优先
+STD-004,文件头与版本,明确作者/时间/版本的事实来源，默认不手工维护个人作者时间,MAJOR,参照 file-metadata-versioning.md §默认策略
+STD-005,注释与文档,注释解释原因而非复述代码；TODO/FIXME 关联追踪标识（属于可执行性，参见 STD-010）,BLOCKER,参照 comments-documentation.md §注释目的/TODO 与 FIXME
+STD-006,设计原则与模式,仅在真实变化点引入模式，并有收益与失败行为的测试证据,MAJOR,参照 design-principles-patterns.md §模式选择流程/模式验收
+STD-007,实现质量,空值/并发/资源/安全边界有明确规则，数据库用参数化接口,MAJOR,参照 implementation-quality.md §空值与失败/安全/并发
+STD-008,测试评审与自动化,定义测试分层、隔离要求与 CI 质量门禁清单,BLOCKER,参照 testing-review.md §测试要求/自动化质量门禁 与 code-review-checklist.csv
+STD-009,语言实施附录,多语言项目区分主规范与语言附录，冲突按优先级裁决,MAJOR,参照 language-adaptation.md §基本原则（冲突优先级）
+STD-010,可执行性,每条规则标注可自动化/需评审/仅合规，避免无法执行的规则,MAJOR,避免无法自动执行或评审的空话规则

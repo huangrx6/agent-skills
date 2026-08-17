@@ -1,0 +1,11 @@
+﻿code,title,httpStatus,category,retryable,publicDetail,owner,introducedVersion,deprecatedVersion
+INVALID_REQUEST,请求格式不正确,400,INPUT,false,请求格式不正确，请检查后重试,平台团队,1.0,
+INVALID_ARGUMENT,请求参数不合法,422,INPUT,false,一个或多个参数未通过校验,平台团队,1.0,
+UNAUTHENTICATED,未认证,401,AUTH,false,请完成身份认证后重试,安全团队,1.0,
+PERMISSION_DENIED,无权执行该操作,403,AUTH,false,当前身份无权执行该操作,安全团队,1.0,
+RESOURCE_NOT_FOUND,资源不存在,404,BUSINESS,false,请求的资源不存在,平台团队,1.0,
+RESOURCE_CONFLICT,资源状态冲突,409,CONFLICT,false,资源当前状态不允许执行该操作,平台团队,1.0,
+RATE_LIMITED,请求过于频繁,429,RATE_LIMIT,true,请求过于频繁，请稍后重试（retryable 从调用方视角；本服务限流时应返回 Retry-After 避免加重负载）,平台团队,1.0,
+DEPENDENCY_UNAVAILABLE,依赖服务不可用,503,DEPENDENCY,true,服务暂时不可用，请稍后重试,平台团队,1.0,
+DEPENDENCY_TIMEOUT,依赖服务超时,504,DEPENDENCY,true,服务响应超时，请稍后重试,平台团队,1.0,
+INTERNAL_ERROR,内部系统错误,500,SYSTEM,false,服务暂时无法完成请求,平台团队,1.0,

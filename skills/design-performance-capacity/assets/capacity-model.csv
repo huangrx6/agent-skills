@@ -1,0 +1,3 @@
+﻿component,workUnit,capacityPerInstance,limitingResource,safeUtilization,headroom,owner
+parser,pages/s,120,CPU,70%,30%,knowledge
+vlm-worker,images/s,8,GPU,80%,20%,ai-platform

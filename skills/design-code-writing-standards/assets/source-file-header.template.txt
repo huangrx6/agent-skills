@@ -1,0 +1,30 @@
+条件式源文件头模板
+
+注释语法按语言调整：C 系（C/C++/Java/JS/Go）用 `//`；Python/Shell/Ruby 用 `#`；SQL 用 `--`；XML/HTML 用 `<!-- -->`。以下示例为 C 系风格，其他语言替换为对应注释符。
+
+默认普通源文件不需要作者、创建时间、最后修改时间和文件版本字段。
+
+1. 最小许可证头
+
+// SPDX-License-Identifier: Apache-2.0
+
+2. 自动生成文件
+
+// SPDX-License-Identifier: Apache-2.0
+// 由 <generator-name>/<generator-version> 自动生成，请勿手工修改。
+// Source: <stable-source-path>
+
+3. 确有组织或合规要求时
+
+// SPDX-License-Identifier: Proprietary
+// Copyright: <organization>
+// Owner-Team: <team-or-domain>
+// Classification: <classification>
+
+禁止默认加入：
+
+Author:
+Created:
+Last Modified:
+Version:
+Change History:

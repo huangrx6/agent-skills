@@ -1,0 +1,401 @@
+openapi: 3.2.0
+info:
+  title: Example Orders API
+  version: 1.0.0
+  summary: 示例订单 API
+  description: |
+    这是 API 契约起始模板。发布前替换示例域名、联系人、Schema 和安全配置。
+  contact:
+    name: API Owner Team
+    url: https://example.com/api-support
+servers:
+  - url: https://api.example.com/v1
+    description: Production
+tags:
+  - name: Orders
+    description: 订单资源
+security:
+  - oauth2:
+      - orders.read
+paths:
+  /orders:
+    get:
+      tags: [Orders]
+      operationId: listOrders
+      summary: 查询订单列表
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageCursor'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderList'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+    post:
+      tags: [Orders]
+      operationId: createOrder
+      summary: 创建订单
+      security:
+        - oauth2:
+            - orders.write
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: 创建成功
+          headers:
+            Location:
+              description: 新订单资源 URI
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '202':
+          description: 已接受，异步处理中（长耗时操作；通过 Location 查询状态资源）
+          headers:
+            Location:
+              description: 操作状态资源 URI
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operation'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /orders/{orderId}:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+    get:
+      tags: [Orders]
+      operationId: getOrder
+      summary: 获取订单
+      responses:
+        '200':
+          description: 获取成功
+          headers:
+            ETag:
+              description: 资源版本标识
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '304':
+          description: 资源未修改
+        '404':
+          $ref: '#/components/responses/Problem'
+    patch:
+      tags: [Orders]
+      operationId: updateOrder
+      summary: 更新订单
+      security:
+        - oauth2:
+            - orders.write
+      parameters:
+        - name: If-Match
+          in: header
+          required: true
+          description: 上次读取的 ETag，用于防止丢失更新
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrderRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /orders/batch:
+    post:
+      tags: [Orders]
+      operationId: batchUpdateOrders
+      summary: 批量更新订单（逐项独立，非原子）
+      security:
+        - oauth2:
+            - orders.write
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  maxItems: 100
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [clientItemId, orderId, status]
+                    properties:
+                      clientItemId:
+                        type: string
+                        minLength: 1
+                        maxLength: 64
+                      orderId:
+                        type: string
+                      status:
+                        type: string
+                        enum: [CONFIRMED, CANCELLED]
+      responses:
+        '200':
+          description: 批量处理完成，逐项结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchWriteResult'
+        '202':
+          description: 大批量已接受，异步处理中
+          headers:
+            Location:
+              description: 操作状态资源 URI
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operation'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://identity.example.com/oauth2/token
+          scopes:
+            orders.read: 读取订单
+            orders.write: 修改订单
+  parameters:
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+      description: 不透明订单标识
+    PageSize:
+      name: pageSize
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    PageCursor:
+      name: pageCursor
+      in: query
+      required: false
+      schema:
+        type: string
+      description: 不透明分页游标
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+      description: 相同调用方和操作范围内的幂等键
+  responses:
+    Problem:
+      description: 统一错误响应
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    CreateOrderRequest:
+      type: object
+      additionalProperties: false
+      required: [clientReference, amount]
+      properties:
+        clientReference:
+          type: string
+          minLength: 1
+          maxLength: 64
+        amount:
+          $ref: '#/components/schemas/Money'
+    UpdateOrderRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        note:
+          type: [string, 'null']
+          maxLength: 500
+    Order:
+      type: object
+      additionalProperties: false
+      required: [id, clientReference, amount, status, createdAt]
+      properties:
+        id:
+          type: string
+          readOnly: true
+        clientReference:
+          type: string
+        amount:
+          $ref: '#/components/schemas/Money'
+        status:
+          type: string
+          enum: [PENDING, CONFIRMED, CANCELLED]
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+    OrderList:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        page:
+          type: object
+          additionalProperties: false
+          required: [hasMore]
+          properties:
+            nextCursor:
+              type: [string, 'null']
+            hasMore:
+              type: boolean
+    Money:
+      type: object
+      additionalProperties: false
+      required: [amountMinor, currency]
+      properties:
+        amountMinor:
+          type: integer
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+    Operation:
+      type: object
+      additionalProperties: false
+      required: [id, status, createdAt]
+      properties:
+        id:
+          type: string
+          description: 操作状态资源 ID（不透明）
+          readOnly: true
+        status:
+          type: string
+          enum: [PENDING, RUNNING, SUCCEEDED, FAILED, CANCELLING, CANCELLED, EXPIRED]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: 进度百分比；不保证精确时在描述中说明
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+    BatchWriteResult:
+      type: object
+      additionalProperties: false
+      required: [results, summary]
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [clientItemId, status]
+            properties:
+              clientItemId:
+                type: string
+                description: 调用方提供的稳定关联键
+              status:
+                type: string
+                enum: [SUCCEEDED, FAILED]
+              resourceId:
+                type: string
+              errorCode:
+                type: string
+        summary:
+          type: object
+          additionalProperties: false
+          required: [succeeded, failed]
+          properties:
+            succeeded:
+              type: integer
+            failed:
+              type: integer
+    Problem:
+      type: object
+      additionalProperties: true
+      required: [type, title, status, code, traceId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        code:
+          type: string
+          pattern: '^[A-Z][A-Z0-9_]*$'
+        traceId:
+          type: string

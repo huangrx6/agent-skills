@@ -1,0 +1,21 @@
+﻿checkId,category,requirement,severity,automatable,evidence
+REV-API-001,资源,资源和动作模型清晰且 URI 稳定,BLOCKER,false,设计说明
+REV-API-002,HTTP,方法、状态码、缓存和 Header 语义准确,BLOCKER,partly,OpenAPI lint 与测试
+REV-API-003,Schema,所有载荷有约束完整的 Schema,BLOCKER,true,规范验证
+REV-API-004,字段,时间、金额、单位、空值和枚举语义明确,BLOCKER,partly,Schema 评审
+REV-API-005,集合,分页、排序、过滤和上限完整,BLOCKER,partly,集合契约测试
+REV-API-006,幂等,重试写操作不会重复产生副作用,BLOCKER,false,集成测试
+REV-API-007,并发,更新不会静默丢失并发修改,BLOCKER,false,并发测试
+REV-API-008,兼容,自动差异未发现未批准破坏性变更,BLOCKER,true,兼容报告
+REV-API-009,错误,错误响应与统一错误契约一致,BLOCKER,true,契约测试
+REV-API-010,安全,认证、授权、字段可见性和批量越权已验证,BLOCKER,partly,安全测试
+REV-API-011,文档,示例、operationId、Owner 和生命周期完整,MAJOR,partly,文档构建
+REV-API-012,异步,202、状态资源、取消和结果保留语义完整,BLOCKER,partly,异步测试
+REV-API-013,容量,页大小、批量、载荷和查询复杂度有上限,BLOCKER,partly,容量测试
+REV-API-014,治理,弃用、迁移和下线有观测与责任人,MAJOR,partly,迁移计划
+REV-API-015,契约,发布契约与部署实现一致,BLOCKER,partly,提供方契约测试
+REV-API-016,风格选择,主协议与交互模型匹配，复杂度有明确收益,BLOCKER,false,协议选择说明
+REV-API-017,GraphQL,查询深度、复杂度、分页、错误和未知枚举策略已定义,BLOCKER,partly,Schema lint 与成本测试
+REV-API-018,实时,长连接定义重连、恢复、背压、连接和消息上限,BLOCKER,partly,实时协议测试
+REV-API-019,事件/Webhook,重复、顺序、重放、签名和死信策略明确,BLOCKER,partly,事件契约测试
+REV-API-020,JSON-RPC,method、notification、batch 和错误语义一致,MAJOR,partly,RPC 契约测试

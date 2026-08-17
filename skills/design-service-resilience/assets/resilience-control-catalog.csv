@@ -1,0 +1,6 @@
+﻿controlId,category,requirement,severity
+RES-001,TIMEOUT,所有远程依赖有 Deadline/Timeout,MUST
+RES-002,RETRY,只有幂等安全瞬态失败可重试,MUST
+RES-003,OVERLOAD,资源耗尽前可快速拒绝或降级,MUST
+RES-004,BACKPRESSURE,队列和并发有硬上限,MUST
+RES-005,ASYNC,消费者可安全去重和重放,MUST

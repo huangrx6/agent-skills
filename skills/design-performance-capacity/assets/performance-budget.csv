@@ -1,0 +1,3 @@
+﻿operation,workload,p50Ms,p95Ms,p99Ms,throughput,errorRate,owner
+document-parse,median_20_page,800,1500,3000,20 docs/s,<0.5%,knowledge
+image-vlm,1080p_image,500,1500,3000,50 img/s,<1%,ai-platform

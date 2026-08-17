@@ -1,0 +1,39 @@
+command,category,safetyLevel,changesHistory,affectsRemote,requiresConfirm,notes
+status,inspection,readonly,false,false,false,查看工作区/暂存区状态
+diff,inspection,readonly,false,false,false,查看未暂存改动
+diff --cached,inspection,readonly,false,false,false,查看已暂存改动
+log,inspection,readonly,false,false,false,查看提交历史
+show,inspection,readonly,false,false,false,查看某次提交详情
+blame,inspection,readonly,false,false,false,查看每行最后修改者
+reflog,inspection,readonly,false,false,false,查看 HEAD 移动记录（恢复用）
+fetch,remote,readonly,false,false,false,拉取远程但不合并
+ls-files,inspection,readonly,false,false,false,列出跟踪文件
+add,staging,need-confirm,false,false,true,暂存文件到暂存区
+restore --staged,staging,need-confirm,false,false,true,取消暂存（不丢改动）
+commit,staging,need-confirm,true,false,true,创建提交
+commit --amend,staging,dangerous,true,false,true,修改最近提交（未推送时安全）
+stash,staging,need-confirm,false,false,true,临时保存工作区改动
+stash pop,staging,need-confirm,false,false,true,恢复并删除 stash
+stash drop,staging,dangerous,false,false,true,删除 stash（可能丢失）
+branch,staging,need-confirm,false,false,true,创建/列出分支
+branch -d,staging,need-confirm,true,false,true,删除已合并分支（安全）
+branch -D,staging,dangerous,true,false,true,强制删除分支（丢未合并 commit）
+checkout/switch,staging,need-confirm,false,false,true,切换分支
+tag,staging,need-confirm,false,false,true,创建标签
+restore,staging,need-confirm,false,false,true,恢复工作区文件（丢弃改动）
+clean -f,staging,dangerous,false,false,true,删除未跟踪文件
+clean -fdx,staging,dangerous,false,false,true,删除未跟踪+忽略文件（极危险）
+merge,branching,high-risk,true,false,true,合并分支（可能冲突）
+merge --abort,branching,need-confirm,false,false,true,放弃合并
+rebase,branching,high-risk,true,false,true,变基（改历史，个人分支安全）
+rebase -i,branching,dangerous,true,false,true,交互式变基（改历史）
+cherry-pick,branching,high-risk,true,false,true,挑选提交
+reset --soft,undo,high-risk,true,false,true,移动 HEAD（改动留暂存区）
+reset --mixed,undo,need-confirm,true,false,true,移动 HEAD（改动留工作区）
+reset --hard,undo,dangerous,true,false,true,彻底重置（丢弃改动）
+revert,undo,need-confirm,true,false,true,反向提交（不改历史，安全）
+push,remote,high-risk,true,true,true,推送提交到远程
+push --force,remote,dangerous,true,true,true,强制覆盖远程（用 --force-with-lease）
+push --force-with-lease,remote,dangerous,true,true,true,安全强制推送（推荐）
+pull,remote,high-risk,false,false,true,拉取并合并（可能冲突）
+filter-branch,history,dangerous,true,true,true,改写历史（不推荐，用 git-filter-repo）

@@ -1,0 +1,16 @@
+fieldName,required,type,format,description,classification,indexed,maxLength,example
+timestamp,true,TIMESTAMP,RFC3339_UTC,事件发生时间,PUBLIC,true,,2026-08-06T09:30:00.123Z
+observed_timestamp,false,TIMESTAMP,RFC3339_UTC,采集器观察到事件的时间（采集链路延迟明显时使用）,PUBLIC,false,,2026-08-06T09:30:01.200Z
+level,true,STRING,LEVEL,日志级别,PUBLIC,true,10,INFO
+severity_number,false,INTEGER,OTEL_SEVERITY,OpenTelemetry 严重性数值（见格式规范映射）,PUBLIC,false,,9
+event.name,true,STRING,EVENT_NAME,稳定事件名称,PUBLIC,true,128,order.created
+schema.version,false,STRING,VERSION,日志字段结构版本（字段演进时递增）,INTERNAL,false,32,1.2.0
+message,true,STRING,UTF8_TEXT,人类可读消息,INTERNAL,false,2048,订单创建完成
+service.name,true,STRING,RESOURCE_NAME,服务名称,INTERNAL,true,128,order-service
+service.version,false,STRING,VERSION,服务版本,INTERNAL,true,64,1.8.0
+deployment.environment,true,STRING,ENVIRONMENT,运行环境,INTERNAL,true,32,production
+trace_id,false,STRING,TRACE_ID,分布式链路标识,INTERNAL,true,64,4bf92f3577b34da6a3ce929d0e0e4736
+span_id,false,STRING,SPAN_ID,当前 Span 标识,INTERNAL,true,32,00f067aa0ba902b7
+correlation_id,false,STRING,IDENTIFIER,业务关联标识（订单号/会话号等非机密标识）,INTERNAL,true,128,order-20260806-0001
+duration_ms,false,DOUBLE,MILLISECONDS,操作耗时毫秒,INTERNAL,false,,12.5
+log.truncated,false,BOOLEAN,BOOLEAN,记录是否发生截断,INTERNAL,false,,false

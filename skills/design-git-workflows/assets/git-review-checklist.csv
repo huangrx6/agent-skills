@@ -1,0 +1,16 @@
+checkId,requirement,severity
+GIT-001,任何写操作前先 git status 确认工作区状态,BLOCKER
+GIT-002,自动化提交默认 dry-run，显式授权才执行,BLOCKER
+GIT-003,git push 必须显式授权，默认不推送,BLOCKER
+GIT-004,共享分支不 rebase/reset --hard/filter-branch,BLOCKER
+GIT-005,密钥/.env/私钥默认不 stage，命中黑名单单独确认,BLOCKER
+GIT-006,一个 commit 只做一件事，按功能单元分组,BLOCKER
+GIT-007,提交信息符合 Conventional Commits 规范,MAJOR
+GIT-008,已推送的提交用 revert 不用 reset,MAJOR
+GIT-009,危险操作前记录 HEAD 恢复点,MAJOR
+GIT-010,冲突人工解决，不盲目 --theirs/--ours,BLOCKER
+GIT-011,force push 用 --force-with-lease 而非 --force,MAJOR
+GIT-012,误操作先用 git reflog 找回再恢复,MAJOR
+GIT-013,并行任务用 worktree 隔离，不混在主工作区,MINOR
+GIT-014,clean 前先预览 -f 不带 -x,MAJOR
+GIT-015,操作后用 git status/git log 验证结果,MAJOR

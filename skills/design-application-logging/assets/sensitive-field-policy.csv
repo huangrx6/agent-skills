@@ -1,0 +1,9 @@
+﻿fieldPattern,classification,action,exampleOutput,notes
+password,SECRET,DROP,,任何密码字段均不得记录
+*token*,SECRET,DROP,,访问令牌和刷新令牌不得记录
+cookie,SECRET,DROP,,Cookie 和会话凭据不得记录
+cardNumber,PAYMENT,MASK,************1234,仅保留末四位
+governmentId,PERSONAL_SENSITIVE,MASK,********1234,按合规规则掩码
+email,PERSONAL,MASK,a***@example.com,仅在必要场景记录
+actor.id,PERSONAL,ALLOW,user-10086,审计追溯需要主体标识；仅限日志查询权限内访问
+userInput,UNTRUSTED,TRUNCATE,（截断到 256 字符）...,同时处理换行和控制字符

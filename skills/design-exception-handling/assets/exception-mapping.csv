@@ -1,0 +1,13 @@
+internalException,publicCode,httpStatus,retryable,notes
+RequestParseException,INVALID_REQUEST,400,false,请求语法或基础结构错误
+ValidationException,INVALID_ARGUMENT,422,false,字段语义校验失败
+UnauthenticatedException,UNAUTHENTICATED,401,false,认证失败
+PermissionDeniedException,PERMISSION_DENIED,403,false,授权失败
+ResourceNotFoundException,RESOURCE_NOT_FOUND,404,false,资源不存在
+BusinessConflictException,RESOURCE_CONFLICT,409,false,应按领域细化错误码
+RateLimitException,RATE_LIMITED,429,true,按需返回 Retry-After
+DependencyUnavailableException,DEPENDENCY_UNAVAILABLE,503,true,仅幂等操作可重试
+DependencyTimeoutException,DEPENDENCY_TIMEOUT,504,true,依赖调用超时
+CircuitBreakerOpenException,DEPENDENCY_UNAVAILABLE,503,true,熔断打开期间快速失败；应退避后重试
+DeadlineExceededException,DEPENDENCY_TIMEOUT,504,true,调用链剩余截止时间耗尽；不应在本地重试
+UnknownException,INTERNAL_ERROR,500,false,未知异常统一兜底

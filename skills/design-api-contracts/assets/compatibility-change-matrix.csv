@@ -1,0 +1,27 @@
+﻿changeType,location,example,defaultClassification,conditions,requiredAction
+新增可选字段,响应,新增 displayName,COMPATIBLE,客户端容忍未知字段且载荷限制允许,运行差异检查和旧客户端测试
+新增可选字段,请求,新增 note,COMPATIBLE,服务端不要求旧客户端提供且默认语义安全,Schema 与默认值测试
+新增必填字段,请求,新增 required tenantCode,BREAKING,无,发布新版本或兼容填充
+删除字段,响应,删除 legacyCode,BREAKING,无,弃用、迁移并发布新版本
+字段重命名,请求/响应,userId 改为 customerId,BREAKING,无,并行字段过渡或新版本
+改变字段类型,请求/响应,integer 改为 string,BREAKING,即使部分解析器可兼容也需评估语义,发布新版本
+放宽输入范围,请求,最大长度 50 改为 100,CONDITIONAL,下游、存储和安全限制支持,容量与安全测试
+收紧输入范围,请求,最大长度 100 改为 50,BREAKING,无,新版本或迁移窗口
+新增枚举值,响应,新增 PAUSED,CONDITIONAL,客户端有 UNKNOWN/default 分支,消费者测试和通知
+删除枚举值,请求/响应,删除 LEGACY,BREAKING,无,停止产生、弃用、迁移
+新增端点,路径/RPC,新增 GET /reports,COMPATIBLE,名称与权限无冲突,正常评审
+改变状态码,响应,404 改为 200 空对象,BREAKING,无,新版本或兼容层
+改变默认排序,集合,createdAt 改为 priority,BREAKING,无,新版本或显式 sort
+降低最大页大小,查询,1000 改为 100,CONDITIONAL,调用方不依赖且提前通知,观测、通知、兼容测试
+增加认证要求,安全,公开接口改为 OAuth2,BREAKING,无,新版本或迁移期
+Protobuf 新增字段,消息,新增 optional note = 8,COMPATIBLE,使用新编号且缺省安全,跨版本测试
+Protobuf 重用字段号,消息,复用已删除的 5,BREAKING,禁止,恢复 reserved 并使用新编号
+事件新增可选字段,载荷,新增 sourceRegion,COMPATIBLE,消费者忽略未知字段,历史重放测试
+事件改变字段语义,载荷,amount 从元改为分,BREAKING,无,新事件版本和迁移
+GraphQL 新增可选字段,Schema,Order 新增 displayName,COMPATIBLE,字段无额外权限或成本风险,Schema diff 与旧 Query 测试
+GraphQL 新增必填参数,Schema,order 增加 region: String!,BREAKING,无默认值时旧 Query 失效,改为可选或提供迁移
+GraphQL 新增枚举值,Schema,OrderStatus 新增 PAUSED,CONDITIONAL,客户端有 unknown/default 分支,消费者兼容测试
+WebSocket 消息类型改名,实时,order.updated 改 order.changed,BREAKING,无,双发旧新类型或新协议版本
+SSE 事件字段新增,实时,data 新增 region,COMPATIBLE,客户端忽略未知字段,旧客户端测试
+事件分区键改变,事件,orderId 改 customerId,BREAKING,顺序与并行语义变化,新 topic/version 与迁移
+JSON-RPC method 重命名,RPC,orders.cancel 改 order.cancel,BREAKING,无,并行 method 或新版本

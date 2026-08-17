@@ -1,0 +1,4 @@
+interface:
+  display_name: "可观测性设计"
+  short_description: "设计指标、链路、SLI/SLO、Dashboard、告警、采样与遥测治理"
+  default_prompt: "使用 $design-observability 为当前服务设计或评审可观测性体系，确保 Metrics、Trace、日志关联和告警能够支持真实排障与 SLO 判断。"

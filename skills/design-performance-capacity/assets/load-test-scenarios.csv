@@ -1,0 +1,5 @@
+﻿scenario,type,duration,workload,target,stopCondition
+steady-normal,LOAD,30m,production_mix,target_peak,error>2%
+spike-2x,SPIKE,10m,production_mix,2x_peak,critical_error
+find-saturation,STRESS,until_limit,production_mix,step_up,service_unstable
+memory-soak,SOAK,8h,production_mix,0.7x_peak,memory_growth>budget

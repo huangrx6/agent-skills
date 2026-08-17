@@ -1,0 +1,7 @@
+﻿checkId,requirement,severity
+PERF-001,关键场景有 P95/P99 与吞吐目标,BLOCKER
+PERF-002,测试 workload 与生产分布相近,BLOCKER
+PERF-003,已找到饱和点和首个限制资源,MAJOR
+PERF-004,容量模型包含故障余量和扩容 lead time,BLOCKER
+PERF-005,优化有 profiler/benchmark 证据,MAJOR
+PERF-006,重大版本有性能回归对比,MAJOR

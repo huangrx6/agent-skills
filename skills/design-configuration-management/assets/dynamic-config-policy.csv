@@ -1,0 +1,3 @@
+﻿keyPattern,reloadMode,validation,fallback,maxStale,owner
+worker.*,ATOMIC_SNAPSHOT,schema+semantic,LAST_KNOWN_GOOD,30m,platform
+feature.*,ATOMIC_SNAPSHOT,schema,SAFE_DEFAULT,15m,product-platform

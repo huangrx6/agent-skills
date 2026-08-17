@@ -1,0 +1,4 @@
+interface:
+  display_name: "安全编码设计"
+  short_description: "审查信任边界、注入、权限、秘密、文件网络和 AI 生成代码安全"
+  default_prompt: "使用 $design-secure-coding 审查当前代码或为项目建立安全编码规范，先识别不可信 Source 和危险 Sink，再给出最小充分、可测试的安全控制。"

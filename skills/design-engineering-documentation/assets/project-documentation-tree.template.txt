@@ -1,0 +1,31 @@
+推荐目标结构（按需创建，不要一次生成全部空文件）
+
+/
+├── README.md
+├── AGENTS.md
+├── PROJECT_CONTEXT.md
+└── docs/
+    ├── index.md
+    ├── project/
+    │   ├── overview.md
+    │   ├── glossary.md
+    │   └── constraints.md
+    ├── architecture/
+    │   ├── overview.md
+    │   ├── diagrams/
+    │   └── decisions/
+    ├── development/
+    │   ├── setup.md
+    │   ├── workflows.md
+    │   └── testing.md
+    ├── contracts/
+    │   └── index.md
+    ├── data/
+    │   ├── ownership.md
+    │   └── lifecycle.md
+    ├── operations/
+    │   ├── overview.md
+    │   └── runbooks/
+    ├── working-agreements.md
+    └── handoffs/
+        └── active/

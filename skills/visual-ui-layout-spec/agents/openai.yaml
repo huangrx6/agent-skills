@@ -1,0 +1,4 @@
+interface:
+  display_name: "UI 布局规格解析"
+  short_description: "把 UI 截图量化成可直接实现的布局、组件和设计令牌规格"
+  default_prompt: "使用 $visual-ui-layout-spec 把这张 UI 截图转换成可直接交给前端实现的页面布局规格，所有关键尺寸和颜色都给出可重跑证据与置信度。"

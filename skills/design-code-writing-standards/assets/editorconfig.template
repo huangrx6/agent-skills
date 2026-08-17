@@ -1,0 +1,22 @@
+# 代码书写规范基础模板。语言专用格式化器仍是语法格式的事实来源。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+# 根据仓库语言和格式化器调整，不将本值视为跨语言绝对标准。
+indent_size = 4
+max_line_length = 120
+
+[*.{json,yml,yaml,js,jsx,ts,tsx}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab

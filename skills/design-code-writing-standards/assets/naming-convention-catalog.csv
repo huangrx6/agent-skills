@@ -1,0 +1,14 @@
+ruleId,scope,language,convention,example,severity,rationale
+NAM-001,领域术语,ALL,同一概念跨代码、API、配置和文档使用同一术语,orderId,MUST,减少语义漂移
+NAM-002,布尔值,ALL,使用可判断的肯定命题,isEnabled,MUST,降低双重否定和条件误读
+NAM-003,集合,ALL,体现复数或容器语义,ordersById,MUST,明确基数与访问方式
+NAM-004,单位,ALL,歧义时在类型或名称中表达单位,timeoutMs,MUST,避免单位错误
+NAM-005,类型,ALL,使用名词或名词短语,PaymentPolicy,SHOULD,表达稳定职责
+NAM-006,函数,ALL,使用与副作用一致的动词短语,reserveInventory,MUST,让调用行为可预测
+NAM-007,接口实现,ALL,避免无语义 Impl 后缀,PostgresOrderRepository,SHOULD,表达具体策略
+NAM-008,测试,ALL,表达条件、行为和结果（大小写按语言惯例：camelCase/snake_case/PascalCase）,refreshRejectsExpiredToken / refresh_rejects_expired_token,MUST,失败时可定位意图
+NAM-009,文件/模块,ALL,避免无边界 common/utils 杂物箱,payment/risk,SHOULD,保持模块职责
+NAM-010,缩写,ALL,仅使用约定或行业通用缩写,httpClient,MUST,提高可读性和可搜索性
+NAM-011,数据库对象,ALL,表名单数 snake_case 并带业务模块前缀,iam_account,SHOULD,区分模块归属与避免重名（贴合 Java/MyBatis 生态常见单数表名）
+NAM-012,数据库对象,ALL,列名 snake_case；布尔列用 is_/has_ 前缀,is_enabled,SHOULD,统一列命名语义
+NAM-013,数据库对象,ALL,迁移文件版本化且不可变、按序递增,V20260807__add_user_table.sql,MUST,保证迁移可追溯与历史不可篡改

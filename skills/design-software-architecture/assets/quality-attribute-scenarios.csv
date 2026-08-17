@@ -1,0 +1,8 @@
+﻿id,qualityAttribute,source,stimulus,environment,artifact,response,measure,priority
+QA-001,PERFORMANCE,终端用户,提交订单,正常高峰,订单 API,完成订单创建,P99 <= 800ms,HIGH
+QA-002,AVAILABILITY,单可用区故障,计算节点不可用,高峰期,订单系统,流量切换并继续服务,2分钟内恢复；错误率<1%,HIGH
+QA-003,RECOVERABILITY,数据库故障,主节点不可恢复,灾难恢复,订单数据,从备份/PITR恢复,RPO<=5min; RTO<=30min,HIGH
+QA-004,SCALABILITY,流量增长,请求量达到当前5倍,促销活动,查询服务,水平扩展,15分钟内达到目标容量,MEDIUM
+QA-005,SECURITY,未授权租户,访问其他租户资源,正常运行,多租户数据,拒绝并审计,0跨租户数据泄露,HIGH
+QA-006,MODIFIABILITY,产品团队,新增支付渠道,正常开发,支付模块,局部修改并独立测试,不修改订单核心模块,MEDIUM
+QA-007,COST,产品/财务,扩展到 5 倍当前容量,正常运行,基础设施,成本可预测,单交易成本增长不超过 2x,MEDIUM

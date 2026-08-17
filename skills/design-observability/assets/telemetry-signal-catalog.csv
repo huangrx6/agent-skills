@@ -1,0 +1,5 @@
+﻿signal,purpose,requiredIdentity,cardinalityPolicy,owner
+METRICS,trend/sli/alert,service.name|environment,bounded_labels_only,platform
+TRACES,request_causality,service.name|version,sampled_high_cardinality_allowed,platform
+LOGS,event_diagnostics,service.name|trace_id,redacted_high_cardinality_allowed,service
+PROFILES,resource_hotspots,service.name|version,controlled_sampling,performance

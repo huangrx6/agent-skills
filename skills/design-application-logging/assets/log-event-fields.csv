@@ -1,0 +1,14 @@
+fieldName,required,type,format,description,classification,indexed,maxLength,example
+operation,false,STRING,OPERATION_NAME,当前操作标识（业务动词或 API 操作）,INTERNAL,true,128,user.create
+error.code,false,STRING,ERROR_CODE,稳定错误码（与 API 错误契约一致）,INTERNAL,true,64,ACCOUNT_LOCKED
+error.type,false,STRING,ERROR_TYPE,错误分类（validation/dependency/timeout 等）,INTERNAL,true,64,validation
+dependency.name,false,STRING,RESOURCE_NAME,外部依赖名称（数据库/缓存/下游服务）,INTERNAL,true,128,user-db
+retry.count,false,INTEGER,COUNT,已重试次数（从 0 或 1 起统一约定）,INTERNAL,false,,3
+degradation.type,false,STRING,ENUM,降级类型（fallback/circuit_open/stale_data 等）,INTERNAL,true,64,fallback
+actor.id,false,STRING,IDENTIFIER,操作主体标识（用户/服务身份）,PERSONAL,true,128,user-10086
+resource.id,false,STRING,IDENTIFIER,被操作资源标识,INTERNAL,true,256,role-42
+action,false,STRING,ENUM,操作动作（create/update/delete/grant/revoke 等）,INTERNAL,true,64,grant
+result,false,STRING,ENUM,操作结果（SUCCESS/FAILURE/DENIED）,INTERNAL,false,16,SUCCESS
+auth_type,false,STRING,ENUM,认证方式（password/oauth2/mfa/oidc 等）,INTERNAL,false,32,password
+failure.reason,false,STRING,ENUM,预期失败原因短码（bad-credentials/locked/disabled/expired 等）,INTERNAL,true,64,bad-credentials
+audit.action,false,STRING,OPERATION_NAME,审计记录对应的业务操作标识,INTERNAL,true,128,credential.revoke

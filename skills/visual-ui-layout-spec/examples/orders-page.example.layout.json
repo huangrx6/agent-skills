@@ -1,0 +1,74 @@
+{
+  "canvas": {
+    "width": 1440,
+    "height": 900,
+    "device_pixel_ratio": 1.0,
+    "design_base_width": 1440,
+    "scale_factor": 1.0,
+    "image_path": "examples/orders-page.png",
+    "image_type": "SCREENSHOT_UI"
+  },
+  "regions": [
+    {"id": "R-001", "name": "顶部导航栏", "bbox": {"x": 0, "y": 0, "width": 1440, "height": 56}, "layout": "horizontal", "background": "surface/elevated", "evidence_ids": ["EV-001", "EV-002"]},
+    {"id": "R-002", "name": "侧边导航", "bbox": {"x": 0, "y": 56, "width": 220, "height": 844}, "layout": "vertical", "evidence_ids": ["EV-003"]},
+    {"id": "R-003", "name": "主内容区", "bbox": {"x": 220, "y": 56, "width": 1220, "height": 844}, "layout": "vertical", "evidence_ids": ["EV-001"]},
+    {"id": "R-004", "name": "筛选条", "bbox": {"x": 220, "y": 88, "width": 1220, "height": 64}, "layout": "horizontal", "evidence_ids": ["EV-004"]},
+    {"id": "R-005", "name": "订单表格", "bbox": {"x": 220, "y": 168, "width": 1180, "height": 720}, "layout": "table", "evidence_ids": ["EV-005"]},
+    {"id": "R-006", "name": "分页器", "bbox": {"x": 220, "y": 856, "width": 1180, "height": 32}, "layout": "horizontal", "evidence_ids": ["EV-006"]}
+  ],
+  "tokens": {
+    "color": [
+      {"name": "surface/default", "observed": "#ffffff", "normalized": "surface/default", "confidence": "high", "evidence": "EV-002"},
+      {"name": "surface/elevated", "observed": "#fafafa", "normalized": "surface/elevated", "confidence": "high", "evidence": "EV-002"},
+      {"name": "text/primary", "observed": "#1f2328", "normalized": "text/primary", "confidence": "high", "evidence": "EV-002"},
+      {"name": "text/secondary", "observed": "#57606a", "normalized": "text/secondary", "confidence": "high", "evidence": "EV-002"},
+      {"name": "border/default", "observed": "#d0d7de", "normalized": "border/default", "confidence": "high", "evidence": "EV-002"},
+      {"name": "accent/primary", "observed": "#0969da", "normalized": "accent/primary", "confidence": "high", "evidence": "EV-002"}
+    ],
+    "typography": [
+      {"name": "text/title-lg", "observed_px": 20, "normalized_pt": 16, "confidence": "medium", "evidence": "EV-007"},
+      {"name": "text/body", "observed_px": 14, "normalized_pt": 14, "confidence": "high", "evidence": "EV-007"},
+      {"name": "text/caption", "observed_px": 12, "normalized_pt": 12, "confidence": "medium", "evidence": "EV-007"}
+    ],
+    "spacing": [
+      {"name": "space/1", "observed_px": 4, "normalized": "space-1", "confidence": "high"},
+      {"name": "space/2", "observed_px": 8, "normalized": "space-2", "confidence": "high"},
+      {"name": "space/3", "observed_px": 12, "normalized": "space-3", "confidence": "high"},
+      {"name": "space/4", "observed_px": 16, "normalized": "space-4", "confidence": "high"},
+      {"name": "space/6", "observed_px": 24, "normalized": "space-6", "confidence": "high"}
+    ],
+    "radius": [
+      {"name": "radius/sm", "observed_px": 4, "recommended_token": "radius-sm", "confidence": "medium", "evidence": "EV-008"},
+      {"name": "radius/md", "observed_px": 8, "recommended_token": "radius-md", "confidence": "medium", "evidence": "EV-008"}
+    ],
+    "shadow": [
+      {"name": "shadow/sm", "observed": "soft drop ~4px", "recommended": "0 1px 2px rgba(0,0,0,0.06)", "confidence": "low"}
+    ]
+  },
+  "components": [
+    {"id": "C-001", "type": "Button", "region_id": "R-004", "variant": "primary", "size": "md", "anatomy": {"label": "新建订单", "padding": "8px 16px", "radius": "radius-sm"}, "evidence_ids": ["EV-009"]},
+    {"id": "C-002", "type": "Input", "region_id": "R-004", "anatomy": {"placeholder": "搜索订单号", "size": "md", "radius": "radius-sm"}, "evidence_ids": ["EV-009"]},
+    {"id": "C-003", "type": "Table", "region_id": "R-005", "anatomy": {"columns": ["订单号", "客户", "金额", "状态", "创建时间"], "row_height_px": 48, "header_height_px": 44, "striped": false}, "evidence_ids": ["EV-005"]},
+    {"id": "C-004", "type": "Pagination", "region_id": "R-006", "anatomy": {"current": 1, "total_unknown": true}, "evidence_ids": ["EV-006"]}
+  ],
+  "charts": [],
+  "tables": [
+    {"id": "T-001", "region_id": "R-005", "header_height_px": 44, "row_height_px": 48, "columns": ["订单号", "客户", "金额", "状态", "创建时间"], "alignment": "left/right/left/left/left", "cell_padding_px": 12, "evidence_ids": ["EV-005"]}
+  ],
+  "evidence": [
+    {"id": "EV-001", "command": "image_probe.py info examples/orders-page.png --json", "result": {"width": 1440, "height": 900, "megapixels": 1.30, "mode": "RGB"}},
+    {"id": "EV-002", "command": "image_probe.py palette examples/orders-page.png --colors 12", "result_summary": "主色 #ffffff/#fafafa/#1f2328/#57606a/#d0d7de/#0969da"},
+    {"id": "EV-003", "command": "image_probe.py runs examples/orders-page.png --row 480 --tol 6 --min-len 5", "result_summary": "侧边栏宽 220px"},
+    {"id": "EV-004", "command": "image_probe.py runs examples/orders-page.png --col 100 --tol 6", "result_summary": "筛选条高 64px"},
+    {"id": "EV-005", "command": "image_probe.py bands examples/orders-page.png --axis v --top 8", "result_summary": "表格行高 48px / 表头 44px"},
+    {"id": "EV-006", "command": "image_probe.py runs examples/orders-page.png --row 880 --tol 6", "result_summary": "分页器高 32px"},
+    {"id": "EV-007", "command": "image_probe.py crop examples/orders-page.png --box 0,0,1440,56 --scale 3 --out /tmp/crop_nav.png", "result_summary": "标题/搜索文字 glyph 高度 20px / 14px / 12px"},
+    {"id": "EV-008", "command": "image_probe.py pick examples/orders-page.png --points 240,52 --radius 3", "result_summary": "按钮圆角半径 ~4-6px"},
+    {"id": "EV-009", "command": "vlm semantic pass on examples/orders-page.png", "result_summary": "组件类型与可见文字"}
+  ],
+  "uncertainties": [
+    {"id": "U-001", "text": "hover/loading/disabled 状态未提供", "confidence": "low"},
+    {"id": "U-002", "text": "响应式断点（mobile/tablet）未提供", "confidence": "low"},
+    {"id": "U-003", "text": "字体族未确定（中文/西文 stack）", "confidence": "low"}
+  ]
+}

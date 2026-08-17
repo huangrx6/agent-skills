@@ -1,0 +1,4 @@
+interface:
+  display_name: "服务韧性设计"
+  short_description: "设计超时、重试、隔离、限流、降级、背压与故障恢复策略"
+  default_prompt: "使用 $design-service-resilience 为当前服务设计或评审生产级韧性方案，优先防止重试放大、资源耗尽和级联故障。"

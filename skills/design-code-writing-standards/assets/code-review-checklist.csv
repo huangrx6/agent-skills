@@ -1,0 +1,15 @@
+checkId,category,requirement,severity,automatable,evidence
+REV-001,格式,代码通过仓库唯一格式化器,BLOCKER,true,CI 格式检查
+REV-002,命名,名称表达领域含义、单位和副作用,BLOCKER,false,评审记录
+REV-003,文件头,未手工维护作者、修改时间和文件版本,MAJOR,true,文件头扫描
+REV-004,许可证,必要文件使用有效 SPDX 标识,BLOCKER,true,许可证扫描
+REV-005,注释,注释解释原因且与实现一致,MAJOR,false,评审记录
+REV-006,设计,不存在无证据的过度抽象和模式堆砌,MAJOR,false,设计说明
+REV-007,依赖,新增依赖有许可证、安全和维护评估,BLOCKER,partly,依赖审查
+REV-008,安全,无硬编码密钥且信任边界有验证,BLOCKER,partly,扫描与测试
+REV-009,并发,所有权、取消、超时和资源释放明确,BLOCKER,false,测试与设计说明
+REV-010,测试,关键行为、边界和失败路径有确定性测试,BLOCKER,partly,测试报告
+REV-011,公共 API,文档、兼容性和迁移方案完整,BLOCKER,partly,API 差异报告
+REV-012,生成代码,生成文件可重复生成且未手工修改,BLOCKER,true,生成一致性检查
+REV-013,性能,复杂优化有测量证据和容量边界,MAJOR,false,基准或剖析报告
+REV-014,变更范围,变更聚焦且可理解、可回滚,MAJOR,false,PR 说明

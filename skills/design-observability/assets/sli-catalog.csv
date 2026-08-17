@@ -1,0 +1,3 @@
+﻿sliId,service,name,numerator,denominator,window,target,owner
+SLI-001,orders,availability,successful_valid_requests,valid_requests,28d,99.9%,orders
+SLI-002,orders,latency,requests_under_800ms,valid_requests,28d,99.0%,orders

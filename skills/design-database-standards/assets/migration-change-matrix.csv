@@ -1,0 +1,14 @@
+﻿change,defaultRisk,compatibleRollout,unsafeShortcut,verification
+新增 nullable 列,LOW,先加列，再发布读写,同时要求旧应用必填,新旧应用并存
+新增带常量默认列,CONDITIONAL,验证目标版本 fast path,假设所有数据库都不重写,锁/表重写测试
+新增 NOT NULL,MEDIUM,nullable→回填→验证→NOT NULL,直接扫描大表并阻塞,NULL 计数与锁测试
+删除列,DESTRUCTIVE,停读→停写→观察→DROP,应用发布同时 DROP,依赖扫描+备份/PITR
+重命名列,DESTRUCTIVE,新列+双写+回填+切读+删旧,直接 rename,跨版本测试
+改变字段类型,HIGH,新列迁移或验证 online 能力,生产原地转换未知数据,数据转换+表重写测试
+缩短 varchar/精度,DESTRUCTIVE,先验证存量与调用方,直接收紧,最大值/精度审计
+新增普通索引,MEDIUM,concurrent/online（引擎支持时）,高峰阻塞建大索引,建索引时长+复制延迟
+删除索引,MEDIUM,先观察/隐藏索引（支持时）,仅凭未使用统计直接删,关键 query 回归
+新增 UNIQUE,HIGH,先清冲突+保护并发+online build,清历史后留并发窗口,冲突扫描+并发测试
+新增外键,HIGH,分阶段验证（引擎支持时）,高峰直接全表验证,锁/扫描/孤儿数据
+大规模回填,HIGH,批量+checkpoint+限速+对账,单事务全表 UPDATE,负载+复制延迟+一致性
+删除大量历史数据,HIGH,分批或分区淘汰,单事务 DELETE 亿级行,WAL/binlog+空间+副本

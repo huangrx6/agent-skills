@@ -1,0 +1,4 @@
+riskId,category,risk,likelihood,impact,mitigation,owner,status,revisitTrigger
+EX-001,COUPLING,多个模块共享写数据库,HIGH,HIGH,明确单一数据 Owner 并逐步移除跨模块写入,交易组,OPEN,新增第三个共享写入模块
+EX-002,RELIABILITY,清算队列积压导致对账超时,MEDIUM,MEDIUM,worker 扩缩 + 积压告警 + DLQ 治理,清算组,OPEN,积压持续 > 15 分钟
+EX-003,OPERABILITY,卡数据泄露,LOW,HIGH,token 化 + 渗透测试 + 审计,交易组,OPEN,新支付渠道引入

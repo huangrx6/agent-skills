@@ -1,0 +1,44 @@
+﻿pathPattern,securityAreas,reason,requiredAction
+**/auth/**,AUTHN|AUTHZ|SESSION,identity boundary changed,Run authentication/authorization security review
+**/security/**,ALL,security control implementation changed,Run full relevant control review
+**/api/**,INPUT|AUTHZ|OUTPUT,new/changed external input surface,"Check validation, authorization and output"
+**/graphql/**,INPUT|AUTHZ|DOS,query surface changed,Check field/object auth and query limits
+**/upload/**,FILES|PARSING,file attack surface changed,Check type/size/storage/parser isolation
+**/files/**,FILES|PATH,filesystem behavior changed,"Check traversal, symlink and permission"
+**/http/**,SSRF|TLS,HTTP client/server code changed,Check outbound destination and TLS policy
+**/client/**,SSRF|TLS,external client changed,"Check URL source, timeout, redirect and TLS"
+**/template/**,XSS|TEMPLATE_INJECTION,rendering changed,Check contextual encoding and template source
+**/db/**,INJECTION|DATA,query/data access changed,Check parameterization and least privilege
+**/repository/**,INJECTION|DATA,data access changed,Check dynamic query construction
+**/crypto/**,CRYPTO|SECRETS,cryptographic code changed,Require specialist review and vectors
+**/token/**,AUTHN|CRYPTO,token code changed,Check issuer/audience/alg/key lifecycle
+**/admin/**,AUTHZ|AUDIT,privileged operation changed,Check least privilege and audit
+**/payments/**,AUTHZ|REPLAY|DATA,high-impact financial flow changed,Run high-risk review and negative tests
+package.json,DEPENDENCY,dependency set changed,Verify package source and run vulnerability review
+requirements*.txt,DEPENDENCY,dependency set changed,Verify package source and run vulnerability review
+pyproject.toml,DEPENDENCY,dependency/build config changed,Verify sources and build hooks
+pom.xml,DEPENDENCY,dependency/build config changed,Verify dependencies/plugins
+build.gradle*,DEPENDENCY,dependency/build config changed,Verify dependencies/plugins
+*Controller*.java,INPUT|AUTHZ|OUTPUT,HTTP input handler changed,"Check validation, authorization and output"
+*Controller*.ts,INPUT|AUTHZ|OUTPUT,HTTP input handler changed,"Check validation, authorization and output"
+*Auth*.java,INPUT|AUTHZ|SESSION,identity boundary changed,"Check authentication, authorization and session"
+*Auth*.ts,AUTHN|AUTHZ,identity boundary changed,"Check authentication and authorization"
+*Session*.java,AUTHN|SESSION,session handling changed,"Check session ID, rotation and timeout"
+*Token*.java,AUTHN|CRYPTO,token handling changed,Check issuer/audience/alg/key lifecycle
+*SecurityConfig*.java,AUTHZ|ALL,security configuration changed,Run full relevant control review
+*Config*.java,AUTHZ|SECRETS,configuration may affect security,"Check auth defaults, secrets and limits"
+*Webhook*.java,SSRF|AUTHN,webhook receiver changed,"Check signature, target validation and replay"
+*Webhook*.ts,SSRF|AUTHN,webhook receiver changed,"Check signature, target validation and replay"
+*Cors*.java,BROWSER,Cross-Origin policy changed,"Check allowed origins, credentials and preflight"
+*Csrf*.java,BROWSER,CSRF protection changed,Check token flow and SameSite
+*.yml,INPUT|SECRETS|CONFIG,config file changed,"Check secrets, trust boundaries and limits"
+*.yaml,INPUT|SECRETS|CONFIG,config file changed,"Check secrets, trust boundaries and limits"
+*.env,INPUT|SECRETS|CONFIG,env config changed,Check secrets and environment injection
+*.properties,INPUT|SECRETS|CONFIG,config file changed,"Check secrets, trust boundaries and limits"
+*Util*.java,PARSING|DANGEROUS_APIS,utility may host dangerous APIs,Review for eval/exec/path/deserialization patterns
+*Helper*.java,PARSING|DANGEROUS_APIS,utility may host dangerous APIs,Review for eval/exec/path/deserialization patterns
+*Util*.ts,PARSING|DANGEROUS_APIS,utility may host dangerous APIs,Review for eval/exec/path patterns
+*Repository*.java,INJECTION|DATA,data access changed,Check dynamic query construction and parameterization
+*Repository*.ts,INJECTION|DATA,data access changed,Check dynamic query construction and parameterization
+*Mapper*.java,INJECTION|DATA,data access changed,Check dynamic query construction
+*Service*.java,INPUT|AUTHZ,service layer may process untrusted input,"Check validation, authorization and resource limits"

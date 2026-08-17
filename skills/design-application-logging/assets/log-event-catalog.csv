@@ -1,0 +1,10 @@
+eventName,description,defaultLevel,responsibilityBoundary,requiredFields,samplingPolicy,retentionDays,owner
+service.started,服务完成启动,INFO,process-boundary,service.name|service.version|deployment.environment,ALL,30,平台团队
+request.failed,请求最终失败,ERROR,request-boundary,operation|error.code|error.type|trace_id|duration_ms,ALL,30,平台团队
+dependency.retry_exhausted,依赖调用重试耗尽,ERROR,dependency-client,dependency.name|operation|retry.count|error.code|trace_id,ALL,30,平台团队
+operation.degraded,操作使用降级路径完成,WARN,operation-boundary,operation|degradation.type|trace_id,RATE_LIMIT,14,平台团队
+authentication.succeeded,认证成功,INFO,authentication-boundary,actor.id|auth_type|trace_id,ALL,30,安全团队
+authentication.failed,认证失败（预期但需可见性）,WARN,authentication-boundary,actor.id|failure.reason|trace_id,RATE_LIMIT,30,安全团队
+process.fatal,进程级致命错误（替代 FATAL 级别）,ERROR,process-boundary,service.name|error.type,ALL,90,平台团队
+audit.sink_degraded,审计通道故障或未装配导致审计降级为仅日志,WARN,audit-boundary,audit.action|degradation.type,RATE_LIMIT,90,安全团队
+security.permission_changed,权限发生变更,INFO,audit-boundary,actor.id|resource.id|action|result,ALL,365,安全团队

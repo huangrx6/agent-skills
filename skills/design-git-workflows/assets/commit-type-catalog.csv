@@ -1,0 +1,12 @@
+type,purpose,semverImpact,example,scopeExample
+feat,新增面向用户的功能,MINOR,feat(orders): add bulk export endpoint,orders
+fix,修正错误行为,PATCH,fix(auth): handle expired token redirect,auth
+docs,文档变更,NONE,docs(readme): update install steps,readme
+style,格式/空白/注释（不改逻辑）,NONE,style: fix indentation in parser,parser
+refactor,重构（不改外部行为）,NONE,refactor(api): extract response builder,api
+perf,性能优化,PATCH,perf(query): add index for order lookup,query
+test,测试新增或修改,NONE,test(orders): add export edge cases,orders
+build,构建系统或依赖变更,NONE,build: upgrade webpack to v5,
+ci,CI 配置变更,NONE,ci: add lint job to pipeline,
+chore,杂项（不属上述任何）,NONE,chore: update .gitignore,
+revert,撤销之前的提交,VARIES,revert: revert feat(auth) add OAuth2,auth

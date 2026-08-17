@@ -1,0 +1,4 @@
+logStream,environment,outputTarget,format,rotationOwner,rotationTrigger,rotationInterval,maxFileSizeMB,maxFiles,compress,retentionDays,maxLocalDiskMB,archiveTarget,cleanupPolicy,owner
+application,production,STDOUT,JSON_LINES,PLATFORM,PLATFORM,PLATFORM,,,true,30,,central-log-platform,OLDEST_ELIGIBLE_FIRST,平台团队
+application-file,production,FILE,JSON_LINES,OS,SIZE_OR_TIME,DAILY,100,31,true,30,4096,central-log-platform,OLDEST_ELIGIBLE_FIRST,平台团队
+audit,production,FILE,JSON_LINES,PLATFORM,SIZE_OR_TIME,DAILY,100,400,true,365,51200,compliance-archive,LEGAL_HOLD_AWARE,安全团队

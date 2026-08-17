@@ -1,0 +1,4 @@
+interface:
+  display_name: "数据库设计与变更规范"
+  short_description: "制定表结构、索引、事务、迁移、大表变更与恢复规范"
+  default_prompt: "使用 $design-database-standards 为当前项目制定一套生产可用、重点突出迁移安全和数据完整性的数据库规范。"

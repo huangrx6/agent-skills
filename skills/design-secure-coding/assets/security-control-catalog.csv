@@ -1,0 +1,15 @@
+﻿controlId,category,requirement,severity,automatable,evidence
+SEC-001,TRUST_BOUNDARY,所有跨信任边界输入均按不可信处理,MUST,partly,data-flow review
+SEC-002,VALIDATION,输入执行语法与业务语义验证并设置大小/深度上限,MUST,partly,schema/tests
+SEC-003,INJECTION,SQL/NoSQL/命令等使用参数化或结构化安全 API,MUST,partly,SAST/code review
+SEC-004,OUTPUT,动态输出使用目标上下文对应编码,MUST,partly,framework/tests
+SEC-005,AUTHZ,受保护资源执行服务端资源级授权,MUST,partly,negative tests
+SEC-006,SECRETS,Secret 不进入源码、Git、日志、文档和测试 fixture,MUST,true,secret scan
+SEC-007,CRYPTO,使用批准库、CSPRNG 和当前安全算法；禁止自制密码学,MUST,partly,review
+SEC-008,SSRF,用户可控出站请求限制协议、目标、IP、redirect、size 和 timeout,MUST,partly,SSRF tests
+SEC-009,FILES,文件上传限制类型、大小、存储路径和处理能力,MUST,partly,file tests
+SEC-010,DESERIALIZATION,不可信输入不得进入通用 native object deserialization,MUST,partly,SAST/review
+SEC-011,BROWSER,浏览器应用按认证模型配置 XSS/CSRF/CORS/CSP/Cookie 控制,MUST,partly,browser security tests
+SEC-012,DEPENDENCY,新依赖确认官方来源并进行漏洞/秘密扫描,MUST,partly,dependency scan
+SEC-013,AI_CODING,AI 生成高风险代码和依赖必须执行额外来源与安全验证,MUST,false,review
+SEC-014,EXCEPTION,安全控制例外有 Owner、期限、补偿和退出条件,MUST,partly,exception register

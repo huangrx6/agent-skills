@@ -1,0 +1,10 @@
+﻿style,primaryUse,direction,contract,strengths,mainRisks,defaultFor
+REST_STYLE_HTTP,公开/资源型业务 API,request-response,OpenAPI,通用、缓存和代理生态成熟,聚合读取可能多请求；REST 语义容易漂移,资源生命周期与公开 API
+GRPC,内部强类型 RPC,request-response/streaming,Protobuf,低延迟、代码生成、Streaming,浏览器门槛；Proto 演进要求高,内部服务调用
+GRAPHQL,多前端聚合查询,request-response/subscription,GraphQL Schema,客户端选择字段、统一图,成本攻击、N+1、缓存和 Schema 治理复杂,BFF 与复杂查询
+SSE,服务器单向实时推送,server-to-client,Event Schema,HTTP 原生、自动重连、实现简单,仅单向；连接数和恢复窗口需治理,通知与进度
+WEBSOCKET,双向实时会话,bidirectional,Application Message Schema,全双工、低延迟,连接状态、背压、重连和扩缩容复杂,聊天、协作、实时控制
+HTTP_STREAMING,单请求持续输出,server-to-client stream,Chunk Schema,请求模型简单、基础设施友好,中途错误和恢复需自定义,AI 输出、逐块结果
+EVENT_PUBSUB,异步多消费者,producer-to-consumers,AsyncAPI/Schema Registry,松耦合、重放、吞吐,重复、乱序、最终一致性,领域事件
+WEBHOOK,跨组织异步回调,server-to-server push,HTTP + Event Schema,接入普遍,SSRF、签名、重试和重复投递,合作方通知
+JSON_RPC,轻量命令 RPC,request-response/notification,JSON-RPC,简单、transport agnostic,HTTP 语义利用少、类型弱,工具与控制面

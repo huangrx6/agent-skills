@@ -1,0 +1,14 @@
+﻿checkId,category,requirement,severity,automatable,evidence
+DOC-001,DISCOVERY,README、PROJECT_CONTEXT、docs/index 职责清楚且互相可达,BLOCKER,partly,link validation
+DOC-002,AI_CONTEXT,AGENTS 只包含执行指令且保持有界,BLOCKER,true,size/content check
+DOC-003,AI_CONTEXT,PROJECT_CONTEXT 不包含临时任务流水账,MAJOR,false,review
+DOC-004,SOURCE_OF_TRUTH,重要事实只有一个 canonical source,BLOCKER,false,review
+DOC-005,LIFECYCLE,变更优先更新已有 canonical doc，不无意义新增文件,MAJOR,false,review
+DOC-006,DECISION,重大决定通过新 ADR 保留历史和替代关系,BLOCKER,partly,ADR review
+DOC-007,HANDOFF,active handoff 只保存未完成任务且有关闭条件,MAJOR,partly,handoff scan
+DOC-008,MEMORY,个人推断偏好不会自动写入共享仓库,BLOCKER,false,review
+DOC-009,SECURITY,上下文和文档不包含 secrets/production data,BLOCKER,partly,secret scan
+DOC-010,AUTOMATION,任务完成流程包含 documentation impact analysis,MAJOR,partly,AGENTS/PR template
+DOC-011,INDEX,新增长期文档可从 index 或主题入口发现,MAJOR,true,orphan check
+DOC-012,FRESHNESS,过时文档被更新、标记 superseded 或删除,BLOCKER,partly,stale review
+DOC-013,GENERATED,生成 Reference 从 source 生成且不手改,MAJOR,partly,generation check

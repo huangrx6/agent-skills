@@ -1,0 +1,15 @@
+﻿checkId,category,requirement,severity,automatable,evidence
+DBR-001,模型,业务不变量、Owner 和生命周期明确,BLOCKER,false,表设计文档
+DBR-002,约束,关键唯一性/非空/引用完整性由数据库保护,BLOCKER,partly,Schema
+DBR-003,类型,金额、时间、NULL、状态和单位语义准确,BLOCKER,partly,Schema review
+DBR-004,索引,每个新增索引有目标 Query 和收益证据,MAJOR,partly,执行计划
+DBR-005,SQL,查询有上限、参数化且避免 SELECT * / N+1,BLOCKER,partly,SQL lint/测试
+DBR-006,事务,事务短且无不可控网络 I/O,BLOCKER,false,代码评审
+DBR-007,并发,关键不变量有锁/版本/约束证明,BLOCKER,false,并发测试
+DBR-008,迁移,新旧应用与 Schema 可兼容滚动发布,BLOCKER,false,迁移计划
+DBR-009,大表,DDL 锁、重写、临时空间和复制延迟已验证,BLOCKER,partly,演练结果
+DBR-010,回填,回填幂等、可暂停、可恢复、有限速和校验,BLOCKER,partly,回填测试
+DBR-011,恢复,备份/PITR 满足 RPO/RTO 且恢复演练通过,BLOCKER,partly,恢复报告
+DBR-012,安全,应用最小权限且敏感数据策略完整,BLOCKER,partly,权限/安全检查
+DBR-013,容量,增长、磁盘、WAL/binlog 和保留有预算,MAJOR,partly,容量预测
+DBR-014,发布,stop condition、cleanup、forward-fix 路径明确,BLOCKER,false,发布计划

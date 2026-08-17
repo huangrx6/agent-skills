@@ -1,0 +1,4 @@
+interface:
+  display_name: "API 契约设计"
+  short_description: "制定资源、Schema、兼容性、OpenAPI、RPC 与事件接口规范"
+  default_prompt: "使用 $design-api-contracts 为当前系统制定一套精简、可执行、可自动验证的 API 契约规范，并区分 HTTP、RPC 与事件接口的适用规则。"

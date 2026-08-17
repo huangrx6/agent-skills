@@ -1,0 +1,6 @@
+﻿checkId,requirement,severity
+OBS-001,跨信号 Resource Identity 一致,BLOCKER
+OBS-002,关键用户旅程有 SLI/SLO,BLOCKER
+OBS-003,关键入口/依赖可通过 Trace 定位,BLOCKER
+OBS-004,Metric 无明显无界高基数标签,BLOCKER
+OBS-005,Alert 可行动并有 Owner/Runbook,MAJOR

@@ -1,0 +1,13 @@
+﻿source,sink,primaryControl,secondaryControls,reviewPriority
+HTTP/RPC/GraphQL input,SQL/NoSQL,parameterized query,allowlist identifiers; least DB privilege,CRITICAL
+HTTP/message input,OS command,avoid shell; fixed executable + arg array,allowlist; least privilege; timeout,CRITICAL
+user/database content,HTML/DOM,context output encoding,sanitizer for allowed rich HTML; CSP,CRITICAL
+user content,JavaScript/CSS,avoid dynamic insertion; context encoding,CSP,CRITICAL
+user filename/path,filesystem,server-side ID/path mapping,canonicalize; base dir; no symlink escape,CRITICAL
+user URL,HTTP client,destination allowlist/network policy,DNS/IP checks; redirect limits; timeout,CRITICAL
+uploaded bytes,file parser,type/size validation + isolated parser,malware/CDR; resource limits,HIGH
+untrusted bytes,native deserializer,do not deserialize native object format,signed trusted data; type allowlist,CRITICAL
+XML,XML parser,disable DTD/external entities,size/depth limits,HIGH
+user redirect,redirect response,relative URL or origin allowlist,canonical URL parser,HIGH
+untrusted string,template/expression/eval,do not execute as code,fixed templates; allowlist,CRITICAL
+request identity/resource,privileged operation,server-side resource authorization,re-auth; audit; anti-replay,CRITICAL

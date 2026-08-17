@@ -1,0 +1,6 @@
+﻿checkId,requirement,severity
+RR-001,关键路径有端到端 Deadline,BLOCKER
+RR-002,不存在多层重试放大,BLOCKER
+RR-003,过载时资源和队列有上限,BLOCKER
+RR-004,fallback 不返回危险陈旧数据,BLOCKER
+RR-005,已执行故障/超载验证,MAJOR

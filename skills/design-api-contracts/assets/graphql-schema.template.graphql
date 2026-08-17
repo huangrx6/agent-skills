@@ -1,0 +1,76 @@
+schema {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
+
+scalar DateTime
+
+type Query {
+  order(id: ID!): Order
+  orders(first: Int = 20, after: String): OrderConnection!
+}
+
+type Mutation {
+  createOrder(input: CreateOrderInput!): CreateOrderPayload!
+  cancelOrder(input: CancelOrderInput!): CancelOrderPayload!
+}
+
+type Subscription {
+  orderStatusChanged(orderId: ID): OrderStatusChangedEvent!
+}
+
+type OrderStatusChangedEvent {
+  orderId: ID!
+  previousStatus: OrderStatus!
+  newStatus: OrderStatus!
+  changedAt: DateTime!
+}
+
+type Order {
+  id: ID!
+  clientReference: String!
+  status: OrderStatus!
+  createdAt: DateTime!
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+input CreateOrderInput {
+  clientMutationId: String
+  clientReference: String!
+}
+
+type CreateOrderPayload {
+  clientMutationId: String
+  order: Order
+}
+
+input CancelOrderInput {
+  clientMutationId: String
+  orderId: ID!
+}
+
+type CancelOrderPayload {
+  clientMutationId: String
+  order: Order
+}
+
+type OrderConnection {
+  edges: [OrderEdge!]!
+  pageInfo: PageInfo!
+}
+
+type OrderEdge {
+  cursor: String!
+  node: Order!
+}
+
+type PageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+}

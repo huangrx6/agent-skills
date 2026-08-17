@@ -1,0 +1,4 @@
+interface:
+  display_name: "快速看图"
+  short_description: "一条命令把图片交给远端视觉模型，返回详细 Markdown 描述（布局、逐字文本、对象、细节）"
+  default_prompt: "使用 $visual-image-understanding 看这张图片：一条命令返回详细 Markdown 描述并转述。需要精确逐字或提问时用 --prompt/--no-downscale。"

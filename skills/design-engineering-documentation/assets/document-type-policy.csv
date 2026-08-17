@@ -1,0 +1,15 @@
+﻿type,canonicalLocation,purpose,createWhen,updateWhen,newVsUpdate,lifecycle
+README,README.md,human entrypoint,repository created,setup/entry path changes,always update existing,active
+PROJECT_CONTEXT,PROJECT_CONTEXT.md,bounded human/AI project snapshot,AI-first documentation initialized,stable project-level facts change,always update existing,active
+DOC_INDEX,docs/index.md,documentation navigation,docs introduced,docs added/removed/moved,always update existing,active
+PROJECT_OVERVIEW,docs/project/overview.md,current project scope and behavior,project needs detail beyond context file,scope/current behavior changes,update existing unless independent product appears,active
+GLOSSARY,docs/project/glossary.md,canonical domain vocabulary,domain terms need shared definitions,term meaning changes/new durable term,update existing,active
+ARCHITECTURE_OVERVIEW,docs/architecture/overview.md,current architecture state,architecture needs durable explanation,current structure/boundaries change,update existing,active
+DECISION,docs/architecture/decisions/*.md,historical significant decision,significant hard-to-reverse decision made,decision receives evidence/status update,new decision when old decision is replaced,historical
+CONTRACTS_INDEX,docs/contracts/index.md,契约事实来源位置与验证/生成方式,项目引入外部契约或 API 需统一入口,契约入口/版本策略/生成方式变化,update existing,active
+DATA_OWNERSHIP,docs/data/ownership.md,数据 Owner、敏感分类与跨库生命周期规则,存在跨模块/跨服务数据归属需治理,数据 Owner/分类/生命周期变化,update existing,active
+HOW_TO,docs/development/*.md,repeatable developer task,repeatable task needs guidance,workflow changes,new only for independent goal,active
+RUNBOOK,docs/operations/runbooks/*.md,production diagnosis/recovery,repeatable operational event exists,recovery steps/alerts change,new per independent incident class,active
+WORKING_AGREEMENTS,docs/working-agreements.md,explicit durable team agreements,project needs non-tool-enforceable agreements,explicit durable agreement changes,update existing,active
+HANDOFF,docs/handoffs/active/*.md,unfinished cross-session state,work must continue in another session/person,task state changes,new per active task; close promptly,temporary
+GENERATED_REFERENCE,generated,machine-derived facts,source can generate reliable reference,source changes,"update generator/source, not generated copy",generated

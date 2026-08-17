@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Visual UI Layout Model",
+  "type": "object",
+  "required": [
+    "canvas",
+    "regions",
+    "tokens",
+    "components",
+    "evidence"
+  ],
+  "properties": {
+    "canvas": {
+      "type": "object"
+    },
+    "regions": {
+      "type": "array"
+    },
+    "tokens": {
+      "type": "object"
+    },
+    "components": {
+      "type": "array"
+    },
+    "charts": {
+      "type": "array"
+    },
+    "tables": {
+      "type": "array"
+    },
+    "evidence": {
+      "type": "array"
+    },
+    "uncertainties": {
+      "type": "array"
+    }
+  }
+}
