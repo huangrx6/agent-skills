@@ -1,0 +1,23 @@
+{
+  "skill_name": "obsidian-work-log-release-recorder",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "我刚改完内部系统A运营分析页面的筛选条件和后端统计口径，顺手把本周发版文档也补一下。前端涉及 web-console 的日志页面，后端涉及 admin-console 的 usage_metrics 和 overview_stats 接口，SQL 有 metrics_v1.sql。",
+      "expected_output": "Updates the relevant 客户X/内部系统A area notes, creates or updates the current weekly release note, records only landed changes, and includes scripts/config/SQL/validation placeholders without inventing secrets.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "这次只是讨论了下 内部系统B后续可能怎么做，还没定方案，也没改代码。你帮我看看要不要记知识库。",
+      "expected_output": "Does not create a release note or durable project note; explains that speculative discussion should not be recorded unless there is an accepted decision, reusable constraint, or confirmed next action.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "今天发布内部系统A：打包 h5_bundle、admin dist、admin-console app，上传到内网主机的 /srv/release，解压后复制 .env.production，然后执行 admin-console/scripts/docker-restart.sh -e prod -s app，前端重启 web-service。把这些落实到本周发版文档里。",
+      "expected_output": "Creates or updates the 内部系统A weekly release note with package, upload, unzip, config copy, backend restart, frontend restart, validation, rollback, and path details using the vault's operational note style.",
+      "files": []
+    }
+  ]
+}
