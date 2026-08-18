@@ -1,6 +1,6 @@
 ---
 name: visual-image-understanding
-description: 用户发来图片（截图、照片、文档、图表、对话/聊天截图、漫画、海报等）想了解其中内容时，使用本 Skill：一条 `uv run` 命令把图片发给远端视觉模型，返回分节 Markdown 描述（概述 / 布局与区域 / 可见文字逐字 / 关键对象 / 数据与图表 / 值得注意的细节 / 不确定），再原样转述给用户即可。典型触发语："看看这张图""截图发你看下""读下图里的文字""这张界面长什么样""图里报错什么意思""对比这两张截图""这张图主要讲啥"。需三个环境变量 `VISUAL_BASE_URL` / `VISUAL_MODEL` / `VISUAL_API_KEY`（默认推荐智谱 `glm-4.6v-flash`，写在 `~/.zshrc` 并重启终端或 DSH 宿主进程）；稠密小字 / 大图精确读取加 `--no-downscale`，针对性提问用 `--prompt`，多图对比直接传多个路径。不负责把 UI 截图转成可交付前端的布局规格（区域、组件、栅格、设计令牌）——那是 `visual-ui-layout-spec` 的工作。
+description: 你必须在以下场景使用本 Skill：(a) 用户发来图片（截图、照片、文档、图表、对话/聊天截图、漫画、海报等）要求看图、读图、读界面、读报错、对比多图；(b) 你当前任务过程中涉及到任何需要理解、描述或提取信息的图片。用户只是文字提及一张图（如引用图里说过的某句话）时不调。仅支持 JPEG / PNG / WebP 三种格式；PDF / GIF / SVG / PSD 不支持（PDF 用其它工具解析、GIF 取首帧或换格式）。需三个环境变量 VISUAL_BASE_URL / VISUAL_MODEL / VISUAL_API_KEY（默认推荐智谱 glm-4.6v-flash），写在 ~/.zshrc 后重启终端或 DSH 宿主进程才生效。一条命令：`uv run scripts/visual_runtime.py <图> [多个图...]`，稠密小字 / 大图精确读取加 `--no-downscale`，针对性提问用 `--prompt "..."`，需结构化 JSON 加 `--json`。注意：路径若以 `@` 开头（如用户输入 `@/path/to/img.png`），必须先去掉 `@` 再传给脚本。不负责把 UI 截图转成可交付前端的布局规格（区域、组件、栅格、设计令牌）——那是 visual-ui-layout-spec 的工作。
 ---
 
 # 快速看图

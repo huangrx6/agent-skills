@@ -1,6 +1,6 @@
 ---
 name: design-git-workflows
-description: "设计、审查和执行生产级 Git 工作流，覆盖工作区与暂存区管理、分支与合并策略、worktree 隔离、提交信息（Conventional Commits）、回退与恢复（reset/revert/reflog）、标签与版本、远程协作、冲突解决和危险操作门控。用于建立项目级 Git 规范、安全执行 add/commit/merge/rebase/reset、评审 Git 操作风险、自动化提交归类，以及在误操作后可靠恢复。不覆盖代码审查内容、持续集成配置与发布流水线编排。"
+description: "设计、审查和执行生产级 Git 工作流，覆盖工作区与暂存区管理、分支与合并策略、worktree 隔离、提交信息（Conventional Commits）、回退与恢复（reset / revert / reflog）、标签与版本、远程协作、冲突解决和危险操作门控。用于建立项目级 Git 规范、安全执行 add / commit / merge / rebase / reset、评审 Git 操作风险、自动化提交归类，以及在误操作后可靠恢复。代码评审内容、持续集成配置与发布流水线编排参考独立规范。"
 ---
 
 # Git 工作流设计
