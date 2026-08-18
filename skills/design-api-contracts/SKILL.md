@@ -1,6 +1,6 @@
 ---
 name: design-api-contracts
-description: "设计、选择、审查和完善 API 契约风格，包括资源化 HTTP/REST-style API、gRPC/Protobuf、GraphQL、WebSocket、Server-Sent Events、HTTP Streaming、Webhook、事件接口和 JSON-RPC。覆盖资源与方法语义、Schema、分页过滤、幂等与并发、实时连接、查询成本、版本兼容、弃用、OpenAPI、GraphQL Schema、Proto、AsyncAPI、契约测试、安全和 API 治理。用于建立组织级或项目级 API 设计规范、选择接口风格、评审接口方案、生成契约模板和兼容性检查清单。不覆盖错误码体系、统一错误响应实现、代码书写规范与日志格式。"
+description: "设计、选择、审查和完善 API 契约风格，包括资源化 HTTP/REST-style API、gRPC/Protobuf、GraphQL、WebSocket、Server-Sent Events、HTTP Streaming、Webhook、事件接口和 JSON-RPC，覆盖资源与方法语义、Schema、分页过滤、幂等与并发、实时连接、查询成本、版本兼容、弃用、OpenAPI、GraphQL Schema、Proto、AsyncAPI、契约测试、安全和 API 治理。用于建立组织级或项目级 API 设计规范、选择接口风格、评审接口方案、生成契约模板与兼容性检查清单。错误码体系、统一错误响应实现、代码书写规范与应用日志格式参考独立规范。"
 ---
 
 # API 契约设计
@@ -126,4 +126,3 @@ python scripts/ensure_uv.py
 uv run scripts/validate_api_contract_catalog.py assets/api-rule-catalog.csv --compatibility assets/compatibility-change-matrix.csv --status-map assets/http-operation-status-map.csv --review assets/api-review-checklist.csv --styles assets/api-style-selection.csv --openapi assets/openapi.template.yaml --graphql assets/graphql-schema.template.graphql --change-proposal assets/api-change-proposal.template.md
 uv run python -m unittest discover -s scripts/tests   # 跑测试
 ```
-
