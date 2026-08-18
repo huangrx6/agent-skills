@@ -3,11 +3,22 @@ name: obsidian-personal-knowledge-base
 description: >-
   操作 Huangrx6 的 Obsidian 知识库 /Users/huangrx6/obsidian。用于在库内创建、更新、移动、重命名、审阅、整理笔记；在 Inbox、Projects、Areas、Resources、Archive、Assets、System 之间判断内容归属；维护 MOC、索引、模板、周计划、周报、项目主页、领域主页、学习笔记和技术资源笔记。使用目录专属规则：Areas/Projects 使用轻量工作管理规则，Resources 才使用深度研究和学习笔记规则。
   处理 Resources 技术学习笔记时，尤其要保证 API 入口、依赖安装、参数说明、可运行示例、轻量 MOC、独立正文、配图清单和表达风格都能直接用于长期复用。
+  本 skill 绑定特定 vault 路径 /Users/huangrx6/obsidian，**跨机复用性低**——换电脑或换 vault 路径需要重新校准 references/vault-map.md。
 ---
 
 # Obsidian 个人知识库
 
 在 `/Users/huangrx6/obsidian` 这个正在演进的 PARA + MOC 知识库里工作。行动前先查看当前文件，目录可能已经被用户重置或重组。
+
+## Prerequisites（机器绑定）
+
+本 skill 绑定 Huangrx6 的本机 Obsidian vault：
+
+- vault 路径必须是 `/Users/huangrx6/obsidian`
+- `references/vault-map.md` 描述的是这个 vault 的 PARA + MOC 结构；用户调整过目录结构后需要**同步更新** `references/vault-map.md`，否则起手流程会基于过期信息做判断
+- **跨机复用性低**：换电脑或换 vault 路径都需要重新校准
+
+参考本 skill 依赖的 5 个 references：`vault-map.md` / `resource-notes.md` / `work-management.md` / `writing-conventions.md` / `research-and-synthesis.md`。
 
 ## 起手流程
 
@@ -22,7 +33,7 @@ description: >-
 ## 任务分流
 
 | 目标/任务 | 加载这些引用 | 工作姿态 |
-|---|---|---|
+| --- | --- | --- |
 | 归位、重命名、移动、MOC/索引维护 | `vault-map.md`、`writing-conventions.md` | 结构准确、导航轻量。 |
 | `01 Projects`、`02 Areas`、周计划、周报、工作日志、交付记录 | `vault-map.md`、`writing-conventions.md`、`work-management.md` | 行动导向，短、清楚、看状态。 |
 | `03 Resources`、学习笔记、技术概念、研究综合 | `vault-map.md`、`writing-conventions.md`、`resource-notes.md`；需要研究时再读 `research-and-synthesis.md` | 使用深度学习笔记质量标准。 |
@@ -117,3 +128,10 @@ description: >-
 - `references/work-management.md`：Areas、Projects、周计划、周报、工作日志、交付记录。
 - `references/resource-notes.md`：仅适用于 Resources 的写作标准、学习笔记审阅、技术示例、配图规则。
 - `references/research-and-synthesis.md`：仅适用于 Resources 的研究流程和深度综合规则。
+
+## 安装
+
+通过仓库根的 `npx skills add huangrx6/agent-skills` 安装（详见仓库根 [README.md](../../README.md)）。安装后：
+
+1. 验证本机 vault 路径是否与 `references/vault-map.md` 描述一致
+2. Agent 第一次触发本 skill 时会自动读取 `references/vault-map.md` 确认结构
