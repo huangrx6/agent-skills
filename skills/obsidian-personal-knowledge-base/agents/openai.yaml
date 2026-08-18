@@ -1,0 +1,4 @@
+interface:
+  display_name: "Obsidian 知识库"
+  short_description: "按目录规则管理 PARA 知识库"
+  default_prompt: "使用 $obsidian-personal-knowledge-base 按 Projects、Areas 或 Resources 的对应规则，创建、修改或整理我的 Obsidian 笔记。"
