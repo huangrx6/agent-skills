@@ -1,6 +1,6 @@
 # 知识库地图
 
-本技能操作 `/Users/huangrx6/obsidian`。
+本技能操作 `/Users/huangrx6/Documents/obsidian`。
 
 这个库采用 PARA + MOC 结构。编辑前始终先检查当前文件，因为用户可能在不同轮次之间调整目录。
 
