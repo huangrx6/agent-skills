@@ -1,6 +1,6 @@
 ---
 name: design-database-standards
-description: "设计、审查和完善生产级数据库规范，重点覆盖关系型数据库的数据模型、命名、字段类型、主键与约束、索引、SQL、事务与并发、Schema 迁移、Expand-Migrate-Contract、在线 DDL、大表变更、数据回填、分区与分片、读副本、数据保留与归档、备份恢复、安全、性能、容量和数据库上线验收。适用于制定组织级或项目级 PostgreSQL/MySQL 数据库规范、评审表结构和迁移方案、生成数据库检查清单与迁移模板；MongoDB 等文档数据库仅在明确需要时读取可选附录。不覆盖 API 契约设计、异常重试策略、代码书写规范与日志字段定义。"
+description: "设计、审查和完善生产级数据库规范，重点覆盖关系型数据库的数据模型、命名、字段类型、主键与约束、索引、SQL、事务与并发、Schema 迁移、Expand-Migrate-Contract、在线 DDL、大表变更、数据回填、分区与分片、读副本、数据保留与归档、备份恢复、安全、性能、容量和数据库上线验收。用于制定组织级或项目级 PostgreSQL / MySQL 数据库规范、评审表结构与迁移方案、生成数据库检查清单与迁移模板，MongoDB 等文档数据库仅在明确需要时读取可选附录。API 契约设计、异常重试策略、代码书写规范与日志字段定义参考独立规范。"
 ---
 
 # 数据库设计与变更规范
@@ -124,4 +124,3 @@ python scripts/ensure_uv.py
 uv run scripts/validate_database_standard.py assets/database-naming-catalog.csv --types assets/data-type-decision-matrix.csv --migration assets/migration-change-matrix.csv --review assets/database-review-checklist.csv --table-template assets/table-design.template.md --migration-template assets/migration-plan.template.md
 uv run python -m unittest discover -s scripts/tests   # 跑测试
 ```
-
