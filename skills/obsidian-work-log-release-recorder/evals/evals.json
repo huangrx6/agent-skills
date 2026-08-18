@@ -1,0 +1,23 @@
+{
+  "skill_name": "obsidian-work-log-release-recorder",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "我刚改完灵犀助手运营分析页面的筛选条件和后端统计口径，顺手把本周发版文档也补一下。前端涉及 one-intelligent-agent-for-each-person-admin 的日志页面，后端涉及 fusion-admin 的 tool_usage 和 operation_overview 接口，SQL 有 tool_usage_metrics_v1.sql。",
+      "expected_output": "Updates the relevant 亚信/灵犀助手 area notes, creates or updates the current weekly release note, records only landed changes, and includes scripts/config/SQL/validation placeholders without inventing secrets.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "这次只是讨论了下 AI 网关后续可能怎么做，还没定方案，也没改代码。你帮我看看要不要记知识库。",
+      "expected_output": "Does not create a release note or durable project note; explains that speculative discussion should not be recorded unless there is an accepted decision, reusable constraint, or confirmed next action.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "今天发布灵犀助手：打包 h5_dist、admin dist、fusion-admin app，上传到 217 的 /home/ailignxi/publish/bak，解压后复制 .env.production，然后执行 fusion-admin/scripts/docker-restart.sh -e prod -s app，前端重启 one-agents-mgr。把这些落实到本周发版文档里。",
+      "expected_output": "Creates or updates the 灵犀助手 weekly release note with package, upload, unzip, config copy, backend restart, frontend restart, validation, rollback, and path details using the vault's operational note style.",
+      "files": []
+    }
+  ]
+}
