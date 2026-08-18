@@ -1,6 +1,6 @@
 ---
 name: design-secure-coding
-description: "设计、审查和完善可直接用于日常开发的安全编码规范，包括信任边界、输入验证、上下文输出编码、SQL/NoSQL/命令/模板注入防护、认证与授权、会话和令牌、密钥与密码学、敏感数据、文件上传与路径处理、SSRF 与出站请求、反序列化、XML、浏览器安全、CSRF/CORS/CSP、危险 API、依赖与供应链基础防护、安全测试、代码评审，以及 AI Coding 场景下的生成代码与依赖验证。用于建立组织级或项目级 Secure Coding Standard、评审高风险代码、为 AI Agent 提供安全实现约束和在任务结束前执行安全影响检查。"
+description: "设计、审查和完善可直接用于日常开发的安全编码规范，包括信任边界、输入验证、上下文输出编码、SQL/NoSQL/命令/模板注入防护、认证与授权、会话和令牌、密钥与密码学、敏感数据、文件上传与路径处理、SSRF 与出站请求、反序列化、XML、浏览器安全、CSRF/CORS/CSP、危险 API、依赖与供应链基础防护、安全测试、代码评审，以及 AI Coding 场景下的生成代码与依赖验证。用于建立组织级或项目级 Secure Coding Standard、评审高风险代码、为 AI Agent 提供安全实现约束、在任务结束前执行安全影响检查。无明确不覆盖——建议与 code-writing-standards / exception-handling / configuration-management / observability 配合使用。"
 ---
 
 # 安全编码设计
