@@ -24,3 +24,6 @@ __pycache__/
 # Node 构建产物（如果未来加 node-based skill）
 node_modules/
 dist/
+
+# subagent 探查报告（保留在工作区，不进 git 历史）
+file-only/
