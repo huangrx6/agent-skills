@@ -1,6 +1,6 @@
 ---
 name: design-exception-handling
-description: "设计、审查或完善生产级异常处理方案，包括失败分类、异常传播与包装边界、错误码体系、统一 API 错误响应、全局异常处理器、超时、重试、取消、幂等、异步失败处理和失败路径测试。用于编写工程规范、评审后端错误处理设计、制定 HTTP API 错误契约，或为各类后端语言环境提供落地要求。不覆盖日志级别、结构化日志字段、审计日志与日志脱敏规范。"
+description: "设计、审查或完善生产级异常处理方案，包括失败分类、异常传播与包装边界、错误码体系、统一 API 错误响应、全局异常处理器、超时、重试、取消、幂等、异步失败处理和失败路径测试。用于编写工程规范、评审后端错误处理设计、制定 HTTP API 错误契约，为各类后端语言环境提供落地要求。日志级别、结构化日志字段、审计日志与日志脱敏规范参考独立规范。"
 ---
 
 # 异常处理设计
@@ -134,4 +134,3 @@ python scripts/ensure_uv.py
 uv run scripts/validate_error_catalog.py assets/error-code-registry.csv --mapping assets/exception-mapping.csv
 uv run python -m unittest discover -s scripts/tests   # 跑测试
 ```
-

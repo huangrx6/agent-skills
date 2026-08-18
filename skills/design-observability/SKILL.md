@@ -1,6 +1,6 @@
 ---
 name: design-observability
-description: "设计、评审和完善生产级可观测性体系，包括服务与资源身份、OpenTelemetry traces/metrics/log correlation、上下文传播、指标与基数治理、SLI/SLO、Golden Signals、分布式追踪、采样、Dashboard、告警、黑盒/白盒监控、Telemetry Pipeline 和成本控制。用于新服务可观测性设计、现有监控重构和告警降噪。日志格式与生命周期参考独立规范；韧性参考独立规范；性能容量参考独立规范。"
+description: "设计、评审和完善生产级可观测性体系，包括服务与资源身份、OpenTelemetry traces/metrics/log correlation、上下文传播、指标与基数治理、SLI/SLO、Golden Signals、分布式追踪、采样、Dashboard、告警、黑盒/白盒监控、Telemetry Pipeline 和成本控制。用于新服务可观测性设计、现有监控重构、告警降噪。日志格式与生命周期、服务韧性、性能容量参考独立规范。"
 ---
 
 # 可观测性设计
@@ -117,4 +117,3 @@ python scripts/ensure_uv.py
 uv run scripts/validate_observability.py --assets assets/
 uv run python -m unittest discover -s scripts/tests   # 跑测试
 ```
-
