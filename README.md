@@ -1,6 +1,6 @@
-# huangrx6 / skills
+# huangrx6 / agent-skills
 
-个人 skills 集合，覆盖工程实践设计、skill 创建流程、视觉理解工具三个领域。每个 skill 是给 AI Coding Agent 读的"专业领域提示词 + 工作流"，由 Agent 根据 `SKILL.md` 第一段 `description` 字段自动决定是否触发。
+个人 skills 集合，覆盖工程实践设计、skill 创建流程、视觉理解工具、Obsidian 知识库四个领域。每个 skill 是给 AI Coding Agent 读的"专业领域提示词 + 工作流"，由 Agent 根据 `SKILL.md` 第一段 `description` 字段自动决定是否触发。
 
 > **跨 Agent 通用**：兼容 Claude Code / pi / OpenCode / Cursor / Codex 等任意支持 `SKILL.md` frontmatter 约定的 Agent。
 
@@ -10,18 +10,18 @@
 
 ```sh
 # 交互式安装：让选 skill / agent / 全局或项目级 / symlink 或 copy
-npx skills add huangrx6/skills
+npx skills add huangrx6/agent-skills
 
 # 精确指定：只装某个 skill 到某个 agent 的全局目录，跳过确认
-npx skills add huangrx6/skills \
+npx skills add huangrx6/agent-skills \
   --skill design-api-contracts \
   --agent claude-code --global --yes
 
 # 一次装全部到指定 agent
-npx skills add huangrx6/skills --skill '*' --agent claude-code
+npx skills add huangrx6/agent-skills --skill '*' --agent claude-code
 
 # 列出本仓库所有 skill（不装）
-npx skills add huangrx6/skills --list
+npx skills add huangrx6/agent-skills --list
 ```
 
 ### 完整 flag 速查
@@ -41,7 +41,7 @@ npx skills add huangrx6/skills --list
 任何能读 `SKILL.md` 的 Agent 都能直接 git clone 后用：
 
 ```sh
-git clone https://github.com/huangrx6/skills.git
+git clone https://github.com/huangrx6/agent-skills.git
 
 # 把 skills/<想装的>/ 软链或拷贝到你的 Agent 加载目录，例如：
 #   Claude Code 项目级：./.claude/skills/<name>
@@ -57,6 +57,7 @@ git clone https://github.com/huangrx6/skills.git
 skills/
 ├── design-* (13 个)                       ← 设计类：按工程领域切分
 ├── skill-creator/                         ← 流程类：新建/改进/评估 skill
+├── obsidian-* (2 个)                      ← Obsidian 类：操作本机 Huangrx6 vault
 └── visual-{image-understanding,ui-layout-spec}/   ← 工具类：视觉相关
 ```
 
@@ -107,6 +108,15 @@ skills/
 | [visual-image-understanding](./skills/visual-image-understanding) | 本地图片 → 远端视觉模型 → 分节 Markdown 描述（不依赖 Agent 原生视觉）|
 | [visual-ui-layout-spec](./skills/visual-ui-layout-spec) | UI 截图 / 数据大屏 / 设计稿 → 可交付前端的布局规格（双轨证据 + 设计令牌）|
 
+### Obsidian 类（2 个）
+
+针对本机 Huangrx6 的 Obsidian vault（`/Users/huangrx6/obsidian`，PARA + MOC 结构）。**跨机复用性低**——只能在同一台机器同一用户下使用。
+
+| Skill | 一句话定位 |
+|---|---|
+| [obsidian-personal-knowledge-base](./skills/obsidian-personal-knowledge-base) | 在 PARA + MOC vault 中归位、维护笔记、MOC、模板、领域主页（含 5 个 references）|
+| [obsidian-work-log-release-recorder](./skills/obsidian-work-log-release-recorder) | 完成后沉淀工作日志 + weekly release note（脚本/配置/部署/回滚/验证）|
+
 ## 使用
 
 每个 skill 的 `SKILL.md` 第一段 `description` 字段是 Agent 决定是否触发它的依据；正文写的是详细的输入输出约定、调用流程、注意事项。要了解某个 skill 的具体能力，直接点进对应目录读 `SKILL.md`。
@@ -115,7 +125,7 @@ skills/
 
 - **目录名 = frontmatter `name` 字段**，保持一致
 - 修改某个 skill 后，跑一次 `skill-creator` 里的"如何测试"流程（多数 design skill 没有自动化测试，主要靠人工 review）
-- **设计类** 内容相对稳定（按工程领域沉淀），**工具类**（visual-*）会因上游依赖变动需要跟进
+- **设计类** 内容相对稳定（按工程领域沉淀），**工具类**（visual-*）会因上游依赖变动需要跟进，**Obsidian 类**绑定本机 vault 路径（跨机复用性低）
 - 新增 skill：参考 `skill-creator/SKILL.md` 的"Anatomy of a Skill"和"Writing Patterns"
 - 仓库根的 `.skill-lock.json` 已被 `.gitignore` 排除——那是 pi 工具的本地 lock，每台机器自己生成
 
