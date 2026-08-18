@@ -1,6 +1,6 @@
 ---
 name: design-configuration-management
-description: "设计、评审和完善生产级应用配置管理体系，包括配置分类、Schema、类型和默认值、来源与优先级、环境隔离、启动校验、动态配置、热更新、配置中心、缓存与失效、Feature Flag、Secret 分离、变更审计、灰度、回滚、漂移检测、Kubernetes ConfigMap/Secret 使用和配置测试。用于建立项目级配置规范、设计动态配置平台接入和治理配置事故。Secret 的安全使用参考独立规范；部署流水线参考独立规范。"
+description: "设计、评审和完善生产级应用配置管理体系，包括配置分类、Schema、类型与默认值、来源与优先级、环境隔离、启动校验、动态配置、热更新、配置中心、缓存与失效、Feature Flag、Secret 分离、变更审计、灰度、回滚、漂移检测、Kubernetes ConfigMap/Secret 使用和配置测试。用于建立项目级配置规范、设计动态配置平台接入、治理配置事故。Secret 安全使用、部署流水线参考独立规范。"
 ---
 
 # 配置管理设计
@@ -125,4 +125,3 @@ python scripts/ensure_uv.py
 uv run scripts/validate_configuration.py --assets assets/
 uv run python -m unittest discover -s scripts/tests   # 跑测试
 ```
-
