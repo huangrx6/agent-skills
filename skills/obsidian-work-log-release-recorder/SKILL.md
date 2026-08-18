@@ -1,6 +1,6 @@
 ---
 name: obsidian-work-log-release-recorder
-description: Use this skill after completing a coding task, deployment task, configuration adjustment, database/script change, release preparation, or meaningful project update when the user wants durable notes in Huangrx6's Obsidian vault. It records only landed, reusable, or release-relevant facts into the correct Project/Area/Resource location and maintains a weekly release note with scripts, configs, deployment paths, validation, rollback, and execution assumptions. Use it whenever the user says to record, summarize, settle,沉淀, 更新知识库, 记到 Obsidian, 写发版文档, or after a task has produced operational knowledge worth keeping. This skill is bound to Huangrx6's specific vault path /Users/huangrx6/obsidian; cross-machine reuse is limited.
+description: Use this skill after completing a coding task, deployment task, configuration adjustment, database/script change, release preparation, or meaningful project update when the user wants durable notes in Huangrx6's Obsidian vault. It records only landed, reusable, or release-relevant facts into the correct Project/Area/Resource location and maintains a weekly release note with scripts, configs, deployment paths, validation, rollback, and execution assumptions. Use it whenever the user says to record, summarize, settle,沉淀, 更新知识库, 记到 Obsidian, 写发版文档, or after a task has produced operational knowledge worth keeping. This skill is bound to Huangrx6's specific vault path /Users/huangrx6/Documents/obsidian; cross-machine reuse is limited.
 ---
 
 # Obsidian Work Log And Release Recorder
@@ -11,7 +11,7 @@ This skill turns completed work into durable Obsidian notes. It is intentionally
 
 This skill is bound to a specific machine and Obsidian vault:
 
-- vault path must be `/Users/huangrx6/obsidian`
+- vault path must be `/Users/huangrx6/Documents/obsidian`
 - depends on `obsidian-personal-knowledge-base` skill for vault structure conventions (`references/vault-map.md`, `references/writing-conventions.md`)
 - **cross-machine reuse is limited**: switching machines or vault paths requires re-aligning references
 
@@ -19,7 +19,7 @@ This skill is bound to a specific machine and Obsidian vault:
 
 Use this skill with the Obsidian vault at:
 
-`/Users/huangrx6/obsidian`
+`/Users/huangrx6/Documents/obsidian`
 
 Use the existing `obsidian-personal-knowledge-base` skill conventions when writing in that vault:
 
@@ -224,6 +224,6 @@ Keep the handoff short. The value is in the notes.
 
 Install via the repo-root `npx skills add huangrx6/agent-skills` (see repo-root [README.md](../../README.md)). After installing:
 
-1. Confirm your vault path matches `/Users/huangrx6/obsidian`
+1. Confirm your vault path matches `/Users/huangrx6/Documents/obsidian`
 2. Install `obsidian-personal-knowledge-base` first if not already installed — this skill depends on its `references/vault-map.md` and `references/writing-conventions.md`
 3. Agent will read both skills' references when triggered to write release notes
