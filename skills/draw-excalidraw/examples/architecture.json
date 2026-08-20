@@ -1,0 +1,26 @@
+{
+  "type": "architecture",
+  "title": "IAM Login Architecture",
+  "theme": "technical",
+  "direction": "LR",
+  "groups": [
+    {"id": "edge", "label": "Access"},
+    {"id": "iam", "label": "IAM Core"},
+    {"id": "state", "label": "State"}
+  ],
+  "nodes": [
+    {"id": "user", "label": "User", "kind": "user", "group": "edge", "icon": "lucide:user"},
+    {"id": "web", "label": "Web Client", "kind": "client", "group": "edge", "icon": "lucide:monitor"},
+    {"id": "auth", "label": "Auth Service", "kind": "security", "group": "iam", "detail": "login / token", "icon": "lucide:shield-check"},
+    {"id": "user-service", "label": "User Service", "kind": "service", "group": "iam", "icon": "lucide:users"},
+    {"id": "redis", "label": "Redis", "kind": "cache", "group": "state", "icon": "lucide:database-zap"},
+    {"id": "db", "label": "iam_db", "kind": "database", "group": "state", "icon": "lucide:database"}
+  ],
+  "edges": [
+    {"from": "user", "to": "web"},
+    {"from": "web", "to": "auth", "label": "POST /login"},
+    {"from": "auth", "to": "user-service", "label": "load identity"},
+    {"from": "auth", "to": "redis", "label": "session", "kind": "data"},
+    {"from": "user-service", "to": "db", "label": "users / roles", "kind": "data"}
+  ]
+}

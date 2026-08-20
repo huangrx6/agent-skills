@@ -1,0 +1,15 @@
+{
+  "type": "sequence",
+  "title": "Login Sequence",
+  "participants": [
+    {"id": "browser", "label": "Browser", "kind": "client", "icon": "lucide:monitor"},
+    {"id": "auth", "label": "Auth Service", "kind": "security", "icon": "lucide:shield-check"},
+    {"id": "redis", "label": "Redis", "kind": "cache", "icon": "lucide:database-zap"}
+  ],
+  "messages": [
+    {"from": "browser", "to": "auth", "label": "POST /login"},
+    {"from": "auth", "to": "redis", "label": "SET session", "kind": "data"},
+    {"from": "redis", "to": "auth", "label": "OK", "kind": "return"},
+    {"from": "auth", "to": "browser", "label": "token", "kind": "return"}
+  ]
+}
