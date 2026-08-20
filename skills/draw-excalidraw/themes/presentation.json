@@ -1,0 +1,29 @@
+{
+  "name": "presentation",
+  "canvas": "#ffffff",
+  "stroke": "#343a40",
+  "text": "#212529",
+  "muted": "#68717a",
+  "roughness": 1,
+  "strokeWidth": 2,
+  "fontFamily": 2,
+  "titleFontSize": 32,
+  "nodeFontSize": 18,
+  "detailFontSize": 13,
+  "edgeFontSize": 13,
+  "palette": {
+    "user": ["#dbeafe", "#2563eb"],
+    "client": ["#dbeafe", "#2563eb"],
+    "gateway": ["#e0e7ff", "#4f46e5"],
+    "api": ["#e0e7ff", "#4f46e5"],
+    "service": ["#dcfce7", "#16a34a"],
+    "worker": ["#dcfce7", "#16a34a"],
+    "database": ["#ede9fe", "#7c3aed"],
+    "cache": ["#ffedd5", "#ea580c"],
+    "queue": ["#fef3c7", "#d97706"],
+    "security": ["#fce7f3", "#db2777"],
+    "external": ["#f3f4f6", "#4b5563"],
+    "decision": ["#fef3c7", "#d97706"],
+    "default": ["#f8fafc", "#475569"]
+  }
+}

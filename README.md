@@ -59,7 +59,8 @@ skills/
 ├── skill-creator/                         ← 流程类：新建/改进/评估 skill
 ├── obsidian-* (2 个)                      ← Obsidian 类：操作本机 Huangrx6 vault
 ├── visual-{image-understanding,ui-layout-spec}/   ← 工具类：视觉相关
-└── draw-processon/                        ← 工具类：ProcessOn 可视化技能
+├── draw-processon/                        ← 工具类：ProcessOn 可视化技能
+└── draw-excalidraw/                       ← 工具类：Excalidraw 本地可编辑图表
 ```
 
 每个 skill 目录内统一结构（参考 [skill-creator](./skills/skill-creator) 的"Anatomy of a Skill"）：
@@ -102,13 +103,14 @@ skills/
 |---|---|
 | [skill-creator](./skills/skill-creator) | 创建 / 改进 / 评估 skill 的端到端流程（草稿→试跑→反馈→迭代→描述优化）|
 
-### 工具类（3 个）
+### 工具类（4 个）
 
 | Skill | 一句话定位 |
 |---|---|
 | [visual-image-understanding](./skills/visual-image-understanding) | 本地图片 → 远端视觉模型 → 分节 Markdown 描述（不依赖 Agent 原生视觉）|
 | [visual-ui-layout-spec](./skills/visual-ui-layout-spec) | UI 截图 / 数据大屏 / 设计稿 → 可交付前端的布局规格（双轨证据 + 设计令牌）|
 | [draw-processon](./skills/draw-processon) | 统一的 ProcessOn 可视化技能，自动路由技术图表、思维导图和文档转思维导图工作流 |
+| [draw-excalidraw](./skills/draw-excalidraw) | 从仓库/文档证据生成本地可编辑的 .excalidraw 文件（含自动布局、视觉检查、Lucide/品牌图标）|
 
 ### Obsidian 类（2 个）
 

@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "draw-excalidraw-diagram-spec",
+  "title": "draw-excalidraw semantic diagram spec",
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": {"enum": ["architecture", "topology", "flowchart", "dataflow", "state", "sequence", "er", "mindmap", "wireframe"]},
+    "title": {"type": "string"},
+    "subtitle": {"type": "string"},
+    "theme": {"enum": ["technical", "presentation", "monochrome"]},
+    "detail": {"enum": ["executive", "standard", "diagnostic"]},
+    "direction": {"enum": ["LR", "RL", "TB", "BT"]},
+    "layout": {
+      "type": "object",
+      "properties": {
+        "engine": {"enum": ["auto", "dagre", "elk", "simple", "manual"]},
+        "nodeSeparation": {"type": "number"},
+        "rankSeparation": {"type": "number"}
+      },
+      "additionalProperties": true
+    },
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label"],
+        "properties": {
+          "id": {"type": "string"},
+          "label": {"type": "string"},
+          "description": {"type": "string"}
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label"],
+        "properties": {
+          "id": {"type": "string"},
+          "label": {"type": "string"},
+          "detail": {"type": "string"},
+          "kind": {"type": "string"},
+          "group": {"type": "string"},
+          "shape": {"enum": ["rectangle", "ellipse", "diamond"]},
+          "fields": {"type": "array", "items": {"type": "string"}},
+          "icon": {
+            "oneOf": [
+              {"type": "string"},
+              {
+                "type": "object",
+                "properties": {
+                  "provider": {"enum": ["lucide", "brand", "library", "none"]},
+                  "name": {"type": "string"}
+                }
+              }
+            ]
+          },
+          "x": {"type": "number"}, "y": {"type": "number"},
+          "width": {"type": "number"}, "height": {"type": "number"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to"],
+        "properties": {
+          "id": {"type": "string"},
+          "from": {"type": "string"},
+          "to": {"type": "string"},
+          "label": {"type": "string"},
+          "kind": {"enum": ["call", "async", "data", "dependency", "return", "conditional"]},
+          "style": {"enum": ["solid", "dashed", "dotted"]}
+        },
+        "additionalProperties": true
+      }
+    },
+    "participants": {"type": "array"},
+    "messages": {"type": "array"},
+    "tree": {"type": "object"}
+  },
+  "additionalProperties": true
+}
