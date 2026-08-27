@@ -6,6 +6,9 @@
 .Trashes
 ._*
 
+# JetBrains IDE config
+.idea/
+
 # pi tool 内部状态文件（lock + 缓存）
 .skill-lock.json
 
