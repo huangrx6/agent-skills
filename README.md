@@ -1,49 +1,40 @@
-# huangrx6 / agent-skills
+# ![agent-skills](assets/icons/agent-skills-light.svg#gh-light-mode-only) ![agent-skills](assets/icons/agent-skills-dark.svg#gh-dark-mode-only) **Agent Skills**
 
-个人 skills 集合，覆盖工程实践设计、skill 创建流程、视觉理解工具、Obsidian 知识库四个领域。每个 skill 是给 AI Coding Agent 读的"专业领域提示词 + 工作流"，由 Agent 根据 `SKILL.md` 第一段 `description` 字段自动决定是否触发。
+> 11 个 skill，给 AI Coding Agent 用的专业领域提示词 + 工作流集合。覆盖工程实践（4）+ 视觉 / Obsidian / 流程工具（7）。
 
-> **跨 Agent 通用**：兼容 Claude Code / pi / OpenCode / Cursor / Codex 等任意支持 `SKILL.md` frontmatter 约定的 Agent。
+## What this is
 
-## 快速安装
+每个 skill 是一个独立目录，包含 `SKILL.md`（YAML frontmatter + Markdown 正文）和可选的 `references/` / `assets/` / `scripts/` / `examples/`。Agent 通过 `SKILL.md` 第一段 `description` 字段自动判断是否触发。
+
+**跨 Agent 通用**：兼容 Claude Code / pi / OpenCode / Cursor / Codex 等任意支持 `SKILL.md` frontmatter 约定的 Agent。
+
+---
+
+## Quick install（推荐）
 
 使用 skills 生态的**事实标准 CLI** [`vercel-labs/skills`](https://github.com/vercel-labs/skills)（支持 75+ Agent）：
 
 ```sh
-# 交互式安装：让选 skill / agent / 全局或项目级 / symlink 或 copy
-npx skills add huangrx6/agent-skills
+# 交互式安装
+npx skills add <repo>
 
-# 精确指定：只装某个 skill 到某个 agent 的全局目录，跳过确认
-npx skills add huangrx6/agent-skills \
-  --skill design-api-contracts \
+# 精确指定：只装某个 skill 到某个 agent 的全局目录
+npx skills add <repo> \
+  --skill engineering-architecture \
   --agent claude-code --global --yes
 
 # 一次装全部到指定 agent
-npx skills add huangrx6/agent-skills --skill '*' --agent claude-code
-
-# 列出本仓库所有 skill（不装）
-npx skills add huangrx6/agent-skills --list
+npx skills add <repo> --skill '*' --agent claude-code
 ```
 
-### 完整 flag 速查
+### 备选：git clone + 手动软链
 
-| Flag | 作用 | 例子 |
-|---|---|---|
-| `-s, --skill <name>` | 选择性安装（可多次；`'*'` 代表全部）| `--skill design-api-contracts` |
-| `-a, --agent <name>` | 目标 agent（可多次；`'*'` 代表全部）| `-a claude-code -a opencode` |
-| `-g, --global` | 装到用户目录而不是项目目录 | `--global` |
-| `-y, --yes` | 跳过所有确认提示 | `--yes` |
-| `--all` | 装全部 skill 到全部 agent，无提示 | `--all` |
-| `--copy` | 拷贝而不是 symlink | `--copy` |
-| `-l, --list` | 只列出不装 | `--list` |
-
-### 不依赖 `npx skills` 的备选
-
-任何能读 `SKILL.md` 的 Agent 都能直接 git clone 后用：
+任何能读 `SKILL.md` 的 Agent 都能直接用：
 
 ```sh
-git clone https://github.com/huangrx6/agent-skills.git
+git clone https://github.com/<owner>/agent-skills.git
 
-# 把 skills/<想装的>/ 软链或拷贝到你的 Agent 加载目录，例如：
+# 把 skills/<想装的>/ 软链到你的 Agent 加载目录，例如：
 #   Claude Code 项目级：./.claude/skills/<name>
 #   Claude Code 全局级：~/.claude/skills/<name>
 #   pi 全局级：       ~/.agents/skills/<name>
@@ -51,90 +42,70 @@ git clone https://github.com/huangrx6/agent-skills.git
 #   Codex 全局级：    ~/.codex/skills/<name>
 ```
 
-## 目录结构
+---
 
-```
-skills/
-├── design-* (13 个)                       ← 设计类：按工程领域切分
-├── skill-creator/                         ← 流程类：新建/改进/评估 skill
-├── obsidian-* (2 个)                      ← Obsidian 类：操作本机 Huangrx6 vault
-├── visual-{image-understanding,ui-layout-spec}/   ← 工具类：视觉相关
-├── draw-processon/                        ← 工具类：ProcessOn 可视化技能
-└── draw-excalidraw/                       ← 工具类：Excalidraw 本地可编辑图表
+## Skills 索引（11 个）
+
+### 1. 工程标准（4 个 `engineering-*`）
+
+覆盖软件工程生命周期 4 个维度。每个 skill 都有独立子主题（13 个 sub-topic），子主题的 README 提供快速参考和决策表。
+
+| Icon | Skill | 覆盖 |
+| --- | --- | --- |
+| ![arch](skills/assets/icons/engineering-architecture-light.svg#gh-light-mode-only) ![arch](skills/assets/icons/engineering-architecture-dark.svg#gh-dark-mode-only) | [**engineering-architecture**](skills/engineering-architecture/SKILL.md) | 系统骨架与契约：边界 · 风格 · API · 数据库 · 文档 · Git |
+| ![rel](skills/assets/icons/engineering-reliability-light.svg#gh-light-mode-only) ![rel](skills/assets/icons/engineering-reliability-dark.svg#gh-dark-mode-only) | [**engineering-reliability**](skills/engineering-reliability/SKILL.md) | 运行时可靠性与可观测性：异常 · 韧性 · 监控 · 日志 · 性能容量 |
+| ![sec](skills/assets/icons/engineering-security-light.svg#gh-light-mode-only) ![sec](skills/assets/icons/engineering-security-dark.svg#gh-dark-mode-only) | [**engineering-security**](skills/engineering-security/SKILL.md) | 代码与依赖的安全实现：威胁建模 · 注入防护 · 认证授权 · 密钥 · SAST |
+| ![qual](skills/assets/icons/engineering-quality-light.svg#gh-light-mode-only) ![qual](skills/assets/icons/engineering-quality-dark.svg#gh-dark-mode-only) | [**engineering-quality**](skills/engineering-quality/SKILL.md) | 代码级一致性与配置体系：代码规范 · 命名 · 配置分类 · Feature Flag |
+
+**触发语法**：
+
+```text
+使用 $engineering-<area>[/<sub-topic>] 帮我 <做什么>
 ```
 
-每个 skill 目录内统一结构（参考 [skill-creator](./skills/skill-creator) 的"Anatomy of a Skill"）：
+**子主题入口**：[architecture](skills/engineering-architecture/architecture/README.md) · [api-contracts](skills/engineering-architecture/api-contracts/README.md) · [database](skills/engineering-architecture/database/README.md) · [documentation](skills/engineering-architecture/documentation/README.md) · [git](skills/engineering-architecture/git/README.md) · [exception-handling](skills/engineering-reliability/exception-handling/README.md) · [resilience](skills/engineering-reliability/resilience/README.md) · [observability](skills/engineering-reliability/observability/README.md) · [logging](skills/engineering-reliability/logging/README.md) · [performance-capacity](skills/engineering-reliability/performance-capacity/README.md) · [secure-coding](skills/engineering-security/secure-coding/README.md) · [code-style](skills/engineering-quality/code-style/README.md) · [configuration](skills/engineering-quality/configuration/README.md)
 
-```
+### 2. 工具与流程（7 个）
+
+围绕工程标准做事的辅助 skill：阅读图片 / 写文档 / 操作 Obsidian / 创建新 skill 等。
+
+| Icon | Skill | 用途 |
+| --- | --- | --- |
+| ![readme](skills/assets/icons/developer-readme-design-light.svg#gh-light-mode-only) ![readme](skills/assets/icons/developer-readme-design-dark.svg#gh-dark-mode-only) | [**developer-readme-design**](skills/developer-readme-design/SKILL.md) | 把仓库 README 改造成成熟的开发者工具 landing page（monochrome / restrained / technical） |
+| ![draw](skills/assets/icons/draw-processon-light.svg#gh-light-mode-only) ![draw](skills/assets/icons/draw-processon-dark.svg#gh-dark-mode-only) | [**draw-processon**](skills/draw-processon/SKILL.md) | 统一调用 ProcessOn 画架构图 / 流程图 / ER 图 / 思维导图 |
+| ![vault](skills/assets/icons/obsidian-personal-knowledge-base-light.svg#gh-light-mode-only) ![vault](skills/assets/icons/obsidian-personal-knowledge-base-dark.svg#gh-dark-mode-only) | [**obsidian-personal-knowledge-base**](skills/obsidian-personal-knowledge-base/SKILL.md) | 操作 PARA + MOC 结构的 Obsidian vault |
+| ![record](skills/assets/icons/obsidian-work-log-release-recorder-light.svg#gh-light-mode-only) ![record](skills/assets/icons/obsidian-work-log-release-recorder-dark.svg#gh-dark-mode-only) | [**obsidian-work-log-release-recorder**](skills/obsidian-work-log-release-recorder/SKILL.md) | 任务完成后把可复用事实沉淀到 Obsidian 长期知识 |
+| ![create](skills/assets/icons/skill-creator-light.svg#gh-light-mode-only) ![create](skills/assets/icons/skill-creator-dark.svg#gh-dark-mode-only) | [**skill-creator**](skills/skill-creator/SKILL.md) | 创建新 skill / 改进现有 skill / 跑 eval 测触发准确度 |
+| ![image](skills/assets/icons/visual-image-understanding-light.svg#gh-light-mode-only) ![image](skills/assets/icons/visual-image-understanding-dark.svg#gh-dark-mode-only) | [**visual-image-understanding**](skills/visual-image-understanding/SKILL.md) | 读图片（截图 / 照片 / 文档 / 图表），OCR + 视觉理解 |
+| ![layout](skills/assets/icons/visual-ui-layout-spec-light.svg#gh-light-mode-only) ![layout](skills/assets/icons/visual-ui-layout-spec-dark.svg#gh-dark-mode-only) | [**visual-ui-layout-spec**](skills/visual-ui-layout-spec/SKILL.md) | UI 截图 / 数据大屏转可交付前端的布局规格（双轨证据：原生视觉 + 远端 VLM） |
+
+---
+
+## Anatomy of a Skill
+
+每个 skill 目录内统一结构（参考 [`skill-creator`](skills/skill-creator/SKILL.md) 的"Anatomy of a Skill"）：
+
+```text
 <skill-name>/
 ├── SKILL.md                # 必填：YAML frontmatter（name + description）+ Markdown 正文
 ├── references/             # 按需加载的长文参考
-├── assets/                 # 输出用模板 / 数据 / 图表
+├── assets/                 # 输出用模板 / 数据 / 图表 / 图标
 ├── scripts/                # 可执行脚本（uv run / node）
 ├── agents/                 # 子 agent 定义
 └── examples/               # 输入输出示例
 ```
 
-## Skill 索引
-
-### 设计类（13 个）
-
-工程实践的 design skill，每个聚焦一个领域。被 Agent 调用来辅助**设计、审查、完善**对应领域的规范、方案、清单、模板。
-
-| Skill | 一句话定位 |
-|---|---|
-| [design-api-contracts](./skills/design-api-contracts) | API 契约设计：REST / gRPC / GraphQL / WebSocket / SSE / Webhook / JSON-RPC |
-| [design-application-logging](./skills/design-application-logging) | 应用日志规范：级别、字段、生命周期、注入防护、滚动归档 |
-| [design-code-writing-standards](./skills/design-code-writing-standards) | 代码书写规范：命名、格式化、注释、设计原则、Review 清单 |
-| [design-configuration-management](./skills/design-configuration-management) | 配置管理：Schema、来源优先级、热更新、Secret 分离、漂移检测 |
-| [design-database-standards](./skills/design-database-standards) | 数据库规范：关系型数据模型、索引、迁移、在线 DDL、分区分片 |
-| [design-engineering-documentation](./skills/design-engineering-documentation) | 工程文档体系：README、ADR、文档防腐、AI-first 仓库设计 |
-| [design-exception-handling](./skills/design-exception-handling) | 异常处理：失败分类、错误码、统一响应、超时、重试、幂等 |
-| [design-git-workflows](./skills/design-git-workflows) | Git 工作流：分支策略、提交信息、worktree、回退恢复、危险门控 |
-| [design-observability](./skills/design-observability) | 可观测性：OpenTelemetry、SLI/SLO、采样、告警降噪 |
-| [design-performance-capacity](./skills/design-performance-capacity) | 性能与容量：基准、压测、瓶颈分析、自动扩缩、性能回归 |
-| [design-secure-coding](./skills/design-secure-coding) | 安全编码：信任边界、注入防护、密钥管理、AI 生成代码审查 |
-| [design-service-resilience](./skills/design-service-resilience) | 服务韧性：超时、重试、熔断、舱壁、限流、降级、故障注入 |
-| [design-software-architecture](./skills/design-software-architecture) | 软件架构：模块边界、风格选择、ADR、C4、架构风险评审 |
-
-### 流程类（1 个）
-
-| Skill | 一句话定位 |
-|---|---|
-| [skill-creator](./skills/skill-creator) | 创建 / 改进 / 评估 skill 的端到端流程（草稿→试跑→反馈→迭代→描述优化）|
-
-### 工具类（4 个）
-
-| Skill | 一句话定位 |
-|---|---|
-| [visual-image-understanding](./skills/visual-image-understanding) | 本地图片 → 远端视觉模型 → 分节 Markdown 描述（不依赖 Agent 原生视觉）|
-| [visual-ui-layout-spec](./skills/visual-ui-layout-spec) | UI 截图 / 数据大屏 / 设计稿 → 可交付前端的布局规格（双轨证据 + 设计令牌）|
-| [draw-processon](./skills/draw-processon) | 统一的 ProcessOn 可视化技能，自动路由技术图表、思维导图和文档转思维导图工作流 |
-| [draw-excalidraw](./skills/draw-excalidraw) | 从仓库/文档证据生成本地可编辑的 .excalidraw 文件（含自动布局、视觉检查、Lucide/品牌图标）|
-
-### Obsidian 类（2 个）
-
-针对本机 Huangrx6 的 Obsidian vault（`/Users/huangrx6/obsidian`，PARA + MOC 结构）。**跨机复用性低**——只能在同一台机器同一用户下使用。
-
-| Skill | 一句话定位 |
-|---|---|
-| [obsidian-personal-knowledge-base](./skills/obsidian-personal-knowledge-base) | 在 PARA + MOC vault 中归位、维护笔记、MOC、模板、领域主页（含 5 个 references）|
-| [obsidian-work-log-release-recorder](./skills/obsidian-work-log-release-recorder) | 完成后沉淀工作日志 + weekly release note（脚本/配置/部署/回滚/验证）|
-
-## 使用
-
-每个 skill 的 `SKILL.md` 第一段 `description` 字段是 Agent 决定是否触发它的依据；正文写的是详细的输入输出约定、调用流程、注意事项。要了解某个 skill 的具体能力，直接点进对应目录读 `SKILL.md`。
-
 ## 维护约定
 
 - **目录名 = frontmatter `name` 字段**，保持一致
-- 修改某个 skill 后，跑一次 `skill-creator` 里的"如何测试"流程（多数 design skill 没有自动化测试，主要靠人工 review）
-- **设计类** 内容相对稳定（按工程领域沉淀），**工具类**（visual-*）会因上游依赖变动需要跟进，**Obsidian 类**绑定本机 vault 路径（跨机复用性低）
-- 新增 skill：参考 `skill-creator/SKILL.md` 的"Anatomy of a Skill"和"Writing Patterns"
-- 仓库根的 `.skill-lock.json` 已被 `.gitignore` 排除——那是 pi 工具的本地 lock，每台机器自己生成
+- 修改某个 skill 后：跑它自带的 `validate_*.py` + `unittest`；新加 skill 用 [`skill-creator`](skills/skill-creator/SKILL.md) 的流程
+- **工程标准**（4 个 `engineering-*`）相对稳定；**工具类**（visual-*）会因上游依赖变动需跟进；**Obsidian 类**绑定具体 vault 路径（跨机复用性低）
+- 本仓库的 `.skill-lock.json` 已被 `.gitignore` 排除——那是 pi 工具的本地 lock，每台机器自己生成
+- git 历史包含旧 skill 演化轨迹；通过 `git log --diff-filter=D` 追溯
 
-## 仓库布局遵循
+## 参考
 
 - [`vercel-labs/agent-skills`](https://github.com/vercel-labs/agent-skills) — skills 生态参考仓库
 - [Anthropic — Equipping agents for the real world with agent skills](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills) — SKILL.md frontmatter 约定
 - [`vercel-labs/skills`](https://github.com/vercel-labs/skills) — `npx skills` CLI（支持 75+ Agent）
+- [developer-readme-design](skills/developer-readme-design/SKILL.md) — 本仓库所有 README 的视觉规范来源
