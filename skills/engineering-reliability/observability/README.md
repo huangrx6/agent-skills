@@ -1,4 +1,4 @@
-# Observability
+# ![observability](../assets/icons/observability-light.svg#gh-light-mode-only) ![observability](../assets/icons/observability-dark.svg#gh-dark-mode-only) Observability
 
 > Parent: [`engineering-reliability`](../SKILL.md). Spec for OpenTelemetry-based observability — metrics / traces / logs correlation, SLI / SLO, Golden Signals, sampling, dashboards, alerts, telemetry governance, cost control.
 

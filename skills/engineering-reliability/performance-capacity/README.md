@@ -1,4 +1,4 @@
-# Performance & Capacity
+# ![performance-capacity](../assets/icons/performance-capacity-light.svg#gh-light-mode-only) ![performance-capacity](../assets/icons/performance-capacity-dark.svg#gh-dark-mode-only) Performance & Capacity
 
 > Parent: [`engineering-reliability`](../SKILL.md). Spec for performance and capacity — target, workload model, throughput / concurrency / tail latency, budget, benchmark, load / stress / spike / soak testing, bottleneck analysis, profiling, capacity model, autoscaling, regression and cost efficiency.
 

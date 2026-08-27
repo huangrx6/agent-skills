@@ -1,4 +1,4 @@
-# Code Style
+# ![code-style](../assets/icons/code-style-light.svg#gh-light-mode-only) ![code-style](../assets/icons/code-style-dark.svg#gh-dark-mode-only) Code Style
 
 > Parent: [`engineering-quality`](../SKILL.md). Spec for language-agnostic code style plus per-language adaptation — naming, formatting, file organization, file headers, comments, API documentation, design principles, function and type design, dependencies, security, concurrency, performance, testing, version control, code review.
 

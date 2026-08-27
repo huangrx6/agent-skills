@@ -1,4 +1,4 @@
-# Configuration
+# ![configuration](../assets/icons/configuration-light.svg#gh-light-mode-only) ![configuration](../assets/icons/configuration-dark.svg#gh-dark-mode-only) Configuration
 
 > Parent: [`engineering-quality`](../SKILL.md). Spec for application configuration — classification, schema, source and priority, environment isolation, startup validation, dynamic configuration, hot reload, config center, cache, Feature Flag, Secret separation, change audit, rollout, rollback, drift detection, Kubernetes ConfigMap / Secret, configuration testing.
 

@@ -1,4 +1,4 @@
-# Database
+# ![database](../assets/icons/database-light.svg#gh-light-mode-only) ![database](../assets/icons/database-dark.svg#gh-dark-mode-only) Database
 
 > Parent: [`engineering-architecture`](../SKILL.md). Spec for relational schema, indexes, transactions, migrations, Expand-Migrate-Contract, online DDL, retention, backup.
 

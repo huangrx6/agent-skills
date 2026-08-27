@@ -1,4 +1,4 @@
-# Resilience
+# ![resilience](../assets/icons/resilience-light.svg#gh-light-mode-only) ![resilience](../assets/icons/resilience-dark.svg#gh-dark-mode-only) Resilience
 
 > Parent: [`engineering-reliability`](../SKILL.md). Spec for timeout budget, retry, circuit breaker, bulkhead, rate limit, load shedding, backpressure, queue, degradation, health checks, and fault injection.
 

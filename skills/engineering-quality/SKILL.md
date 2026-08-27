@@ -3,7 +3,7 @@ name: engineering-quality
 description: "用户说\"建立代码风格规范 / 命名约定 / 格式化配置 / lint 规则 / 文件头与版权元数据 / 注释规范 / 评审代码 / 设计模式评审 / 配置中心接入 / Feature Flag 设计 / Secret 分离 / 动态配置 / 配置热更新 / 配置漂移检测\"时激活。覆盖代码风格与命名、文件组织、配置分类与 Schema、动态配置、Secret 边界、Feature Flag。不要用它做：架构选型 → engineering-architecture；异常/韧性/可观测 → engineering-reliability；安全威胁建模 → engineering-security。"
 ---
 
-# 工程质量
+# ![engineering-quality](../assets/icons/engineering-quality-light.svg#gh-light-mode-only) ![engineering-quality](../assets/icons/engineering-quality-dark.svg#gh-dark-mode-only) 工程质量
 
 ## 目标
 

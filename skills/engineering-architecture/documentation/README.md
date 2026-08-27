@@ -1,4 +1,4 @@
-# Engineering Documentation
+# ![documentation](../assets/icons/documentation-light.svg#gh-light-mode-only) ![documentation](../assets/icons/documentation-dark.svg#gh-dark-mode-only) Engineering Documentation
 
 > Parent: [`engineering-architecture`](../SKILL.md). Spec for a documentation system that serves both humans and AI Agents — README, AGENTS.md, PROJECT_CONTEXT, docs/index, ADR, Handoff, lifecycle.
 
