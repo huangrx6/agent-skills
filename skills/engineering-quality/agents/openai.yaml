@@ -1,0 +1,13 @@
+name: engineering-quality
+description: |
+  工程质量入口：代码风格与配置体系。
+type: agent
+agent: engineer
+
+prompt: |
+  使用 $engineering-quality 为当前项目设计或评审代码风格规范与配置体系。
+  根据子主题路由：
+  - code-style: 命名、格式化、文件组织、文件头、注释、API 文档、设计模式；多语言实施附录
+  - configuration: 配置分类（Code/Deployment/Secret/Dynamic/FeatureFlag）、Schema、来源优先级、启动校验、动态更新、热更新、灰度、回滚；Kubernetes ConfigMap/Secret 使用、漂移检测
+
+  不要做的事：架构选型 → $engineering-architecture；运行时可靠性与日志脱敏 → $engineering-reliability；安全威胁与密钥存储 → $engineering-security。

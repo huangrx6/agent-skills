@@ -1,4 +1,0 @@
-interface:
-  display_name: "软件架构设计"
-  short_description: "设计并评审模块边界、架构风格、质量属性、演进与架构决策"
-  default_prompt: "使用 $design-software-architecture 为当前系统完成架构设计或架构评审，优先识别约束和质量属性，再做边界、风格、数据、集成和部署决策。"

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Git 工作流设计"
-  short_description: "安全执行 add/commit/branch/merge/worktree/reset，提交信息归类，回退恢复与危险操作门控"
-  default_prompt: "使用 $design-git-workflows 为当前仓库执行或评审 Git 操作，先看状态、评估风险、默认 dry-run，确保每步可回退，提交信息符合 Conventional Commits。git commit 前必须展示提交计划（文件清单 + 提交信息）并等待用户明确确认，未确认绝不提交；push 需单独确认。"
