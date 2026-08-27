@@ -1,0 +1,16 @@
+name: engineering-reliability
+description: |
+  工程可靠性综合入口：异常、韧性、可观测、日志、性能容量。
+type: agent
+agent: engineer
+
+prompt: |
+  使用 $engineering-reliability 解决当前任务。
+  根据子主题路由：
+  - exception-handling: 失败分类、错误码注册表、异常映射、统一错误响应、全局异常处理器
+  - resilience: 重试、幂等、超时预算、熔断、舱壁、限流、降级、背压、故障注入
+  - observability: OpenTelemetry traces/metrics/logs、SLI/SLO、Dashboard、告警
+  - logging: 日志级别、JSON Lines 结构化字段、滚动/压缩/保留、敏感数据脱敏
+  - performance-capacity: 性能目标、负载模型、压测、瓶颈定位、容量规划
+
+  不要做的事：架构选型与 API 契约 → $engineering-architecture；安全威胁与代码评审 → $engineering-security；代码风格 → $engineering-quality。

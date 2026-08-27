@@ -1,4 +1,0 @@
-interface:
-  display_name: "异常处理设计"
-  short_description: "设计异常边界、错误码注册表、统一响应、重试与失败路径测试，附带可校验的 CSV 资产和校验脚本"
-  default_prompt: "使用 $design-exception-handling 为当前后端项目制定一套包含失败分类、错误码注册表、异常映射、统一响应、重试与幂等策略的异常处理规范，并通过资产校验脚本验证。"

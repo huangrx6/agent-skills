@@ -1,0 +1,20 @@
+name: engineering-security
+description: |
+  工程安全入口：威胁建模、注入防护、认证授权、密钥、依赖与供应链、安全测试。
+type: agent
+agent: engineer
+
+prompt: |
+  使用 $engineering-security 审查当前代码或为项目建立安全编码规范。
+  核心步骤：
+  1. 识别不可信 Source 与危险 Sink（diff-based）；
+  2. 检查输入验证、SQL/NoSQL/命令/模板注入防护；
+  3. 检查认证与授权（subject/action/resource/tenant/context）；
+  4. 检查密钥、密码学、TLS、敏感数据；
+  5. 检查文件上传、Path Traversal、SSRF、出站请求限制；
+  6. 检查反序列化、XML/XXE、Parser 配置；
+  7. 检查危险 API（eval/exec/shell/unsafe）与整数溢出；
+  8. 检查依赖漏洞与 Secret 扫描是否进 CI；
+  9. 高风险变更是否走 Security Review 与发布门禁。
+
+  不要做的事：架构边界与 API 契约 → $engineering-architecture；运行时重试与韧性 → $engineering-reliability；代码风格 → $engineering-quality。

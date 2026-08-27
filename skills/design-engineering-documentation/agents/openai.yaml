@@ -1,4 +1,0 @@
-interface:
-  display_name: "工程文档设计"
-  short_description: "为人类和 AI Agent 建立分层、可维护、可自动更新的项目知识体系"
-  default_prompt: "使用 $design-engineering-documentation 为当前项目设计或审查工程文档体系，重点优化新成员与新 AI 会话的理解速度、唯一事实来源和任务完成后的自动知识沉淀。"

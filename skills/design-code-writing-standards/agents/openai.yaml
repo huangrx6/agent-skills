@@ -1,4 +1,0 @@
-interface:
-  display_name: "代码书写规范设计"
-  short_description: "制定命名、格式、注释、文件头、设计模式与代码评审规范"
-  default_prompt: "使用 $design-code-writing-standards 为当前项目制定一套精简、可执行、可自动化的代码书写规范，并区分通用规则与语言实施附录。"

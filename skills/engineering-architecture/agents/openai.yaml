@@ -1,0 +1,16 @@
+name: engineering-architecture
+description: |
+  工程架构综合入口。
+type: agent
+agent: engineer
+
+prompt: |
+  使用 $engineering-architecture 解决当前任务。
+  根据子主题路由：
+  - architecture: 模块边界、架构风格选择、ADR、架构评审
+  - api-contracts: REST/gRPC/GraphQL/WebSocket/SSE/Webhook 契约、Schema、错误响应、版本兼容
+  - database: 表设计、约束、索引、迁移、扩容、回填、备份
+  - documentation: README/AGENTS/PROJECT_CONTEXT/docs 体系、ADR、Handoff
+  - git: 分支模型、提交信息、worktree、reset/rebase、回退恢复
+
+  不要做的事：性能与容量目标 → $engineering-reliability；安全威胁与代码评审 → $engineering-security；代码风格与 lint → $engineering-quality。

@@ -1,4 +1,0 @@
-interface:
-  display_name: "应用日志设计"
-  short_description: "设计日志格式、事件目录、双流输出、结构化字段、上下文注入、轮转归档、清理、脱敏、审计分离与成本治理，附带可校验的 CSV 资产和校验脚本"
-  default_prompt: "使用 $design-application-logging 为当前项目制定一套包含事件目录、字段契约、双流输出、轮转归档、脱敏与审计分离的生产级应用日志规范，并通过资产校验脚本验证。"

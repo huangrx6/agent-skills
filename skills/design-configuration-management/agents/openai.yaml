@@ -1,4 +1,0 @@
-interface:
-  display_name: "配置管理设计"
-  short_description: "设计配置 Schema、优先级、热更新、Feature Flag、灰度与回滚"
-  default_prompt: "使用 $design-configuration-management 为当前项目设计或评审配置体系，明确配置类型、来源、动态更新、Secret 边界和安全回滚。"

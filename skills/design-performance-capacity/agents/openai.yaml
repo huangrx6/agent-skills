@@ -1,4 +1,0 @@
-interface:
-  display_name: "性能与容量设计"
-  short_description: "设计性能预算、负载测试、瓶颈分析、容量模型、余量与扩缩策略"
-  default_prompt: "使用 $design-performance-capacity 为当前系统建立性能基线、负载模型和容量计划，并用可重复实验定位真实瓶颈。"
