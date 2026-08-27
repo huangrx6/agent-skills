@@ -3,7 +3,7 @@ name: engineering-architecture
 description: "用户说\"画架构图 / 选单体还是微服务 / 评审架构方案 / 写 ADR / 划分服务或模块边界 / 选部署形态 / 做技术选型 / 跨团队系统集成 / 重构或拆分系统 / 治理架构文档 / 设计或评审 API 契约 / 设计或评审数据库 schema 和迁移 / 写或评审工程文档 / 规范 Git 工作流 / 做版本发布\"时激活。覆盖模块与边界、架构风格选择、API 契约、数据库设计、迁移安全、工程文档体系、Git 工作流。不要用它做：性能与容量目标 → engineering-reliability；安全威胁建模与代码评审 → engineering-security；代码风格与 lint → engineering-quality。"
 ---
 
-# 工程架构
+# ![engineering-architecture](../assets/icons/engineering-architecture-light.svg#gh-light-mode-only) ![engineering-architecture](../assets/icons/engineering-architecture-dark.svg#gh-dark-mode-only) 工程架构
 
 ## 目标
 

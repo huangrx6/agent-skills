@@ -1,4 +1,4 @@
-# Logging
+# ![logging](../assets/icons/logging-light.svg#gh-light-mode-only) ![logging](../assets/icons/logging-dark.svg#gh-dark-mode-only) Logging
 
 > Parent: [`engineering-reliability`](../SKILL.md). Spec for application logging — event selection, level, responsibility boundary, structured fields, JSON Lines, double-stream output, context injection, stdout/stderr, trace correlation, exception logging, sensitive data, rotation, retention, cost control.
 

@@ -1,4 +1,4 @@
-# API Contracts
+# ![api-contracts](../assets/icons/api-contracts-light.svg#gh-light-mode-only) ![api-contracts](../assets/icons/api-contracts-dark.svg#gh-dark-mode-only) API Contracts
 
 > Parent: [`engineering-architecture`](../SKILL.md). Spec for API style selection, resource modeling, schemas, error responses, versioning, governance.
 

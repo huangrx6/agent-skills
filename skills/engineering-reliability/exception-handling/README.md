@@ -1,4 +1,4 @@
-# Exception Handling
+# ![exception-handling](../assets/icons/exception-handling-light.svg#gh-light-mode-only) ![exception-handling](../assets/icons/exception-handling-dark.svg#gh-dark-mode-only) Exception Handling
 
 > Parent: [`engineering-reliability`](../SKILL.md). Spec for failure classification, error code registry, exception mapping, unified API error response, global exception handler, async failure, and testing.
 

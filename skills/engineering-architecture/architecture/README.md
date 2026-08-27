@@ -1,4 +1,4 @@
-# Architecture
+# ![architecture](../assets/icons/architecture-light.svg#gh-light-mode-only) ![architecture](../assets/icons/architecture-dark.svg#gh-dark-mode-only) Architecture
 
 > Parent: [`engineering-architecture`](../SKILL.md). Produces system-level decisions: boundaries, style, deployment, ADR.
 

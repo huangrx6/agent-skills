@@ -1,4 +1,4 @@
-# Secure Coding
+# ![secure-coding](../assets/icons/secure-coding-light.svg#gh-light-mode-only) ![secure-coding](../assets/icons/secure-coding-dark.svg#gh-dark-mode-only) Secure Coding
 
 > Parent: [`engineering-security`](../SKILL.md). Spec for threat modeling, input validation, output encoding, injection defense, authentication / authorization, secrets, cryptography, dangerous APIs, dependencies, security testing, and AI-assisted code security audit.
 

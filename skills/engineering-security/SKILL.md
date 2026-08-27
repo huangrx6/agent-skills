@@ -3,7 +3,7 @@ name: engineering-security
 description: "用户说\"代码评审找安全风险 / 做威胁建模 / 做认证或授权 / 密钥管理 / TLS 配置 / 防止 SQL 注入 / 防止 XSS / 防止 CSRF / 防止 SSRF / 文件上传安全 / 反序列化安全 / 危险 API 评审 / 依赖漏洞扫描 / AI 生成代码的安全审计 / 安全 exception 申请\"时激活。覆盖威胁建模、输入验证、输出编码、注入防护、认证授权、密钥与密码学、文件与路径、网络与 SSRF、反序列化、依赖供应链、安全测试与发布门禁。不要用它做：架构边界与 API 契约 → engineering-architecture；运行时重试/熔断 → engineering-reliability；代码风格 → engineering-quality。"
 ---
 
-# 工程安全
+# ![engineering-security](../assets/icons/engineering-security-light.svg#gh-light-mode-only) ![engineering-security](../assets/icons/engineering-security-dark.svg#gh-dark-mode-only) 工程安全
 
 ## 目标
 

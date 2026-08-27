@@ -1,4 +1,4 @@
-# Git Workflow
+# ![git](../assets/icons/git-light.svg#gh-light-mode-only) ![git](../assets/icons/git-dark.svg#gh-dark-mode-only) Git Workflow
 
 > Sub-topic of [`engineering-architecture`](../SKILL.md). Reads as a cheat sheet for daily commits; structured so an Agent can route, classify, and act on Git operations without re-reading every reference.
 
