@@ -1,6 +1,6 @@
 ---
 name: visual-ui-layout-spec
-description: "你必须使用本 Skill 把 UI 截图、数据大屏、设计稿图片转成可直接交付前端和 AI Coding Agent 的页面布局规格（区域、组件、栅格、尺寸、间距、颜色、字号、圆角、边框、阴影、状态、组件文案、图表与表格），保留证据与置信度。视觉语义采用 Agent 原生视觉 + 远端 VLM（VISUAL_REMOTE=true 强制远端，否则优先原生）+ image_probe.py 像素级确定性测量双轨证据。仅支持 JPEG / PNG / WebP 三种格式；PDF / GIF / SVG / PSD 不支持（PDF 需先转换页面为图片）。需环境变量 VISUAL_REMOTE / VISUAL_BASE_URL / VISUAL_MODEL / VISUAL_API_KEY 写在 ~/.zshrc 并重启终端或 DSH 宿主进程才生效。路径以 `@` 开头（如 `@/path/to/img.png`）必须先去掉 `@` 再传给脚本。不负责通用图片语义理解（纯文字提取、对象关系、架构图节点解析）——那是 visual-image-understanding 的工作。"
+description: "你必须使用本 Skill 把 UI 截图、数据大屏、设计稿图片转成可直接交付前端和 AI Coding Agent 的页面布局规格（区域、组件、栅格、尺寸、间距、颜色、字号、圆角、边框、阴影、状态、组件文案、图表与表格），保留证据与置信度。视觉语义采用 Agent 原生视觉 + 远端 VLM（VISUAL_REMOTE=true 强制远端，否则优先原生）+ image_probe.py 像素级确定性测量双轨证据。仅支持 JPEG / PNG / WebP 三种格式；PDF / GIF / SVG / PSD 不支持（PDF 需先转换页面为图片）。需环境变量 VISUAL_REMOTE / VISUAL_BASE_URL / VISUAL_MODEL / VISUAL_API_KEY 写在 ~/.zshrc 并重启终端或 DSH 宿主进程才生效。路径以 `@` 开头（如 `@/path/to/img.png`）必须先去掉 `@` 再传给脚本。不负责通用图片语义理解（纯文字提取、对象关系、架构图节点解析）"
 ---
 
 # UI 布局规格解析
