@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "skills": {
+    "developer-readme-design": {
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/developer-readme-design/SKILL.md",
+      "computedHash": "66be3cdcedd9d783129a64ac2e932a6a6fc063d4d3f28b37a717598fd16b135c"
+    },
+    "draw-processon": {
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/draw-processon/SKILL.md",
+      "computedHash": "20ba4f9c7e85efe24d69a8260a75f7354476b31e0287ad0a86b4a2097920ad5f"
+    },
+    "engineering-architecture": {
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering-architecture/SKILL.md",
+      "computedHash": "68f55e88aa09c36d85bd196591a1850ac842c4adeea0524871a8a726f565d57e"
+    },
+    "engineering-quality": {
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering-quality/SKILL.md",
+      "computedHash": "41c25698b816f067ead6b77a18d0bc801abc4d97cecd6a4dc7a85f88cd1b300a"
+    },
+    "engineering-reliability": {
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering-reliability/SKILL.md",
+      "computedHash": "572d0270976402288e1ca007abd86cdf4da2ffab9fa3ed4cef2f0d01282c7f5c"
+    },
+    "engineering-security": {
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering-security/SKILL.md",
+      "computedHash": "268532331a5a411ab530e1e3552f1cb428f1ed8a352a9510d183ca489509d2f1"
+    },
+    "obsidian-personal-knowledge-base": {
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/obsidian-personal-knowledge-base/SKILL.md",
+      "computedHash": "2ee667b54c819ac6abd1ad5eea3d734baaf85d89ceec0bfbef1fdf05367ff06c"
+    },
+    "obsidian-work-log-release-recorder": {
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/obsidian-work-log-release-recorder/SKILL.md",
+      "computedHash": "68cbbbf1951aac6dde3acfab3e96d431e357bd51b30b66c79f44171434fe99ed"
+    },
+    "skill-creator": {
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-creator/SKILL.md",
+      "computedHash": "5ea13a6d9f0d4bb694405d79acd00cadec0d21bb138c4dd10fcf3c500cb835c2"
+    },
+    "visual-image-understanding": {
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/visual-image-understanding/SKILL.md",
+      "computedHash": "40335c41fe0cfe8c8553205601539c3ca25b53cfaa0f179abc50d734cf9a936f"
+    },
+    "visual-ui-layout-spec": {
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/visual-ui-layout-spec/SKILL.md",
+      "computedHash": "be359c78a074f78e297be9650090b43922dba99863a37638896104d65a95edec"
+    }
+  }
+}

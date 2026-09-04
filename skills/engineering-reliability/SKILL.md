@@ -3,7 +3,7 @@ name: engineering-reliability
 description: "用户说\"服务挂了 / 报错 / 超时 / 想加重试 / 想加熔断 / 想加限流 / 想做故障注入 / 想加监控告警 / 想加 SLO 或 SLI / 想看日志 / 想做日志规范 / 想做性能压测 / 想做容量规划 / 想排查慢请求\"时激活。覆盖异常分类与错误码、服务韧性、可观测性、日志规范、性能与容量。不要用它做：架构选型或 API 契约 → engineering-architecture；安全威胁建模或代码评审 → engineering-security；代码风格与 lint → engineering-quality。"
 ---
 
-# ![engineering-reliability](../assets/icons/engineering-reliability-light.svg#gh-light-mode-only) ![engineering-reliability](../assets/icons/engineering-reliability-dark.svg#gh-dark-mode-only) 工程可靠性
+# ![engineering-reliability](assets/icons/engineering-reliability-light.svg#gh-light-mode-only) ![engineering-reliability](assets/icons/engineering-reliability-dark.svg#gh-dark-mode-only) 工程可靠性
 
 ## 目标
 
