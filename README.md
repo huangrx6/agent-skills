@@ -44,7 +44,7 @@ git clone https://github.com/<owner>/agent-skills.git
 
 ---
 
-## Skills 索引(当前 2 个)
+## Skills 索引(当前 3 个)
 
 ### Obsidian 工作流(2 个)
 
@@ -55,11 +55,20 @@ git clone https://github.com/<owner>/agent-skills.git
 | ![vault](skills/obsidian-personal-knowledge-base/assets/icons/obsidian-personal-knowledge-base-light.svg#gh-light-mode-only) ![vault](skills/obsidian-personal-knowledge-base/assets/icons/obsidian-personal-knowledge-base-dark.svg#gh-dark-mode-only) | [**obsidian-personal-knowledge-base**](skills/obsidian-personal-knowledge-base/SKILL.md) | 在 PARA + MOC vault 内创建、更新、移动、审阅笔记;按 Inbox/Projects/Areas/Resources/Archive/Assets/System 判断归属 |
 | ![record](skills/obsidian-work-log-release-recorder/assets/icons/obsidian-work-log-release-recorder-light.svg#gh-light-mode-only) ![record](skills/obsidian-work-log-release-recorder/assets/icons/obsidian-work-log-release-recorder-dark.svg#gh-dark-mode-only) | [**obsidian-work-log-release-recorder**](skills/obsidian-work-log-release-recorder/SKILL.md) | 任务结束后把可复用事实沉淀到长期知识;维护周发版记录(脚本、配置、部署路径、验证、回滚、执行假设) |
 
+### 元能力(1 个)
+
+不绑定具体业务场景,Agent 在本仓库内工作时反复用到的元 skill。
+
+| Icon | Skill | 覆盖 |
+| --- | --- | --- |
+| ![build](skills/obsidian-personal-knowledge-base/assets/icons/obsidian-personal-knowledge-base-light.svg#gh-light-mode-only) | [**skill-builder**](skills/skill-builder/SKILL.md) | 建新 skill 前的 5 分钟决策:该不该建 / 触发描述怎么写 / 范围定 P0 还是 P1 / 起 SKILL.md 一稿的 checklist |
+
 **触发语法**:
 
 ```text
 使用 $obsidian-personal-knowledge-base 帮我 <整理 / 归位 / 创建 / 审阅 笔记>
 使用 $obsidian-work-log-release-recorder 帮我 <记录 / 沉淀 / 写发版文档>
+使用 $skill-builder 帮我 <判断要不要建 skill / 评审触发描述 / 起 SKILL.md 一稿>
 ```
 
 ---
@@ -68,11 +77,11 @@ git clone https://github.com/<owner>/agent-skills.git
 
 按价值频率排序,后续 skill 计划:
 
-| 优先级 | 方向 | 说明 |
+| 优先级 | 方向 | 状态 |
 | --- | --- | --- |
-| P0 | `skill-builder`(5 分钟决策树) | 建 skill 前的设计评审:该不该建、触发描述怎么写不飘、范围多大、何时算 P0/P1 |
-| P1 | Obsidian 工作流闭环补齐 | 补"事前规划 + 事中同步"环节,与现有两个 obsidian skill 形成闭环 |
-| P2 | 日常高频触发类 | 等 P0/P1 落地后,根据真实触发日志再定 |
+| P0 | `skill-builder`(5 分钟决策树) | ✅ 已建(2025-09) |
+| P1 | Obsidian 工作流闭环补齐 | ⏳ 待开工 |
+| P2 | 日常高频触发类 | ⏳ 等 P0/P1 落地后,根据真实触发日志再定 |
 
 每个新 skill 都要通过 skill-builder 的设计评审才会被加进来——避免重蹈"11 个 skill 只用 2 个"的覆辙。
 

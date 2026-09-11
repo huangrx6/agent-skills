@@ -12,6 +12,12 @@
       "sourceType": "github",
       "skillPath": "skills/obsidian-work-log-release-recorder/SKILL.md",
       "computedHash": "68cbbbf1951aac6dde3acfab3e96d431e357bd51b30b66c79f44171434fe99ed"
+    },
+    "skill-builder": {
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-builder/SKILL.md",
+      "computedHash": "8a83f6b587b2c5829bcbdb1c32e4fefd498b53afe90534f4b58dee4dae52f23e"
     }
   }
 }
