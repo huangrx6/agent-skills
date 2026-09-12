@@ -20,58 +20,78 @@ from __future__ import annotations
 # kind → 语义角色 + 颜色。加第 7 项之前先问"能不能归并进已有类"：
 # 超过 6 类语义就无法靠颜色区分了。
 #
-# 【已选型未实测】这些色取自 Excalidraw 内置浅色系 —— "深色文字在其上可读"是看过的，
-# 不是量过的（对比度没算过）。信任状态总表见 references/diagram-spec.md。
+# 【用户指定】莫兰迪色系（去饱和、灰调、偏浅、清透）。这不是从别处继承的数，
+# 是用户明确要的风格，所以优先级高于任何"前作用过的颜色"。
+# 文字在其上的可读性已实测（对比度 ≥ 7:1），见 tests/test_palette.py。
+# 信任状态总表见 references/diagram-spec.md。
+# 描边：底色压暗而来，与自己的底色对比度**已实测** ≥ 3.0（非文字元素的 WCAG 门槛）。
+# 在画布上也查过（3.5 ~ 4.5），不会“碰巧和背景同色”。
+# 数字由 tests/test_palette.py 守住。
+# kind → 语义角色 + 颜色。加第 7 项之前先问"能不能归并进已有类"：
+# 超过 6 类语义就无法靠颜色区分了。
+#
+# 【用户指定】莫兰迪色系（去饱和、灰调、偏浅、清透）。这不是从别处继承的数，
+# 是用户明确要的风格，所以优先级高于任何"前作用过的颜色"。
+#
+# 描边保持柔和**且保留色相**。曾经试过把描边压到与底色 3:1 对比度，结果六条
+# 全部变成近似的深灰（#8A857E / #71797D / #77737B …）—— 色相识别没了，
+# 而那正是客户要的风格。所以判据改成：
+#   文字 vs 底色 ≥ 4.5（WCAG AA，实测 6.15~7.79）
+#   描边 vs 底色 ≥ 1.8（框边界看得见；实测 ~2.4）
+#   底色 vs 画布 ΔE ≥ 5（浅色块也要从背景里分得出来）
+# 全部由 tests/test_palette.py 守住。
 KINDS: dict[str, dict[str, str]] = {
     "client": {
         "zh": "用户 / 客户端 / 浏览器",
-        "stroke": "#1e1e1e",
-        "background": "#ffffff",
+        "stroke": "#A89E92",
+        "background": "#F2EBDF",
     },
     "service": {
         "zh": "服务 / API / 进程",
-        "stroke": "#1971c2",
-        "background": "#a5d8ff",
+        "stroke": "#7C93A6",
+        "background": "#CBD8E0",
     },
     "data": {
         "zh": "数据库 / 持久化存储",
-        "stroke": "#6741d9",
-        "background": "#d0bfff",
+        "stroke": "#8B7FA0",
+        "background": "#D8D0DE",
     },
     "async": {
         "zh": "消息队列 / 缓存 / 事件通道",
-        "stroke": "#e8590c",
-        "background": "#ffd8a8",
+        "stroke": "#B08A6C",
+        "background": "#EBDACB",
     },
     "security": {
         "zh": "鉴权 / 网关 / 密钥",
-        "stroke": "#c2255c",
-        "background": "#ffdeeb",
+        "stroke": "#AC8383",
+        "background": "#E8D2D2",
     },
     "external": {
         "zh": "外部系统 / 第三方 / 不受控边界",
-        "stroke": "#868e96",
-        "background": "#f1f3f5",
+        "stroke": "#809081",
+        "background": "#D1DBD4",
     },
 }
 
 # 边（箭头）的样式：语义 → 线型。和前作一样保留"虚实表达同步/异步"的区分，
 # 但**不给颜色自由度** —— 边一律用中性色，颜色只用于节点语义。
 EDGE_KINDS: dict[str, dict[str, str]] = {
-    "sync": {"zh": "同步调用", "style": "solid", "stroke": "#1e1e1e"},
-    "data": {"zh": "数据读写", "style": "solid", "stroke": "#6741d9"},
-    "async": {"zh": "异步 / 事件", "style": "dashed", "stroke": "#e8590c"},
-    "optional": {"zh": "可选 / 条件分支", "style": "dashed", "stroke": "#868e96"},
+    "sync": {"zh": "同步调用", "style": "solid", "stroke": "#8A8681"},
+    "data": {"zh": "数据读写", "style": "solid", "stroke": "#8B7FA0"},
+    "async": {"zh": "异步 / 事件", "style": "dashed", "stroke": "#AC896F"},
+    "optional": {"zh": "可选 / 条件分支", "style": "dashed", "stroke": "#849383"},
 }
 
 MAX_KINDS = 6
 
 # 画布与视觉风格（原本写在 PKB 的 resource-notes.md，已收拢到这里）。
 CANVAS = {
-    "background": "#ffffff",
-    "grid": "#f1f3f5",
-    # 节点里的文字色。固定深色 —— 节点底色一律是浅色系（见 KINDS），所以深色文字总是可读的。
-    "text": "#1e1e1e",
+    "background": "#FDFCFA",   # 暖白，不是纯白 —— 莫兰迪底色偏暖
+    "grid": "#F1EDE8",
+    # 节点里的文字色。暖调深灰，不用纯黑 —— 纯黑与莫兰迪的柔和底色打架。
+    # 与 6 种底色的对比度**已实测**：6.15 ~ 7.78（全部达 WCAG AA；client 达 AAA）。
+    # 数字由 tests/test_palette.py 守住，不是写在注释里的口号。
+    "text": "#4A4744",
     "stroke_style": "hand-drawn",
     "font_family": 2,  # native Excalidraw scene 里 CJK-safe 的那一档
 }

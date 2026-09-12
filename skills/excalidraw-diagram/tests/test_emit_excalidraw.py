@@ -274,6 +274,105 @@ class TestRefusesBlockedSpecs(unittest.TestCase):
 
 
 class TestEdgeLabels(unittest.TestCase):
+    @staticmethod
+    def _hits(label: dict, arrows: list[dict]) -> list:
+        """沿箭头折线密集采样（每 0.5px 一点），返回落进标签框里的采样点。
+
+        用采样而不是线段-矩形求交：前者更容易确认对（阈值一目了然），
+        而这条用例要扶的就是一个“差几像素”的缺陷。
+        """
+        hits = []
+        left, right = label["x"], label["x"] + label["width"]
+        top, bottom = label["y"], label["y"] + label["height"]
+        for arrow in arrows:
+            pts = [(arrow["x"] + p[0], arrow["y"] + p[1]) for p in arrow["points"]]
+            for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+                steps = int(max(abs(x1 - x0), abs(y1 - y0)) / 0.5) + 1
+                for i in range(steps + 1):
+                    t = i / steps
+                    x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
+                    if left <= x <= right and top <= y <= bottom:
+                        hits.append((round(x), round(y)))
+        return hits
+
+    def _labels_and_arrows(self, spec):
+        scene = build(spec)
+        labels = [e for e in scene["elements"]
+                  if e["type"] == "text" and not e.get("containerId")]
+        arrows = [e for e in scene["elements"] if e["type"] == "arrow"]
+        return labels, arrows
+
+    def test_label_is_not_crossed_by_its_arrow(self):
+        """**用户看到的真实缺陷**：“还是有遮挡” —— `HTTPS` 被箭头线从中间穿过。
+
+        根因：只上移了一个字号（12px）而标签本身高 15px，于是文字跨 [y-12, y+2]，
+        线就落在里面。修法是沿**法线**退开。
+        """
+        spec = {"type": "architecture", "direction": "LR",
+                "nodes": [{"id": "a", "kind": "client", "label": "Web 前端"},
+                          {"id": "b", "kind": "security", "label": "API 网关"},
+                          {"id": "c", "kind": "service", "label": "订单服务"}],
+                "edges": [{"from": "a", "to": "b", "label": "HTTPS"},
+                          {"from": "b", "to": "c", "label": "gRPC"}]}
+        labels, arrows = self._labels_and_arrows(spec)
+        self.assertEqual(2, len(labels))
+        for label in labels:
+            hits = self._hits(label, arrows)
+            self.assertEqual([], hits,
+                             f"标签 {label['id']} 被连线穿过（{len(hits)} 个采样点）")
+
+    def test_label_clears_diagonal_arrows_too(self):
+        """斜线上的标签必须沿法线退开。
+
+        “再往上挪一点”这个直觉写法在斜线上仍会压线 —— 所以这条用例用 TB 方向、
+        多层级的图造出陡峭的斜边。
+        """
+        spec = {"type": "flow", "direction": "TB",
+                "nodes": [{"id": "a", "kind": "client", "label": "开始"},
+                          {"id": "b", "kind": "async", "label": "构建缓存"},
+                          {"id": "c", "kind": "service", "label": "跑测试"},
+                          {"id": "d", "kind": "security", "label": "审批"},
+                          {"id": "e", "kind": "external", "label": "发布"}],
+                "edges": [{"from": "a", "to": "b", "label": "触发"},
+                          {"from": "b", "to": "c", "label": "命中"},
+                          {"from": "c", "to": "d", "label": "通过"},
+                          {"from": "d", "to": "e", "label": "合入"},
+                          {"from": "b", "to": "d", "label": "长边"}]}
+        labels, arrows = self._labels_and_arrows(spec)
+        self.assertGreaterEqual(len(labels), 4)
+        for label in labels:
+            hits = self._hits(label, arrows)
+            self.assertEqual([], hits,
+                             f"标签 {label['id']} 被连线穿过（{len(hits)} 个采样点）")
+
+    def test_label_gap_is_configurable_not_eyeballed(self):
+        """退开量必须由参数/常量驱动，而不是拍脑袋的像素值。
+
+        断言的是“间隙真的在起作用”—— 把 gap 调大，标签必须跟着退得更远。
+        只断言某个具体坐标会把搜索策略写死，改实现就挂。
+
+        gap 做成可传参而不是改模块常量：一来测试不必去改一个动态加载模块的属性，
+        二来“退多远”本来就是一个调用方该能说的事。
+        """
+        pts = [[0.0, 0.0], [100.0, 0.0]]
+        width, height = 40.0, 15.0
+        _, y_tight = E.label_position(pts, width, height, gap=2.0)
+        _, y_loose = E.label_position(pts, width, height, gap=40.0)
+        self.assertLess(y_loose, y_tight, "把间隙调大，标签必须退得更远")
+        self.assertGreaterEqual(0.0 - (y_tight + height), 1.9)
+        self.assertLess(y_tight + height, 0.0, "标签必须整块在线的上方")
+
+    def test_label_avoids_other_edges_too(self):
+        """标签不能只躲自己那条边 —— **别的边穿过它同样是遮挡**。
+
+        这是单纯算自家法线永远避不开的情况，也是改成候选搜索的主要理由之一。
+        """
+        own = [[0.0, 0.0], [200.0, 0.0]]
+        other = [[0.0, -20.0], [200.0, -20.0]]
+        x, y = E.label_position(own, 40.0, 15.0, [own, other])
+        self.assertFalse(E._hits_lines(x, y, 40.0, 15.0, [own, other]),
+                         "标签仍然撞在线段上")
+
     def test_polyline_midpoint_is_by_arc_length(self):
         """中点是“走一半弧长”处的点，不是“中间那个拐点”。"""
         # 两个点的折线：中点应是两点平均，而不是第二个点（那正是曾经的 bug）

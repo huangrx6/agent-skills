@@ -50,6 +50,9 @@ STROKE_WIDTH = 2
 ROUGHNESS = 1
 TEXT_ALIGN = "center"
 VERTICAL_ALIGN = "middle"
+# 边标签与连线之间至少要留的空隙。太小会被线穿过（实测过：只上移一个字号时，
+# 标签高 15px 而上移 12px，线正好从文字中间过）。
+LABEL_GAP = 6.0
 # Excalidraw 文本元素的 baseline（从文本块顶部到首行基线的距离）。
 # 容器绑定的文字在加载时由 Excalidraw 重算，这里给一个合理初值即可。
 BASELINE_RATIO = 0.875
@@ -211,56 +214,171 @@ def arrow_element(edge: dict, index: int) -> dict:
 
 
 def polyline_midpoint(pts: list) -> list:
-    """沿折线走**一半弧长**处的点 —— 也就是视觉上的中点。
+    """沿折线走**一半弧长**处的点 —— 也就是视觉上的中点。"""
+    return _midpoint_frame(pts)[0]
 
-    不能用“取中间那个拐点”：对只有 2 个点的折线，`pts[1]` **就是终点**，
-    标签会直接贴在目标节点边缘上。实测就是这样被发现的 ——
-    `HTTPS` 标签压在 `API 网关` 的左边缘，而所有机械校验全绿。
-    多拐点的边也不该把标签放在拐点上（拐点通常离两端都很远）。
+
+def _midpoint_frame(pts: list) -> tuple[list, tuple[float, float], tuple[float, float]]:
+    """中点 + 该处的两个方向（反向的入边、出边）。
+
+    两个方向都是相对“沿折线前进”而言的：`back` 指回到来处，`fwd` 指向前方。
+    落在一条直段中间时两者共线（角平分退化，只能用法线）；
+    落在拐点上时两者不同向 —— 那是真正需要区别对待的情况。
     """
+    if not pts:
+        return [0.0, 0.0], (-1.0, 0.0), (1.0, 0.0)
     if len(pts) < 2:
-        return list(pts[0]) if pts else [0.0, 0.0]
+        return list(pts[0]), (-1.0, 0.0), (1.0, 0.0)
     segs = [(pts[i], pts[i + 1], math.dist(pts[i], pts[i + 1]))
             for i in range(len(pts) - 1)]
     total = sum(s[2] for s in segs)
     if total <= 0:
-        return list(pts[0])
+        return list(pts[0]), (-1.0, 0.0), (1.0, 0.0)
     half = total / 2.0
     walked = 0.0
-    for a, b, seg_len in segs:
+    for i, (a, b, seg_len) in enumerate(segs):
         if walked + seg_len >= half:
             t = (half - walked) / seg_len if seg_len else 0.0
-            return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
+            point = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
+            this = (b[0] - a[0], b[1] - a[1])
+            # 刚好落在本段终点（= 拐点）时，前方方向要换成下一段
+            on_vertex = (half - walked) >= seg_len - 1e-9 and i + 1 < len(segs)
+            nxt = (segs[i + 1][1][0] - segs[i + 1][0][0],
+                   segs[i + 1][1][1] - segs[i + 1][0][1]) if on_vertex else this
+            return point, (-this[0], -this[1]), nxt
         walked += seg_len
-    return list(pts[-1])
+    a, b = segs[-1][0], segs[-1][1]
+    return list(pts[-1]), (a[0] - b[0], a[1] - b[1]), (b[0] - a[0], b[1] - a[1])
 
 
-def edge_label_element(edge: dict, index: int) -> dict | None:
-    """边标签：一个独立的文字元素放在折线中点。
+def _unit(vector: tuple[float, float]) -> tuple[float, float] | None:
+    length = math.hypot(*vector)
+    return None if length <= 1e-9 else (vector[0] / length, vector[1] / length)
+
+
+def _segment_enters_rect(a: tuple[float, float], b: tuple[float, float],
+                         left: float, top: float, right: float, bottom: float) -> bool:
+    """线段是否从矩形里穿过（密集采样，步长 0.5px）。
+
+    用采样而不是精确求交：这条路径要在“搜一个干净位置”里被调用很多次，
+    而正确的标准自带 ≥6px 的空白带 —— 0.5px 的采样误差在这个尺度下无关。
+    搜索与守卫用例用**同一个步长**，两者不会结论不一。
+    """
+    steps = math.ceil(max(abs(b[0] - a[0]), abs(b[1] - a[1])) / 0.5) + 1
+    for i in range(steps + 1):
+        t = i / steps
+        x, y = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
+        if left <= x <= right and top <= y <= bottom:
+            return True
+    return False
+
+
+def _hits_lines(x: float, y: float, width: float, height: float,
+                obstacles: list) -> bool:
+    right, bottom = x + width, y + height
+    for polyline in obstacles:
+        for a, b in zip(polyline, polyline[1:]):
+            if _segment_enters_rect(a, b, x, y, right, bottom):
+                return True
+    return False
+
+
+def _candidate_directions(back: tuple[float, float],
+                          fwd: tuple[float, float]) -> list[tuple[float, float]]:
+    """标签可以往哪几个方向退。先试最合理的，再试备选。
+
+    顺序刻意如此：
+    1. **角平分线的外侧** —— 拐点处唯一正确的选择（用法线会有一半盖回入边）
+    2. 出边的法线（朝上）—— 直线段的常规位置
+    3. 出边的法线（朝下）
+    4. 反向入边的两条法线 —— 拐点很尖时靠它绕到另一侧
+    """
+    out: list[tuple[float, float]] = []
+    u, v = _unit(back), _unit(fwd)
+    if u and v:
+        bisector = _unit((-(u[0] + v[0]), -(u[1] + v[1])))
+        if bisector:
+            out.append(bisector)
+    for base in (v, u):
+        if not base:
+            continue
+        for n in ((-base[1], base[0]), (base[1], -base[0])):
+            if n[1] <= 0 and n not in out:      # 优先朝上
+                out.append(n)
+    for base in (v, u):
+        if not base:
+            continue
+        for n in ((-base[1], base[0]), (base[1], -base[0])):
+            if n not in out:
+                out.append(n)
+    return out or [(0.0, -1.0)]
+
+
+def label_position(pts: list, width: float, height: float,
+                   obstacles: list | None = None,
+                   gap: float = LABEL_GAP) -> tuple[float, float]:
+    """找一个**不与任何连线相交**的标签位置 —— 由脚本自己搜，不靠一个魔法偏移量。
+
+    为什么不能只算一个偏移量：
+
+    1. 旧写法 `(mid.x + 6, mid.y - fontSize)` 只上移了一个字号（12px）而标签高 15px，
+       线正好从文字中间穿过 —— 用户看到的“还是有遮挡”就是这个。
+    2. 改成“沿法线退开”之后，**拐点**上仍然会盖：中点落在 V 形折线的顶点时，
+       标签以顶点为中心，它有一半会压回入射那一段（实测：`长边` 标签的左半边被
+       自己的入边穿过）。
+    3. 而且标签还可能撞上**别的边**，那是单纯算自家法线永远避不开的。
+
+    所以改成：按候选方向 × 递增退让量试位置，取第一个干净的。全都不干净时回到第一个
+    候选（法线朝上）—— 那种情况说明图太密，应该由报告建议拆节点，而不是在这里硬拗。
+    """
+    obstacles = obstacles or [list(pts)]
+    mid, back, fwd = _midpoint_frame(pts)
+    directions = _candidate_directions(back, fwd)
+    radius = math.hypot(width, height) / 2
+    first: tuple[float, float] | None = None
+    for extra in (0.0, 6.0, 12.0, 20.0, 30.0):
+        for dx, dy in directions:
+            reach = radius + gap + extra
+            x = mid[0] + dx * reach - width / 2
+            y = mid[1] + dy * reach - height / 2
+            if first is None:
+                first = (x, y)
+            if not _hits_lines(x, y, width, height, obstacles):
+                return round(x, 2), round(y, 2)
+    if first is None:                       # 理论上不可达（候选方向非空），但不靠 assert
+        reach = radius + gap
+        first = (mid[0] - width / 2, mid[1] - reach - height / 2)
+    return round(first[0], 2), round(first[1], 2)
+
+
+def edge_label_element(edge: dict, index: int, obstacles: list | None = None) -> dict | None:
+    """边标签：一个独立的文字元素，位置由 `label_position` 搜出来。
 
     刻意**不**绑到箭头上 —— 箭头标签在 Excalidraw 里有自己的定位规则，
     绑上去容易在编辑时漂移；独立元素至少位置是可预测的。
+
+    `obstacles` 传**所有**边的折线，不只是自己那条 —— 标签撞上别的边同样是遮挡。
     """
     label = edge.get("label")
     if not label:
         return None
-    mid = polyline_midpoint(edge["points"])
+    width = round(tm.weighted_units(label) * tm.FONT_DETAIL, 2)
+    height = round(tm.FONT_DETAIL * tm.LINE_HEIGHT, 2)
+    x, y = label_position(edge["points"], width, height, obstacles)
     el_id = _eid("elabel", f"{edge['from']}-{edge['to']}", index)
-    el = _base(el_id, "text", mid[0] + 6, mid[1] - tm.FONT_DETAIL, 0, 0,
+    el = _base(el_id, "text", x, y, width, height,
                palette.CANVAS["text"], "transparent", extra={"roundness": None})
     el.update({
         "text": label,
         "fontSize": tm.FONT_DETAIL,
         "fontFamily": palette.CANVAS["font_family"],
-        "textAlign": "left",
+        "textAlign": "center",
         "verticalAlign": "top",
         "containerId": None,
         "originalText": label,
         "lineHeight": tm.LINE_HEIGHT,
         "baseline": round(tm.FONT_DETAIL * BASELINE_RATIO, 2),
         "strokeWidth": 1,
-        "width": round(tm.weighted_units(label) * tm.FONT_DETAIL, 2),
-        "height": round(tm.FONT_DETAIL * tm.LINE_HEIGHT, 2),
     })
     return el
 
@@ -286,9 +404,12 @@ def build_scene(spec: dict, result, boxes: dict) -> dict:
         elements += node_elements(by_id[nid], placed, boxes[nid],
                                   arrows_out.get(nid, []), arrows_in.get(nid, []))
 
+    # 折线点存的是相对坐标，障碍物列表要用绝对坐标 —— 否则搜位置时会搜到一个不存在的地方
+    polylines = [[(edge["points"][0][0] + p[0], edge["points"][0][1] + p[1])
+                  for p in edge["points"]] for edge in result.edges]
     for i, (edge, _) in enumerate(arrow_specs):
         elements.append(arrow_element(edge, i))
-        label = edge_label_element(edge, i)
+        label = edge_label_element(edge, i, polylines)
         if label:
             elements.append(label)
 
