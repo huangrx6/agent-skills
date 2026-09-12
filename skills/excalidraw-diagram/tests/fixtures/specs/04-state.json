@@ -1,0 +1,19 @@
+{"type":"state","direction":"LR","title":"订单状态机",
+ "nodes":[
+  {"id":"created","kind":"service","label":"待支付"},
+  {"id":"paid","kind":"service","label":"已支付"},
+  {"id":"picking","kind":"service","label":"备货中"},
+  {"id":"shipped","kind":"service","label":"已发货"},
+  {"id":"done","kind":"service","label":"已完成"},
+  {"id":"cancelled","kind":"external","label":"已取消"},
+  {"id":"refunding","kind":"async","label":"退款中"},
+  {"id":"closed","kind":"external","label":"已关闭"}],
+ "edges":[
+  {"from":"created","to":"paid","kind":"sync","label":"支付成功"},
+  {"from":"created","to":"cancelled","kind":"optional","label":"超时/撤销"},
+  {"from":"paid","to":"picking","kind":"sync"},
+  {"from":"picking","to":"shipped","kind":"sync"},
+  {"from":"shipped","to":"done","kind":"sync","label":"确认收货"},
+  {"from":"paid","to":"refunding","kind":"async","label":"申请退款"},
+  {"from":"refunding","to":"closed","kind":"sync"},
+  {"from":"done","to":"refunding","kind":"async","label":"售后退款"}]}

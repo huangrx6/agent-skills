@@ -1,0 +1,17 @@
+{"type":"mindmap","direction":"LR","title":"可观测性体系",
+ "nodes":[
+  {"id":"root","kind":"service","label":"可观测性"},
+  {"id":"m1","kind":"async","label":"指标 Metrics"},
+  {"id":"m2","kind":"service","label":"日志 Logs"},
+  {"id":"m3","kind":"service","label":"链路 Traces"},
+  {"id":"m4","kind":"security","label":"告警 Alerting"},
+  {"id":"m5","kind":"data","label":"存储"},
+  {"id":"m6","kind":"external","label":"可视化"},
+  {"id":"n1","kind":"data","label":"Prometheus"},
+  {"id":"n2","kind":"data","label":"ClickHouse"},
+  {"id":"n3","kind":"data","label":"Jaeger"}],
+ "edges":[
+  {"from":"root","to":"m1"},{"from":"root","to":"m2"},{"from":"root","to":"m3"},
+  {"from":"root","to":"m4"},{"from":"root","to":"m5"},{"from":"root","to":"m6"},
+  {"from":"m1","to":"n1"},{"from":"m2","to":"n2"},{"from":"m3","to":"n3"},
+  {"from":"m1","to":"m4"},{"from":"n1","to":"m5"},{"from":"n2","to":"m5"},{"from":"n3","to":"m5"}]}

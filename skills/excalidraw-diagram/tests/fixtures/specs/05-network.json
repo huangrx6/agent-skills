@@ -1,0 +1,16 @@
+{"type":"network","direction":"LR","title":"服务网状调用",
+ "nodes":[
+  {"id":"a","kind":"service","label":"订单服务"},
+  {"id":"b","kind":"service","label":"支付服务"},
+  {"id":"c","kind":"service","label":"库存服务"},
+  {"id":"d","kind":"service","label":"用户服务"},
+  {"id":"e","kind":"service","label":"营销服务"},
+  {"id":"f","kind":"async","label":"消息总线"},
+  {"id":"g","kind":"data","label":"配置中心"},
+  {"id":"h","kind":"security","label":"鉴权服务"}],
+ "edges":[
+  {"from":"a","to":"b"},{"from":"a","to":"c"},{"from":"a","to":"d"},
+  {"from":"b","to":"a"},{"from":"c","to":"a"},{"from":"b","to":"f"},
+  {"from":"c","to":"f"},{"from":"e","to":"f"},{"from":"f","to":"d"},
+  {"from":"d","to":"h"},{"from":"a","to":"h"},{"from":"b","to":"h"},
+  {"from":"e","to":"g"},{"from":"c","to":"g"}]}
