@@ -335,6 +335,53 @@ class TestScale(unittest.TestCase):
         self.assertLessEqual(len(attempts), C.MAX_TUNE_ROUNDS + 1)
 
 
+class TestSizeSourcePremise(unittest.TestCase):
+    """钉住 #1/#3 之所以是“后置断言”的那个前提：**尺寸只有一个来源**。
+
+    只要每个节点的框都等于 `text_metrics.measure()` 的输出，容器宽度就只由断行宽度决定，
+    于是“元素间隙”与“文字溢出”在构造上不可能失败（详见 `references/validation.md` 第六节）。
+
+    **Wave 4 引入非文本的尺寸来源（图标固有宽高、分组外框…）时，这个类会先失败。**
+    它失败的意思不是“快改这个测试”，而是“尺寸来源变了，先回去重新审视那两条断言的前提
+    还成不成立” —— 那时候 #1/#3 会从一致性断言退化成真实的门，而且很可能先是误报。
+    """
+
+    def test_every_box_comes_from_text_metrics(self):
+        spec = {"type": "architecture", "direction": "LR",
+                "nodes": [{"id": "a", "kind": "service", "label": "订单服务",
+                           "detail": "3 副本"},
+                          {"id": "b", "kind": "data", "label": "订单库"},
+                          {"id": "c", "kind": "external", "label": "Notification Service"}]}
+        boxes = L.boxes_from_spec(spec)
+        for node in spec["nodes"]:
+            fresh = C.tm.measure(node["label"], node.get("detail", ""))
+            got = boxes[node["id"]]
+            self.assertAlmostEqual(
+                fresh.width, got.width, places=6,
+                msg=f"{node['id']} 的宽度不再等于 text_metrics 的推算 —— "
+                    f"尺寸来源变了，先回去看 validation.md 第六节（#1/#3 的前提）")
+            self.assertAlmostEqual(
+                fresh.height, got.height, places=6,
+                msg=f"{node['id']} 的高度不再等于 text_metrics 的推算 —— 同上")
+
+    def test_gap_check_cannot_fire_with_default_spacing(self):
+        """把这个“跑不到”的事实钉住，而不是只在注释里说一句。
+
+        同层节点恰好相距一个节点间距、跨层恰好相距一个层间距 —— 两者都远大于 12px。
+        这条用意是：哪天它真的报了出来，说明坐标推导被改成了不再由参数唯一决定，
+        那是一个信号，不是一个普通的失败。
+        """
+        ids = ["web", "gw", "order", "pay", "mq", "db", "notify"]
+        spec = spec_of(ids, [("web", "gw"), ("gw", "order"), ("order", "db"),
+                             ("order", "mq"), ("mq", "pay"), ("mq", "notify"),
+                             ("pay", "gw")])
+        result, _, _ = run(spec)
+        gaps = C.check_gaps(result)
+        self.assertEqual([], gaps,
+                         "间隙检查居然报了 —— 坐标推导已经不是“由间距参数唯一决定”了，"
+                         "回去重新判断这条是后置断言还是真实防线")
+
+
 class TestCli(unittest.TestCase):
     """CLI 退出码。
 
