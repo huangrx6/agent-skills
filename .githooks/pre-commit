@@ -1,36 +1,56 @@
 #!/bin/sh
-# 提交前校验 skill 结构。
+# 提交前两道校验。
 #
-# 为什么阻塞:这些是硬要求 —— YAML 解析失败意味着 skill 根本加载不了,
-# name 与目录名不一致意味着触发会错。2026-09-12 一次会话里"正文 ≤ 150 行"
-# 被连续违反两次,都是脚本抓出来的,肉眼没发现,所以宁可挡住。
+# 为什么都阻塞：两道都是客观硬要求，而且失败代价高 ——
+#   · 结构校验：YAML 解析失败意味着 skill 根本加载不了；name 与目录名不一致
+#     意味着触发会错。2026-09-12 一次会话里"正文 ≤ 150 行"被连续违反两次，
+#     都是脚本抓出来的，肉眼没发现。
+#   · 泄露扫描：真实客户名 / 内部系统名一旦推送到 public 仓库，清除要重写
+#     35/38 个 commit 并 force push —— 实际发生过一次。
 #
 # 只在本次提交触及 skills/ 时运行。
-# 跳过方式:git commit --no-verify
-# 安装:git config core.hooksPath .githooks
+# 跳过方式：git commit --no-verify
+# 安装：git config core.hooksPath .githooks
 
 if ! git diff --cached --name-only -z | tr '\0' '\n' | grep -q '^skills/'; then
   exit 0
 fi
 
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "⚠ pre-commit: 未找到 python3，跳过校验"
+  exit 0
+fi
+
 ROOT=$(git rev-parse --show-toplevel)
+
+fail() {
+  echo "$1"
+  echo ""
+  echo "✗ pre-commit: $2，提交已中止"
+  echo "  修好后重试；确需跳过：git commit --no-verify"
+  exit 1
+}
+
+# ── 1. 结构校验 ──
 VALIDATOR="$ROOT/skills/skill-builder/scripts/validate_skill.py"
-
-if ! command -v python3 >/dev/null 2>&1 || [ ! -f "$VALIDATOR" ]; then
-  echo "⚠ pre-commit: 缺少 python3 或 $VALIDATOR,跳过 skill 校验"
-  exit 0
+if [ -f "$VALIDATOR" ]; then
+  OUT=$(python3 "$VALIDATOR" 2>&1)
+  STATUS=$?
+  if [ "$STATUS" -ne 0 ]; then
+    fail "$OUT" "skill 结构校验失败"
+  fi
 fi
 
-OUT=$(python3 "$VALIDATOR" 2>&1)
-STATUS=$?
-
-if [ "$STATUS" -eq 0 ]; then
-  echo "✓ pre-commit: skill 校验通过"
-  exit 0
+# ── 2. 泄露扫描 ──
+# 未配置 blocklist 时脚本自己会跳过并返回 0，所以不会挡流程。
+LEAK="$ROOT/skills/skill-builder/scripts/check_leakage.py"
+if [ -f "$LEAK" ]; then
+  OUT=$(python3 "$LEAK" 2>&1)
+  STATUS=$?
+  if [ "$STATUS" -ne 0 ]; then
+    fail "$OUT" "发现不该外发的真实名称"
+  fi
 fi
 
-echo "$OUT"
-echo ""
-echo "✗ pre-commit: skill 校验失败,提交已中止"
-echo "  修好后重试;确需跳过:git commit --no-verify"
-exit 1
+echo "✓ pre-commit: 结构与泄露检查通过"
+exit 0

@@ -96,9 +96,16 @@ git clone https://github.com/<owner>/agent-skills.git
 
 ### 自动校验(git hook)
 
-`.githooks/pre-commit` 在提交触及 `skills/` 时自动跑 `validate_skill.py`,失败就挡住提交。
+`.githooks/pre-commit` 在提交触及 `skills/` 时跑**两道检查**，任一失败就挡住提交：
 
-hook 不会随 clone 自动生效,新机器上执行一次:
+| 检查 | 抓什么 |
+| --- | --- |
+| `validate_skill.py` | 结构硬错误：YAML 不可解析、`name` 与目录名不一致、description 超 800 字符、正文超 150 行 |
+| `check_leakage.py` | 外发内容里的真实名称（真实客户名 / 内部系统名 / 内网主机路径 / 内部接口名） |
+
+`check_leakage.py` 的 blocklist 放在仓库**之外**（`~/.config/skill-name-blocklist.txt`，一行一个词）——放进仓库它自己就泄露了。未配置时跳过、不阻塞。
+
+hook 不会随 clone 自动生效，新机器上执行一次：
 
 ```sh
 git config core.hooksPath .githooks
@@ -106,7 +113,7 @@ git config core.hooksPath .githooks
 
 跳过单次检查用 `git commit --no-verify`。
 
-> 为什么用 hook 而不是靠自觉:2026-09-12 一次会话里“正文 ≤ 150 行”被连续违反两次(WLRR 256 行、PKB 174 行),两次都是脚本抓出来的,肉眼没发现。
+> 为什么用 hook 而不是靠自觉:2026-09-12 一次会话里“正文 ≤ 150 行”被连续违反两次(WLRR 256 行、PKB 174 行),两次都是脚本抓出来的,肉眼没发现。同一会话里还发生过一次真实名称被推送到本仓库（当时 public），清除它需要重写 35/38 个 commit 并 force push。
 
 ## 参考
 
