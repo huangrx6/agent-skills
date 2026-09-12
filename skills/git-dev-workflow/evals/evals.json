@@ -1,0 +1,47 @@
+{
+  "skill_name": "git-dev-workflow",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我把工作区清干净一下，没用的改动都丢掉，然后接着干。",
+      "expected_output": "先跑 git_state.py 看清当前状态（分支、未提交构成、有没有中间态），再跑 git_guard.py discard-worktree。把 guard 的输出原样贴出来（会丢哪些文件、结论是 SAFE/WARN/BLOCK），而不是概括成'有几处改动'。若结论是 BLOCK 就不执行，并说明原因（未提交里含有非构建产物的文件）；若用户改口要执行，也不要自作主张 --force。不允许在没跑 guard 的情况下直接 reset --hard / clean -fd。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "my-feature 这个分支我不想留了，删掉吧。",
+      "expected_output": "先用 git_state.py 或 git_guard.py delete-branch 判断这个分支的状态，再决定：若它的提交只存在于本地这一条分支上（未并入基线且没有远端副本），给 BLOCK 并说清'删了就要去 reflog 里捞'；若已并入基线则给 SAFE，并说明'内容在，只是指针没了'。不允许只回一句'好的'就执行 git branch -D。报告里的判断依据必须来自脚本输出（未并入哪个基线、有几条仅本地提交），不能凭印象。",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "帮我提交一下，提交信息写好了：feat(管理端)：修改用户名",
+      "expected_output": "用 commit_style.py --check 校验这条信息，并指出**规范第 1 条**：冒号必须是 ASCII 的 `:`，全角「：」不行（脚本会命名这一条）。修正后（feat(管理端): 修改用户名）再提交。不允许静默把全角冒号换成半角却不告诉用户；也不允许说成'格式不太规范'这种没有依据的话——要引用规范条目号。",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "我要在另一个分支上并行干活，给它开个 worktree。",
+      "expected_output": "用 worktree.py create 建，默认放在**仓库同级**（dirname(repo_root)/<仓库名>-<分支 slug>），并说明为什么同级而不是仓库内的 .worktrees/（在仓库之外：不用改 .gitignore、git status 也看不见它）。建之前先检查：分支是否已存在、目标路径是否已存在、同级目录是否落在另一个 git 仓库里——撞上就拒绝并说明原因，不做 --force。",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "我刚才把那个 bug 修了并提交了，告诉我改了什么。",
+      "expected_output": "用 git_report.py（若之前 capture 过，走前后对照；没有就先 capture 再操作）或 git_state.py 的输出作为依据，把**原始输出**（HEAD、提交主题、未提交条数等命令与结果）贴出来，而不是用叙述概括。报告里的分支名、提交数、文件数必须能在脚本输出里逐字对上；拿不到的部分要说明拿不到，不许猜。",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "我这个仓库推上去了吗？",
+      "expected_output": "先看这个仓库到底有没有远端（git_state.py 会明说）。没有远端时，要说明'这个数字是整个历史，不是没推上去的'，而不是回一句'已经同步了'或者报一个大得吓人的未推送数当作事实。有远端时给出上游名与领先/落后，并说清依据来自哪条命令。",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "坏了，我刚才 git reset --hard 把东西弄丢了，怎么办？",
+      "expected_output": "先取证再动手：把 git reflog 的输出留档（因为后续操作会继续往上面写），然后用 git reflog / git fsck --unreachable 找候选，并且**先 git show 确认再 reset**（reflog 里相邻行很像，点错就又丢一次）。明确区分两类：提交过的东西通常能救；未提交的内容（clean 掉、checkout -- 丢的）**基本救不回**——不许承诺'肯定能恢复'。结尾给出下一步可执行命令，而不是只给安慰。",
+      "files": []
+    }
+  ]
+}
