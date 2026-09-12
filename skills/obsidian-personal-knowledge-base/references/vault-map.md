@@ -129,6 +129,15 @@ Templater 脚本：
 
 > 清理 Vault 前先确认文件用途。名字奇怪 / 大小为 0 不等于可删。
 
+## 版本控制
+
+本 vault 已用 git 管理（2026-09-12 初始化）。改动前不需要额外备份，但要知道：
+
+- **`.gitignore` 排除了 `.obsidian/plugins/feishu-lark-cli-sync/data.json`**——那里存着每个同步目录的飞书文档 token，是真实凭据。不要把它加进版本控制，也不要用 `git add -f` 绕过。
+- 删除/移动笔记用 `git rm` / `git mv`，这样可回滚；不要直接 `rm`。
+- 大规模结构调整（删目录、改编号）建议单独提交，commit message 写清原因，方便日后 `git revert`。
+- 工作区状态文件（`workspace*.json`、`*冲突文件*.json`）被忽略，这是有意的。
+
 ## 探查命令示例
 
 任务开始前对目标区域做单层探查：
