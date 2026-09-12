@@ -196,13 +196,18 @@ class TestArrowGeometry(unittest.TestCase):
                 self.assertLessEqual(abs(py), el["height"] + 0.01)
 
     def test_multi_waypoint_arrow_keeps_its_waypoints(self):
-        """跨层边要保留虚节点拐点，不能压成一条直线。"""
-        scene = build(spec_of("ABCDE", [("A", "B"), ("B", "C"), ("C", "D"), ("D", "E"),
-                                        ("A", "D"), ("A", "E")]))
+        """跨层边**必须**保留拐点 —— 当首尾直线会穿过中间节点时。
+
+        原版用的是 A→D / A→E 那组。实测它们的直线并不穿过任何节点，所以
+        「能直就直」（`straighten`）之后被正常拉直了 —— 那正是要的效果，不是丢东西。
+        这里换成一个真的绕不过去的形状：B 正好夹在 A 与 C 之间。
+        """
+        scene = build(spec_of("ABC", [("A", "B"), ("B", "C"), ("A", "C")],
+                              direction="TB"))
         arrows = [e for e in scene["elements"] if e["type"] == "arrow"]
-        self.assertEqual(6, len(arrows), "边丢了")
+        self.assertEqual(3, len(arrows), "边丢了")
         self.assertTrue(any(len(a["points"]) > 2 for a in arrows),
-                        "没有任何箭头带拐点 —— 跨层边被压直了")
+                        "A→C 的直线明明是穿过 B 的，却被压直了")
 
 
 class TestTextFidelity(unittest.TestCase):

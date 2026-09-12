@@ -73,7 +73,9 @@ ResultT = Any       # layout.LayoutResult
 # 它们等的是 validation.md 里那张校准表（用够 5 张图做一次复盘）。
 # 信任状态总表见 references/diagram-spec.md（“数值的信任状态”一节）。
 GAP_MIN = 12.0            # #1 相邻元素最小间隙（前作容忍 4px **重叠**，本版检查间隙）
-EDGE_MIN = 24.0           # #2 连线最短可见长度
+# #2 连线最短可见长度。数值来自 layout.py（那边是唯一定义）—— 两边各写一个数
+# 迟早会漂，而漂的时候“生成”和“检查”会对同一张图给出相反结论。
+EDGE_MIN = L.EDGE_MIN
 CROSSING_RATIO = 0.5      # #5 交叉数软阈值 = 边数 × 0.5
 MAX_TUNE_ROUNDS = 4       # 调参轮数上限
 TOLERANCE = 0.5           # 浮点比较容差（#3 断言用）

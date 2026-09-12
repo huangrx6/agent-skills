@@ -641,6 +641,16 @@ def build_scene(spec: dict, result, boxes: dict,
     # 落到图上却压在真线上（实测某条边被压 19 个采样点）。
     # 这就是 P3“标签压线”反复修不掉的根因。
     polylines = [list(edge["points"]) for edge in result.edges]
+    # 节点框也算障碍。以前只躲线 —— 于是标签躲开了所有线，却正好贴在节点边框上
+    # （实测某张图里「38」就压在 application 的左边框上）。矩形按闭合折线传，
+    # `label_position` 一个字都不用改：几何判据还是同一个函数，只是多喂了几条线。
+    # 只算**真节点**：虚节点是布局内部的东西，不画出来，不该把标签赶走。
+    for placed in result.real_nodes().values():
+        polylines.append([[placed.x, placed.y],
+                          [placed.x + placed.width, placed.y],
+                          [placed.x + placed.width, placed.y + placed.height],
+                          [placed.x, placed.y + placed.height],
+                          [placed.x, placed.y]])
     for i, (edge, _) in enumerate(arrow_specs):
         elements.append(arrow_element(edge, i))
         label = edge_label_element(edge, i, polylines)

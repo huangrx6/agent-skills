@@ -35,6 +35,7 @@ import os
 import random
 import subprocess
 import sys
+import math
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -173,10 +174,22 @@ class TestLongEdges(unittest.TestCase):
         self.assertEqual(6, len(self.r.edges), "边数不对 —— 跨层边很可能被漏掉了")
 
     def test_dummy_count_matches_span(self):
-        """A(0)→D(3) 跨 3 层插 2 个虚节点；A(0)→E(4) 跨 4 层插 3 个；合计 5。"""
+        """A(0)→D(3) 跨 3 层插 2 个虚节点；A(0)→E(4) 跨 4 层插 3 个；合计 5。
+
+        数的是**布局内**的虚节点（`dummy_count`），不是渲染出来的折点数 ——
+        渲染会拉直，两者本来就不该永远相等（以前这里断 `len(points)`，
+        把「虚节点链」和「画出来的折线」当成了同一个东西）。
+        这一段同时守住渲染后的两条硬性质：不穿节点、每一段都比可见下限长。
+        """
         self.assertEqual(5, self.r.dummy_count)
-        self.assertEqual(4, len(self.edge("A", "D")["points"]))
-        self.assertEqual(5, len(self.edge("A", "E")["points"]))
+        for a, b in (("A", "D"), ("A", "E")):
+            pts = self.edge(a, b)["points"]
+            self.assertGreaterEqual(len(pts), 2)
+            self.assertEqual([], L.nodes_hit_by_polyline(pts, self.r.placed, {a, b}),
+                             f"{a}→{b} 的折线穿过了节点")
+            for first, second in zip(pts, pts[1:]):
+                self.assertGreaterEqual(math.dist(first, second), L.EDGE_MIN - 0.01,
+                                        f"{a}→{b} 有一段短于可见下限")
 
     def test_parallel_long_edges_do_not_share_a_chain(self):
         """同一节点出发的两条长边必须各走自己的链。"""
@@ -185,9 +198,21 @@ class TestLongEdges(unittest.TestCase):
         self.assertLess(ad[1][0], ae[1][0] + 10_000)   # 都存在且不同层
 
     def test_dummies_are_apart_by_dummy_separation(self):
-        """虚节点不能吃掉整个节点间距，但也不能重合（否则平行边看起来是一条）。"""
-        ad, ae = self.edge("A", "D")["points"], self.edge("A", "E")["points"]
-        self.assertAlmostEqual(L.DUMMY_SEPARATION, abs(ae[1][1] - ad[1][1]), delta=0.5)
+        """虚节点不能吃掉整个节点间距，但也不能重合（否则平行边看起来是一条）。
+
+        查的是**虚节点自己的位置**（`placed` 里带前缀的那些），不是渲染出来的折点 ——
+        渲染那一步会「能直就直」（`straighten`），折点跟虚节点已经不是一回事了。
+        以前这里读 `points[1]`，等于把两个东西当成一个。
+        """
+        dummies = {nid: p for nid, p in self.r.placed.items()
+                   if nid.startswith(L.DUMMY_PREFIX)}
+        self.assertTrue(dummies, "一条跨层边都没插虚节点")
+        by_rank: dict[int, list[float]] = {}
+        for p in dummies.values():
+            by_rank.setdefault(p.rank, []).append(p.y)
+        first = sorted(by_rank[min(by_rank)])
+        self.assertEqual(2, len(first), "第一层里的虚节点数不对（两条长边各一个）")
+        self.assertAlmostEqual(L.DUMMY_SEPARATION, first[1] - first[0], delta=0.5)
 
     def test_dummy_boxes_are_not_visual(self):
         """虚节点不进 real_nodes()，否则会被当成元素去查间隙。"""

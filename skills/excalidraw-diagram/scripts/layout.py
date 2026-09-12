@@ -102,6 +102,10 @@ ICON_VERTICAL_PAD = 6.0
 # 这几个数都是**待验证**的（没有真实数据校准，见 diagram-spec.md 的信任状态总表）：
 # 间隙沿用“元素最小间隙”那一个数，不另起一套。
 NODE_CLEARANCE = 12.0
+EDGE_MIN = 24.0             # 一条连线上最短的可见段。**唯一定义在这里** ——
+                            # check_layout 的判据也从它取：两边各写一个数，迟早会漂。
+SMALL_DODGE = 40.0          # 让开这么多像素以内算「小动作」；再多就该换贴车道的画法
+                            # （实测：把单点推到 424px 的 V 形，比贴着障碍走更乱）
 # 把挡路的线段推开时，偏移量试探的步长与上限。
 # 上限就是“推不出去就算了”的那条线 —— 病态图里无限推比不推更糟。
 DETOUR_STEP = 28.0
@@ -1372,6 +1376,9 @@ def route_edges(origins: list[dict], segments: list[dict],
         pts = _points(chain, placed, direction, starts[idx], ends[idx])
         # 推开挡路的节点。排除自己的两端 —— 它们本来就贴着线。
         pts = avoid_nodes(pts, placed, {chain[0], chain[-1]})
+        # 最后一道：能直就直。上一步只保证「不穿节点」，不保证「不绕远」——
+        # 虚节点车道会把跨层边牵着在每一层横移一次（实测偏离直线 324px）。
+        pts = straighten(pts, placed, {chain[0], chain[-1]})
         a, b = e["from"], e["to"]
         was_reversed = (b, a) in reversed_set
         if was_reversed:
@@ -1619,6 +1626,162 @@ def _try_detour(pts: list, i: int, blocked: str, placed: dict,
         if not _blocking_nodes(trial, placed, exclude, NODE_CLEARANCE):
             return trial
     return None
+
+
+def _collinear(a: list, b: list, c: list, tolerance: float = 0.5) -> bool:
+    """b 是不是落在 a→c 这条直线上（垂距 ≤ tolerance）。"""
+    base = math.dist(a, c)
+    if base < 1e-9:
+        return True
+    cross = abs((c[0] - a[0]) * (b[1] - a[1]) - (c[1] - a[1]) * (b[0] - a[0]))
+    return cross / base <= tolerance
+
+
+def _simplify_path(pts: list, min_segment: float = EDGE_MIN) -> list:
+    """去掉共线的中间点和过短的段。
+
+    为什么必须有：车道候选会生出「横移 11px」这种几乎为零的拐角 —— 画出来是个
+    小毛刺，而 `check_layout` 有可见长度下限（24px），一条这样的段会把整张图判红。
+    短线不是几何错误，是视觉噪声：与其让检查去报它，不如生成时就不要它。
+
+    首尾两点（贴点）永远不动，所以箭头还落在原来的位置上；中间太短的段靠**删掉
+    那个拐点**来消掉，删到只剩首尾就成了直线。末段同样处理 —— 第一版只看了中间
+    的点，结果 04-state 的收尾段还是 11px（用例抓到的）。
+    """
+    if len(pts) <= 2:
+        return [list(p) for p in pts]
+    kept = [list(pts[0])]
+    for point in pts[1:-1]:
+        if math.dist(kept[-1], point) < min_segment:
+            continue                        # 这一段太短：连这个拐点一起跳过
+        if len(kept) >= 2 and _collinear(kept[-2], kept[-1], point):
+            kept.pop()                      # 只是多了一个「结」，去掉它
+        kept.append(list(point))
+    tail = list(pts[-1])
+    while len(kept) >= 2 and math.dist(kept[-1], tail) < min_segment:
+        kept.pop()                          # 末段太短：把最后一个内点也去掉
+    kept.append(tail)
+    return kept
+
+
+def _max_deviation(pts: list) -> float:
+    """折点离「首尾直线」最远有多少像素。0 = 就是直线。"""
+    a, b = pts[0], pts[-1]
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    span = math.hypot(dx, dy) or 1e-9
+    return max((abs((q[0] - a[0]) * dy - (q[1] - a[1]) * dx) / span
+                for q in pts[1:-1]), default=0.0)
+
+
+def _path_rank(pts: list, tier: int) -> tuple[int, int, int, float, float]:
+    """候选路径的排序键：**先看它是哪一类形状**，再看折点数、偏离、绕路比。
+
+    为什么不是单纯的几何评分：试过「折点最少优先」，它把一条边的中点推到 424px
+    开外（一个巨大的 V），折点确实最少，看着却比原来还乱。人能接受的形状是分档的：
+
+      0 直线          —— 无疑最好
+      1 小幅让开      —— 单点推开，且**偏得不远**（≤ SMALL_DODGE），几乎看不出弯
+      2 贴车道        —— 让开、贴着障碍直走、再回来：中段是长直线，两个拐在两端
+      3 其余          —— 沿虚节点车道的碎折线，以及推不动的那些
+
+    档位由**生成候选的人**标（每条候选自己带着 tier），不靠事后猜几何 ——
+    「这是贴车道的形状」这件事在建它的时候就知道，重新反推一遍只会多一个漂移点。
+    同档之内再比折点数、偏离、绕路比。
+    """
+    a, b = pts[0], pts[-1]
+    span = math.hypot(b[0] - a[0], b[1] - a[1]) or 1e-9
+    length = sum(math.dist(pts[i], pts[i + 1]) for i in range(len(pts) - 1))
+    if len(pts) <= 2:
+        return (0, 0, 0, 0.0, 1.0)
+    # 「有短于可见下限的段」排在最前 —— 那是**缺陷**（check_layout 会因此判红整张图），
+    # 不是审美偏好：一条 3px 的毛刺比多一个折点难看多了。
+    stub = 0 if all(math.dist(first, second) >= EDGE_MIN
+                    for first, second in zip(pts, pts[1:])) else 1
+    return (stub, tier, len(pts) - 2, round(_max_deviation(pts), 2),
+            round(length / span, 3))
+
+
+def _lane_candidates(a: list[float], b: list[float], placed: dict,
+                     exclude: set[str]) -> list[list[list[float]]]:
+    """绕过**一整列节点**的候选：让开、贴着走、再回来。
+
+    单个中间点推不开一整列节点（实测：跨 7 层的边被 6 个节点排成一列挡住，
+    偏移梯度扫到上限也过不去），绕盒子那四个候选也只管一个盒子。人画这种线的方式
+    就是“先横着让开一条车道，直着走到位置，最后再横回来”。
+
+    给两种画法，都贴在障碍整体包围盒的外侧（贴着障碍走，不是跑到画布边缘）：
+
+    - **4 点**：横移段就走在 a/b 的高度上。最省，但那条横移线常常穿过别的节点
+      （实测过：一列节点打横排开时它一定过不去）。
+    - **6 点**：横移段挪到障碍上下两侧的走廊（包围盒外），中间那段沿车道直走。
+      多一点折点，但连接段不会横穿障碍 —— 这是真绕得过去的那种。
+
+    两种都交给调用方按档位比，不在这里替它选。
+    """
+    blockers = [p for nid, p in _visible_nodes(placed, exclude)
+                if _segment_hits_box(a, b, p, NODE_CLEARANCE)]
+    if not blockers:
+        return []
+    left = min(p.x for p in blockers) - NODE_CLEARANCE
+    right = max(p.x + p.width for p in blockers) + NODE_CLEARANCE
+    top = min(p.y for p in blockers) - NODE_CLEARANCE
+    bottom = max(p.y + p.height for p in blockers) + NODE_CLEARANCE
+    out: list[list[list[float]]] = []
+    if abs(b[1] - a[1]) >= abs(b[0] - a[0]):        # 竖向为主：左右让车道
+        for lane in (left, right):
+            out.append([list(a), [lane, a[1]], [lane, b[1]], list(b)])
+        for lane in (left, right):
+            out.append([list(a), [a[0], top], [lane, top],
+                        [lane, bottom], [b[0], bottom], list(b)])
+    else:                                            # 横向为主：上下让车道
+        for lane in (top, bottom):
+            out.append([list(a), [a[0], lane], [b[0], lane], list(b)])
+        for lane in (top, bottom):
+            out.append([list(a), [left, a[1]], [left, lane],
+                        [right, lane], [right, b[1]], list(b)])
+    return out
+
+
+def straighten(pts: list, placed: dict, exclude: set[str]) -> list[list[float]]:
+    """把一条边**能直就直、要弯就最小弯**。
+
+    为什么必须有这一遍：跨层的边在分层算法里是被**虚节点**牵着走的 —— 虚节点的 x
+    由「层内排序（减少交叉）」决定，它不管这条边离首尾两点的直线差多远。于是一条
+    跨 7 层的边会在每一层的车道上各横移一次：实测偏离直线 **324px**、六个折点；
+    而它真正需要做的，只是让开、直着走、再回来（三个折点）。
+
+    候选四类（各自带档位，见 `_path_rank`）：
+      ① 首尾直线（两点）
+      ② 把直线交给 `avoid_nodes`：小幅推开 / 绕盒子走 —— 推得太远就不算「小动作」，
+         直接降到第 3 档（那种 V 形实测比贴着走更乱）
+      ③ 贴车道：绕过挡路的**整列**节点
+      ④ 原路径（虚节点车道）
+    先用「不许穿节点」过滤，再按档位与折点数挑。**不会让任何一条边新穿过节点**：
+    穿节点的候选直接出局，而那条判据只有一份实现（`nodes_hit_by_polyline`）。
+    """
+    if len(pts) < 2:
+        return [[round(x, 2), round(y, 2)] for x, y in pts]
+    straight = [list(pts[0]), list(pts[-1])]
+    pushed = avoid_nodes(straight, placed, exclude)
+    candidates = [(0, straight),
+                  (1 if _max_deviation(pushed) <= SMALL_DODGE else 3, pushed)]
+    candidates += [(2, lane) for lane in _lane_candidates(straight[0], straight[1],
+                                                          placed, exclude)]
+    candidates.append((3, pts))
+    viable = []
+    for tier, path in candidates:
+        if nodes_hit_by_polyline(path, placed, exclude):
+            continue
+        # **每个**候选都先简化一遍 —— 只简化最后选中的那个是不够的：
+        # 简化会挪动拐点，可能挪进节点，于是那一份不可用，而「不可用就退回未简化的」
+        # 会把带毛刺的原样留下（实测 A→D 就留了一段 3px，用例抓到的）。
+        simple = _simplify_path(path)
+        viable.append((tier, simple if not nodes_hit_by_polyline(simple, placed, exclude)
+                       else path))
+    if not viable:
+        return [[round(x, 2), round(y, 2)] for x, y in pts]
+    _tier, best = min(viable, key=lambda item: _path_rank(item[1], item[0]))
+    return [[round(x, 2), round(y, 2)] for x, y in best]
 
 
 def avoid_nodes(pts: list, placed: dict, exclude: set[str]) -> list[list[float]]:
