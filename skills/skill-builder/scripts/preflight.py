@@ -182,6 +182,24 @@ def checks(root: str) -> list[dict]:
     ]
 
 
+def install_drift(root: str) -> tuple[bool, str]:
+    """仓库 vs pi 安装位（`~/.agents/skills`）有没有漂移。
+
+    为什么进 preflight：pi 加载的是**副本**，不是仓库 —— 实测过一次「仓库改了 13 个
+    文件、安装位一个都没有」，那个 skill 在下一个会话里会画出旧配色旧框线，
+    而且不知道新能力存在。这类“改得再好，不跑同步就等于没改”的事必须在报告里可见。
+
+    ⚠️ 只报告、**不算失败**：钩子是在 commit **之前**跑的，那时候安装位按定义就是
+    旧的 —— 把它算成失败，等于每次提交都挂。所以这里只给一条能照抄的命令。
+    """
+    code, out = _run([sys.executable, os.path.join(root, "tools", "install_skills.py"),
+                      "--check"], root)
+    if code == 0:
+        return True, "与仓库一致"
+    bad = [line.strip() for line in out.split("\n") if line.strip().startswith("✗")]
+    return False, "；".join(bad) or "与仓库不一致"
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="报告前的强制一步：检查 + 事实快照")
     ap.add_argument("--json", action="store_true", help="输出 JSON")
@@ -203,11 +221,14 @@ def main(argv: list[str] | None = None) -> int:
     steps = hook_steps(root)
     total_tests = sum(f["tests"] for f in facts)
     orphans = [(f["skill"], s) for f in facts for s in f["orphan_scripts"]]
+    install_ok, install_note = install_drift(root)
 
     if args.json:
         print(json.dumps({"root": root, "checks": results, "skills": facts,
                           "hook_steps": steps, "total_tests": total_tests,
-                          "orphan_scripts": orphans}, ensure_ascii=False, indent=2))
+                          "orphan_scripts": orphans,
+                          "install_in_sync": install_ok, "install_note": install_note},
+                         ensure_ascii=False, indent=2))
         failed = any(r["exit"] != 0 for r in results) or bool(orphans)
         return 1 if failed else 0
 
@@ -239,6 +260,14 @@ def main(argv: list[str] | None = None) -> int:
               "把用法写进 SKILL.md 或 references/。")
     else:
         print("\n  ✓ 无孤儿脚本")
+
+    # ⚠️ 只报告、不算失败（原因见 install_drift 的 docstring：钩子在 commit 前跑，
+    # 那时安装位按定义就是旧的）。
+    if install_ok:
+        print(f"  ✓ 安装位 {install_note}")
+    else:
+        print(f"  ⚠ 安装位落后于仓库：{install_note}")
+        print("      → python3 tools/install_skills.py")
 
     failed = any(r["exit"] != 0 for r in results) or bool(orphans)
     return 1 if failed else 0
