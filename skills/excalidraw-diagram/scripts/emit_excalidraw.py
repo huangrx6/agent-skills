@@ -149,7 +149,9 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
 
     kind = node.get("kind")
     emphasis = node.get("emphasis", palette.DEFAULT_EMPHASIS)
-    stroke = palette.stroke_for(kind)
+    # stroke 也要带上 emphasis —— 否则 critical 节点的填充是警示色、
+    # 描边却还是基础层级那一档，而线宽又按 emphasis 来，三者对不上。
+    stroke = palette.stroke_for(kind, emphasis)
     fill = palette.fill_for(kind, emphasis)
     stroke_width = palette.emphasis_stroke_width(emphasis)
     elements = shape_elements(shape_id, box.shape, placed, stroke, fill,
