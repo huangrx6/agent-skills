@@ -12,7 +12,9 @@
 # 跳过方式：git commit --no-verify
 # 安装：git config core.hooksPath .githooks
 
-if ! git diff --cached --name-only -z | tr '\0' '\n' | grep -q '^skills/'; then
+# 触发范围也含 tools/: 仓库级工具（装 skill 的安装器）有自己的回归测试，只改 tools/
+# 却跳过这道门，那些测试就等于没接线 —— 而这正是本文件第 3 段要防的事。
+if ! git diff --cached --name-only -z | tr '\0' '\n' | grep -qE '^(skills|tools)/'; then
   exit 0
 fi
 
