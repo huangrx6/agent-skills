@@ -373,6 +373,11 @@ class TestDocsDoNotRestateColours(unittest.TestCase):
     却一次都没提"莫兰迪"三个字 —— **只 grep 旧名字是查不出来的**。
     """
 
+    # §20 要"禁止灰蓝成为默认答案"，就必须把那几个色值**写出来**才说得清禁止的是什么。
+    # 这是白名单而不是放宽：任何**新增**的色值仍然会被拦下（这条防线本来就是为了
+    # 拦住"文档复述色板"——kind→HEX 表那种）。白名单是精确的、需要理由的。
+    ALLOWED_MENTIONS = {"#6E879B", "#7F96A5", "#AAB8C0"}
+
     def test_no_hex_colours_in_docs(self):
         root = os.path.dirname(HERE)
         offenders = []
@@ -382,9 +387,12 @@ class TestDocsDoNotRestateColours(unittest.TestCase):
                 if not name.endswith(".md"):
                     continue
                 path = os.path.join(base, name)
-                for number, line in enumerate(
-                        open(path, encoding="utf-8").read().split("\n"), 1):
+                with open(path, encoding="utf-8") as handle:
+                    body = handle.read()
+                for number, line in enumerate(body.split("\n"), 1):
                     for match in pattern.findall(line):
+                        if match.upper() in {c.upper() for c in self.ALLOWED_MENTIONS}:
+                            continue
                         offenders.append(f"{name}:{number} {match}")
         self.assertEqual([], offenders,
                          "文档里出现了写死的色值：" + "；".join(offenders))
