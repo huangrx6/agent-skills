@@ -52,5 +52,20 @@ if [ -f "$LEAK" ]; then
   fi
 fi
 
-echo "✓ pre-commit: 结构与泄露检查通过"
+# ── 3. 脚本回归测试 ──
+# 前两道检查都依赖 skills/*/scripts/ 下的脚本,而这些脚本自己有回归测试
+# （check_links.py 8 个、check_paths.py 11 个）,测的正是它们的防线:
+# 代码块里的 [[ ]] 不是 wikilink、含空格的路径不能被截断、扫描范围不能扩散……
+# 不跑的话,那些测试和没写一样 —— 改坏了脚本也不会有人发现防线已经失效。
+# 代价实测 0.4 秒。
+TESTS="$ROOT/skills/obsidian-personal-knowledge-base/tests"
+if [ -d "$TESTS" ]; then
+  OUT=$(cd /tmp && python3 -m unittest discover -s "$TESTS" 2>&1)
+  STATUS=$?
+  if [ "$STATUS" -ne 0 ]; then
+    fail "$OUT" "脚本回归测试失败"
+  fi
+fi
+
+echo "✓ pre-commit: 结构、泄露与回归测试通过"
 exit 0

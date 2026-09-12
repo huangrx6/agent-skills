@@ -26,7 +26,7 @@ python3 scripts/vault_path.py --explain     # 路径 + 来源 + 目录是否存�
 
 都解析不出时会报错并给配置指引，**不要退回到任何硬编码路径**。换机器或 vault 搬家只改上面第 1/2 项，两个 skill 与脚本都跟着走。
 
-参考本 skill 依赖的 6 个 references：`vault-map.md` / `writing-conventions.md` / `work-management.md` / `resource-notes.md` / `research-and-synthesis.md` / `link-checking.md`。
+参考本 skill 依赖的 6 个 references：`vault-map.md` / `writing-conventions.md` / `work-management.md` / `resource-notes.md` / `research-and-synthesis.md` / `structural-checks.md`。
 
 ## 起手流程
 
@@ -126,15 +126,16 @@ python3 scripts/vault_path.py --explain     # 路径 + 来源 + 目录是否存�
 
 归位规则见 `references/vault-map.md` 的「归位规则」表。核心原则：**只选一个最稳定的主家，其他地方用链接**。
 
-## 链接检查
+## 结构检查
 
-要求“检查失效链接”时用 `scripts/check_links.py`，不要手写临时扫描：
+要求“检查失效链接”时用脚本，不要手写临时扫描：
 
 ```sh
-python3 scripts/check_links.py --ignore-template
+python3 scripts/check_links.py --ignore-template   # 失效 wikilink 与嵌入
+python3 scripts/check_paths.py                     # .obsidian/ 配置里的失效绝对路径
 ```
 
-退出码 `0`/`1`/`2`；为什么必须用脚本、失效链接的五种处理方式见 `references/link-checking.md`。
+退出码 `0`/`1`/`2`；失效链接的五种处理方式、配置路径的分层判定见 `references/structural-checks.md`。
 
 ## 引用文件
 
@@ -143,8 +144,9 @@ python3 scripts/check_links.py --ignore-template
 - `references/work-management.md`：Areas、Projects、周计划、周报、工作日志、交付记录。
 - `references/resource-notes.md`：仅适用于 Resources 的写作标准、学习笔记审阅、技术示例、配图规则。
 - `references/research-and-synthesis.md`：仅适用于 Resources 的研究流程和深度综合规则。
-- `references/link-checking.md`：失效链接检查的用法与五种处理方式。
+- `references/structural-checks.md`：链接与配置路径两类结构检查的用法与处理方式。
 - `scripts/check_links.py`：全库失效 wikilink 与嵌入检查。
+- `scripts/check_paths.py`：`.obsidian/` 配置里指向不存在位置的绝对路径。
 
 ## 安装
 
