@@ -165,22 +165,43 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
     top = inner_y + (inner_h - (title_h + detail_h)) / 2.0
     content_w = text.break_units * tm.FONT_NODE
 
-    # 图标（可选）放左侧，文字在它右边那块区域里居中。
-    # 文字**不再在整个盒子里居中** —— 盒子已经为图标加宽过（layout.boxes_from_spec），
-    # 这里必须把加出来的那部分让给图标，否则两者会叠在一起。
+    # 图标（可选）与文字的摆放，要按**真实 Excalidraw 的规矩**来算。
+    #
+    # 关键事实（实测）：绑定到容器的文字，官方会把它**水平居中于容器**，并且
+    # 重算位置 —— 我们写进去的 x 只影响预览。第一版不知道这一点，按“图标在左、
+    # 文字在剩余区域居中”算（文本中心 173.6 vs 节点中心 154.7，偏了 19px），
+    # 于是真实渲染里就成了“文字居中、图标丢在左边”。用户的原话：
+    # “为什么图标这么靠左，你要考虑整体的协调啊”。
+    #
+    # 推论：文字的位置不在我们手里（它总在容器中心），所以“图标+文字整体居中”
+    # **在数学上做不到** —— 强行去居中会让图标和文字叠在一起。
+    # 能做且正确的是：让图标**紧贴可见文字的左边**，间隔就是设计值。
+    # 代价是整组视觉重心比中心偏左 (图标宽 + 间隔) / 2 ≈ 19px —— 在 300px 宽的
+    # 节点上是 6%，基本看不出来；而换成“把文字解绑”能完美居中，但拖动节点时
+    # 文字会留在原地，那是功能倒退，不能接受。
     icon_w = 0.0
+    height = icon_height if icon_height else icons.ICON_HEIGHT
     if icon_src:
-        height = icon_height if icon_height else icons.ICON_HEIGHT
         scale = icons.fit_scale(icon_src, height)
         icon_w = icons.intrinsic_size(icon_src)[0] * scale
-        elements += icons.place(icon_src,
-                                placed.x + tm.PADDING_X,
-                                inner_y + (inner_h - height) / 2.0,
-                                key=_eid("icon", nid), target_height=height)
+
     gap = (layout_gap() if icon_w else 0.0)
-    left = placed.x + tm.PADDING_X + icon_w + gap
-    right = placed.x + placed.width - tm.PADDING_X
-    tx = left + max(0.0, (right - left - content_w) / 2.0)
+    # 文字元素本身就是个居中的盒子（宽度 = 断行宽度），可见文字在它里面居中 ——
+    # 所以“可见文字的左边界”是下面这个，而不是盒子的左边界。
+    visible_w = max([tm.weighted_units(line) for line in text.lines]
+                    + [tm.weighted_units(line) for line in text.detail_lines]
+                    or [0.0]) * tm.FONT_NODE
+    center = placed.x + placed.width / 2.0
+    tx = center - content_w / 2.0          # 与真实渲染一致（官方会把它放这里）
+
+    if icon_src:
+        icon_left = center - visible_w / 2.0 - gap - icon_w
+        icon_left = max(icon_left, placed.x + tm.PADDING_X)   # 不越出内边距
+        # 竖向与**文字块**对齐（不是与整个可放字区域）—— 带 detail 的节点里
+        # 文字是两行，图标对着那两行的中心才协调。
+        elements += icons.place(icon_src, icon_left,
+                                top + (title_h + detail_h) / 2.0 - height / 2.0,
+                                key=_eid("icon", nid), target_height=height)
 
     elements.append(_text_block(title_id, shape_id, text.lines, tx, top,
                                 content_w, tm.FONT_NODE))

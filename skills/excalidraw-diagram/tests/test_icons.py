@@ -280,16 +280,49 @@ class TestIconWiring(unittest.TestCase):
         self.assertEqual(2, len(nodes), "两个节点就是两个；图标与圆柱顶盖都不能算进去")
         self.assertEqual({"node-a", "node-b"}, {e["id"] for e in nodes})
 
-    def test_text_does_not_overlap_the_icon(self):
+    def test_icon_hugs_the_visible_text(self):
+        """图标要紧贴**可见文字**的左边 —— 不是紧贴文字元素那个盒子。
+
+        文字元素是个**居中的盒子**（宽 = 断行宽度），可见文字在盒子里居中。
+        按盒子左边对齐，间距会凭空多出一大截（用户原话：和文本间距是不是太大了），
+        而且在真实 Excalidraw 里更糟：官方会把绑定文字拉回容器中心，
+        于是成了「文字居中、图标丢在左边」（为什么图标这么靠左）。
+
+        所以这条验的是**可见**的那条边，不是盒子的边。
+        """
         scene, _, _, _ = self.E.emit(ICON_SPEC, library=V2)
-        node = next(e for e in scene["elements"] if e["id"].startswith("node-a"))
-        icon = next(e for e in scene["elements"] if e["groupIds"])
-        title = next(e for e in scene["elements"]
-                     if e["id"].startswith("title-a"))
-        self.assertLessEqual(icon["x"] + icon["width"], title["x"] + 0.5,
-                             "图标右边越过了文字左边 —— 两者会叠在一起")
-        self.assertLessEqual(title["x"] + title["width"], node["x"] + node["width"] + 0.5,
-                             "文字溢出了节点右侧")
+        icon_group = next(e["groupIds"][0] for e in scene["elements"]
+                          if e["id"].startswith("icon-a"))
+        icons = [e for e in scene["elements"] if e.get("groupIds") == [icon_group]]
+        icon_right = max(e["x"] + e["width"] for e in icons)
+        title = next(e for e in scene["elements"] if e["id"].startswith("title-a"))
+        visible_w = max(self.E.tm.weighted_units(line)
+                        for line in title["text"].split("\n")) * title["fontSize"]
+        visible_left = title["x"] + title["width"] / 2.0 - visible_w / 2.0
+        self.assertAlmostEqual(self.E.layout_gap(), visible_left - icon_right, places=1,
+                               msg="图标与可见文字之间的间隔不是设计值")
+
+    def test_the_title_box_is_centred_in_the_node(self):
+        """文字元素要摆在**官方会把它放的位置**（容器中心），否则预览与真实渲染对不上。
+
+        这是这次踩坑的直接教训：写进去的 x 只影响预览，官方会重算。
+        两边的约定不一致时，预览会画出一张真实渲染里不存在的图。
+        """
+        scene, _, _, _ = self.E.emit(ICON_SPEC, library=V2)
+        node = next(e for e in scene["elements"] if e["id"] == "node-a")
+        title = next(e for e in scene["elements"] if e["id"].startswith("title-a"))
+        self.assertAlmostEqual(node["x"] + node["width"] / 2.0,
+                               title["x"] + title["width"] / 2.0, places=1)
+
+    def test_icon_stays_inside_the_padding(self):
+        scene, _, _, _ = self.E.emit(ICON_SPEC, library=V2)
+        node = next(e for e in scene["elements"] if e["id"] == "node-a")
+        icon_group = next(e["groupIds"][0] for e in scene["elements"]
+                          if e["id"].startswith("icon-a"))
+        icon_left = min(e["x"] for e in scene["elements"]
+                        if e.get("groupIds") == [icon_group])
+        self.assertGreaterEqual(icon_left, node["x"] + self.E.tm.PADDING_X - 0.5,
+                                "图标越出了节点的内边距")
 
     def test_no_icon_means_the_library_is_never_opened(self):
         """一个图标都不用的话，即使给了一个不存在的库也不该出错。"""
