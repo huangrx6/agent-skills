@@ -34,7 +34,7 @@ import sys
 # 让"顺手加一个"变得有摩擦。
 TOP_FIELDS = {"type", "title", "direction", "detail", "groups", "nodes", "edges"}
 GROUP_FIELDS = {"id", "label", "description"}
-NODE_FIELDS = {"id", "label", "kind", "group", "detail", "rank", "pin"}
+NODE_FIELDS = {"id", "label", "kind", "shape", "group", "detail", "rank", "pin"}
 EDGE_FIELDS = {"id", "from", "to", "label", "kind"}
 
 DIAGRAM_TYPES = {"architecture", "flow", "state", "dependency", "mindmap", "network"}
@@ -76,6 +76,7 @@ def _load_sibling(name: str):
 _palette = _load_sibling("palette")
 KINDS = _palette.KINDS
 EDGE_KINDS = _palette.EDGE_KINDS
+SHAPES = _load_sibling("shapes").SHAPES
 
 
 class Issues:
@@ -183,6 +184,13 @@ def validate(spec: dict) -> Issues:
             # 判失败而不是 fallback —— fallback 会让"颜色必须在板内"这条校验自己绕过自己
             issues.error("UNKNOWN_KIND", f"{where}.kind",
                          f"未知 kind {kind!r}；允许的取值（色板唯一真相源）：{sorted(KINDS)}")
+
+        shape = n.get("shape")
+        if shape is not None and shape not in SHAPES:
+            # 同 kind 一条原则：不 fallback。静默换成 rect 会让
+            # “形状必须与语义有关”变成空话 —— 写错的人不知道，看图的人也看不出。
+            issues.error("UNKNOWN_SHAPE", f"{where}.shape",
+                         f"未知 shape {shape!r}；允许的取值：{sorted(SHAPES)}")
 
         grp = n.get("group")
         if grp is not None and grp not in group_ids:

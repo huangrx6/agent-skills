@@ -77,6 +77,7 @@ def _load_sibling(name: str):
 L = _load_sibling("layout")
 palette = _load_sibling("palette")
 tm = _load_sibling("text_metrics")
+shapes = _load_sibling("shapes")
 
 
 def _stable_int(key: str, salt: str = "") -> int:
@@ -132,35 +133,78 @@ def _base(el_id: str, el_type: str, x: float, y: float, w: float, h: float,
 def node_elements(node: dict, placed, box, arrows_out: list[str],
                   arrows_in: list[str]) -> list[dict]:
     nid = node["id"]
-    rect_id = _eid("node", nid)
+    shape_id = _eid("node", nid)
     title_id = _eid("title", nid)
     detail_id = _eid("detail", nid)
     has_detail = bool(node.get("detail"))
+    text = box.text          # 形状包围盒里面的文字信息（见 layout.NodeBox）
 
     bound = [{"type": "text", "id": title_id}]
     if has_detail:
         bound.append({"type": "text", "id": detail_id})
     bound += [{"type": "arrow", "id": a} for a in arrows_out + arrows_in]
 
-    rect = _base(rect_id, "rectangle", placed.x, placed.y, placed.width, placed.height,
-                 palette.stroke_for(node.get("kind")), palette.background_for(node.get("kind")),
-                 roundness={"type": 3})
-    rect["boundElements"] = bound
+    stroke = palette.stroke_for(node.get("kind"))
+    fill = palette.background_for(node.get("kind"))
+    elements = shape_elements(shape_id, box.shape, placed, stroke, fill)
+    # 文字与箭头都绑到**主体**那个元素上；圆柱的顶盖只是一个装饰性叠加
+    elements[0]["boundElements"] = bound
 
-    # 文字块整体在容器里垂直居中；标题在上，detail 紧随其后。
-    # 两个高度都由行数与字号算出 —— 与容器高度无关（容器高度本就是它们加内边距推出来的）。
-    title_h = len(box.lines) * tm.FONT_NODE * tm.LINE_HEIGHT
-    detail_h = len(box.detail_lines) * tm.FONT_DETAIL * tm.LINE_HEIGHT
-    top = placed.y + (placed.height - (title_h + detail_h)) / 2.0
-    tx = placed.x + tm.PADDING_X
-    content_w = box.break_units * tm.FONT_NODE
+    # 文字在**形状里能放字的那块区域**居中（不是在整个包围盒里居中）——
+    # 圆柱要下沉一个盖高，否则标题会压在椭圆盖上。
+    inner_y, inner_h = text_band(box.shape, placed)
+    title_h = len(text.lines) * tm.FONT_NODE * tm.LINE_HEIGHT
+    detail_h = len(text.detail_lines) * tm.FONT_DETAIL * tm.LINE_HEIGHT
+    top = inner_y + (inner_h - (title_h + detail_h)) / 2.0
+    content_w = text.break_units * tm.FONT_NODE
+    tx = placed.x + (placed.width - content_w) / 2.0    # 形状内水平居中
 
-    elements = [rect, _text_block(title_id, rect_id, box.lines, tx, top,
-                                  content_w, tm.FONT_NODE)]
+    elements.append(_text_block(title_id, shape_id, text.lines, tx, top,
+                                content_w, tm.FONT_NODE))
     if has_detail:
-        elements.append(_text_block(detail_id, rect_id, box.detail_lines, tx,
+        elements.append(_text_block(detail_id, shape_id, text.detail_lines, tx,
                                     top + title_h, content_w, tm.FONT_DETAIL))
     return elements
+
+
+def text_band(shape_name: str, placed) -> tuple[float, float]:
+    """形状里“能放文字的那一条带”的 (顶边, 高)。"""
+    if shape_name == "cylinder":
+        cap = shapes.cylinder_cap(placed.width)
+        return placed.y + cap, placed.height - cap
+    return placed.y, placed.height
+
+
+def shape_elements(element_id: str, shape_name: str, placed,
+                   stroke: str, fill: str) -> list[dict]:
+    """按形状建元素。除圆柱外都是一个元素。
+
+    **圆柱刻意让柱体跨满整个包围盒**，而不是“柱体在下半、盖子在右上”：
+    柱体就是箭头与文字绑定的主体，它的包围盒必须等于整个盒子，
+    否则箭头会连到柱体上、看起来像“连到了下半截”。
+    顶盖椭圆只是叠在上面的装饰（元素顺序 = 叠放顺序，它在后面所以在上）。
+    """
+    entry = shapes.SHAPES[shape_name]
+    style = shapes.stroke_style_for(shape_name)
+    if shape_name == "cylinder":
+        cap = shapes.cylinder_cap(placed.width)
+        body = _base(element_id, "rectangle", placed.x, placed.y, placed.width,
+                     placed.height, stroke, fill, stroke_style=style,
+                     roundness={"type": 3})
+        lid = _base(f"{element_id}-lid", "ellipse", placed.x, placed.y,
+                    placed.width, cap, stroke, fill)
+        # 顶盖与柱体成组：在 Excalidraw 里拖动时它们一起动（否则一拖就散开），
+        # 同时这也是一个明确标记 —— “groupIds 非空的是装饰，不是节点”，
+        # 校验/量图那边靠它区分顶盖与真节点。
+        lid["groupIds"] = [element_id]
+        return [body, lid]
+    roundness = entry.get("roundness")
+    if shape_name == "capsule":
+        # Excalidraw 没有原生胶囊。type 2 是“按比例取半径”，0.5 就是高的一半 → 真正的胶囊。
+        roundness = {"type": 2, "value": 0.5}
+    return [_base(element_id, entry["excalidraw"], placed.x, placed.y,
+                  placed.width, placed.height, stroke, fill,
+                  stroke_style=style, roundness=roundness)]
 
 
 def _text_block(el_id: str, container_id: str, lines: tuple[str, ...],
@@ -236,16 +280,40 @@ def _midpoint_frame(pts: list) -> tuple[list, tuple[float, float], tuple[float, 
         return list(pts[0]), (-1.0, 0.0), (1.0, 0.0)
     half = total / 2.0
     walked = 0.0
+
+    def _dir(seg):
+        return (seg[1][0] - seg[0][0], seg[1][1] - seg[0][1])
+
     for i, (a, b, seg_len) in enumerate(segs):
         if walked + seg_len >= half:
             t = (half - walked) / seg_len if seg_len else 0.0
             point = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
-            this = (b[0] - a[0], b[1] - a[1])
-            # 刚好落在本段终点（= 拐点）时，前方方向要换成下一段
-            on_vertex = (half - walked) >= seg_len - 1e-9 and i + 1 < len(segs)
-            nxt = (segs[i + 1][1][0] - segs[i + 1][0][0],
-                   segs[i + 1][1][1] - segs[i + 1][0][1]) if on_vertex else this
-            return point, (-this[0], -this[1]), nxt
+            this = _dir(segs[i])
+            # 中点落在拐点上有**两种**到达方式，两种都必须认出：
+            #   ① 落在本段终点（t≈1）→ 入边是本段，出边是下一段
+            #   ② 落在本段起点且 i>0（t≈0）→ 入边是**上一段**，出边是本段
+            #
+            # ② 不是理论情况，实测真实发生过：两段**近似**等长（实测差约 1e-3 像素）时，
+            # 中点会被算在第 1 段的 t≈0 处。那时若按“直段中间”处理，
+            # back 与 fwd 会互为**精确反向** → 角平分线退化 → 只剩法线候选
+            # → 标签必然压在自己的折线臂上（实测那条 b→d 的边压了 30 个采样点）。
+            #
+            # 判据是“到拐点的距离 < 半个像素”。这个阈值我前后改过三次，前两次都是猜的：
+            #   ① `<= 1e-9`（到端点的**绝对距离**）→ 漏；
+            #   ② `t <= 1e-6`（无量纲）→ 还是漏，实测偏差比它大一个量级。
+            # 错的根源不是数字大小，是**猜** —— 根本不知道两段长度到底差多少。
+            # 换成半个像素就不再依赖猜测：渲染分辨率是 1px，小于半像素的位置差在屏幕上
+            # 不可分辨，在本项目尺度上也远小于任何布局阈值（最小间隙 12px）。
+            # 要改这个数，依据得是分辨率或布局阈值，不能是为了让某张图好看。
+            SUB_PIXEL = 0.5
+            near_end = (1.0 - t) * seg_len <= SUB_PIXEL
+            near_start = t * seg_len <= SUB_PIXEL
+            if near_end and i + 1 < len(segs):
+                return list(segs[i][1]), (-this[0], -this[1]), _dir(segs[i + 1])
+            if near_start and i > 0:
+                back = _dir(segs[i - 1])
+                return list(segs[i][0]), (-back[0], -back[1]), this
+            return point, (-this[0], -this[1]), this
         walked += seg_len
     a, b = segs[-1][0], segs[-1][1]
     return list(pts[-1]), (a[0] - b[0], a[1] - b[1]), (b[0] - a[0], b[1] - a[1])
@@ -336,7 +404,7 @@ def label_position(pts: list, width: float, height: float,
     directions = _candidate_directions(back, fwd)
     radius = math.hypot(width, height) / 2
     first: tuple[float, float] | None = None
-    for extra in (0.0, 6.0, 12.0, 20.0, 30.0):
+    for extra in (0.0, 6.0, 12.0, 20.0, 30.0, 45.0, 65.0):
         for dx, dy in directions:
             reach = radius + gap + extra
             x = mid[0] + dx * reach - width / 2
@@ -426,12 +494,31 @@ def build_scene(spec: dict, result, boxes: dict) -> dict:
     }
 
 
+class SpecError(ValueError):
+    """规格本身不合法 —— 出图之前就该拦住它。
+
+    为什么不让它半路崩：`boxes_from_spec` 要先定形状才能算尺寸，而形状要读 kind；
+    kind 写错时它会报一个误导性的错（实测：“未知 shape: None”）。
+    所以 emit 先跑一遍 `validate_spec`，把真正的病因说清楚。
+
+    以前 emit **根本不调用 validate_spec** —— 文档写着“先校验规格再出图”，
+    但实际靠调用方自觉；调用方忘了就会在半路崩。
+    """
+
+
 def emit(spec: dict, *, params=None) -> tuple[dict, Any, Any, list]:
     """跑完整条流水线并返回场景。**校验有阻塞项就不出图。**
 
     顺序刻意是 validate → layout → check → emit：出图是最后一步，
-    前一步不过就不该走到这里。跳过校验直接出图，等于把"不重叠/不溢出"的保证丢掉。
+    前一步不过就不该走到这里。跳过校验直接出图，等于把“不重叠/不溢出”的保证丢掉。
     """
+    validator = _load_sibling("validate_spec")
+    report = validator.validate(spec)
+    if getattr(report, "errors", None):
+        detail = "\n".join(f"  - {e.line() if hasattr(e, 'line') else e}"
+                           for e in report.errors)
+        raise SpecError(f"规格不通过，没有出图：\n{detail}")
+
     boxes = L.boxes_from_spec(spec)
     result, outcome, attempts = _check_layout().layout_with_retry(spec, boxes, params)
     if outcome.blocking:
@@ -459,8 +546,14 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         scene, result, outcome, attempts = emit(spec)
+    except SpecError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     except ValueError as exc:
         print(f"布局失败：{exc}", file=sys.stderr)
+        return 1
+    except KeyError as exc:
+        print(f"规格里有个值不认识：{exc}", file=sys.stderr)
         return 1
 
     if not scene:

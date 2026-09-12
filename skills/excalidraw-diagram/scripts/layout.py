@@ -620,19 +620,42 @@ def layout(spec: dict, boxes: dict[str, Box],
                         pin_conflicts=pin_conflicts)
 
 
+@dataclass(frozen=True)
+class NodeBox:
+    """一个节点的**形状包围盒** + 里面的文字信息。
+
+    为什么要两个：
+    - 布局与间隙只看**包围盒**（菱形比它的文字大得多，间隙得按菱形算）
+    - 落笔要看**文字**（断行结果与字号）
+
+    为什么不在 TextBox 上直接改宽高：那只会在一个对象上混两套含义，
+    而且 TextBox 是 frozen 的、它声称的就是文字尺寸。
+    """
+
+    id: str
+    shape: str
+    width: float
+    height: float
+    text: Any          # text_metrics.TextBox
+
+
 def boxes_from_spec(spec: dict) -> dict[str, Any]:
-    """按文字反推每个节点的尺寸。尺寸不由模型给，见 text_metrics.py。
+    """由文字 + 形状反推每个节点的尺寸。**尺寸不由模型给。**
 
-    返回的是 `text_metrics.TextBox` 本身，而不是缩水成 (width, height) 的 `Box`。
-    TextBox 本来就满足“有 width/height”这个用法（布局只用到这两个），
-    而输出层还需要里面的**断行结果与断行宽度** —— 在这里退化成 Box，
-    出口脚本就只能把文字再量一遍，量两遍就多一个不一致的机会。
-
-    真实的 `Box` 只在内部用（给尺寸为 0 的虚节点）。
+    尺寸链：文字 → text_metrics.measure（断行、容器宽高）→ shapes.box_for（形状包围盒）。
+    两者都由本 skill 自己算，所以“尺寸只有一个来源”这个前提仍然成立 ——
+    只是从一个来源变成了两个步骤（详见 references/validation.md 第六节）。
     """
     tm = load_sibling("text_metrics")
-    return {n["id"]: tm.measure(n.get("label", ""), n.get("detail", ""))
-            for n in spec.get("nodes", [])}
+    sh = load_sibling("shapes")
+    out: dict[str, NodeBox] = {}
+    for n in spec.get("nodes", []):
+        text = tm.measure(n.get("label", ""), n.get("detail", ""))
+        shape = sh.resolve(n)
+        width, height = sh.box_for(shape, text.width, text.height)
+        out[n["id"]] = NodeBox(id=n["id"], shape=shape, width=width,
+                                height=height, text=text)
+    return out
 
 
 def load_sibling(name: str):

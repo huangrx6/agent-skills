@@ -263,14 +263,27 @@ class TestTextGeometry(unittest.TestCase):
             self.assertLessEqual(el["y"] + el["height"], box["y"] + box["height"] + 0.5)
 
 
-class TestRefusesBlockedSpecs(unittest.TestCase):
-    """校验有阻塞项就不该出图 —— 出图是流水线最后一步。"""
+class TestRefusesBadSpecs(unittest.TestCase):
+    """规格不合法就不该出图 —— 出图是流水线最后一步。
 
-    def test_unknown_kind_produces_no_scene(self):
+    emit 现在**自己先跑一遍 validate_spec**（以前它不跑，靠调用方自觉；
+    调用方忘了就会在半路崩，而且崩出来的错还是误导性的）。
+    """
+
+    def test_unknown_kind_raises_spec_error(self):
         spec = spec_of(["a", "b"], [("a", "b")], kind="queue")
-        scene, result, outcome, attempts = E.emit(spec)
-        self.assertEqual({}, scene)
-        self.assertTrue(outcome.blocking)
+        with self.assertRaises(E.SpecError) as ctx:
+            E.emit(spec)
+        message = str(ctx.exception)
+        self.assertIn("queue", message, "报错要说清是哪个值不认识")
+        self.assertIn("async", message, "还要列出允许的取值")
+
+    def test_unknown_shape_raises_spec_error(self):
+        spec = spec_of(["a", "b"], [("a", "b")])
+        spec["nodes"][0]["shape"] = "star"
+        with self.assertRaises(E.SpecError) as ctx:
+            E.emit(spec)
+        self.assertIn("star", str(ctx.exception))
 
 
 class TestEdgeLabels(unittest.TestCase):
@@ -320,6 +333,37 @@ class TestEdgeLabels(unittest.TestCase):
             hits = self._hits(label, arrows)
             self.assertEqual([], hits,
                              f"标签 {label['id']} 被连线穿过（{len(hits)} 个采样点）")
+
+    def test_midpoint_frame_survives_the_equal_length_vertex(self):
+        """两段等长的折线，中点是拐点 —— 这时角平分线**必须**还在。
+
+        真实缺陷：等长时 `walked + seg_len >= half` 会在第 1 段就成立
+        （浮点上 seg0 比 half 小约 1e-14），中点被算成“第 1 段的 t≈0”。
+        而顶点检测只认“落在段终点”那一种到达方式，于是这里被当成直段中间
+        → back 与 fwd 互为精确反向 → 角平分线退化 → 只剩法线候选
+        → 标签必然压在自己的折线臂上（实测那条 b→d 的边压了 30 个采样点）。
+        """
+        # 两段等长（都是 45°），拐点在中间。三组：
+        #   ① 严格等长（路径上算得刚好落在拐点）
+        #   ② 第一段短 1e-7（**实测真实发生的偏移量**，端点裁切引入）
+        #   ③ 第一段长 1e-7（镜像情形）
+        cases = [
+            ("严格等长", [[272.0, 464.0], [403.0, 606.0], [272.0, 748.0]]),
+            ("首段短 1e-7", [[272.0, 464.0], [403.0, 606.0 - 1e-7], [272.0, 748.0]]),
+            ("首段长 1e-7", [[272.0, 464.0], [403.0, 606.0 + 1e-7], [272.0, 748.0]]),
+        ]
+        for name, pts in cases:
+            with self.subTest(case=name):
+                mid, back, fwd = E._midpoint_frame(pts)
+                self.assertAlmostEqual(pts[1][0], mid[0], places=3)
+                self.assertAlmostEqual(pts[1][1], mid[1], places=3)
+                cross = abs(back[0] * fwd[1] - back[1] * fwd[0])
+                self.assertGreater(
+                    cross, 1e-6,
+                    f"{name}: back={back} 与 fwd={fwd} 共线 —— 角平分线退化了，"
+                    f"标签会压在自己的折线臂上。"
+                    f"注意别用“到端点的绝对距离”当判据：实测差约 1e-6 像素，"
+                    f"1e-9 的阈值会漏")
 
     def test_label_clears_diagonal_arrows_too(self):
         """斜线上的标签必须沿法线退开。
@@ -456,8 +500,8 @@ class TestCli(unittest.TestCase):
             proc = subprocess.run([sys.executable, EMIT, path],
                                   capture_output=True, text=True)
             self.assertEqual(1, proc.returncode)
-            self.assertFalse(os.path.exists(out), "阻塞时不该留下文件")
-            self.assertIn("不出图", proc.stderr)
+            self.assertFalse(os.path.exists(out), "不通过时不该留下文件")
+            self.assertIn("没有出图", proc.stderr)
         finally:
             if os.path.exists(path):
                 os.unlink(path)

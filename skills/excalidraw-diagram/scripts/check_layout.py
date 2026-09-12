@@ -208,7 +208,10 @@ def check_text_fit(spec: dict, result: ResultT,
         if nid not in boxes:
             continue
         fresh = tm.measure(node.get("label", ""), node.get("detail", ""))
-        used = boxes[nid]
+        # 盒子现在是 NodeBox：形状包围盒 + 里面的文字。断言比的是**文字那一半** ——
+        # 形状多出来的余量是从文字算出来的，拿包围盒去比文字尺寸会必然不等。
+        # 比文字本身反而更强：形状算错了会从 layout.boxes_from_spec 那条路被发现。
+        used = getattr(boxes[nid], "text", boxes[nid])
         if abs(fresh.width - used.width) > TOLERANCE or abs(fresh.height - used.height) > TOLERANCE:
             out.append(Issue("text", True, nid,
                              f"落笔尺寸 {used.width:.0f}×{used.height:.0f}，"

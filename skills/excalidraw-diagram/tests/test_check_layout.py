@@ -85,6 +85,20 @@ def placed(node_id: str, x: float, y: float, w: float = 100.0, h: float = 50.0):
     return L.Placed(id=node_id, x=x, y=y, width=w, height=h, rank=0)
 
 
+def palette_outcome(spec: dict):
+    """**直接测 check_palette 这一层**，不走流水线。
+
+    为什么不走：`boxes_from_spec` 现在需要合法 kind 才能定形状（形状决定尺寸），
+    所以非法 kind 根本到不了 check_palette —— 它会在定形状时就抛错（emit 里由
+    validate_spec 先拦住并报出真正的病因）。
+
+    这一层仍然是必要的第二道闸：它管的是"颜色必须在板内、未知 kind 不许 fallback"，
+    与 validate_spec 的 UNKNOWN_KIND 是**两件事** —— 前者防的是色板被改坏，
+    后者防的是规格写错。
+    """
+    return C.Outcome(issues=C.check_palette(spec))
+
+
 class TestGapBoundary(unittest.TestCase):
     """#1：阈值是「间隙 < 12」不是「重叠」。前作容忍 4px 重叠 —— 那检查的是另一个东西。"""
 
@@ -201,12 +215,20 @@ class TestTuner(unittest.TestCase):
         self.assertEqual(L.PARAM_LIMIT["barycenterRounds"],
                          attempts[-1].params["barycenterRounds"])
 
-    def test_content_error_never_wastes_rounds(self):
-        """未知 kind 改参数没用 —— 应该立刻停。"""
+    def test_palette_error_is_not_tunable(self):
+        """未知 kind 改参数没用 —— 它既不在可调集里，也属于 STOP_ON。
+
+        为什么不跑整条流水线：`boxes_from_spec` 需要合法 kind 才能定形状，
+        非法 kind 到不了 check_palette（emit 里由 validate_spec 先拦住并报出真正的病因）。
+        所以直接打那一层，并断言**调参表不会为它动任何参数** —— 那才是"不浪费轮次"的实质。
+        """
         spec = spec_of(["a", "b"], [("a", "b")], kind="queue")
-        _, outcome, attempts = run(spec)
+        outcome = palette_outcome(spec)
         self.assertEqual({"palette"}, outcome.checks_hit())
-        self.assertEqual(1, len(attempts))
+        self.assertIn("palette", C.STOP_ON, "palette 必须属于「停下来别再调参」那一类")
+        before = dict(C.L.DEFAULT_PARAMS)
+        self.assertEqual(before, C._step(before, outcome),
+                         "调参表不该为 palette 问题动任何参数")
 
     def test_text_mismatch_never_wastes_rounds(self):
         spec = spec_of(["a", "b"], [("a", "b")])
@@ -231,7 +253,6 @@ class TestReportWording(unittest.TestCase):
     def test_report_never_contains_param_names(self):
         specs = [
             spec_of(["a", "b"], [("a", "b")]),
-            spec_of(["a", "b"], [("a", "b")], kind="queue"),
             spec_of([f"a{i}" for i in (1, 2, 3)] + [f"b{i}" for i in (1, 2, 3)],
                     [(f"a{i}", f"b{j}") for i in (1, 2, 3) for j in (1, 2, 3)]),
             spec_of(["a"], [], kind="service"),
@@ -241,6 +262,13 @@ class TestReportWording(unittest.TestCase):
             text = C.format_report(spec, attempts, outcome)
             for name in C.PARAM_SPOKEN:
                 self.assertNotIn(name, text, f"报告泄露了参数名 {name}")
+
+        # 带非法 kind 的那一份单独走 palette 层（流水线到不了那里，见 palette_outcome）
+        bad = spec_of(["a", "b"], [("a", "b")], kind="queue")
+        outcome = palette_outcome(bad)
+        text = C.format_report(bad, [C.Attempt(0, dict(C.L.DEFAULT_PARAMS), outcome)], outcome)
+        for name in C.PARAM_SPOKEN:
+            self.assertNotIn(name, text, f"报告泄露了参数名 {name}")
 
     def test_guard_actually_raises(self):
         """断言本身要真的会拦 —— 否则它只是一句注释。"""
@@ -263,7 +291,8 @@ class TestReportWording(unittest.TestCase):
 
     def test_report_has_three_sections(self):
         spec = spec_of(["a", "b"], [("a", "b")], kind="queue")
-        result, outcome, attempts = run(spec)
+        result, outcome = None, palette_outcome(spec)
+        attempts = [C.Attempt(0, dict(C.L.DEFAULT_PARAMS), outcome)]
         text = C.format_report(spec, attempts, outcome)
         for section in ("已尝试过的排布", "仍然失败的项", "能动的只有内容"):
             self.assertIn(section, text)
@@ -295,7 +324,7 @@ class TestAdvice(unittest.TestCase):
 
     def test_unknown_kind_lists_allowed_values(self):
         spec = spec_of(["a", "b"], [("a", "b")], kind="queue")
-        _, outcome, _ = run(spec)
+        outcome = palette_outcome(spec)
         detail = outcome.blocking[0].detail
         self.assertIn("queue", detail)
         for allowed in sorted(C.palette.KINDS):
@@ -303,17 +332,17 @@ class TestAdvice(unittest.TestCase):
 
     def test_every_issue_advice_is_content_level(self):
         """建议里不许出现"调大某某"这类话 —— 那是把旋钮交回模型。"""
-        specs = [
-            spec_of(["a", "b"], [("a", "b")], kind="queue"),
-            spec_of([f"a{i}" for i in (1, 2, 3)] + [f"b{i}" for i in (1, 2, 3)],
-                    [(f"a{i}", f"b{j}") for i in (1, 2, 3) for j in (1, 2, 3)]),
-        ]
-        for spec in specs:
-            result, outcome, _ = run(spec)
-            for issue in outcome.blocking + outcome.soft:
-                if issue.advice:
-                    self.assertNotIn("调大", issue.advice)
-                    self.assertNotIn("间距", issue.advice)
+        # 走流水线的那份（密集图 → 交叉是软项，会带 advice）
+        dense = spec_of([f"a{i}" for i in (1, 2, 3)] + [f"b{i}" for i in (1, 2, 3)],
+                        [(f"a{i}", f"b{j}") for i in (1, 2, 3) for j in (1, 2, 3)])
+        _, outcome, _ = run(dense)
+        # 非法 kind 的那份走 palette 层（理由见 palette_outcome）
+        for issue in (outcome.blocking + outcome.soft
+                      + palette_outcome(spec_of(["a", "b"], [("a", "b")],
+                                                kind="queue")).issues):
+            if issue.advice:
+                self.assertNotIn("调大", issue.advice)
+                self.assertNotIn("间距", issue.advice)
 
 
 class TestScale(unittest.TestCase):
@@ -336,40 +365,59 @@ class TestScale(unittest.TestCase):
 
 
 class TestSizeSourcePremise(unittest.TestCase):
-    """钉住 #1/#3 之所以是“后置断言”的那个前提：**尺寸只有一个来源**。
+    """钉住 #1/#3 作为"后置断言"的那个前提：**尺寸只有一个来源，而且那个来源是我们自己算的**。
 
-    只要每个节点的框都等于 `text_metrics.measure()` 的输出，容器宽度就只由断行宽度决定，
-    于是“元素间隙”与“文字溢出”在构造上不可能失败（详见 `references/validation.md` 第六节）。
+    尺寸链：文字 → `text_metrics.measure` → `shapes.box_for` → 坐标。
 
-    **Wave 4 引入非文本的尺寸来源（图标固有宽高、分组外框…）时，这个类会先失败。**
-    它失败的意思不是“快改这个测试”，而是“尺寸来源变了，先回去重新审视那两条断言的前提
-    还成不成立” —— 那时候 #1/#3 会从一致性断言退化成真实的门，而且很可能先是误报。
+    加入节点形状时这个类**确实失败过**，并按文档的约定处理了：先改
+    `references/validation.md` 第六节，再改这里。这不是"测试写错了" ——
+    它本来就该在前提变化时先响。
+
+    **再失败的意思仍然是同一个**：有新的尺寸来源进来了。但要分清两种：
+    "多算了一步"（像形状）仍然是我们自己算，把新步骤纳入这条断言即可；
+    "尺寸来自别人给的东西"（像图标库）才是真外部来源，#1/#3 得改当"真实的门"看。
     """
 
-    def test_every_box_comes_from_text_metrics(self):
+    def test_every_box_follows_our_own_chain(self):
         spec = {"type": "architecture", "direction": "LR",
                 "nodes": [{"id": "a", "kind": "service", "label": "订单服务",
                            "detail": "3 副本"},
                           {"id": "b", "kind": "data", "label": "订单库"},
-                          {"id": "c", "kind": "external", "label": "Notification Service"}]}
+                          {"id": "c", "kind": "client", "label": "Web 前端"},
+                          {"id": "d", "kind": "service", "label": "判断一下？",
+                           "shape": "diamond"}]}
         boxes = L.boxes_from_spec(spec)
+        sh = L.load_sibling("shapes")
         for node in spec["nodes"]:
-            fresh = C.tm.measure(node["label"], node.get("detail", ""))
-            got = boxes[node["id"]]
-            self.assertAlmostEqual(
-                fresh.width, got.width, places=6,
-                msg=f"{node['id']} 的宽度不再等于 text_metrics 的推算 —— "
-                    f"尺寸来源变了，先回去看 validation.md 第六节（#1/#3 的前提）")
-            self.assertAlmostEqual(
-                fresh.height, got.height, places=6,
-                msg=f"{node['id']} 的高度不再等于 text_metrics 的推算 —— 同上")
+            with self.subTest(node=node["id"]):
+                box = boxes[node["id"]]
+                fresh = C.tm.measure(node["label"], node.get("detail", ""))
+                want_w, want_h = sh.box_for(box.shape, fresh.width, fresh.height)
+                self.assertAlmostEqual(
+                    want_w, box.width, places=6,
+                    msg=f"{node['id']} 的包围盒不再等于「文字 × 形状」—— 尺寸链变了，"
+                        f"先回去看 validation.md 第六节（#1/#3 的前提）")
+                self.assertAlmostEqual(want_h, box.height, places=6)
+                self.assertAlmostEqual(fresh.width, box.text.width, places=6,
+                                       msg="盒子里的文字不再是现量出来的")
+
+    def test_shape_actually_changes_the_geometry(self):
+        """形状不改变几何的话，"形状"就只是换了个 type 字段，没有意义。
+
+        而不算这个量，文字就会溢出形状 —— 菱形里能放字的只有内接矩形。
+        """
+        spec = {"nodes": [{"id": "d", "kind": "service", "label": "条件？",
+                           "shape": "diamond"},
+                          {"id": "r", "kind": "service", "label": "条件？"}]}
+        boxes = L.boxes_from_spec(spec)
+        self.assertGreater(boxes["d"].width, boxes["r"].width * 1.9)
+        self.assertGreater(boxes["d"].height, boxes["r"].height * 1.9)
 
     def test_gap_check_cannot_fire_with_default_spacing(self):
-        """把这个“跑不到”的事实钉住，而不是只在注释里说一句。
+        """把这个"跑不到"的事实钉住，而不是只在注释里说一句。
 
         同层节点恰好相距一个节点间距、跨层恰好相距一个层间距 —— 两者都远大于 12px。
-        这条用意是：哪天它真的报了出来，说明坐标推导被改成了不再由参数唯一决定，
-        那是一个信号，不是一个普通的失败。
+        它哪天真的报了出来，说明坐标推导被改成了不再由参数唯一决定，那是一个信号。
         """
         ids = ["web", "gw", "order", "pay", "mq", "db", "notify"]
         spec = spec_of(ids, [("web", "gw"), ("gw", "order"), ("order", "db"),
@@ -378,7 +426,7 @@ class TestSizeSourcePremise(unittest.TestCase):
         result, _, _ = run(spec)
         gaps = C.check_gaps(result)
         self.assertEqual([], gaps,
-                         "间隙检查居然报了 —— 坐标推导已经不是“由间距参数唯一决定”了，"
+                         "间隙检查居然报了 —— 坐标推导已经不是「由间距参数唯一决定」了，"
                          "回去重新判断这条是后置断言还是真实防线")
 
 

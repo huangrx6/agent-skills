@@ -301,14 +301,18 @@ class TestCoordinates(unittest.TestCase):
 
 
 class TestBoxesFromSpec(unittest.TestCase):
-    def test_boxes_match_text_metrics(self):
-        """尺寸由文字反推，不由模型给。"""
+    def test_boxes_carry_both_shape_and_text(self):
+        """盒子现在是「形状包围盒 + 里面的文字」两样 —— 尺寸仍由文字反推，不由模型给。"""
         tm = L.load_sibling("text_metrics")
-        s = {"nodes": [{"id": "a", "label": "订单服务", "detail": "3 副本"}]}
-        got = L.boxes_from_spec(s)["a"]
+        s = {"nodes": [{"id": "a", "kind": "service", "label": "订单服务",
+                        "detail": "3 副本"}]}
+        box = L.boxes_from_spec(s)["a"]
         want = tm.measure("订单服务", "3 副本")
-        self.assertAlmostEqual(want.width, got.width, places=6)
-        self.assertAlmostEqual(want.height, got.height, places=6)
+        self.assertAlmostEqual(want.width, box.text.width, places=6)
+        self.assertAlmostEqual(want.height, box.text.height, places=6)
+        self.assertEqual("round", box.shape)
+        self.assertGreaterEqual(box.width, want.width)
+        self.assertGreaterEqual(box.height, want.height)
 
 
 class TestCli(unittest.TestCase):
