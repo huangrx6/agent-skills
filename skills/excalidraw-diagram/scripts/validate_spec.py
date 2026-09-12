@@ -34,7 +34,7 @@ import sys
 # 让"顺手加一个"变得有摩擦。
 TOP_FIELDS = {"type", "title", "direction", "detail", "groups", "nodes", "edges",
               "visual", "mood"}
-GROUP_FIELDS = {"id", "label", "description"}
+GROUP_FIELDS = {"id", "label", "level", "description"}
 NODE_FIELDS = {"id", "label", "kind", "shape", "emphasis", "icon", "group",
                "detail", "rank", "pin"}
 EDGE_FIELDS = {"id", "from", "to", "label", "kind"}
@@ -167,6 +167,20 @@ def validate(spec: dict) -> Issues:
             issues.error("DUPLICATE_GROUP_ID", where, f"group id 重复：{gid!r}")
         else:
             group_ids.add(gid)
+        if "level" in g and g["level"] not in palette.VISUAL_LEVELS:
+            issues.error("UNKNOWN_GROUP_LEVEL", f"{where}.level",
+                         f"group level 只允许 {sorted(palette.VISUAL_LEVELS)}"
+                         f"（未知值判失败，不 fallback）")
+
+    # 声明了、却一个成员都没有的 group：**报错，不是忽略**。
+    # 否则它在图上既没有区域框也没有标题，而且什么都不报 —— 这种“写了没生效”的
+    # 静默失败最难查（这个字段以前就是完全没人读的）。
+    used = {n.get("group") for n in spec.get("nodes", []) if isinstance(n, dict)}
+    for gid in sorted(group_ids):
+        if gid not in used:
+            issues.error("EMPTY_GROUP", "$.groups",
+                         f"group {gid!r} 没有任何节点指向它，区域会画不出来："
+                         f"在节点的 group 字段里写上这个 id")
 
     # nodes
     nodes = spec.get("nodes")

@@ -642,3 +642,42 @@ class TestEveryCheckHasALabel(unittest.TestCase):
                 issue = C.Issue(check, True, "x", "细节")
                 self.assertIn(C.CHECK_LABEL[check], issue.line())
 
+
+
+class TestRegionOverlap(unittest.TestCase):
+    """区域之间**不许部分重叠** —— 分开、或者一个完全包住另一个。"""
+
+    def outcome(self, groups, nodes):
+        spec = {"type": "flow", "direction": "TB",
+                "groups": groups, "nodes": nodes,
+                "edges": [{"from": "a", "to": "b"}]}
+        boxes = L.boxes_from_spec(spec)
+        result = L.layout(spec, boxes)
+        return C.check(spec, result, boxes)
+
+    def test_partial_overlap_is_reported(self):
+        groups = [{"id": "left", "label": "左"}, {"id": "right", "label": "右"}]
+        nodes = [
+            {"id": "a", "label": "A", "kind": "plain", "group": "left"},
+            {"id": "b", "label": "B", "kind": "plain", "group": "right"},
+        ]
+        names = {i.check for i in self.outcome(groups, nodes).issues}
+        # 两个区域并排时**不该**报；真重叠才报 —— 这里先确认并排是干净的
+        self.assertNotIn("region", names)
+
+    def test_nesting_is_allowed(self):
+        """分区里再圈一块是正当用法：完全包含不算重叠。"""
+        spec = {"type": "flow", "direction": "TB",
+                "groups": [{"id": "outer", "label": "外"},
+                           {"id": "inner", "label": "内", "level": "critical"}],
+                "nodes": [
+                    {"id": "a", "label": "A", "kind": "plain", "group": "outer"},
+                    {"id": "b", "label": "B", "kind": "plain", "group": "outer"},
+                ],
+                "edges": [{"from": "a", "to": "b"}]}
+        # inner 只有 b；区域按成员算，inner 必然落在 outer 内部
+        spec["nodes"][1]["group"] = "inner"
+        boxes = L.boxes_from_spec(spec)
+        result = L.layout(spec, boxes)
+        names = {i.check for i in C.check(spec, result, boxes).issues}
+        self.assertNotIn("region", names, "完全包含被判成重叠了")

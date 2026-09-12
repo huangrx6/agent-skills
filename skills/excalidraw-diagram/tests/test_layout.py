@@ -650,3 +650,56 @@ class TestForceLayout(unittest.TestCase):
         roomier = self._run({"nodeSeparation": 260.0})[0]
         self.assertGreater(_spread(roomier), _spread(base),
                            "加大最小间隙没有把节点推开")
+
+
+class TestRegions(unittest.TestCase):
+    """`groups` → 区域（圆角矩形 + 顶部标题）。以前这个字段**一处都不被读**。"""
+
+    def spec(self, **over):
+        base = {
+            "type": "flow", "direction": "TB", "title": "T",
+            "groups": [{"id": "g1", "label": "第一区", "level": "tint"}],
+            "nodes": [
+                {"id": "a", "label": "A", "kind": "plain", "group": "g1"},
+                {"id": "b", "label": "B", "kind": "plain", "group": "g1"},
+                {"id": "c", "label": "C", "kind": "plain"},
+            ],
+            "edges": [{"from": "a", "to": "b"}, {"from": "b", "to": "c"}],
+        }
+        base.update(over)
+        return base
+
+    def box_of(self, spec):
+        boxes = L.boxes_from_spec(spec)
+        return L.region_boxes(spec, L.layout(spec, boxes).placed, boxes)
+
+    def test_region_is_offered_to_the_renderer(self):
+        """区域必须真的算得出来 —— 声明了没效果正是这个字段以前的毛病。"""
+        regions = self.box_of(self.spec())
+        self.assertEqual(["g1"], [g["id"] for g in regions])
+        self.assertEqual("第一区", regions[0]["label"])
+
+    def test_region_encloses_every_member(self):
+        """区域框一定框得住它的每个成员：少了哪一个都是画错。"""
+        spec = self.spec()
+        boxes = L.boxes_from_spec(spec)
+        placed = L.layout(spec, boxes).placed
+        for region in L.region_boxes(spec, placed, boxes):
+            for nid, node in placed.items():
+                if nid == "c":
+                    continue                      # 不在这一区里
+                self.assertLessEqual(region["x"], node.x)
+                self.assertLessEqual(region["y"], node.y)
+                self.assertGreaterEqual(region["x"] + region["width"],
+                                        node.x + node.width)
+                self.assertGreaterEqual(region["y"] + region["height"],
+                                        node.y + node.height)
+
+    def test_title_band_is_above_the_members(self):
+        """标题带留在成员上方 —— 这样标题在结构上不可能压到节点。"""
+        spec = self.spec()
+        boxes = L.boxes_from_spec(spec)
+        placed = L.layout(spec, boxes).placed
+        region = L.region_boxes(spec, placed, boxes)[0]
+        top_of_members = min(placed[n].y for n in ("a", "b"))
+        self.assertLess(region["label_y"] + L.REGION_HEAD, top_of_members)

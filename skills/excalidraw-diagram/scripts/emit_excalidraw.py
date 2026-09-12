@@ -263,6 +263,62 @@ def shape_elements(element_id: str, shape_name: str, placed,
                   stroke_width=stroke_width)]
 
 
+REGION_STROKE_WIDTH = 1.0
+REGION_FILL_STYLE = "cross-hatch"   # 参考图里那种交叉网格（Excalidraw 原生档位）
+REGION_LABEL_SIZE = 20.0
+
+
+def region_elements(region: dict) -> list[dict]:
+    """一个区域 = 圆角矩形（交叉网格填充）+ 顶部居中的标题。
+
+    ⚠️ **必须先进 `build_scene` 的 elements 数组。** Excalidraw 的绘制顺序就是
+    数组顺序，区域是背景 —— 后进数组的话它会盖住里面的节点（参考图里节点是
+    清清楚楚压在网格上面的）。
+
+    ⚠️ 贴一个 `groupIds`：本项目"没有 groupId 的才是节点"这条判定靠它区分装饰
+    与节点（见 `node_elements` 附近的说明）。区域是装饰，不带它会把自己混进节点。
+
+    颜色走**层级**而不是写死：`tint`（默认）用极轻的一片，`critical` 用来圈
+    "这一段是异常路径"。区域是图上**唯一的整片颜色** —— 在节点只能承载
+    单点关注的预算下，它就是让图不沉闷的那一层。
+    """
+    level = region.get("level", "tint")
+    if level not in palette.LEVELS:
+        raise ValueError(f"区域 {region['id']!r} 的 level 不认识：{level!r}"
+                         f"（可用 {sorted(palette.LEVELS)}；未知值判失败，不 fallback）")
+    stroke = palette.LEVELS[level]["stroke"]
+    fill = palette.LEVELS[level]["fill"]
+    el_id = _eid("region", region["id"])
+    elements = [_base(el_id, "rectangle", region["x"], region["y"],
+                      region["width"], region["height"], stroke, fill,
+                      stroke_width=REGION_STROKE_WIDTH,
+                      roundness={"type": 3},
+                      extra={"fillStyle": REGION_FILL_STYLE,
+                             "groupIds": [el_id]})]
+    label = region.get("label")
+    if label:
+        box = tm.measure(label, "", font_size=REGION_LABEL_SIZE)
+        width = max(tm.weighted_units(line) for line in box.lines) * REGION_LABEL_SIZE
+        height = len(box.lines) * REGION_LABEL_SIZE * tm.LINE_HEIGHT
+        text = "\n".join(box.lines)
+        label_id = _eid("region-label", region["id"])
+        elements.append({
+            **_base(label_id, "text", region["label_x"] - width / 2.0,
+                   region["label_y"], width, height, stroke, "transparent",
+                   extra={"groupIds": [el_id]}),
+            "text": text,
+            "fontSize": REGION_LABEL_SIZE,
+            "fontFamily": palette.CANVAS["font_family"],
+            "textAlign": "center",
+            "verticalAlign": "top",
+            "containerId": None,
+            "originalText": text,
+            "lineHeight": tm.LINE_HEIGHT,
+            "baseline": round(REGION_LABEL_SIZE * BASELINE_RATIO, 2),
+        })
+    return elements
+
+
 def _text_block(el_id: str, container_id: str, lines: tuple[str, ...],
                 x: float, y: float, content_width: float, font_size: float) -> dict:
     """一个容器绑定的文字块。
@@ -668,6 +724,10 @@ def build_scene(spec: dict, result, boxes: dict,
                 icon_lookup=None, icon_height=None) -> dict:
     elements: list[dict] = []
     by_id = {n["id"]: n for n in spec.get("nodes", [])}
+
+    # 区域**第一个**进数组：它是背景，后进会盖住节点（见 region_elements）。
+    for region in L.region_boxes(spec, result.placed, boxes):
+        elements += region_elements(region)
 
     arrows_out: dict[str, list[str]] = {nid: [] for nid in by_id}
     arrows_in: dict[str, list[str]] = {nid: [] for nid in by_id}

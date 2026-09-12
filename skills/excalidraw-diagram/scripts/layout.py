@@ -2447,6 +2447,57 @@ class NodeBox:
 
 
 
+REGION_PAD = 26.0        # 区域边框到成员节点的距离
+REGION_HEAD = 40.0       # 区域标题要占的高度（留在成员节点**上方**的空白带）
+REGION_MIN_GAP = 18.0    # 两个区域贴在一起时至少留这么多
+
+
+def region_boxes(spec: dict, placed: dict, boxes: dict) -> list[dict]:
+    """把 `groups` 变成**看得见的区域**：成员节点的并集 + 留白 + 标题带。
+
+    这以前是空的 —— `groups` 只被校验、没有任何视觉效果，文档里也如实写着
+    以前"既没有分组框，也没有分组标签"。用户拿 Excalidraw 手画的参考图来问
+    "需要用区域表示的可以这样做"，那是**一整片浅色交叉网格 + 顶部标题**，
+    图上立刻就有了色块 —— 而我们的图一直只有单个节点在承担颜色，95% 是中性色。
+
+    用**成员节点自己的包围盒**算（不是虚线节点那种内部东西），所以区域一定
+    框得住它画的每一个节点。标题带留在顶边以上，区域标题因此不会压到任何节点。
+
+    返回 [{id, label, level, x, y, width, height, label_x, label_y}, ...]，
+    顺序沿用 `groups` 的声明顺序（先声明的画在更下面）。
+    """
+    members: dict[str, list[str]] = {}
+    for node in spec.get("nodes", []):
+        gid = node.get("group")
+        if gid:
+            members.setdefault(gid, []).append(node["id"])
+
+    out: list[dict] = []
+    for group in spec.get("groups", []):
+        ids = [nid for nid in members.get(group["id"], []) if nid in placed]
+        if not ids:
+            continue                      # 校验器已经拦了"没有成员的 group"
+        left = min(placed[nid].x for nid in ids)
+        top = min(placed[nid].y for nid in ids)
+        right = max(placed[nid].x + boxes[nid].width for nid in ids)
+        bottom = max(placed[nid].y + boxes[nid].height for nid in ids)
+        x = left - REGION_PAD
+        y = top - REGION_PAD - REGION_HEAD
+        width = (right - left) + REGION_PAD * 2
+        height = (bottom - top) + REGION_PAD * 2 + REGION_HEAD
+        out.append({
+            "id": group["id"],
+            "label": group.get("label") or "",
+            "level": group.get("level", "tint"),
+            "x": round(x, 2), "y": round(y, 2),
+            "width": round(width, 2), "height": round(height, 2),
+            # 标题在标题带里**水平居中**（参考图就是这个样子）
+            "label_x": round(x + width / 2.0, 2),
+            "label_y": round(top - REGION_PAD - REGION_HEAD + 10.0, 2),
+        })
+    return out
+
+
 def boxes_from_spec(spec: dict, icon_sizes: dict | None = None) -> dict[str, Any]:
     """由文字 + 形状反推每个节点的尺寸。**尺寸不由模型给。**
 

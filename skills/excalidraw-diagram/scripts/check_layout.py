@@ -102,6 +102,7 @@ CHECK_LABEL = {
     # 平时看不见，因为报告只在有问题时打印。现在由用例钉住两张表一致
     # （TestEveryCheckHasALabel），加检查时忘不了。
     "through": "连线穿节点",
+    "region": "区域重叠",
 }
 # 报告里用的中文说法。**参数名不许出现在报告里** —— 一旦报告写"建议调大某某"，
 # 参数选择权就又回到模型手上了（validation.md 第二节）。
@@ -366,6 +367,45 @@ def check_edges_through_nodes(spec: dict, result: ResultT) -> list[Issue]:
     return out
 
 
+# ── #7 区域 ─────────────────────────────────────────────────
+def check_regions(spec: dict, result: ResultT, boxes: dict[str, BoxT]) -> list[Issue]:
+    """区域之间**要么分开、要么一个完全包住另一个** —— 不许部分重叠。
+
+    实测踩过：一个 group 的节点在空间上被另一个 group 的节点夹在中间时，两个区域框
+    会叠成一块 —— 图上看不出"谁包着谁"，区域就不再表达任何东西了。
+
+    为什么判失败而不是自动缩框：缩框要么盖住自己的成员、要么把自己的成员排除在外，
+    两种都是在**骗**。正解是改分组或改布局，那得让作者知道。
+
+    为什么允许完全包含：分区里面再圈一块（"这一段属于异常路径"）是正当用法。
+    """
+    regions = L.region_boxes(spec, result.placed, boxes)
+    out: list[Issue] = []
+    for i in range(len(regions)):
+        for j in range(i + 1, len(regions)):
+            a, b = regions[i], regions[j]
+            overlap_x = (min(a["x"] + a["width"], b["x"] + b["width"])
+                         - max(a["x"], b["x"]))
+            overlap_y = (min(a["y"] + a["height"], b["y"] + b["height"])
+                         - max(a["y"], b["y"]))
+            if overlap_x <= 0 or overlap_y <= 0:
+                continue
+            inside = ((a["x"] >= b["x"] and a["y"] >= b["y"]
+                       and a["x"] + a["width"] <= b["x"] + b["width"]
+                       and a["y"] + a["height"] <= b["y"] + b["height"])
+                      or (b["x"] >= a["x"] and b["y"] >= a["y"]
+                          and b["x"] + b["width"] <= a["x"] + a["width"]
+                          and b["y"] + b["height"] <= a["y"] + a["height"]))
+            if inside:
+                continue
+            out.append(Issue(
+                "region", True, f"{a['id']} ↔ {b['id']}",
+                f"两个区域部分重叠 {overlap_x:.0f}×{overlap_y:.0f}px",
+                advice="区域要么分开、要么一个完全包住另一个。把其中一组的节点挪到一起，"
+                       "或者把这几个节点重新归组 —— 不要靠缩框，缩完就盖住成员了。"))
+    return out
+
+
 def check(spec: dict, result: ResultT,
           boxes: dict[str, BoxT]) -> Outcome:
     return Outcome(issues=[
@@ -375,6 +415,7 @@ def check(spec: dict, result: ResultT,
         *check_palette(spec),
         *check_crossings(spec, result),
         *check_edges_through_nodes(spec, result),
+        *check_regions(spec, result, boxes),
     ])
 
 
