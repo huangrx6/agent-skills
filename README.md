@@ -48,7 +48,7 @@ git clone https://github.com/<owner>/agent-skills.git
 
 ### Obsidian 工作流(2 个)
 
-围绕 Huangrx6 的 Obsidian vault(`/Users/huangrx6/Documents/obsidian`)构建的工作流。绑定特定 vault 路径,**跨机复用性低**——换电脑或换 vault 路径需要重新校准 `references/vault-map.md`。
+围绕 Huangrx6 的 Obsidian vault 构建的工作流。**vault 路径不写死在文档里**——按 `$OBSIDIAN_VAULT_PATH` → `~/.config/obsidian-vault-path` 的顺序解析，换机器或 vault 搬家只改一处。
 
 | Icon | Skill | 覆盖 |
 | --- | --- | --- |

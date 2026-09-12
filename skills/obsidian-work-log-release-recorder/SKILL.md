@@ -1,6 +1,6 @@
 ---
 name: obsidian-work-log-release-recorder
-description: Use this skill after completing a coding, deployment, configuration, database/script, or release task when the user wants the outcome recorded as durable notes in Huangrx6's Obsidian vault. Records only landed, reusable, or release-relevant facts (scripts, configs, paths, validation, rollback, assumptions) and maintains the weekly release note (发版). Triggers on record, summarize, settle, 沉淀, 更新知识库, 记到 Obsidian, 写发版文档. Do NOT use for ordinary note editing, creating, moving, renaming, reviewing, MOC maintenance, or regular weekly reports (周报) — use `obsidian-personal-knowledge-base` for those. Also do NOT use for brainstorming, speculative plans, or chat with no landed changes. Bound to vault path /Users/huangrx6/Documents/obsidian; cross-machine reuse is limited.
+description: Use this skill after completing a coding, deployment, config, database, or release task when the user wants the outcome recorded as durable notes in Huangrx6's Obsidian vault. Records only landed, release-relevant facts (scripts, configs, paths, validation, rollback) and maintains the weekly release note (发版). Triggers on 记录, 记一下, 沉淀, 总结, 更新知识库, 记到 Obsidian, 写发版文档, record, summarize — but only when there are landed facts. Do NOT use for note editing, creating, moving, renaming, reviewing, MOC maintenance, weekly reports, or general what-I-did-this-week summaries — use `obsidian-personal-knowledge-base` for those. Do NOT use for brainstorming or speculation. Vault path comes from $OBSIDIAN_VAULT_PATH or ~/.config/obsidian-vault-path, never hardcoded.
 ---
 
 # Obsidian Work Log And Release Recorder
@@ -11,7 +11,8 @@ This skill turns completed work into durable Obsidian notes. It is intentionally
 
 This skill is bound to a specific machine and Obsidian vault:
 
-- vault path must be `/Users/huangrx6/Documents/obsidian`
+- vault path resolves from `$OBSIDIAN_VAULT_PATH` or `~/.config/obsidian-vault-path` — never hardcode it
+- 取路径的规范方式：`python3 ../obsidian-personal-knowledge-base/scripts/vault_path.py --explain`
 - **cross-machine reuse is limited**: switching machines or vault paths requires re-aligning references
 
 ### Mandatory startup checklist
@@ -39,6 +40,8 @@ Use this skill when one or more of these are true:
 - a recurring operations process becomes clearer after a task and should be kept for future use
 
 Do not trigger for ordinary explanations, brainstorming, speculative plans, one-off chat summaries, or tiny edits with no future operational value.
+
+If the request mixes recording landed work with editing or organising existing notes (for example “发版了，帮我整理一下” or “更新一下知识库里某块内容”), **ask which one the user wants before acting** instead of guessing. Both intents are legitimate; only the user knows which.
 
 ## What To Record
 

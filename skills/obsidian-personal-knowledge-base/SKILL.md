@@ -1,25 +1,32 @@
 ---
 name: obsidian-personal-knowledge-base
 description: >-
-  操作 Huangrx6 的 Obsidian 知识库 /Users/huangrx6/Documents/obsidian。用于在库内创建、新建、写、更新、编辑、移动、重命名、审阅、整理、归位笔记；在 Inbox、Projects、Areas、Resources、Archive、Assets、System 之间判断内容归属；维护 MOC、索引、模板、周计划、周报、项目主页、领域主页、学习笔记和技术资源笔记。使用目录专属规则：Areas/Projects 使用轻量工作管理规则，Resources 才使用深度研究和学习笔记规则。
+  操作 Huangrx6 的 Obsidian 知识库（路径从配置读取，见 Prerequisites）。用于在库内创建、新建、写、补一篇、更新、编辑、移动、重命名、审阅、整理、归位笔记；在 Inbox、Projects、Areas、Resources、Archive、Assets、System 之间判断内容归属；维护 MOC、索引、模板、周计划、周报、项目主页、领域主页、学习笔记和技术资源笔记。使用目录专属规则：Areas/Projects 使用轻量工作管理规则，Resources 才使用深度研究和学习笔记规则。
   处理 Resources 技术学习笔记时，要保证 API 入口、依赖安装、参数说明、可运行示例、轻量 MOC、独立正文、配图清单和表达风格都能直接用于长期复用。
   Do NOT use for recording completed work, landed facts, weekly release notes, or 发版文档 —— use `obsidian-work-log-release-recorder` for those. Also do NOT use for pure discussion, brainstorming, or one-off chat with no note to create or edit.
-  本 skill 绑定特定 vault 路径 /Users/huangrx6/Documents/obsidian，跨机复用性低——换电脑或换 vault 路径需要重新校准 references/vault-map.md。
+  本 skill 一次只服务一个 vault；vault 路径从 $OBSIDIAN_VAULT_PATH 或 ~/.config/obsidian-vault-path 解析，永远不要在文档或代码里写死。
 ---
 
 # Obsidian 个人知识库
 
-在 `/Users/huangrx6/Documents/obsidian` 这个正在演进的 PARA + MOC 知识库里工作。行动前先查看当前文件，目录可能已经被用户重置或重组。
+在一个正在演进的 PARA + MOC 知识库里工作。vault 路径由配置决定（见 Prerequisites）。行动前先探查真实文件，目录可能已经被用户重置或重组。
 
-## Prerequisites（机器绑定）
+## Prerequisites（单一 vault 绑定）
 
-本 skill 绑定 Huangrx6 的本机 Obsidian vault：
+本 skill 一次只服务一个 vault。**路径不写死在本文件**，按序解析：
 
-- vault 路径必须是 `/Users/huangrx6/Documents/obsidian`
-- `references/vault-map.md` 是**某次探查的快照**，用于导航和归位参考，不用于直接信任；起手流程会先探查真实结构再与它对照。用户调整过目录结构后应**同步更新**该文件
-- **跨机复用性低**：换电脑或换 vault 路径都需要重新校准
+1. 环境变量 `OBSIDIAN_VAULT_PATH`
+2. 配置文件 `~/.config/obsidian-vault-path`（单行，内容就是路径）
 
-参考本 skill 依赖的 5 个 references：`vault-map.md` / `resource-notes.md` / `work-management.md` / `writing-conventions.md` / `research-and-synthesis.md`。
+规范取法（不要猜、不要写死）：
+
+```sh
+python3 scripts/vault_path.py --explain     # 路径 + 来源 + 目录是否存在
+```
+
+都解析不出时会报错并给配置指引，**不要退回到任何硬编码路径**。换机器或 vault 搬家只改上面第 1/2 项，两个 skill 与脚本都跟着走。
+
+参考本 skill 依赖的 6 个 references：`vault-map.md` / `writing-conventions.md` / `work-management.md` / `resource-notes.md` / `research-and-synthesis.md` / `link-checking.md`。
 
 ## 起手流程
 
@@ -37,11 +44,11 @@ description: >-
 
 | 场景 | 处理 |
 | --- | --- |
-| 探查范围 | 目标区域单层（`ls "01 Projects"`、`rg --files "03 Resources/<topic>"`）；不做全库递归 |
+| 探查范围与开销 | 目标区域单层，不做全库递归；结果超过约 30 行时**只列子目录名**，不列文件 |
 | 文档与真实不符 | 以真实文件系统为准；告知用户“vault-map.md 的 X 段已过期（文档说 A，实际是 B）”，并询问是否更新 |
 | 目标目录不存在 | 先问用户“要新建在哪”，不要写入不存在的路径 |
 | 用户说某区域被删除 / 重置 / 重建 | 以真实文件系统为准，不凭旧链接或记忆恢复已删除结构，除非用户明确要求恢复 |
-| 是否写回 vault-map.md | 结构稳定后再更新，沿用文档末尾“重置规则”；探查本身不触发写回 |
+| 是否写回 vault-map.md | 发现漂移 → 在 vault-map.md 的「漂移记录」给该段 +1；同一段累计 3 次仍未更新 → **主动提议更新**（更新后清零）。探查本身不写回 |
 
 ## 任务分流
 
@@ -54,6 +61,8 @@ description: >-
 | 归属不清的临时内容 | `vault-map.md`、`writing-conventions.md` | 放入 `00 Inbox`；只有归位风险较高时再问。 |
 
 资源区规则不会自动套用到领域区或项目区。不要强迫项目计划、领域 MOC、周计划、工作日志解释基础概念、添加配图提示词，或满足学习笔记深度，除非用户明确要求写成学习笔记。
+
+如果请求在“编辑 / 整理已有笔记”与“记录已完成工作”之间模糊（例如同时出现“发版”和“整理”），**先问用户要做哪一种**，不要猜。
 
 ## Resources 技术学习笔记规则
 
@@ -115,15 +124,7 @@ description: >-
 
 ## 目录判断
 
-- `01 Projects`：有明确结果、能完成或关闭的工作。
-- `02 Areas`：长期责任、持续维护事项。
-- `03 Resources`：可复用知识、学习材料、资料、技术笔记。
-- `00 Inbox`：归属不清的捕获和临时笔记。
-- `04 Archive`：已不活跃但需要保留的历史内容。
-- `90 Assets`：附件、图片、绘图。
-- `99 System`：模板、规范、工作流、首页。
-
-如果一个内容看起来可以放多处，只选一个最稳定的主家，再从其他地方链接过去。
+归位规则见 `references/vault-map.md` 的「归位规则」表。核心原则：**只选一个最稳定的主家，其他地方用链接**。
 
 ## 链接检查
 

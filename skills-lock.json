@@ -5,13 +5,13 @@
       "source": "huangrx6/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/obsidian-personal-knowledge-base/SKILL.md",
-      "computedHash": "34ca4ebbbc50ea01b921970a0816373c5497b651355f76dca0232c52e1a801e7"
+      "computedHash": "816d244b507e41c1b63b0c0293f60b85a52c6c7793c45b9c7aa424a7874e5e58"
     },
     "obsidian-work-log-release-recorder": {
       "source": "huangrx6/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/obsidian-work-log-release-recorder/SKILL.md",
-      "computedHash": "8bb742e76979e999167f8540aed0273cfd950c54a8dfcaae1cade8074bf5d6ee"
+      "computedHash": "54dd9d8de802e28edc9d02f96adea3c91b87610287546b0fb999b05a9877e15f"
     },
     "skill-builder": {
       "source": "huangrx6/agent-skills",

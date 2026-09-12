@@ -1,0 +1,35 @@
+{
+  "skill_name": "obsidian-personal-knowledge-base",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我看看 01 Projects 下现在有哪些项目，然后更新项目区索引。",
+      "expected_output": "对 01 Projects 做单层探查，拿真实目录作为结论依据，而不是引用 vault-map.md 的记载。如果真实结构与 vault-map.md 的「当前 Projects 结构」不符，以文件系统为准，向用户报告漂移，并按 vault-map.md 的「漂移记录」给该段 +1。更新索引时列出真实存在的项目，不列文档里记的。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "帮我在 02 Areas 下建一个客户X领域的记录，把内部系统A的部署信息整理进去。",
+      "expected_output": "加载 vault-map.md 与 writing-conventions.md，先探查 02 Areas，发现它为空、没有「客户X」目录。不往 02 Areas/客户X/ 写任何东西（那是已不存在的历史路径）。告知用户该目录不存在，并询问是否新建领域、建在哪，等确认后再动手。",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "vault-map.md 是不是有点过时了？你帮我判断一下。",
+      "expected_output": "对几个关键段落（顶层结构、Projects、Areas、Resources）分别做单层探查并与 vault-map.md 对照，逐段给出「一致 / 不一致」。对不一致的段落在「漂移记录」表 +1。若某段累计已达 3 次仍未更新，主动提议现在更新该段。不把「文档说 X」当作结论。",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "这段东西你先帮我存一下，是关于某个内部工具的一些零散想法，还没想好放哪。",
+      "expected_output": "归入 00 Inbox，并给一个可检索的名字（不用「未命名」「笔记」「记录」这类泛名）。不强行塞进 Projects / Areas / Resources。只有在归位风险较高时才追问用户。",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "帮我在 03 Resources 的 40 大模型与应用开发 下补一篇关于 Mamba 的学习笔记。",
+      "expected_output": "先探查目标目录确认结构与最近的 MOC。加载 resource-notes.md，按深度学习笔记标准写：对象与边界、解决的问题、核心机制、可运行的例子或验证路径、常见误区。使用 vault 现有模板与命名（资源笔记 - 主题），并把新笔记挂到最近的 MOC。不套用 Areas / Projects 的轻量工作管理规则。",
+      "files": []
+    }
+  ]
+}

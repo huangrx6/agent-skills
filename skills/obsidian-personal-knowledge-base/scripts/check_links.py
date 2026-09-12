@@ -12,27 +12,52 @@
      规避方式：索引 vault 内**所有文件**，不只笔记。
 
 用法：
-    python3 check_links.py                  # 扫默认 vault
-    python3 check_links.py --vault PATH     # 扫指定 vault
+    python3 check_links.py                  # 扫自动解析出的 vault
+    python3 check_links.py --vault PATH     # 显式指定 vault
     python3 check_links.py --json           # 机器可读输出
     python3 check_links.py --quiet          # 只输出统计
-    python3 check_links.py --show-ignored   # 附带列出被跳过的路径
+    python3 check_links.py --ignore-template  # 跳过模板占位符（模板有意为之）
 
-退出码：0 = 无失效链接，1 = 有失效链接，2 = vault 路径不存在。
+vault 路径不在本文件硬编码，由同目录的 vault_path.py 按
+「环境变量 OBSIDIAN_VAULT_PATH → ~/.config/obsidian-vault-path」解析。
+原因：这个路径以前散在 10 处，vault 搬家时漏改一处就会静默用错路径。
+
+退出码：0 = 无失效链接，1 = 有失效链接，2 = vault 路径解析失败或不存在。
 """
 
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import re
 import sys
 
-DEFAULT_VAULT = "/Users/huangrx6/Documents/obsidian"
+DEFAULT_VAULT = None  # 不再硬编码；由 vault_path.py 解析（见下方说明）
 
 # 不参与扫描的目录（版本控制、编辑器状态、缓存、嵌套仓库、废纸篓）
 SKIP_DIRS = {".git", ".obsidian", ".cache", ".theme-publish", ".trash", "node_modules"}
+
+# vault 路径由同目录的 vault_path.py 统一解析（环境变量 → 配置文件），
+# 不在本文件硬编码 —— 那个路径以前散在 10 处，漏改一处就会静默用错。
+#
+# 用 importlib 而不是 `from vault_path import ...`：scripts/ 不是 Python 包，
+# 同级 import 语句在静态层面无法解析（静态分析器会报 could not be resolved）。
+# 与其把那条报错用 type: ignore 盖住，不如把「动态加载同级脚本」写明白。
+def _load_sibling(name: str):
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"{name}.py")
+    spec = importlib.util.spec_from_file_location(f"_obsidian_{name}", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"加载不了同目录模块：{path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_VAULT = _load_sibling("vault_path")
+VaultPathError = _VAULT.VaultPathError
+resolve_vault = _VAULT.resolve
 
 # 围栏代码块起始标记
 FENCE_RE = re.compile(r"^(?:`{3,}|~{3,})")
@@ -145,7 +170,8 @@ def scan(vault: str, ignore: tuple[str, ...] = ()) -> list[dict]:
         if any(pat in rel for pat in ignore):
             continue
         try:
-            raw = open(os.path.join(vault, rel), encoding="utf-8", errors="ignore").read()
+            with open(os.path.join(vault, rel), encoding="utf-8", errors="ignore") as fh:
+                raw = fh.read()
         except OSError:
             continue
         for lineno, line in enumerate(strip_code(raw).split("\n"), 1):
@@ -165,7 +191,11 @@ def scan(vault: str, ignore: tuple[str, ...] = ()) -> list[dict]:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="检查 Obsidian vault 的失效 wikilink")
-    ap.add_argument("--vault", default=DEFAULT_VAULT, help=f"vault 路径（默认 {DEFAULT_VAULT}）")
+    ap.add_argument(
+        "--vault",
+        default=DEFAULT_VAULT,
+        help="vault 路径；省略时从 $OBSIDIAN_VAULT_PATH 或 ~/.config/obsidian-vault-path 解析",
+    )
     ap.add_argument("--json", action="store_true", help="输出 JSON")
     ap.add_argument("--quiet", action="store_true", help="只输出统计")
     ap.add_argument(
@@ -175,16 +205,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = ap.parse_args(argv)
 
-    vault = os.path.abspath(os.path.expanduser(args.vault))
+    try:
+        vault, vault_source = resolve_vault(args.vault)
+    except VaultPathError as exc:
+        print(exc, file=sys.stderr)
+        return 2
     if not os.path.isdir(vault):
-        print(f"vault 不存在：{vault}", file=sys.stderr)
+        print(f"vault 不存在：{vault}（来源：{vault_source}）", file=sys.stderr)
         return 2
 
     ignore = ("Templates/",) if args.ignore_template else ()
     broken = scan(vault, ignore)
 
     if args.json:
-        print(json.dumps({"vault": vault, "broken_count": len(broken), "broken": broken},
+        print(json.dumps({"vault": vault, "vault_source": vault_source,
+                          "broken_count": len(broken), "broken": broken},
                          ensure_ascii=False, indent=2))
         return 1 if broken else 0
 
