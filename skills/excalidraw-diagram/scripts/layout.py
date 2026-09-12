@@ -52,10 +52,11 @@ import sys
 from dataclasses import dataclass
 from typing import Any
 
+# **图类型这个枚举只有这一份。** `validate_spec.py` 的类型白名单直接从这里取 ——
+# 以前它自己抄了一份，两份已经漂移过：`component` / `sequence` 在这个表里有方向，
+# 但白名单不接受它们，所以永远走不到（校验先挡掉）。是死条目，已删。
 DIRECTION_FOR_TYPE = {
     "architecture": "LR",
-    "component": "LR",
-    "sequence": "LR",
     "dependency": "TB",
     "flow": "TB",
     "state": "LR",

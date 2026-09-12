@@ -37,8 +37,6 @@ GROUP_FIELDS = {"id", "label", "description"}
 NODE_FIELDS = {"id", "label", "kind", "shape", "emphasis", "icon", "group",
                "detail", "rank", "pin"}
 EDGE_FIELDS = {"id", "from", "to", "label", "kind"}
-
-DIAGRAM_TYPES = {"architecture", "flow", "state", "dependency", "mindmap", "network"}
 DIRECTIONS = {"LR", "TB"}
 DETAIL_LEVELS = {"executive", "standard", "diagnostic"}
 PINS = {"left", "right", "top", "bottom"}
@@ -76,6 +74,11 @@ def _load_sibling(name: str):
 
 _palette = _load_sibling("palette")
 KINDS = _palette.KINDS
+
+# 从 `layout.py` **取**，不自己抄一份。抄的那份漂移过：layout 里有过 `component` /
+# `sequence` 两个类型，这个白名单不接受，于是它们永远走不到也没人发现。
+# 必须放在 `_load_sibling` 定义**之后** —— 模块级代码是自顶向下跑的。
+DIAGRAM_TYPES = frozenset(_load_sibling("layout").DIRECTION_FOR_TYPE)
 EDGE_KINDS = _palette.EDGE_KINDS
 SHAPES = _load_sibling("shapes").SHAPES
 palette = _load_sibling("palette")

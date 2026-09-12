@@ -236,3 +236,20 @@ class ValidateSpecTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+class TestTypeEnumHasOneSource(unittest.TestCase):
+    """图类型这个枚举只能有一份 —— 两份必然漂移，而且已经漂移过一次。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.mod = _load("validate_spec_under_test", VALIDATE_SPEC)
+
+    def test_whitelist_comes_from_the_layout_module(self):
+        layout = self.mod._load_sibling("layout")
+        self.assertEqual(set(self.mod.DIAGRAM_TYPES), set(layout.DIRECTION_FOR_TYPE))
+
+    def test_every_accepted_type_has_a_direction(self):
+        for name in sorted(self.mod.DIAGRAM_TYPES):
+            spec = {"type": name, "nodes": [], "edges": []}
+            codes = {i["code"] for i in self.mod.validate(spec).errors}
+            self.assertNotIn("BAD_TYPE", codes, f"{name} 被白名单接受但校验报 BAD_TYPE")
