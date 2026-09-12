@@ -599,3 +599,46 @@ class TestCli(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestOpeningView(unittest.TestCase):
+    """写进 appState 的视图必须**真的把内容框在视口里**。
+
+    只断言"字段存在"是没有用的 —— 数写错了字段照样存在。这里按 Excalidraw 的换算关系
+    反推：屏幕位置 = (场景坐标 + scroll) × zoom，于是内容左上角应该正落在留白处。
+
+    ⚠ 边界（实测）：这三个字段**在 `#url=` 导入那条路上会被忽略**（详见
+    references/validation.md 的第三次对账）。这条用例管的是"我们写出去的值是对的"，
+    管不了"应用一定采纳它"。
+    """
+
+    def test_content_left_top_lands_at_the_margin(self):
+        scene = build(spec_of(["a", "b", "c"], [("a", "b"), ("b", "c")]))
+        state = scene["appState"]
+        left, top, right, bottom = E.scene_bounds(scene["elements"])
+        self.assertGreater(right - left, 0)
+        self.assertGreater(bottom - top, 0)
+        self.assertAlmostEqual(E.OPEN_MARGIN[0], (left + state["scrollX"]) * state["zoom"],
+                               delta=1.0)
+        self.assertAlmostEqual(E.OPEN_MARGIN[1], (top + state["scrollY"]) * state["zoom"],
+                               delta=1.0)
+
+    def test_zooms_out_when_the_content_is_larger_than_the_viewport(self):
+        """内容装不下时靠**缩小**来适配。
+
+        用 TB 方向、1 个根挂 10 个叶子来构造"装不下"：它不会触发折段
+        （折段只对每层 ≤ 2 个节点的链式图生效），所以横向真的会超出名义视口。
+        最早想用 9 个节点的链来试，结果被折段折成了几列，比例只有 0.61 —— 覆盖不到。
+        """
+        leaves = [f"leaf{i}" for i in range(10)]
+        scene = build(spec_of(["root", *leaves], [("root", leaf) for leaf in leaves],
+                              direction="TB"))
+        state = scene["appState"]
+        left, top, right, bottom = E.scene_bounds(scene["elements"])
+        room_x = E.OPEN_VIEW[0] - 2 * E.OPEN_MARGIN[0]
+        self.assertGreater(right - left, room_x,
+                           "这张图在 100% 下就装得下，覆盖不到缩小那条路径 —— 换个更大的场景")
+        self.assertLess(state["zoom"], 1.0, "装不下却没有缩小")
+        self.assertLessEqual((right - left) * state["zoom"], E.OPEN_VIEW[0])
+        self.assertLessEqual((bottom - top) * state["zoom"],
+                             E.OPEN_VIEW[1] - E.OPEN_MARGIN[1])

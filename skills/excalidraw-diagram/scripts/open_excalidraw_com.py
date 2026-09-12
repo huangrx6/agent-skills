@@ -38,7 +38,11 @@ Excalidraw 支持从外部 JSON 地址导入场景：`https://excalidraw.com/#ur
     python3 scripts/open_excalidraw_com.py x.excalidraw
     python3 scripts/open_excalidraw_com.py x.excalidraw --port 8777 --no-open
 
-按 Ctrl-C 结束服务。**页面加载完之后就可以关掉它了** —— 场景已经进了浏览器。
+按 Ctrl-C 结束服务。**页面载入完成后就可以关掉它**。
+
+  ⚠ 浏览器里会先弹一次确认（"加载外部绘图将替换您现有的内容"），点红色那一下
+  才会真的载入 —— 这是 excalidraw.com 自己的安全确认，不是本脚本的步骤。
+  在此之前"页面打开了"不等于"场景进去了"。
 """
 
 from __future__ import annotations
@@ -134,7 +138,8 @@ def main(argv: list[str] | None = None) -> int:
     # 不加的话用户**看不到那句“打开地址”，会以为程序没反应**（实测踩过）。
     print(f"只服务这一个文件：{os.path.basename(args.scene)}", flush=True)
     print(f"打开地址 {url}", flush=True)
-    print("（加载完就可以 Ctrl-C 停掉；场景已经在浏览器里了）", flush=True)
+    print("（浏览器里会先弹一次确认框：加载外部绘图将替换您现有的内容 —— "
+          "点红色那一下才会真的载入；点完就可以 Ctrl-C 停掉这个服务）", flush=True)
 
     if not args.no_open:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()

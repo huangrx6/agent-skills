@@ -540,7 +540,11 @@ def scene_bounds(elements: list[dict]) -> tuple[float, float, float, float]:
 
 # 标题底边到内容顶边的距离。数值来源：与最小元素间隙（12px）同量级再放大一档，
 # 让标题与图之间看得出“这不是图的一部分”。**未经真实数据校准**，属于待验证。
-TITLE_GAP = 28.0
+TITLE_GAP = 28
+# 打开文件时用的**名义视口**与留白（Excalidraw 不会告诉我们真实视口有多大）。
+# 顶部那条留白是给工具栏的 —— 不留的话内容会压在工具下面。
+OPEN_VIEW = (1400.0, 800.0)
+OPEN_MARGIN = (60.0, 110.0, 50.0)
 
 
 def title_element(title: str | None) -> dict | None:
@@ -645,13 +649,36 @@ def build_scene(spec: dict, result, boxes: dict,
 
     # 图标题最后加：它要按已排好的内容来居中，而它自己**不参与**布局。
     # 放的位置是“内容顶边往上 TITLE_GAP”，所以不需要把别的元素往下挪 ——
-    # 标题可能落到 y 为负的地方，对 Excalidraw 没有影响（载入时会自动居中视图）。
+    # 标题落到 y 为负的地方没关系：下面会把视图滚到内容左上角（见 OPEN_MARGIN_*）。
     title = title_element(spec.get("title"))
     if title is not None and elements:
         left, top, right, _bottom = scene_bounds(elements)
         title["x"] = round(left + (right - left) / 2.0 - title["width"] / 2.0, 2)
         title["y"] = round(top - TITLE_GAP - title["height"], 2)
         elements.append(title)
+
+    # ── 打开时停在哪儿：**必须自己写** ──
+    #
+    # 实测（真实 excalidraw.com，2026-09-12）：appState 里不给 scrollX/scrollY 时，
+    # 应用停在画布原点 —— 内容偏到屏幕角落，得先按一次"缩放至适合"才看得见。
+    # 以前这里写着"载入时会自动居中视图"，那是个**没验过的假设**，实测不成立。
+    #
+    # ⚠ 但这三个字段**有没有被采纳，取决于打开方式**（同一次实测）：
+    #   - `#url=` 导入（open_excalidraw_com.py 那条路）：**忽略** —— 它只采纳了
+    #     `viewBackgroundColor`（画布真的是我们那个底色），视图仍是 100% 停在原点。
+    #   - 当成**场景**打开（Obsidian 插件、编辑器里 Ctrl+O）：**尚未实测**。
+    # 写它们仍然是对的（真实 Excalidraw 存盘时就是这些字段，我们的文件应该像一份
+    # 正常的场景），但**别把"打开就框住内容"当成已验证的事实** —— 上面那条路不是。
+    #
+    # 视口按名义尺寸估：Excalidraw 不会告诉我们它多大，但"打开就框住内容"这件事
+    # 只需要一个合理的默认值。margin 除以 zoom 是因为屏幕位置 = (场景 + scroll) × zoom。
+    left, top, right, bottom = scene_bounds(elements)
+    span_x = max(1.0, right - left)
+    span_y = max(1.0, bottom - top)
+    zoom = round(min(1.0, (OPEN_VIEW[0] - 2 * OPEN_MARGIN[0]) / span_x,
+                     (OPEN_VIEW[1] - OPEN_MARGIN[1] - OPEN_MARGIN[2]) / span_y), 2)
+    scroll_x = -left + OPEN_MARGIN[0] / zoom
+    scroll_y = -top + OPEN_MARGIN[1] / zoom
 
     return {
         "type": SCENE_TYPE,
@@ -661,6 +688,9 @@ def build_scene(spec: dict, result, boxes: dict,
         "appState": {
             "gridSize": None,
             "viewBackgroundColor": palette.CANVAS["background"],
+            "scrollX": round(scroll_x, 2),
+            "scrollY": round(scroll_y, 2),
+            "zoom": zoom,
         },
         "files": {},
     }
