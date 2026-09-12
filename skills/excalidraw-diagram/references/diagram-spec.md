@@ -10,7 +10,7 @@
   "title": "鉴权链路",               // 可选，图标题
   "direction": "LR",                // 可选，仅 LR / TB
   "detail": "standard",             // executive | standard | diagnostic
-  "theme": "morandi",               // 可选，见下方"主题"；不写 = morandi
+  "theme": "soft-light",             // 可选，见下方"主题"；不写 = soft-light
   "groups": [
     { "id": "edge", "label": "接入层" }
   ],
@@ -20,7 +20,7 @@
       "label": "鉴权服务",            // 必填，节点标题
       "kind": "security",           // 必填，必须是色板文件里的键
       "shape": "cylinder",         // 可选，必须在本文件的形状表里（不写就按 kind 取默认）
-      "emphasis": "primary",       // 可选，primary | normal | muted（不写 = normal）
+      "emphasis": "primary",       // 可选，muted | normal | primary | critical（不写 = normal）
       "icon": "Database",           // 可选，素材库里的项名（见 references/icons.md）
       "group": "edge",              // 可选，必须指向已声明的 group
       "detail": "login / token",    // 可选，一行次要说明
@@ -87,13 +87,20 @@
 
 ## `emphasis`：视觉重点，**不改几何**
 
-| `emphasis` | 填充 | 描边宽 | 什么时候用 |
-| --- | --- | --- | --- |
-| `primary` | 色板原色向**自己的描边色**靠一点（颜色更实） | 2.5 | 这张图的视觉中心：主流程、核心服务 |
-| `normal` | **就是色板原色** | 1.5 | 默认。不写 `emphasis` 时就是这一档 |
-| `muted` | 向**画布色**靠拢 55% | 1.0 | 背景设施、边缘模块、次要分支 |
+`emphasis` 不直接给颜色，它**在视觉层级上上下挪一档**：
 
-三档的填充全部由 `palette.emphasis_fill(kind, emphasis)` 从色板**派生**，没有第二份颜色表。
+| `emphasis` | 对层级的作用 | 描边宽 | 什么时候用 |
+| --- | --- | --- | --- |
+| `primary` | **提一档**（tint → accent → secondary，封顶在 secondary） | 2.5 | 这张图的视觉中心 |
+| `normal` | 不动（就是 `kind` 给的默认层级） | 1.5 | 默认。不写 `emphasis` 时就是这一档 |
+| `muted` | **降一档**（accent → tint → neutral，下限 neutral） | 1.0 | 背景设施、边缘模块、次要分支 |
+| `critical` | **直接进 `critical`** | 2.5 | **真的异常 / 危险 / 失败路径** |
+
+`primary` **封顶在 `secondary`** —— 普通节点被"强调"不该变成警示色；
+`critical` 是唯一能进警示档的入口，也是唯一允许跳出主色系的色相。
+
+颜色本身由 `palette.fill_for(kind, emphasis)` / `stroke_for(kind, emphasis)`
+从**主题的层级表**派生，没有第二份颜色表。
 
 ### 为什么不用尺寸表达重点
 
@@ -124,19 +131,25 @@
 
 ## 主题（`theme` 字段）
 
-`配色 = THEMES[主题名][语义角色]` —— **两个维度都是封闭枚举**。这就是"不规定每张图
+`颜色 = THEMES[主题名][视觉层级]` —— **两个维度都是封闭枚举**。这就是"不规定每张图
 长什么样，但要稳定的设计原则"的落地机制：既不给模型自由发挥的空间，也不逼所有图一个样。
+
+**一个主题只手写两个色相**（`accent` + `critical`），其余颜色全部派生 —— 见
+`visual-design.md` 的 2.0 节。所以"一张图最多一个主色系"是构造上的事实。
 
 只列**真正实现的**（写进去而没做出来，就是"指向一个空文件的指针"）：
 
 | `theme` | 气质 | 适合 |
 | --- | --- | --- |
-| `morandi` | 柔和自然、去饱和、偏浅（**默认**，用户指定） | 技术架构、系统图 |
-| `bright-clean` | 明亮清爽、白底、饱和度更高 | 产品流程、需要明快的图 |
-| `dark-tech` | 深色底 + 浅色文字 | 科技主题、演示 |
+| `soft-light` | 柔和自然、去饱和、偏浅（**默认**，用户指定） | 技术架构、系统图 |
+| `clean-light` | 明亮清爽、白底、饱和度更高 | 产品流程、需要明快的图 |
+| `dark` | 深色底 + 浅色文字 | 科技主题、演示 |
 
-每个主题都要过同一套**不变量**（`tests/test_palette.py` 的 `TestEveryTheme`）：
-文字在其填充上 ≥ 4.5、描边贴着填充与画布时都看得见、六种填充两两可区分（ΔE ≥ 5）。
+旧名 `morandi` / `bright-clean` / `dark-tech` 仍可用，但不推荐 —— 新名字表达的是**气质**。
+
+每个主题都要过同一套**不变量**（`tests/test_palette.py` 的 `TestThemes`）：
+文字在其填充上 ≥ 4.5、描边贴着填充与画布时都看得见、五档层级两两可分、
+**一张图里 accent + secondary ≤ 30%、critical ≤ 5%（至少允许一处）**。
 
 > 深色主题在这套不变量上翻过一次车：第一版六色都挤在窄明度带里，两两 ΔE 最小只有 **2.5**
 > （浅色主题是 6.7）—— 看着就是六块差不多的深灰。深色底上"彼此可区分"比浅色底难，
@@ -249,7 +262,7 @@ categories by color"）。需要第 7 类时，先问"能不能归并进已有�
 | `nodeSeparation` 70 / `rankSeparation` 120 | `layout.py` | **待验证**：来自前作 Dagre 默认值 |
 | 阈值 12px / 24px / 边数÷2 | `check_layout.py` | **待验证**：依据前作数值与常识设的起点 |
 | 6 类语义色 | `palette.py` | **已选型未实测**：取自 Excalidraw 内置浅色；深色文字在其上可读是看过的，不是量过的 |
-| 莫兰迪 6 色 + 3 档 emphasis 派生色 | `palette.py` | **已实测**：对比度 / ΔE / 饱和度 / 亮度全部由 `tests/test_palette.py` 锁住（数值是量出来的） |
+| 2 个色相 + 5 档层级 + 3 档 emphasis 派生 | `palette.py` | **已实测**：对比度 / ΔE / 色相跨度 / 颜色密度全部由 `tests/test_palette.py` 锁住（数值是量出来的） |
 | 图标高 22 / 与文字间隙 10 / 无尺寸时占位 30 | `icons.py` `layout.py` | **待验证**：新定的数，没有真实数据校准过 |
 | 标题上方 28px / 上边距 | `emit_excalidraw.py` | **待验证**：与最小间隙同量级再放大一档，未校准 |
 
