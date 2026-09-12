@@ -504,7 +504,7 @@ class TestIconColourClash(unittest.TestCase):
     def test_dark_icon_on_dark_fill_is_reported(self):
         """合成素材的元素是 #333333 描边；放到深色主题的深填充上就该报。"""
         _, _, light_outcome, _ = self.E.emit(self._spec(), library=V2)
-        _, _, dark_outcome, _ = self.E.emit(self._spec("dark-tech"), library=V2)
+        _, _, dark_outcome, _ = self.E.emit(self._spec("dark"), library=V2)
         light = [i for i in light_outcome.issues if i.check == "icon"]
         dark = [i for i in dark_outcome.issues if i.check == "icon"]
         self.assertEqual([], light, "浅色主题下不该报撞色")
@@ -527,7 +527,7 @@ class TestIconColourClash(unittest.TestCase):
                 json.dump({"type": "excalidrawlib", "version": 2, "libraryItems": [
                     {"id": "i", "name": "Bound Box", "elements": bright}]},
                     fh, ensure_ascii=False)
-            _, _, outcome, _ = self.E.emit(self._spec("dark-tech"), library=path)
+            _, _, outcome, _ = self.E.emit(self._spec("dark"), library=path)
             self.assertEqual([], [i for i in outcome.issues if i.check == "icon"])
         finally:
             shutil.rmtree(directory, ignore_errors=True)

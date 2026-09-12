@@ -33,18 +33,18 @@
     },
     {
       "id": "pay",
-      "kind": "service",
+      "kind": "plain",
       "label": "支付服务",
       "emphasis": "primary"
     },
     {
       "id": "stock",
-      "kind": "service",
+      "kind": "plain",
       "label": "库存服务"
     },
     {
       "id": "user",
-      "kind": "service",
+      "kind": "plain",
       "label": "用户服务"
     },
     {

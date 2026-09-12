@@ -16,12 +16,12 @@
     },
     {
       "id": "m2",
-      "kind": "service",
+      "kind": "plain",
       "label": "日志 Logs"
     },
     {
       "id": "m3",
-      "kind": "service",
+      "kind": "plain",
       "label": "链路 Traces"
     },
     {

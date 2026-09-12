@@ -110,9 +110,11 @@ class TestElementBase(unittest.TestCase):
     def test_colours_come_from_the_palette(self):
         allowed = set()
         for entry in list(palette.KINDS.values()) + list(palette.EDGE_KINDS.values()):
-            # 颜色现在住在**层级**表里；语义角色只指向层级，本身不带颜色。
+            # 颜色住在**层级**表 + **边型**表里；语义角色只指向层级，本身不带颜色。
             for level in palette.VISUAL_LEVELS:
                 allowed.update(palette.LEVELS[level].values())
+            for edge in palette.EDGE_KINDS.values():
+                allowed.add(edge["stroke"])
         allowed.update(palette.CANVAS.values())
         allowed.add("transparent")
         for el in self.scene["elements"]:

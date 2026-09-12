@@ -62,128 +62,121 @@ CANVAS: dict = {}
 # 这是封闭枚举里唯一的例外分支，是未来最容易漏改的地方。
 # 待办：把 morandi 迁进 `THEMES` 的标准结构，去掉 `_rebind()` 的分支。
 
-# ── 主题：`颜色 = THEMES[主题名][视觉层级]` ─────────────────────
+# ── 主题 = 一套**视觉语言**，不是一套色值套餐 ────────────────────
 #
-# 落地机制就是两层封闭枚举：主题名封闭、语义角色封闭 —— 既不给模型自由发挥的空间，
-# 也不逼所有图一个样。
+# 一个主题**只手写两个色相**：一个主色（accent）+ 一个状态色（critical）。
+# 其余颜色全部由这两个 + 画布 / 墨色派生出来。
 #
-# **只列真正实现的。** 文档里另外几个是候选，没做出来的不往这里写 ——
-# 写进去就会变成"指向一个空文件"的那种指针。
+# 为什么必须这样：只要 accent 和 secondary 是两个各自手写的色相，图上就会同时
+# 出现**两个视觉中心** —— 看起来"柔和"，但不高级。**高级感不是颜色淡，是视觉关系简单。**
+# 派生之后，"一张图最多一个主色系 + 一个状态色系"是**构造上保证**的事实，
+# 而不是一条靠自觉遵守的约定。
 #
-# **语义不直接决定颜色。** 中间隔一层"视觉层级"：
+#   canvas ──┬─→ ink ──┬─→ accent-wash  （tint 的填充：主色的极浅）
+#            │         ├─→ accent-soft  （accent 的填充）
+#            │         ├─→ accent-mid   （secondary 的填充：更深一档）
+#            │         └─→ accent-deep  （secondary 的描边：往墨色靠）
+#            ├─→ edge          （普通连线：画布与墨色之间）
+#            └─→ edge-muted    （弱连线：更靠近画布）
+#   accent ──→ …（上同）
+#   critical ──→ critical-soft（唯一允许跳出主色系的色相）
 #
-#   kind ──(语义)──→ 默认层级 ──┐
-#                               ├──→ THEMES[主题][层级] ──→ 描边 + 填充
-#   emphasis ──(强调)──────────┘
-#
-# 为什么必须有这一层：六种语义各绑一套颜色，工程上干净，**视觉上一定丑** ——
-# 实测旧色板的六种填充色相跨度 310°（占整个色环 86%），眼睛读到的是"六个颜色"
-# 而不是"一个结构"；一张 14 节点的架构图会出现 6 种节点色 + 3 种边色。
-#
-# 目标是**视觉上只有少数几个颜色，语义上仍然能区分** —— 这两件事不一样。
-# 层级只有 5 档，其中 neutral / tint / accent 承担绝大多数节点，
-# secondary 少量，critical 只在真的异常时用。
+# 主题名代表的是**气质**，不是某一组具体 HEX —— 换主题换的是整体视觉语言，
+# 不是"把蓝色换成紫色"。
+
 VISUAL_LEVELS = ("neutral", "tint", "accent", "secondary", "critical")
 _LEVEL_ORDER = {name: i for i, name in enumerate(VISUAL_LEVELS)}
 
+# 层级 → **视觉角色**（描边角色, 填充角色）。这一层把"我有多重要"翻译成"用哪几个颜色"。
+LEVEL_ROLES: dict[str, tuple[str, str]] = {
+    "neutral":   ("ink",         "canvas"),        # 完全中性：填充就是画布色
+    "tint":      ("ink",         "accent-wash"),   # 中性 + 一点主色倾向（**不是第二种颜色**）
+    "accent":    ("accent",      "accent-soft"),   # 整张图真正的视觉重点
+    "secondary": ("accent-deep", "accent-mid"),    # 仍是主色家族，只是更深
+    "critical":  ("critical",    "critical-soft"), # 唯一允许跳出主色系
+}
+
+# 派生配比。数字放在一起，方便一眼看出"深浅关系"是从哪来的。
+WASH_MIX = 0.12       # tint 填充：只比画布深一点点
+SOFT_MIX = 0.32       # accent 填充
+MID_MIX = 0.55        # secondary 填充：同一个主色的更深一档
+DEEP_MIX = 0.60       # secondary 描边：主色往墨色靠
+# critical 填充。它只是一层极浅的洗染 —— 警示主要靠**描边色 + 线宽**表达，
+# 填充只负责"这一块也带着那个调子"。再谈就变成大色块，那就成了它想避免的东西。
+CRITICAL_MIX = 0.26
+EDGE_MIX = 0.45       # 普通连线：画布与墨色之间
+EDGE_MUTED_MIX = 0.28 # 弱连线：更靠近画布
+
+# 边型 → 视觉角色。**不再全用同一个灰** —— 全同色的线配上手绘效果，很容易糊成
+# "一层脏脏的灰"。但也不能各走各的色：只有真正承载数据的那条用主色。
+EDGE_ROLES: dict[str, str] = {
+    "sync":     "edge",        # 普通调用：中性
+    "data":     "accent",      # 数据流：值得用主色（信息在哪，眼睛就该去哪）
+    "async":    "edge",        # 异步：靠线型（虚线）区分，不靠颜色
+    "optional": "edge-muted",  # 可选 / 间接：再弱一档
+}
+
 THEMES: dict[str, dict] = {
-    "morandi": {
-        "zh": "莫兰迪（默认，用户指定）",
-        "canvas": {"background": "#FDFCFA", "grid": "#F1EDE8", "text": "#4A4744"},
-        "levels": {
-            "neutral":   {"stroke": "#A9A49C", "fill": "#FFFFFF"},
-            "tint":      {"stroke": "#A9A49C", "fill": "#F4F1EC"},
-            "accent":    {"stroke": "#7C93A6", "fill": "#CBD8E0"},
-            "secondary": {"stroke": "#8B7FA0", "fill": "#DDD6E4"},
-            "critical":  {"stroke": "#B0888A", "fill": "#F2DEDA"},
-        },
-        "kinds": {
-            "client":   "tint",
-            "service":  "accent",
-            "data":     "tint",
-            "async":    "secondary",
-            "security": "neutral",
-            "external": "neutral",
-            # 通用角色：流水线步骤 / 状态机状态 / 普通模块 / 思维导图叶子 ——
-            # 任何“就是个节点、不是那个特殊角色”的东西。没有它的时候这些节点
-            # 只能硬套 service，整张图就变成强调色（实测 04-state 75%、05-network 75%）。
-            # 注意：**加角色不会加颜色** —— 角色映射到已有层级，颜色数由层级封顶。
-            "plain":    "tint",
-        },
-        "edges": {
-            "sync":     {"zh": "同步调用", "stroke": "#A9A49C", "style": "solid"},
-            "data":     {"zh": "数据读写", "stroke": "#A9A49C", "style": "solid"},
-            "async":    {"zh": "异步 / 事件", "stroke": "#A9A49C", "style": "dashed"},
-            "optional": {"zh": "可选 / 条件分支", "stroke": "#A9A49C", "style": "dashed"},
-        },
+    "soft-light": {
+        "zh": "柔和浅色（默认，用户指定）",
+        "canvas": "#FDFCFA",
+        "grid": "#F1EDE8",
+        "ink": "#4A4744",
+        "accent": "#6E879B",
+        "critical": "#AE7F7D",
     },
-    "bright-clean": {
-        "zh": "明亮清爽",
-        "canvas": {"background": "#FFFFFF", "grid": "#EEF2F6", "text": "#2E3440"},
-        "levels": {
-            "neutral":   {"stroke": "#8A94A0", "fill": "#FFFFFF"},
-            "tint":      {"stroke": "#8A94A0", "fill": "#EDF2F5"},
-            "accent":    {"stroke": "#3F7C8C", "fill": "#C9E4E2"},
-            "secondary": {"stroke": "#6B6FA8", "fill": "#DFE1F2"},
-            "critical":  {"stroke": "#B06070", "fill": "#F5DDE1"},
-        },
-        # 语义角色 → **默认层级**。注意大多数角色落在 neutral / tint：
-        # 一张图里"有颜色的"节点应该是少数，颜色才有信息量。
-        "kinds": {
-            "client":   "tint",
-            "service":  "accent",
-            "data":     "tint",
-            "async":    "secondary",
-            "security": "neutral",
-            "external": "neutral",
-            # 通用角色：流水线步骤 / 状态机状态 / 普通模块 / 思维导图叶子 ——
-            # 任何“就是个节点、不是那个特殊角色”的东西。没有它的时候这些节点
-            # 只能硬套 service，整张图就变成强调色（实测 04-state 75%、05-network 75%）。
-            # 注意：**加角色不会加颜色** —— 角色映射到已有层级，颜色数由层级封顶。
-            "plain":    "tint",
-        },
-        # 默认连线**统一中性**，只有真的需要区分才上色 ——
-        # 否则会出现"蓝框─蓝线、绿框─绿线"，那是技术 PPT 风。
-        "edges": {
-            "sync":     {"zh": "同步调用", "stroke": "#8A94A0", "style": "solid"},
-            "data":     {"zh": "数据流",   "stroke": "#8A94A0", "style": "solid"},
-            "async":    {"zh": "异步消息", "stroke": "#8A94A0", "style": "dashed"},
-            "optional": {"zh": "可选 / 间接", "stroke": "#8A94A0", "style": "dashed"},
-        },
+    "clean-light": {
+        "zh": "明快清爽",
+        "canvas": "#FFFFFF",
+        "grid": "#EEF2F6",
+        "ink": "#2E3440",
+        "accent": "#3F7C8C",
+        "critical": "#B06070",
     },
-    "dark-tech": {
-        "zh": "深色科技",
-        "canvas": {"background": "#12161C", "grid": "#1D232B", "text": "#E6E9EE"},
-        "levels": {
-            "neutral":   {"stroke": "#5A6472", "fill": "#181D24"},
-            "tint":      {"stroke": "#5A6472", "fill": "#2A3540"},
-            "accent":    {"stroke": "#6FA8D0", "fill": "#13293A"},
-            "secondary": {"stroke": "#9B8FD0", "fill": "#2A2340"},
-            "critical":  {"stroke": "#D08F8F", "fill": "#3A1D26"},
-        },
-        "kinds": {
-            "client":   "tint",
-            "service":  "accent",
-            "data":     "tint",
-            "async":    "secondary",
-            "security": "neutral",
-            "external": "neutral",
-            # 通用角色：流水线步骤 / 状态机状态 / 普通模块 / 思维导图叶子 ——
-            # 任何“就是个节点、不是那个特殊角色”的东西。没有它的时候这些节点
-            # 只能硬套 service，整张图就变成强调色（实测 04-state 75%、05-network 75%）。
-            # 注意：**加角色不会加颜色** —— 角色映射到已有层级，颜色数由层级封顶。
-            "plain":    "tint",
-        },
-        "edges": {
-            "sync":     {"zh": "同步调用", "stroke": "#7A828E", "style": "solid"},
-            "data":     {"zh": "数据流",   "stroke": "#7A828E", "style": "solid"},
-            "async":    {"zh": "异步消息", "stroke": "#7A828E", "style": "dashed"},
-            "optional": {"zh": "可选 / 间接", "stroke": "#7A828E", "style": "dashed"},
-        },
+    "dark": {
+        "zh": "深色",
+        "canvas": "#12161C",
+        "grid": "#1D232B",
+        "ink": "#E6E9EE",
+        "accent": "#6FA8D0",
+        "critical": "#D08F8F",
     },
 }
 
-DEFAULT_THEME = "morandi"
+# 向后兼容的旧名。**不建议用** —— 新名字表达的是气质，旧名字表达的是色值套餐。
+THEME_ALIASES = {"morandi": "soft-light", "bright-clean": "clean-light",
+                 "dark-tech": "dark"}
+
+# 语义角色 → 默认层级。**不随主题变** —— "这是个什么角色"和"这张图什么气质"
+# 是两个正交的问题。放在主题里就变成三份要同步的数据（这个坑已经踩过）。
+# 注意 `secondary` **不在**这张表的右边 —— 和 `critical` 一样，"第二档重要程度"
+# 不是某个角色天生就该占的位置，它只能由 `emphasis: primary` 提升到达。
+# 第一版把 `async` 放在 secondary，理由是"队列很重要" —— 那是把**结构角色**
+# 当成了**重要程度**。队列是支撑设施，不该跟主色抢注意力。
+DEFAULT_KIND_LEVELS: dict[str, str] = {
+    "client":   "tint",
+    "service":  "accent",
+    "data":     "tint",
+    "async":    "tint",
+    "security": "neutral",
+    "external": "neutral",
+    # 通用角色：流水线步骤 / 状态机状态 / 普通模块 / 思维导图叶子。
+    # 没有它的时候这些节点只能硬套 service，整张图就变成强调色
+    # （实测 04-state 75%、05-network 75%）。加角色**不会**加颜色。
+    "plain":    "tint",
+}
+
+# 边型的中文名与线型。**也不随主题变** —— 颜色由 EDGE_ROLES 从主题派生。
+DEFAULT_EDGE_STYLES: dict[str, tuple[str, str]] = {
+    "sync":     ("同步调用", "solid"),
+    "data":     ("数据读写", "solid"),
+    "async":    ("异步 / 事件", "dashed"),
+    "optional": ("可选 / 条件分支", "dashed"),
+}
+
+DEFAULT_THEME = "soft-light"
+AUTO_THEME = "auto"
+
 
 # 当前生效的主题。为什么用模块级状态而不是把主题一路传参：
 # `stroke_for` / `background_for` / `CANVAS` 被几十处调用，全改成带主题参数会把
@@ -236,6 +229,7 @@ def use_theme(name: str | None) -> str:
     """
     global _active
     name = name if name else DEFAULT_THEME
+    name = THEME_ALIASES.get(name, name)     # 旧名照收，但不推荐
     if name == AUTO_THEME:
         name = suggest_theme(_auto_type)
     if name not in THEMES:
@@ -435,12 +429,33 @@ def _rebind() -> None:
     morandi 现在和其他主题**同一套结构**，这里不再有特例分支
     （以前它的定义散在三个独立常量里，是封闭枚举里唯一的例外）。
     """
-    global LEVELS, KINDS, EDGE_KINDS, CANVAS
+    global LEVELS, KINDS, EDGE_KINDS, CANVAS, ROLES
     spec = THEMES[_active]
-    LEVELS = {k: dict(v) for k, v in spec["levels"].items()}
-    KINDS = dict(spec["kinds"])
-    EDGE_KINDS = {k: dict(v) for k, v in spec["edges"].items()}
-    CANVAS = {**spec["canvas"], **CANVAS_STYLE}
+    canvas, ink = spec["canvas"], spec["ink"]
+    accent, critical = spec["accent"], spec["critical"]
+    ROLES = {
+        "canvas":       canvas,
+        "ink":          ink,
+        "accent":       accent,
+        # 同一个主色的四档深浅 —— 由一个色相派生，所以**不可能**出现两个视觉中心
+        "accent-wash":  _mix(canvas, accent, WASH_MIX),
+        "accent-soft":  _mix(canvas, accent, SOFT_MIX),
+        "accent-mid":   _mix(canvas, accent, MID_MIX),
+        "accent-deep":  _mix(ink,    accent, DEEP_MIX),
+        "critical":     critical,
+        "critical-soft": _mix(canvas, critical, CRITICAL_MIX),
+        "edge":         _mix(canvas, ink, EDGE_MIX),
+        "edge-muted":   _mix(canvas, ink, EDGE_MUTED_MIX),
+    }
+    # 层级 → 描边 / 填充，全部走**角色**，没有一处直接写十六进制
+    LEVELS = {name: {"stroke": ROLES[LEVEL_ROLES[name][0]],
+                     "fill":   ROLES[LEVEL_ROLES[name][1]]}
+              for name in VISUAL_LEVELS}
+    KINDS = dict(DEFAULT_KIND_LEVELS)
+    EDGE_KINDS = {name: {"zh": zh, "style": style, "stroke": ROLES[EDGE_ROLES[name]]}
+                  for name, (zh, style) in DEFAULT_EDGE_STYLES.items()}
+    CANVAS = {"background": canvas, "grid": spec["grid"], "text": ink,
+              **CANVAS_STYLE}
 
 
 _rebind()

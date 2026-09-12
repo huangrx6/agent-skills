@@ -64,7 +64,15 @@ saturation = P.saturation
 TEXT_MIN = 4.5              # 正文对比度（WCAG AA）
 STROKE_MIN = 1.5            # 描边只要"看得见边界"，不要求它自己成为焦点
 VISIBLE_DE = 5.0            # 感知可辨阈值 ΔE≈2.3，这里留两倍余量
-ACCENT_SHARE_MAX = 0.5      # 一张图里 accent 及以上的节点占比上限
+# 颜色是**稀缺资源**：主色是视觉焦点，不是默认节点样式。
+# 50% 太宽 —— 一半节点带主色，整张图依然会花。这两个数不是设计铁律，
+# 是"多到什么时候就没有信息量了"的经验线；真要动它，得先有一张被它误伤的图。
+ACCENT_SHARE_MAX = 0.30     # accent + secondary 的占比上限
+CRITICAL_SHARE_MAX = 0.05   # critical 的占比上限（警示色一旦常见就不再是警示）
+# 但小图上这个比例没有意义：8 个节点的 5% 等于"一个都不许有"，而"一条异常路径"
+# 本来就该被标出来。所以按**绝对数量**兜底：至少允许一处。
+# 这不是放宽，是比例在样本很小时会失效 —— 图大起来仍然按 5% 收紧。
+CRITICAL_COUNT_MIN = 1
 
 
 def _luminance(colour: str) -> float:
@@ -177,9 +185,11 @@ class TestVisualBurden(unittest.TestCase):
         for i, a in enumerate(names):
             for b in names[i + 1:]:
                 with self.subTest(pair=(a, b)):
-                    d = delta_e(P.LEVELS[a]["fill"], P.LEVELS[b]["fill"])
+                    # critical 看描边（它的填充刻意很淡，是洗染不是色块）
+                    key = "stroke" if "critical" in (a, b) else "fill"
+                    d = delta_e(P.LEVELS[a][key], P.LEVELS[b][key])
                     self.assertGreaterEqual(d, VISIBLE_DE,
-                                            f"{a} 与 {b} 的填充 ΔE 只有 {d:.1f}")
+                                            f"{a} 与 {b} 的{key} ΔE 只有 {d:.1f}")
 
     def test_accent_stands_out_from_neutral(self):
         """accent 是"重要的东西"，它必须从大量中性节点里跳出来。"""
@@ -193,6 +203,18 @@ class TestVisualBurden(unittest.TestCase):
         d = delta_e(P.LEVELS["critical"]["stroke"], P.LEVELS["accent"]["stroke"])
         self.assertGreaterEqual(d, VISIBLE_DE)
 
+    def test_critical_is_visible_against_the_quiet_levels(self):
+        """critical 靠**描边**从普通节点里跳出来。
+
+        为什么不对填充提同样要求：浅色主题下 critical 的填充本来就只是一层极浅的
+        洗染（和 tint 的填充很近），这是有意的 —— 一整块大色块正是要避免的东西。
+        真正"看得见它"的是描边色加上更粗的线宽。
+        """
+        for quiet in ("neutral", "tint"):
+            with self.subTest(against=quiet):
+                d = delta_e(P.LEVELS["critical"]["stroke"], P.LEVELS[quiet]["stroke"])
+                self.assertGreaterEqual(d, VISIBLE_DE, f"与 {quiet} 的描边 ΔE 只有 {d:.1f}")
+
     def test_most_nodes_are_not_accented(self):
         """**关于图、而不是关于色板的那条约束**：一张图里 accent 及以上的节点 ≤ 一半。
 
@@ -204,14 +226,17 @@ class TestVisualBurden(unittest.TestCase):
             nodes = spec.get("nodes", [])
             if not nodes:
                 continue
-            hot = 0
+            hot = crit = 0
             for node in nodes:
                 level = P.level_for(node["kind"], node.get("emphasis", P.DEFAULT_EMPHASIS))
-                if P.VISUAL_LEVELS.index(level) >= P.VISUAL_LEVELS.index("accent"):
-                    hot += 1
-            share = hot / len(nodes)
-            if share > ACCENT_SHARE_MAX:
-                offenders.append(f"{name}: {hot}/{len(nodes)} = {share:.0%}")
+                hot += P.VISUAL_LEVELS.index(level) >= P.VISUAL_LEVELS.index("accent")
+                crit += level == "critical"
+            if hot / len(nodes) > ACCENT_SHARE_MAX:
+                offenders.append(f"{name}: 主色 {hot}/{len(nodes)} = {hot/len(nodes):.0%}")
+            allowed_crit = max(CRITICAL_COUNT_MIN, CRITICAL_SHARE_MAX * len(nodes))
+            if crit > allowed_crit:
+                offenders.append(f"{name}: 警示 {crit}/{len(nodes)} = {crit/len(nodes):.0%}"
+                                 f"（上限 {allowed_crit:.0f} 处）")
         self.assertEqual(
             [], offenders,
             "这些图的强调色占比超过一半，颜色就没有信息量了：" + "；".join(offenders))
@@ -316,12 +341,12 @@ class TestThemes(unittest.TestCase):
     def test_unknown_theme_raises_and_lists_options(self):
         with self.assertRaises(KeyError) as ctx:
             P.use_theme("不存在的主题")
-        self.assertIn("morandi", str(ctx.exception))
+        self.assertIn("soft-light", str(ctx.exception))
 
     def test_theme_context_restores_the_previous_one(self):
         before = P.active_theme()
-        with P.theme_context("dark-tech"):
-            self.assertEqual("dark-tech", P.active_theme())
+        with P.theme_context("dark"):
+            self.assertEqual("dark", P.active_theme())
         self.assertEqual(before, P.active_theme())
 
     def test_suggestion_table_only_names_real_diagram_types(self):
