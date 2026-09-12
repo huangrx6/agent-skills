@@ -130,6 +130,22 @@ def resolve_style(raw: dict | None) -> dict:
     return style
 
 
+FRAME_MIX = 0.52          # 区域边框：层级描边色往画布方向退这么多
+
+
+def frame_stroke(level: str) -> str:
+    """**区域边框的颜色** —— 它不是节点的框，所以不该用节点的颜色。
+
+    踩过的坑：区域边框原来是 `LEVELS[level]["stroke"]`（`ink`，近黑），和节点框
+    一模一样，再加上样式轴把两者都设成虚线时，区域边框和连线在视觉上就分不开了 ——
+    用户看到"三根线只到两个箭头"，其中两根其实是相邻两个区域的边框。
+
+    判据：区域是**背景**，它的框只该表示"到这儿为止"，不该和前景抢。所以往画布
+    方向退一半多，让它明确落在"背景层"那一档。
+    """
+    return _mix(CANVAS["background"], LEVELS[level]["stroke"], 1.0 - FRAME_MIX)
+
+
 def roundness_of(style: dict, shape_default: dict | None) -> dict | None:
     """圆角给 Excalidraw 的 roundness 对象，直角给 None（不是 type 0）。
 

@@ -149,7 +149,11 @@ WRAP_MIN_ASPECT = 0.45
 WRAP_MAX_ASPECT = 4.5
 # 段与段之间的空档。与 rankSeparation 同量级（120）但它们是两件事：
 # 段内是"层与层的距离"，段间是"两块图之间的空白"，后者要更明显才看得出是折过来的。
-WRAP_SEGMENT_GAP = 150.0
+WRAP_SEGMENT_GAP = 220.0
+# 跨栏车道之间的间距。实测踩过：两条跨栏边（`disposable→finishRefresh` 与
+# `disposable→failure`）拿到同一个空档 x，**精确重叠**画成了同一条线 ——
+# 看上去是"一根线"，其实是两根。现在按用过的次数依次错开。
+WRAP_LANE_STEP = 34.0
 # 主轴超过这么长才考虑折。**比例分不出"三个节点排一行"和"十三个节点排一行"** ——
 # 两者都是 13:1，但前者是一张小图（一屏放得下），后者才是真长条。
 # 少了这条，几张测试用的小图都会被折，几何也跟着变得莫名其妙。
@@ -2420,6 +2424,7 @@ def layout(spec: dict, boxes: dict[str, Box],
         placed, routed = plain_table, plain_routed
     # 折段之后，两端落在不同段的连线改走空档 —— 直连会横穿两栏。
     if coords.bands:
+        lane_uses: dict[float, int] = {}
         for e in routed:
             sa = coords.segments.get(placed[e["from"]].rank) if e["from"] in placed else None
             sb = coords.segments.get(placed[e["to"]].rank) if e["to"] in placed else None
@@ -2439,8 +2444,15 @@ def layout(spec: dict, boxes: dict[str, Box],
                 far = max(q.x + q.width for q in peers) + 30.0
                 near = min(q.x for q in peers) - 30.0
                 lane = far if pb.x >= pa.x else near
-            e["points"] = wrap_route(pa, placed[e["to"]], coords.bands[min(sa, sb)],
-                                     lane, direction)
+            band = coords.bands[min(sa, sb)]
+            # **分车道**：同一个空档里已经走过 n 条边，就往外让 n 个步长 ——
+            # 否则两条边会精确重叠，图上看起来是一根线（实测踩过）。
+            used = lane_uses.get(band, 0)
+            lane_uses[band] = used + 1
+            # **对称往两边散**（-1、+1、-2、+2…），不是一路往右挤 ——
+            # 空档本来就夹在左右两块之间，只往一边让会把后面那条挤到右边那块身上去。
+            offset = WRAP_LANE_STEP * (used // 2 + 1) * (-1 if used % 2 == 0 else 1)
+            e["points"] = wrap_route(pa, placed[e["to"]], band + offset, lane, direction)
 
     return LayoutResult(direction=direction, params=p, ranks=ranks, order=order,
                         placed=placed, edges=routed, crossings=crossings,

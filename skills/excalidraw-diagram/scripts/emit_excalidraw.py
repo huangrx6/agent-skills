@@ -282,7 +282,7 @@ def shape_elements(element_id: str, shape_name: str, placed,
                   roughness=roughness)]
 
 
-REGION_STROKE_WIDTH = 1.0
+REGION_STROKE_WIDTH = 0.75       # 比节点细：区域是背景层（见 palette.frame_stroke）
 REGION_LABEL_SIZE = 20.0
 
 
@@ -304,7 +304,7 @@ def region_elements(region: dict, style: dict | None = None) -> list[dict]:
     if level not in palette.LEVELS:
         raise ValueError(f"区域 {region['id']!r} 的 level 不认识：{level!r}"
                          f"（可用 {sorted(palette.LEVELS)}；未知值判失败，不 fallback）")
-    stroke = palette.LEVELS[level]["stroke"]
+    stroke = palette.frame_stroke(level)      # 退到背景层的颜色，不再和连线撞脸
     fill = palette.LEVELS[level]["fill"]
     resolved = palette.resolve_style(style)
     el_id = _eid("region", region["id"])
@@ -325,7 +325,8 @@ def region_elements(region: dict, style: dict | None = None) -> list[dict]:
         label_id = _eid("region-label", region["id"])
         elements.append({
             **_base(label_id, "text", region["label_x"] - width / 2.0,
-                   region["label_y"], width, height, stroke, "transparent",
+                   region["label_y"], width, height,
+                   palette.LEVELS[level]["stroke"], "transparent",
                    extra={"groupIds": [el_id]}),
             "text": text,
             "fontSize": REGION_LABEL_SIZE,
