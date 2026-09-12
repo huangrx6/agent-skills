@@ -43,10 +43,10 @@ description: >-
 | `architecture` | 有向、近似无环 | 分层（简化 Sugiyama） | `LR` |
 | `flow` / `state` | 有向、可能有环 | 分层 + 环回边特殊处理 | `TB` |
 | `dependency` | 有向、层级明显 | 分层 | `LR` |
-| `mindmap` | 中心辐射 | **暂用分层**（径向／树形尚未实现） | `LR` |
+| `mindmap` | 中心辐射 | 径向（同心环，子树按叶子数分扇区） | 不适用 |
 | `network` | 网状、无明显层级 | **暂用分层**（力导向尚未实现） | `LR` |
 
-**能力边界：只有分层一种布局算法，上表所有类型都走它** —— 思维导图/网状图不是中心辐射/力导向。
+**能力边界：两种布局算法 —— 分层（Sugiyama）与径向（同心环）；力导向尚未实现。** 网状图走分层、不是力导向。
 
 **判断类型是你的活；判断完之后的计算全是脚本的活。** 类型拿不准时问用户，不要混着套。
 
@@ -89,7 +89,7 @@ layout(参数) → 校验 ──通过──→ 输出
 python3 scripts/emit_excalidraw.py x.diagram.json     # 出图：串起整条流水线，写 .excalidraw
 python3 scripts/open_excalidraw_com.py x.excalidraw   # 在 excalidraw.com 官网上打开它、接着手改
 python3 scripts/validate_spec.py x.diagram.json       # 只校验规格（封闭字段集）
-python3 scripts/layout.py x.diagram.json --explain    # 只算布局：分层与层内顺序、坐标、交叉数
+python3 scripts/layout.py x.diagram.json --explain    # 只算布局：用的哪个算法、层/环内顺序、坐标、交叉数
 python3 scripts/check_layout.py x.diagram.json        # 只跑校验 + 调参报告
 python3 scripts/text_metrics.py "节点标题"            # 看文字 → 容器尺寸的实际推算
 python3 scripts/palette.py                            # 打印色板与 kind 取值

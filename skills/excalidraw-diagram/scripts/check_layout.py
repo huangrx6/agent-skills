@@ -96,6 +96,10 @@ CHECK_LABEL = {
     "text": "文字溢出",
     "palette": "颜色越界",
     "crossing": "边交叉数",
+    # 加这条检查的时候漏了这张表 —— 结果**报告里一出现"穿节点"就崩**（KeyError）。
+    # 平时看不见，因为报告只在有问题时打印。现在由用例钉住两张表一致
+    # （TestEveryCheckHasALabel），加检查时忘不了。
+    "through": "连线穿节点",
 }
 # 报告里用的中文说法。**参数名不许出现在报告里** —— 一旦报告写"建议调大某某"，
 # 参数选择权就又回到模型手上了（validation.md 第二节）。
@@ -168,10 +172,11 @@ def _aabb_gap(a: PlacedT, b: PlacedT) -> float:
 
     用**间隙**而不是前作那种"容忍 4px 重叠"：两个框相距 2px 在视觉上就已经糊在一起，
     而重叠检测不会报。
+
+    实现只有一份，在 `layout.aabb_gap` —— 径向布局的半径外推也要量同一个间隙。
+    两处各写一份的话就是第二个漂移点：径向按 A 松开、校验按 B 报错，会来回打架。
     """
-    gap_x = max(b.x - (a.x + a.width), a.x - (b.x + b.width), 0.0)
-    gap_y = max(b.y - (a.y + a.height), a.y - (b.y + b.height), 0.0)
-    return math.hypot(gap_x, gap_y)
+    return L.aabb_gap(a, b)
 
 
 def check_gaps(result: ResultT) -> list[Issue]:

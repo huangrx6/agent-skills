@@ -599,3 +599,39 @@ class TestCli(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+class TestEveryCheckHasALabel(unittest.TestCase):
+    """每条检查都必须有中文标签 —— 否则**报告一打印就崩**。
+
+    "through" 那条就这么漏过：加检查的时候没同步 CHECK_LABEL，而报告只在
+    有问题时才打印，所以一直没被发现，直到径向布局第一次让"穿节点"进了报告。
+    """
+
+    def test_labels_cover_every_check(self):
+        # 跑一遍六张 fixture，收集真实产生过的检查名
+        specs = os.path.join(HERE, "fixtures", "specs")
+        seen = set()
+        for name in sorted(os.listdir(specs)):
+            with open(os.path.join(specs, name), encoding="utf-8") as handle:
+                spec = json.load(handle)
+            result = L.layout(spec, L.boxes_from_spec(spec))
+            outcome = C.check(spec, result, L.boxes_from_spec(spec))
+            # check() 返回 Outcome，不是列表 —— 列出来的东西在 .issues 里
+            seen.update(i.check for i in outcome.issues)
+        self.assertTrue(seen, "一条检查都没跑到，这个用例就成了空话")
+        missing = seen - set(C.CHECK_LABEL)
+        self.assertEqual(set(), missing, f"这些检查没有中文标签：{sorted(missing)}")
+
+    def test_labels_have_no_orphans(self):
+        # 反过来也要成立：表里不该有已经不存在的检查
+        seen = set(C.STOP_ON) | set(C.TUNABLE) | {"through"}
+        self.assertEqual(set(), set(C.CHECK_LABEL) - seen,
+                         "CHECK_LABEL 里有已经不存在（或已改名）的检查")
+
+    def test_every_issue_can_render_its_line(self):
+        # 直接调 line()：这正是崩掉的那一处
+        for check in sorted(C.CHECK_LABEL):
+            with self.subTest(check=check):
+                issue = C.Issue(check, True, "x", "细节")
+                self.assertIn(C.CHECK_LABEL[check], issue.line())
+

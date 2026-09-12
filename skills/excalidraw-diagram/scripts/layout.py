@@ -109,6 +109,21 @@ DETOUR_MAX_OFFSET = 280.0
 # 最多几轮。一轮解决一处，多轮是给“推完之后又撞上别的”留的余地。
 DETOUR_ROUNDS = 6
 
+# ── 径向布局：思维导图（#94）──────────────────────────────────
+#
+# 思维导图要的是**同心环**（根在中心、按深度铺在环上），不是把分层布局转 90° ——
+# 后者出来是一棵树被压扁，而不是"中心辐射"。
+#
+# 三件事要算对，缺一个就不像：
+#   1. **扇区**：每个子树占一段连续角度，按**叶子数**分配 —— 否则一边挤一边空
+#   2. **半径**：逐环外推，且必须让**同环相邻节点**不重叠（角度间距 × 半径 ≥ 两者半宽 + 间隙）
+#   3. **端点**：连线是朝外的辐条，走两个节点中心之间的直线并裁到盒子边上 ——
+#      分层那套"按四个边贴点"的规则在这里不成立
+RING_GAP = 46.0            # 环与环之间的净空
+RADIAL_REFINE_STEPS = 60   # 半径外推的迭代上界：正常 2~4 轮收敛；这是护栏不是预算
+RADIAL_MIN_PUSH = 2.0      # 每轮至少往外让这么多，保证迭代一定在推进
+RADIAL_GAP = 34.0          # 同环相邻节点之间的净空
+
 # ── 折段：主轴太长时把它折成几段并排（P7）─────────────────────
 #
 # 为什么需要：`02-flow` 是一条 13 节点的链，主轴必然很长、交叉轴必然很空 ——
@@ -579,6 +594,371 @@ def apply_cross_axis_pins(order: dict[int, list[str]], ranks: dict[str, int],
 
 
 # ── 阶段三：坐标分配 ────────────────────────────────────────
+def aabb_gap(a: Any, b: Any) -> float:
+    """两个包围盒之间的最短距离（重叠时为 0）。
+
+    **间隙的唯一实现**：check_layout 的间隙校验和径向布局的自动外推都用它。
+    两处各写一份的话就是第二个漂移点 —— 这个项目已经吃过几次这个亏。
+    """
+    gap_x = max(b.x - (a.x + a.width), a.x - (b.x + b.width), 0.0)
+    gap_y = max(b.y - (a.y + a.height), a.y - (b.y + b.height), 0.0)
+    return math.hypot(gap_x, gap_y)
+
+
+def _aabb_deficit(a: Any, b: Any, want: float) -> float:
+    """离 want 还差多少；**重叠时连渗入深度一起算**。
+
+    这样外推一次就够，而不是每轮只挪 12px（上界只有 60 轮，慢慢挪会用完）。
+    """
+    dx = max(b.x - (a.x + a.width), a.x - (b.x + b.width))
+    dy = max(b.y - (a.y + a.height), a.y - (b.y + b.height))
+    if dx >= 0 and dy >= 0:
+        return max(0.0, want - math.hypot(dx, dy))
+    if dx < 0 and dy < 0:
+        return want + min(-dx, -dy)      # 两轴都相交：最短分离平移
+    return want - max(dx, dy, 0.0)
+
+
+def _radial_extent(box: Any, theta: float) -> float:
+    """盒子在**半径方向**（角度 theta）上的半宽。"""
+    return ((box.width / 2.0) * abs(math.cos(theta))
+            + (box.height / 2.0) * abs(math.sin(theta)))
+
+
+def _tangential_extent(box: Any, theta: float) -> float:
+    """盒子在**切向**上的半宽。"""
+    return ((box.width / 2.0) * abs(math.sin(theta))
+            + (box.height / 2.0) * abs(math.cos(theta)))
+
+
+def _angular_distance(first: float, second: float) -> float:
+    delta = abs(first - second) % (2 * math.pi)
+    return min(delta, 2 * math.pi - delta)
+
+
+def _nearest_by_angle(node: str, members: list[str], angle: dict[str, float],
+                      count: int = 2) -> list[str]:
+    """角度上离 node 最近的若干个（跨环比较用）。
+
+    不取全局最大：内环节点一多，"最宽的那个"会把整圈撑得毫无必要地大。
+    取最近的几个（通常是它的父节点）才是有意义的那对。
+    """
+    return sorted(members, key=lambda m: _angular_distance(
+        angle.get(m, 0.0), angle.get(node, 0.0)))[:count]
+
+
+def _seed_radii(rings: dict[int, list[str]], angle: dict[str, float],
+                boxes: dict[str, Any]) -> dict[int, float]:
+    """半径初值：按**方向感知**的支撑值，不是 height/2。
+
+    第一版拿 height/2 当"半径方向的半宽"，于是 150×50 的盒子在 -150° 方向上
+    真实半宽 77px、公式只算 25px —— 两环的框直接叠上（实测间隙 0px）。
+    轴对齐的盒子在半径方向上的半宽是 (w/2)|cosθ| + (h/2)|sinθ|。
+    """
+    radius: dict[int, float] = {}
+    for index in sorted(rings):
+        members = rings[index]
+        if index == 0:
+            radius[0] = 0.0
+            continue
+        inner_radius = radius.get(index - 1, 0.0)
+        inner = rings.get(index - 1, [])
+        need = inner_radius + RING_GAP
+        for n in members:
+            theta = angle.get(n, 0.0)
+            extent = _radial_extent(boxes[n], theta)
+            for m in _nearest_by_angle(n, inner, angle):
+                need = max(need, inner_radius
+                           + _radial_extent(boxes[m], angle.get(m, 0.0))
+                           + extent + RING_GAP)
+        if len(members) == 1:
+            need = max(need, _tangential_extent(
+                boxes[members[0]], angle.get(members[0], 0.0)) + RADIAL_GAP)
+        else:
+            # 同环相邻：角度差 × 半径 ≥ 切向半宽和 + 间隙
+            for i, n in enumerate(members):
+                other = members[(i + 1) % len(members)]
+                delta = _angular_distance(angle.get(n, 0.0), angle.get(other, 0.0))
+                delta = delta if delta > 1e-9 else 2 * math.pi
+                span = (_tangential_extent(boxes[n], angle.get(n, 0.0))
+                        + _tangential_extent(boxes[other], angle.get(other, 0.0)))
+                need = max(need, (span + RADIAL_GAP) / delta)
+        radius[index] = need
+    return radius
+
+
+def _place_rings(rings: dict[int, list[str]], angle: dict[str, float],
+                 radius: dict[int, float], boxes: dict[str, Any]) -> dict[str, Any]:
+    """把每环的节点摆到自己的圆上（位置是**中心**在 (r cosθ, r sinθ)）。"""
+    placed: dict[str, Any] = {}
+    for index in sorted(rings):
+        r = radius.get(index, 0.0)
+        for n in rings[index]:
+            theta = angle.get(n, 0.0)
+            box = boxes[n]
+            placed[n] = Placed(id=n,
+                               x=round(r * math.cos(theta) - box.width / 2.0, 2),
+                               y=round(r * math.sin(theta) - box.height / 2.0, 2),
+                               width=box.width, height=box.height, rank=index)
+    return placed
+
+
+def _ring_deficit(placed: dict[str, Any], ring_of: dict[str, int],
+                  want: float) -> tuple[int | None, float, str, str]:
+    """所有节点对里最严重的一处"离 want 还差多少"。"""
+    worst_ring, worst_missing, worst_pair = None, 0.0, ("", "")
+    ids = sorted(placed)
+    for position, a_id in enumerate(ids):
+        for b_id in ids[position + 1:]:
+            missing = _aabb_deficit(placed[a_id], placed[b_id], want)
+            if missing > worst_missing:
+                worst_missing = missing
+                worst_ring = max(ring_of[a_id], ring_of[b_id])
+                worst_pair = (a_id, b_id)
+    return worst_ring, worst_missing, worst_pair[0], worst_pair[1]
+
+
+def _refine_radii(rings: dict[int, list[str]], angle: dict[str, float],
+                  boxes: dict[str, Any]) -> tuple[dict[str, Any], dict[int, float]]:
+    """半径定稿：**摆出来量真实间隙，不够就往外推**。
+
+    初值公式再怎么修都是近似（盒子的占位随角度变、同环两个宽盒子彼此挤压），
+    所以最终值由"量"决定，不由公式决定 —— 和折段那次"空档位置从摆好的坐标实测"
+    是同一条原则。推的是**这一环连同它外面的所有环**，相对间距保持不变。
+
+    60 轮还没收敛就不收敛了：交出去的图会带着真实的间隙问题，由间隙校验报阻塞项、
+    进而拒绝出图 —— 布局层不替校验层兜底，也不假装成功。
+    """
+    radius = _seed_radii(rings, angle, boxes)
+    ring_of = {n: index for index, members in rings.items() for n in members}
+    want = NODE_CLEARANCE + 1.0
+    placed = _place_rings(rings, angle, radius, boxes)
+    for _ in range(RADIAL_REFINE_STEPS):
+        hit, missing, first, second = _ring_deficit(placed, ring_of, want)
+        if hit is None:
+            return placed, radius
+        if ring_of[first] == ring_of[second]:
+            # 同环：往外推能拉开弧长，但增益是角度差倍数 → 按角度差放大
+            delta = max(_angular_distance(angle.get(first, 0.0),
+                                          angle.get(second, 0.0)), 0.05)
+            push = max(missing / delta, RADIAL_MIN_PUSH)
+        else:
+            push = max(missing, RADIAL_MIN_PUSH)
+        for index in list(radius):
+            if index >= hit:
+                radius[index] += push
+        placed = _place_rings(rings, angle, radius, boxes)
+    return placed, radius
+
+
+def radial_tree(node_ids: list[str], edges: list[dict]) -> tuple[str, dict[str, int], dict[str, list[str]]]:
+    """把图取成一棵树：返回 (根, 深度, 孩子表)。
+
+    取根的顺序：**入度为 0 → 扇出最大 → 输入顺序**。都在输入里出现过并列的情况，
+    所以三级都要有，结果才是确定的（同一份规格永远出同一张图）。
+    有多条入边的节点按 BFS 先到先得，多余的边**仍然会被画出来**（只是不参与定位）——
+    思维导图本来就可能有交叉引用。
+    """
+    children: dict[str, list[str]] = {n: [] for n in node_ids}
+    indegree = {n: 0 for n in node_ids}
+    outdegree = {n: 0 for n in node_ids}
+    for edge in edges:
+        a, b = edge["from"], edge["to"]
+        if a in children and b in indegree and a != b:
+            outdegree[a] += 1
+            indegree[b] += 1
+    roots = [n for n in node_ids if indegree[n] == 0] or list(node_ids)
+    root = max(roots, key=lambda n: (outdegree[n], -node_ids.index(n)))
+
+    depth = {root: 0}
+    queue = [root]
+    seen = {root}
+    while queue:
+        current = queue.pop(0)
+        for edge in edges:
+            if edge["from"] != current:
+                continue
+            child = edge["to"]
+            if child in seen or child not in children:
+                continue
+            seen.add(child)
+            children[current].append(child)
+            depth[child] = depth[current] + 1
+            queue.append(child)
+    # 断开的节点（不在任何边里）挂在根下面，深度 1 —— 丢了它们等于丢内容
+    for n in node_ids:
+        if n not in depth:
+            depth[n] = 1
+            children[root].append(n)
+    return root, depth, children
+
+
+def _leaf_count(node: str, children: dict[str, list[str]],
+                cache: dict[str, int]) -> int:
+    if node not in cache:
+        kids = children.get(node, [])
+        cache[node] = 1 if not kids else sum(
+            _leaf_count(k, children, cache) for k in kids)
+    return cache[node]
+
+
+def radial_layout(node_ids: list[str], boxes: dict[str, Any],
+                  edges: list[dict]) -> tuple[dict[str, Any], dict[str, int], dict[int, list[str]]]:
+    """同心环布局。返回 (placed, depth, 环上的顺序)。"""
+    root, depth, children = radial_tree(node_ids, edges)
+    live = [n for n in node_ids if n in boxes]
+    if not live:
+        return {}, {}, {}
+
+    leaves: dict[str, int] = {}
+    for n in live:
+        _leaf_count(n, children, leaves)
+
+    # ── 扇区：根占整圆，孩子按叶子数切 ──
+    sector: dict[str, tuple[float, float]] = {root: (-math.pi, math.pi)}
+    for n in _breadth_first(root, children):
+        kids = [k for k in children.get(n, []) if k in leaves]
+        if not kids:
+            continue
+        low, high = sector[n]
+        total = sum(leaves[k] for k in kids) or 1
+        cursor = low
+        for k in kids:
+            share = (high - low) * leaves[k] / total
+            sector[k] = (cursor, cursor + share)
+            cursor += share
+
+    angle = {n: sum(sector[n]) / 2.0 for n in sector}
+
+    # ── 环：按深度分组，组内按角度排序 ──
+    rings: dict[int, list[str]] = {}
+    for n in live:
+        rings.setdefault(depth.get(n, 0), []).append(n)
+    for members in rings.values():
+        members.sort(key=lambda n: angle.get(n, 0.0))
+
+    # ── 半径：初值按方向感知的支撑值，**最终值由摆出来量决定** ──
+    placed, radius = _refine_radii(rings, angle, boxes)
+
+    order = {index: list(members) for index, members in rings.items()}
+    return placed, depth, order
+
+
+def _breadth_first(root: str, children: dict[str, list[str]]) -> list[str]:
+    """自根向下逐层访问（父一定排在子前面）。"""
+    out: list[str] = []
+    queue = [root]
+    seen = {root}
+    while queue:
+        node = queue.pop(0)
+        out.append(node)
+        for child in children.get(node, []):
+            if child not in seen:
+                seen.add(child)
+                queue.append(child)
+    return out
+
+
+def radial_edges(node_ids: list[str], edges: list[dict],
+                 placed: dict[str, Any]) -> list[dict]:
+    """径向的连线：两个节点中心之间的直线，裁到盒子边上。
+
+    分层那套"按 LR/TB 的四个边贴点"在这里不成立 —— 径向的线是**朝外的辐条**，
+    方向取决于两个节点在环上的相对位置，不是固定的上下左右。
+
+    **试过又退掉的方案**：交叉引用（非树边）绕外圈走弧。当时理由是长弦会穿过圆心
+    附近的节点；实测确实如此（3 条边各穿 2 个节点），但那是**软项、不阻塞出图** ——
+    而绕外圈付出的代价更大：所有交叉引用被推到最外环之外，几条弧合并成一圈看起来
+    像"容器边界"的多边形，读者会以为画里有个框；从同一节点收进来的几条还会长距离
+    收敛成一个尖。**穿节点是软项，围栏是结构误读** —— 后者更糟。退回直线，穿节点
+    如实报在软项里，由人决定要不要改内容。
+    """
+    out: list[dict] = []
+    for index, edge in enumerate(edges):
+        a, b = edge.get("from"), edge.get("to")
+        if a not in placed or b not in placed:
+            continue
+        start, end = _clip_to_boxes(placed[a], placed[b])
+        points = avoid_nodes([start, end], placed, {a, b})
+        out.append({"from": a, "to": b, "points": points, "reversed": False,
+                    "label": edge.get("label"), "kind": edge.get("kind"),
+                    "origin": index})
+    return out
+
+
+def _clip_to_boxes(a: Any, b: Any) -> tuple[list[float], list[float]]:
+    """把中心连线裁到两个盒子的边界上（各取中心出发、朝对方那一侧的交点）。"""
+    ax, ay = a.x + a.width / 2.0, a.y + a.height / 2.0
+    bx, by = b.x + b.width / 2.0, b.y + b.height / 2.0
+    return (_edge_point(a, ax, ay, bx, by), _edge_point(b, bx, by, ax, ay))
+
+
+def _edge_point(box: Any, cx: float, cy: float, tx: float, ty: float) -> list[float]:
+    """从盒心朝 (tx, ty) 射线，与盒子边界的交点。"""
+    dx, dy = tx - cx, ty - cy
+    if abs(dx) < 1e-9 and abs(dy) < 1e-9:
+        return [round(cx, 2), round(cy, 2)]
+    scale = math.inf
+    if abs(dx) > 1e-9:
+        scale = min(scale, (box.width / 2.0) / abs(dx))
+    if abs(dy) > 1e-9:
+        scale = min(scale, (box.height / 2.0) / abs(dy))
+    return [round(cx + dx * scale, 2), round(cy + dy * scale, 2)]
+
+
+def geometric_crossing_pairs(edges: list[dict]) -> list[list[int]]:
+    """**几何**交叉：哪些边对真的穿过了彼此（返回规格里的边序号）。
+
+    分层布局用的是组合定义（相邻层之间顺序倒置），那个定义要求"有层"；
+    径向没有层，所以这里换几何定义 —— 两者是两个不同的量，各自在各自的路径上
+    是有意义的那个。报的是同一栏数字，但定义写在各自的 docstring 里，不混用。
+
+    第一版按**线段对**计数，一条弧被折成 18 段就把它自己那一对边算成十几次，
+    于是"7 处交叉"变成"31 处"：同一对边最多记 1 次才对得上分层那个定义的口径。
+
+    与 `crossing_pairs` / `count_crossings` 保持同构：**定位与计数共用一份实现**，
+    这样报告里那句"必须给出交叉的是哪几条边"在径向的图上同样成立。
+    """
+    polylines: list[list] = []
+    origins: list[int] = []
+    for edge in edges:
+        origin = edge.get("origin")
+        if not isinstance(origin, int):
+            continue          # 没有来源序号的边不参与定位（两条路径都会填上）
+        polylines.append(edge.get("points") or [])
+        origins.append(origin)   # 与 polylines 同步追加，下标才对得上
+    pairs: list[list[int]] = []
+    for i in range(len(polylines)):
+        for j in range(i + 1, len(polylines)):
+            if _polylines_cross(polylines[i], polylines[j]):
+                pairs.append([origins[i], origins[j]])
+    return pairs
+
+
+
+def _polylines_cross(first: list, second: list) -> bool:
+    """两条折线是否**真正穿过**彼此（端点相碰不算）。"""
+    for a, b in zip(first, first[1:]):
+        for c, d in zip(second, second[1:]):
+            if _segments_intersect(a, b, c, d):
+                return True
+    return False
+
+
+def _segments_intersect(p1, p2, p3, p4) -> bool:
+    """严格相交：四条叉积**同号反转**才算。
+
+    用"严格"，是为了让**端点相碰不算交叉** —— 从同一个节点出发的两条弧会共享
+    同一个外侧出发点（坐标完全一样），宽松判据会把它们记成交叉。
+    """
+    def cross(o, a, b) -> float:
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    d1, d2 = cross(p3, p4, p1), cross(p3, p4, p2)
+    d3, d4 = cross(p1, p2, p3), cross(p1, p2, p4)
+    return d1 * d2 < 0 and d3 * d4 < 0
+
+
 @dataclass(frozen=True)
 class Coords:
     """坐标 + **折段的划分**。
@@ -1008,6 +1388,20 @@ def layout(spec: dict, boxes: dict[str, Box],
               "kind": e.get("kind")} for e in (spec.get("edges") or [])]
     pins = {n["id"]: n["pin"] for n in nodes if n.get("pin")}
     explicit = {n["id"]: n["rank"] for n in nodes if n.get("rank") is not None}
+
+    # ── 策略分发：思维导图走**径向**（中心辐射），其余走分层 ──
+    # 放在这里、在任何分层计算之前：径向不需要 rank / dummy / 层内排序那一整套，
+    # 但**共用**边路径的绕行与所有几何校验（它们只看坐标，与布局方式无关）。
+    if str(spec_type or "") == "mindmap" and len(node_ids) >= 2:
+        placed, depth, order = radial_layout(node_ids, boxes, edges)
+        if placed:
+            routed = radial_edges(node_ids, edges, placed)
+            crossings = geometric_crossing_pairs(routed)
+            return LayoutResult(
+                direction="RADIAL", params=p, ranks=depth, order=order,
+                placed=placed, edges=routed,
+                crossings=len(crossings), crossing_origins=crossings,
+                dummy_count=0, reversed_edges=[], pin_conflicts=[])
 
     dag, reversed_edges = break_cycles(node_ids, edges)
     ranks = assign_ranks(node_ids, dag, explicit)
