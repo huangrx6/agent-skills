@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import random
 import subprocess
 import sys
 import unittest
@@ -476,3 +477,52 @@ class TestWrapLongChains(unittest.TestCase):
             hits = L.nodes_hit_by_polyline(e["points"], result.placed,
                                            {e["from"], e["to"]})
             self.assertEqual(hits, [], f"{e['from']} → {e['to']} 穿过了 {hits}")
+
+
+class TestFastRejectChangesNothing(unittest.TestCase):
+    """加速用的**精确否定**必须不改变结果。
+
+    `_segment_hits_box` 前面加了一步 slab 法排除（一条 900px 的弦原本要采 452 个点）。
+    它唯一的正确性依据是这条不变量：**线段与矩形不相交 ⇒ 线段上任何采样点都不在矩形内**。
+    不成立的话，绕行、校验、fixture 基线会一起漂 —— 而且是"同一件几何给出两个答案"
+    那种最难查的漂法。
+
+    所以这里拿一个**采样版参照实现**逐例比对：随机撒 2000 组线段/盒子（含 pad），
+    断言加速版与参照版**逐例相同**。参照实现故意写在测试里、不放进 layout ——
+    它代表的是"改动前的行为"，不是第二个权威口径。
+    """
+
+    @staticmethod
+    def _sampling_only(a, b, box, pad):
+        left, top = box.x - pad, box.y - pad
+        right, bottom = box.x + box.width + pad, box.y + box.height + pad
+        return any(left <= x <= right and top <= y <= bottom
+                   for x, y in L._sample_points(a, b))
+
+    def test_same_answer_as_sampling_only(self):
+        rng = random.Random(20260101)      # 固定种子：失败可复现
+        rejected = 0
+        for index in range(2000):
+            box = L.Placed(id="box", x=rng.uniform(-200, 200),
+                           y=rng.uniform(-200, 200), width=rng.uniform(10, 200),
+                           height=rng.uniform(10, 120), rank=0)
+            a = [rng.uniform(-320, 320), rng.uniform(-320, 320)]
+            b = [rng.uniform(-320, 320), rng.uniform(-320, 320)]
+            pad = rng.choice([0.0, 12.0])
+            if not L._segment_may_hit_box(a, b, box, pad):
+                rejected += 1
+            with self.subTest(case=index, pad=pad):
+                self.assertEqual(self._sampling_only(a, b, box, pad),
+                                 L._segment_hits_box(a, b, box, pad))
+        # 反向保险：一条都没否掉的话，上面那条用例就成了空话（加速也没发生）
+        self.assertGreater(rejected, 100, f"只否掉了 {rejected} 例，加速没起作用")
+
+    def test_reject_is_exact_not_approximate(self):
+        """两个方向各钉一个确定答案 —— 免得用例只在随机例子上自洽。"""
+        box = L.Placed(id="box", x=0, y=0, width=50, height=50, rank=0)
+        self.assertFalse(L._segment_may_hit_box([200, 200], [300, 300], box))
+        self.assertFalse(L._segment_may_hit_box([60, 25], [90, 25], box))
+        self.assertTrue(L._segment_may_hit_box([-10, 25], [60, 25], box))
+        self.assertTrue(L._segment_may_hit_box([25, -5], [25, 55], box))
+        # 贴着盒子外沿擦过：不相交，但也不许误判成交叉
+        self.assertFalse(L._segment_may_hit_box([-50, 50.001], [100, 50.001], box))

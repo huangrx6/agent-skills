@@ -122,6 +122,7 @@ DETOUR_ROUNDS = 6
 RING_GAP = 46.0            # 环与环之间的净空
 RADIAL_REFINE_STEPS = 60   # 半径外推的迭代上界：正常 2~4 轮收敛；这是护栏不是预算
 RADIAL_MIN_PUSH = 2.0      # 每轮至少往外让这么多，保证迭代一定在推进
+RING_ORDER_ROUNDS = 4      # 环内重排的交换轮数上界：一轮全试一遍，没改进就停
 RADIAL_GAP = 34.0          # 同环相邻节点之间的净空
 
 # ── 折段：主轴太长时把它折成几段并排（P7）─────────────────────
@@ -802,46 +803,156 @@ def _leaf_count(node: str, children: dict[str, list[str]],
     return cache[node]
 
 
+def _assign_sectors(root: str, order: dict[str, list[str]],
+                    leaves: dict[str, int]) -> dict[str, tuple[float, float]]:
+    """扇区：根占整圆，每个父节点的孩子按**叶子数**切分它的扇区。
+
+    切分顺序由 `order` 决定 —— 重排就是换这个顺序（见 _search_sibling_order）。
+    """
+    sector: dict[str, tuple[float, float]] = {root: (-math.pi, math.pi)}
+    for node in _breadth_first(root, order):
+        kids = [k for k in order.get(node, []) if k in leaves]
+        if not kids:
+            continue
+        low, high = sector[node]
+        total = sum(leaves[k] for k in kids) or 1
+        cursor = low
+        for kid in kids:
+            share = (high - low) * leaves[kid] / total
+            sector[kid] = (cursor, cursor + share)
+            cursor += share
+    return sector
+
+
+def _rings_of(live: list[str], depth: dict[str, int],
+              angle: dict[str, float]) -> dict[int, list[str]]:
+    """按深度分环，环内按角度排序（角度是从扇区切出来的，所以这就是环上顺序）。"""
+    rings: dict[int, list[str]] = {}
+    for node in live:
+        rings.setdefault(depth.get(node, 0), []).append(node)
+    for members in rings.values():
+        members.sort(key=lambda node: angle.get(node, 0.0))
+    return rings
+
+
+def _edge_cost(placed: dict[str, Any], routed: list[dict]) -> tuple[int, int]:
+    """真指标：(穿节点数, 交叉数)。
+
+    穿节点用的是 `check_layout` 那条检查**同一个原语**（`nodes_hit_by_polyline`，
+    排除自己的两端），所以这里量的和报告里写的、以及 fixture 基线记的是同一个数。
+
+    交叉用的是**几何定义** —— 径向报的就是它。分层报的是组合定义（相邻层顺序倒置），
+    两者是不同的量（见 `geometric_crossing_pairs` 的说明），所以这个函数只用来做
+    径向的取舍，不拿去和分层的交叉数比。
+    """
+    through = 0
+    for edge in routed:
+        through += len(nodes_hit_by_polyline(
+            edge["points"], placed, {edge["from"], edge["to"]}))
+    return through, len(geometric_crossing_pairs(routed))
+
+
+def _search_sibling_order(root: str, children: dict[str, list[str]],
+                          leaves: dict[str, int], boxes: dict[str, Any],
+                          depth: dict[str, int], live: list[str],
+                          edges: list[dict]) -> tuple[dict[str, list[str]], tuple[int, int]]:
+    """在**扇区槽位**之间重排兄弟节点，降低穿节点/交叉。返回 (顺序, 代理代价)。
+
+    对齐分层的 `order_layers`：那边在层内重排（barycenter + 保留最优），这边在
+    扇区槽位之间重排。差别在**粒度** —— 分层的节点彼此独立；径向的槽位属于**子树**，
+    排一个兄弟会把它的整棵子树带着走（后代的角度是从父节点的扇区递归切出来的），
+    所以重排的单位是子树，不是单个节点。
+
+    目标按**字典序**：(穿节点数, 交叉数)。不混成加权和 —— 穿节点是遮挡（内容被压住
+    读不出来），交叉只是多一根线，两者不是一回事，加权和会把取舍藏进系数里。
+
+    用**便宜代理**（初值半径 + 直裁线，实测 0.06ms）而不是完整摆放（35ms，几乎全花在
+    `avoid_nodes` 上）—— 几十个候选就是几秒。代理会**高估**穿节点（它没有绕行能力），
+    所以它只负责提名；采纳前用真指标复核，见 `radial_layout`。
+    """
+    order = {node: list(kids) for node, kids in children.items()}
+
+    def cost(candidate: dict[str, list[str]]) -> tuple[int, int]:
+        sector = _assign_sectors(root, candidate, leaves)
+        angle = {node: sum(bounds) / 2.0 for node, bounds in sector.items()}
+        rings = _rings_of(live, depth, angle)
+        placed = _place_rings(rings, angle, _seed_radii(rings, angle, boxes), boxes)
+        lines: list[dict] = []
+        for index, edge in enumerate(edges):
+            a, b = edge.get("from"), edge.get("to")
+            if a not in placed or b not in placed:
+                continue
+            lines.append({"from": a, "to": b, "origin": index,
+                          "points": list(_clip_to_boxes(placed[a], placed[b]))})
+        return _edge_cost(placed, lines)
+
+    best = cost(order)
+    for _ in range(RING_ORDER_ROUNDS):
+        improved = False
+        for node in _breadth_first(root, children):
+            siblings = order.get(node, [])
+            for i in range(len(siblings)):
+                for j in range(i + 1, len(siblings)):
+                    trial = {key: list(value) for key, value in order.items()}
+                    trial[node][i], trial[node][j] = trial[node][j], trial[node][i]
+                    candidate = cost(trial)
+                    if candidate < best:
+                        best, order, improved = candidate, trial, True
+        if not improved:
+            break
+    return order, best
+
+
+def _radial_pipeline(order: dict[str, list[str]], root: str,
+                     leaves: dict[str, int], boxes: dict[str, Any],
+                     depth: dict[str, int], live: list[str],
+                     edges: list[dict]) -> tuple[dict[str, Any], dict[int, list[str]], list[dict]]:
+    """一套完整摆放：扇区 → 环 → 半径外推 → 连线绕行。返回 (placed, rings, routed)。"""
+    sector = _assign_sectors(root, order, leaves)
+    angle = {node: sum(bounds) / 2.0 for node, bounds in sector.items()}
+    rings = _rings_of(live, depth, angle)
+    placed, _radius = _refine_radii(rings, angle, boxes)
+    return placed, rings, radial_edges(edges, placed)
+
+
 def radial_layout(node_ids: list[str], boxes: dict[str, Any],
-                  edges: list[dict]) -> tuple[dict[str, Any], dict[str, int], dict[int, list[str]]]:
-    """同心环布局。返回 (placed, depth, 环上的顺序)。"""
+                  edges: list[dict]) -> tuple[dict[str, Any], dict[str, int],
+                                             dict[int, list[str]], list[dict]]:
+    """同心环布局。返回 (placed, depth, 环上的顺序, 已绕行的连线)。
+
+    连线一起返回，是因为**绕行（`avoid_nodes`）占了整个函数 99% 的时间**（35ms 里
+    几乎全是它），而它对外面没有意义 —— 让调用方再绕一遍就是白花一倍。
+    """
     root, depth, children = radial_tree(node_ids, edges)
     live = [n for n in node_ids if n in boxes]
     if not live:
-        return {}, {}, {}
+        return {}, {}, {}, []
 
     leaves: dict[str, int] = {}
     for n in live:
         _leaf_count(n, children, leaves)
 
-    # ── 扇区：根占整圆，孩子按叶子数切 ──
-    sector: dict[str, tuple[float, float]] = {root: (-math.pi, math.pi)}
-    for n in _breadth_first(root, children):
-        kids = [k for k in children.get(n, []) if k in leaves]
-        if not kids:
-            continue
-        low, high = sector[n]
-        total = sum(leaves[k] for k in kids) or 1
-        cursor = low
-        for k in kids:
-            share = (high - low) * leaves[k] / total
-            sector[k] = (cursor, cursor + share)
-            cursor += share
-
-    angle = {n: sum(sector[n]) / 2.0 for n in sector}
-
-    # ── 环：按深度分组，组内按角度排序 ──
-    rings: dict[int, list[str]] = {}
-    for n in live:
-        rings.setdefault(depth.get(n, 0), []).append(n)
-    for members in rings.values():
-        members.sort(key=lambda n: angle.get(n, 0.0))
-
-    # ── 半径：初值按方向感知的支撑值，**最终值由摆出来量决定** ──
-    placed, radius = _refine_radii(rings, angle, boxes)
+    # ── 环上顺序：默认**用作者写的顺序**；只有真的被遮挡了才去搜别的排法 ──
+    #
+    # 环上的顺序同时也是**阅读顺序**（人按什么次序写节点，图上就按什么次序读）。
+    # 所以重排是有代价的，代价换来的必须是"遮挡变少" —— 只少一根交叉不值得把作者的
+    # 顺序打乱。这条还带来一个好处：**没遮挡的图根本不跑搜索**，快路径的成本和
+    # 没有环内排序时完全一样。
+    placed, rings, routed = _radial_pipeline(children, root, leaves, boxes,
+                                             depth, live, edges)
+    occlusions = _edge_cost(placed, routed)
+    if occlusions[0]:
+        searched, _proxy = _search_sibling_order(root, children, leaves, boxes,
+                                                 depth, live, edges)
+        if searched != children:
+            trial = _radial_pipeline(searched, root, leaves, boxes,
+                                     depth, live, edges)
+            # 代理只负责**提名**；采纳与否看真指标，而且只看主键（穿节点数）
+            if _edge_cost(trial[0], trial[2])[0] < occlusions[0]:
+                placed, rings, routed = trial
 
     order = {index: list(members) for index, members in rings.items()}
-    return placed, depth, order
+    return placed, depth, order, routed
 
 
 def _breadth_first(root: str, children: dict[str, list[str]]) -> list[str]:
@@ -859,8 +970,7 @@ def _breadth_first(root: str, children: dict[str, list[str]]) -> list[str]:
     return out
 
 
-def radial_edges(node_ids: list[str], edges: list[dict],
-                 placed: dict[str, Any]) -> list[dict]:
+def radial_edges(edges: list[dict], placed: dict[str, Any]) -> list[dict]:
     """径向的连线：两个节点中心之间的直线，裁到盒子边上。
 
     分层那套"按 LR/TB 的四个边贴点"在这里不成立 —— 径向的线是**朝外的辐条**，
@@ -1208,10 +1318,45 @@ def _sample_points(a: list[float], b: list[float], step: float = 2.0):
 
 def _segment_hits_box(a: list[float], b: list[float], p: Placed,
                       pad: float = 0.0) -> bool:
+    if not _segment_may_hit_box(a, b, p, pad):
+        return False            # 精确否定：这一步不改结果，只省掉几百个采样点
     left, top = p.x - pad, p.y - pad
     right, bottom = p.x + p.width + pad, p.y + p.height + pad
     return any(left <= x <= right and top <= y <= bottom
                for x, y in _sample_points(a, b))
+
+
+def _segment_may_hit_box(a: list[float], b: list[float], p: Placed,
+                         pad: float = 0.0) -> bool:
+    """纯加速用的**精确**排除测试（slab 法），不是第二个判据。
+
+    它只做"提前否定"：说"不可能相交"时，采样版也一定找不到落进盒子的点
+    （线段与矩形不相交 ⇒ 线段上的任何点都不在矩形内），所以 `_segment_hits_box`
+    的结果一个字都不会变。说"可能"时仍旧走采样 —— **采样是权威口径**，
+    绕行、校验、测试都用它，这里绝不另立一套几何判据（同一件几何算两遍必然漂移）。
+
+    为什么要它：采样间距 2px，一条 900px 的弦会采出 452 个点，再对每个节点
+    逐点做包含判断 —— 环内排序要跑几十个候选，光这一项就把搜索拖到 100ms。
+    """
+    left, top = p.x - pad, p.y - pad
+    right, bottom = p.x + p.width + pad, p.y + p.height + pad
+    low, high = 0.0, 1.0
+    for delta, start, lo_bound, hi_bound in (
+            (b[0] - a[0], a[0], left, right),
+            (b[1] - a[1], a[1], top, bottom)):
+        if abs(delta) < 1e-12:
+            if start < lo_bound or start > hi_bound:
+                return False        # 与这条板平行，且落在板外
+            continue
+        enter = (lo_bound - start) / delta
+        leave = (hi_bound - start) / delta
+        if enter > leave:
+            enter, leave = leave, enter
+        low = max(low, enter)
+        high = min(high, leave)
+        if low > high:
+            return False
+    return True
 
 
 def _visible_nodes(placed: dict, exclude: set[str]):
@@ -1393,9 +1538,8 @@ def layout(spec: dict, boxes: dict[str, Box],
     # 放在这里、在任何分层计算之前：径向不需要 rank / dummy / 层内排序那一整套，
     # 但**共用**边路径的绕行与所有几何校验（它们只看坐标，与布局方式无关）。
     if str(spec_type or "") == "mindmap" and len(node_ids) >= 2:
-        placed, depth, order = radial_layout(node_ids, boxes, edges)
+        placed, depth, order, routed = radial_layout(node_ids, boxes, edges)
         if placed:
-            routed = radial_edges(node_ids, edges, placed)
             crossings = geometric_crossing_pairs(routed)
             return LayoutResult(
                 direction="RADIAL", params=p, ranks=depth, order=order,
