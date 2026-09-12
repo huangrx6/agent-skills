@@ -31,8 +31,8 @@ description: >-
 1. **先拿证据**：图的内容来自代码／配置／文档／运行输出。不要凭目录树猜架构。
 2. **判断图类型**，查下面的策略表（类型决定布局算法，不是学美规则）。
 3. **写规格**：一份 `*.diagram.json`，只有结构（节点／边／分组），见 `references/diagram-spec.md`。
-4. **先校验规格，再生成**：`python3 scripts/validate_spec.py x.diagram.json` —— 字段集是封闭的，未知字段会判失败（包括坐标）。通过后再跑生成脚本，脚本自己会布局、校验、失败时调参重跑。
-5. **看报告**：只有脚本自动重试耗尽时才有报告，此时按报告建议改**内容**，不要改参数。
+4. **先校验规格，再算布局**：`python3 scripts/validate_spec.py x.diagram.json` —— 字段集是封闭的，未知字段会判失败（包括坐标）。通过后跑 `scripts/layout.py`（分层 → 层内排序 → 坐标）与 `scripts/check_layout.py`（五项校验，失败时自己调参重跑）。
+5. **看报告**：只有脚本自动重试耗尽时才有报告，此时按报告建议改**内容**，不要改参数。报告里不会出现参数名。
 6. **保留规格文件**，和 `.excalidraw` 放一起；以后的修改改规格再重新生成。
 
 ## 图类型 → 布局策略
@@ -72,18 +72,27 @@ layout(参数) → 校验 ──通过──→ 输出
 **报告只在你无法自动收敛时出现**，而且只建议**内容层面**的修改（拆节点／缩短标签／降 `detail`／
 调整分组）。报告会列出**已经试过哪些参数** —— 看到"建议调大某某间距"这种话是设计事故，请上报。
 
-五项校验（重叠／连线过短／文字溢出／越界颜色／边交叉数）的阈值与级别见 `references/validation.md`。
+五项校验（重叠／连线过短／文字溢出／越界颜色／边交叉数）的阈值与级别见 `references/validation.md`，实现在 `scripts/check_layout.py`；切分与排序在 `scripts/layout.py`。
+
+两个容易看错的点：
+
+- **交叉数是“软”项**：它不挡输出，但**仍然会被调参**。把它当成“不报错”就会连它调过没调过都不知道。
+- **“元素间隙”与“文字溢出”是后置断言**：坐标是从间距参数算出来的，尺寸也是从同一份文字测量算出来的 —— 在今天的推导下它们**构造上不可能失败**。一旦报，报的是脚本内部不一致，不是你的内容有问题。详见 `references/validation.md` 的“已知局限”。
 
 ## 脚本
 
 ```sh
 python3 scripts/validate_spec.py x.diagram.json   # 校验规格（封闭字段集）
-python3 scripts/text_metrics.py "节点标题"        # 看文字 → 容器尺寸的实际推算
-python3 scripts/palette.py                        # 打印色板与 kind 取值
+python3 scripts/layout.py x.diagram.json --explain   # 只算布局：分层与层内顺序、坐标、交叉数
+python3 scripts/check_layout.py x.diagram.json       # 五项校验 + 自动调参 + （收敛不了时）出报告
+python3 scripts/text_metrics.py "节点标题"          # 看文字 → 容器尺寸的实际推算
+python3 scripts/palette.py                          # 打印色板与 kind 取值
 ```
 
-生成脚本（布局 + 元素落笔）在 Wave 3/4 落地后加进这里 —— 在那之前，本 skill 只做到
-“规格写对 + 尺寸算对”，还不能直接出 `.excalidraw`。
+`check_layout.py` 退出码：0 = 无阻塞项，1 = 有阻塞项，2 = 读不到规格。
+
+**元素落笔（真的写出 `.excalidraw` 文件）还没落地。** 在那之前，本 skill 只做到
+“规格写对 + 尺寸算对 + 布局算对并校验过”—— 能告诉你图长什么样，但还不能交图。
 
 ## 引用文件
 
