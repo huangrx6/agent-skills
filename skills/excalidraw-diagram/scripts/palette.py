@@ -131,10 +131,6 @@ THEMES: dict[str, dict] = {
     },
 }
 
-# 向后兼容的旧名。**不建议用** —— 新名字表达的是气质，旧名字表达的是色值套餐。
-THEME_ALIASES = {"morandi": "soft-light", "bright-clean": "clean-light",
-                 "dark-tech": "dark"}
-
 # 语义角色 → 默认层级。**不随主题变** —— "这是个什么角色"和"这张图什么气质"
 # 是两个正交的问题。放在主题里就变成三份要同步的数据（这个坑已经踩过）。
 # 注意 `secondary` **不在**这张表的右边 —— 和 `critical` 一样，"第二档重要程度"
@@ -217,7 +213,6 @@ def use_theme(name: str | None) -> str:
     """
     global _active
     name = name if name else DEFAULT_THEME
-    name = THEME_ALIASES.get(name, name)     # 旧名照收，但不推荐
     if name == AUTO_THEME:
         name = suggest_theme(_auto_type)
     if name not in THEMES:

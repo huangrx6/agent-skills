@@ -36,6 +36,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import sys
 import unittest
 
@@ -370,3 +371,31 @@ class TestThemes(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TestDocsDoNotRestateColours(unittest.TestCase):
+    """文档里**一个十六进制色值都不许出现**。
+
+    颜色只有一处定义（`THEMES`），复述一次就会漂移一次 —— 这不是假设，是发生过的：
+    换掉六色硬编码模型之后，`diagram-spec.md` 里那张 kind→HEX 的表还留了两个版本，
+    直到有人 grep 才被发现。而且**只 grep 旧名字是不够的**：那一整节描述的是旧模型，
+    却一次都没提"莫兰迪"三个字。
+
+    所以这里用**机械**的方式守住：文档只管讲原则，具体色值去代码里读。
+    """
+
+    def test_no_hex_colours_in_docs(self):
+        root = os.path.dirname(HERE)
+        offenders = []
+        pattern = re.compile(r"#[0-9A-Fa-f]{6}\b")
+        for base in (os.path.join(root, "references"), root):
+            for name in sorted(os.listdir(base)):
+                if not name.endswith(".md"):
+                    continue
+                path = os.path.join(base, name)
+                for number, line in enumerate(
+                        open(path, encoding="utf-8").read().split("\n"), 1):
+                    for match in pattern.findall(line):
+                        offenders.append(f"{name}:{number} {match}")
+        self.assertEqual([], offenders,
+                         "文档里出现了写死的色值，颜色只有一处定义：" + "；".join(offenders))
+
