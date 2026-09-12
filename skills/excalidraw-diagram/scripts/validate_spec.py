@@ -133,11 +133,12 @@ def validate(spec: dict) -> Issues:
         issues.error("BAD_DIRECTION", "$.direction",
                      f"direction 只允许 {sorted(DIRECTIONS)}")
     theme = spec.get("theme")
-    if theme is not None and theme not in palette.THEMES:
+    if theme is not None and not palette.is_known_theme(theme):
         # 同 kind / shape 一条原则：不 fallback。静默换主题会让"风格"这件事
         # 变成"我明明写了 A 出来的是 B"，而且看图的人不知道为什么。
         issues.error("UNKNOWN_THEME", "$.theme",
-                     f"未知主题 {theme!r}；可用的：{palette.available_themes()}")
+                     f"未知主题 {theme!r}；可用的：{palette.available_themes()}"
+                     f" 或 {palette.AUTO_THEME!r}（按图类型自己挑）")
     if "detail" in spec and spec["detail"] not in DETAIL_LEVELS:
         issues.error("BAD_DETAIL", "$.detail",
                      f"detail 只允许 {sorted(DETAIL_LEVELS)}")

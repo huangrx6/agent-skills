@@ -108,7 +108,36 @@ DEFAULT_THEME = "morandi"
 _active = DEFAULT_THEME
 
 
+# 图类型 → 建议主题（#76）。**只引用已实现的主题** —— 指向一个不存在的主题名
+# 就是"指向空文件的指针"，写规格的人会照着一个永远报错的值去写。
+#
+# 这是**建议**，不是默认：默认永远是 `morandi`（用户明确指定过）。
+# 想用建议就必须显式写 `"theme": "auto"` —— 自动覆盖用户的选择是错的。
+THEME_SUGGESTION: dict[str, str] = {
+    "flow": "bright-clean",          # 流程要明快、有节奏
+    "mindmap": "bright-clean",       # 结构图要清爽
+    "architecture": "morandi",       # 技术架构要克制、耐看
+    "component": "morandi",
+    "sequence": "morandi",
+    "dependency": "morandi",
+    "state": "morandi",
+    "network": "morandi",
+}
+AUTO_THEME = "auto"
+
+
+def suggest_theme(diagram_type: str | None) -> str:
+    """按图类型给一个主题建议。没收录的类型回落到默认主题。"""
+    return THEME_SUGGESTION.get(diagram_type or "", DEFAULT_THEME)
+
+
 def available_themes() -> list[str]:
+    return sorted(THEMES)
+
+
+def is_known_theme(name: str) -> bool:
+    """`auto` 也算已知 —— 它是"按图类型自己挑"，不是未知值。"""
+    return name in THEMES or name == AUTO_THEME
     return sorted(THEMES)
 
 
@@ -117,14 +146,29 @@ def active_theme() -> str:
 
 
 def use_theme(name: str | None) -> str:
-    """切换主题。未知主题名**判失败不 fallback** —— 同 kind / shape 一条规矩。"""
+    """切换主题。未知主题名**判失败不 fallback** —— 同 kind / shape 一条规矩。
+
+    `"auto"` 是特例：按图类型查表（见 `suggest_theme`）。它必须由调用方把图类型
+    一起传进来，所以 emit 里是 `use_theme(spec.get("theme"), spec.get("type"))`。
+    """
     global _active
     name = name if name else DEFAULT_THEME
+    if name == AUTO_THEME:
+        name = suggest_theme(_auto_type)
     if name not in THEMES:
-        raise KeyError(f"未知主题 {name!r}；可用的：{available_themes()}")
+        raise KeyError(f"未知主题 {name!r}；可用的：{available_themes()} 或 {AUTO_THEME!r}")
     _active = name
     _rebind()
     return name
+
+
+_auto_type: str | None = None
+
+
+def set_auto_type(diagram_type: str | None) -> None:
+    """给 `"auto"` 用：记下当前图类型。"""
+    global _auto_type
+    _auto_type = diagram_type
 
 
 @contextlib.contextmanager
@@ -221,6 +265,70 @@ EMPHASIS: dict[str, dict] = {
     "muted": {"zh": "次要", "stroke_width": 1.0, "to_canvas": 0.55},
 }
 DEFAULT_EMPHASIS = "normal"
+
+
+# ── 颜色数学：**唯一实现**在 palette 里 ────────────────────────
+# 以前这套公式只写在 tests/test_palette.py 里，于是"检查颜色"的地方（图标撞色、
+# 报告里的可读性）只能自己再写一份 —— 两份必然漂移，而漂移的那一份会让两边
+# 给出不同结论（这个坑在这个项目里踩过好几次）。
+# 测试仍然会用已知值把这几把尺子钉住（白对黑 = 21 之类），尺子本身照样是验过的。
+def hex_to_rgb(colour: str) -> tuple[int, int, int]:
+    if not colour.startswith("#") or len(colour) != 7:
+        raise ValueError(f"不是 #RRGGBB：{colour!r}")
+    return (int(colour[1:3], 16), int(colour[3:5], 16), int(colour[5:7], 16))
+
+
+def relative_luminance(colour: str) -> float:
+    channels = []
+    for value in hex_to_rgb(colour):
+        c = value / 255.0
+        channels.append(c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4)
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+
+
+def contrast(a: str, b: str) -> float:
+    """WCAG 对比度。1.0 = 完全一样，21 = 纯黑对纯白。"""
+    la, lb = relative_luminance(a), relative_luminance(b)
+    high, low = max(la, lb), min(la, lb)
+    return (high + 0.05) / (low + 0.05)
+
+
+def saturation(colour: str) -> float:
+    """**HSV** 里的 S（`(max-min)/max`）。莫兰迪那一族靠它判"去饱和"。
+
+    ⚠ 别"顺手改成 HSL"：搬进本文件时我就这么干过一次，三个"填充要去饱和"的用例
+    立刻变红 —— 两种饱和度的定义不同（HSL 的 S 在浅色上数值差别很大，
+    而莫兰迪全是浅色）。测试挡住了它，但这条注释是为了别再犯第二次。
+    """
+    r, g, b = (v / 255.0 for v in hex_to_rgb(colour))
+    high = max(r, g, b)
+    if high <= 0:
+        return 0.0
+    return (high - min(r, g, b)) / high
+
+
+def to_lab(colour: str) -> tuple[float, float, float]:
+    r, g, b = (v / 255.0 for v in hex_to_rgb(colour))
+
+    def lin(c: float) -> float:
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+    r, g, b = lin(r), lin(g), lin(b)
+    x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047
+    y = r * 0.2126 + g * 0.7152 + b * 0.0722
+    z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883
+
+    def f(t: float) -> float:
+        return t ** (1.0 / 3.0) if t > 0.008856 else 7.787 * t + 16.0 / 116.0
+
+    fx, fy, fz = f(x), f(y), f(z)
+    return (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
+
+
+def delta_e(a: str, b: str) -> float:
+    """CIE76 色差。两个颜色"看起来差多少"，跟亮度差不是一回事。"""
+    la, lb = to_lab(a), to_lab(b)
+    return sum((x - y) ** 2 for x, y in zip(la, lb)) ** 0.5
 
 
 def _parse_hex(value: str) -> tuple[int, int, int]:

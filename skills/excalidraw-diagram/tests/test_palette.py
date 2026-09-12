@@ -68,49 +68,14 @@ P = _load("palette", PALETTE)
 
 
 # ── 颜色数学 ────────────────────────────────────────────────
-def _channels(colour: str) -> tuple[int, int, int]:
-    if not colour.startswith("#") or len(colour) != 7:
-        raise ValueError(f"不是 #RRGGBB 形式：{colour!r}")
-    return (int(colour[1:3], 16), int(colour[3:5], 16), int(colour[5:7], 16))
-
-
-def _luminance(colour: str) -> float:
-    linear = []
-    for value in _channels(colour):
-        c = value / 255
-        linear.append(c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4)
-    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
-
-
-def contrast(a: str, b: str) -> float:
-    high, low = sorted((_luminance(a), _luminance(b)), reverse=True)
-    return (high + 0.05) / (low + 0.05)
-
-
-def saturation(colour: str) -> float:
-    r, g, b = (v / 255 for v in _channels(colour))
-    high, low = max(r, g, b), min(r, g, b)
-    return 0.0 if high <= 0 else (high - low) / high
-
-
-def _lab(colour: str) -> tuple[float, float, float]:
-    v = []
-    for value in _channels(colour):
-        c = value / 255
-        v.append(c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4)
-    x = (v[0] * 0.4124 + v[1] * 0.3576 + v[2] * 0.1805) / 0.95047
-    y = v[0] * 0.2126 + v[1] * 0.7152 + v[2] * 0.0722
-    z = (v[0] * 0.0193 + v[1] * 0.1192 + v[2] * 0.9505) / 1.08883
-    f = lambda t: t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116   # noqa: E731
-    fx, fy, fz = f(x), f(y), f(z)
-    return (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
-
-
-def delta_e(a: str, b: str) -> float:
-    """CIE76 色差。**不能拿对比度当色差用** —— 对比度只量亮度差，
-    而这套莫兰迪相邻色的特点正是"亮度相近、色相不同"（实测踩过：用对比度判，
-    async 与 external 只差 1.005，看着像同色，实际一眼能分）。"""
-    return sum((x - y) ** 2 for x, y in zip(_lab(a), _lab(b))) ** 0.5
+# 颜色数学的**唯一实现**在 scripts/palette.py 里（图标撞色检查、报告的可读性提示
+# 都要用它）—— 这里不再存第二份，只把这几把尺子钉住。
+_channels = P.hex_to_rgb
+_luminance = P.relative_luminance
+contrast = P.contrast
+saturation = P.saturation
+_lab = P.to_lab
+delta_e = P.delta_e
 
 
 class TestColourMath(unittest.TestCase):

@@ -242,6 +242,25 @@ def place(elements: list, left: float, top: float, *, key: str,
     return out
 
 
+def visible_colours(elements: list) -> list[str]:
+    """图标里**看得见**的颜色（描边 + 不透明的填充）。
+
+    为什么要挑着算：素材元素区分"描边色"和"填充色"，而填充常常是 `transparent`
+    （线框图标）。把 transparent 也拿去算对比度，会得到一堆无意义的结果。
+    只算真正画出颜色的那些。
+    """
+    colours: list[str] = []
+    for el in elements:
+        stroke = el.get("strokeColor")
+        if isinstance(stroke, str) and stroke.startswith("#"):
+            colours.append(stroke)
+        background = el.get("backgroundColor")
+        if (isinstance(background, str) and background.startswith("#")
+                and background not in ("transparent", "none")):
+            colours.append(background)
+    return colours
+
+
 def background_elements(elements: list) -> set[str]:
     """图标里哪些元素是"图形/背景"（用来判断图标是否与底色冲突）。
 

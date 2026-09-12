@@ -750,6 +750,50 @@ def icon_readability_issues(spec: dict, lookup: dict,
                 f"图标 {name!r} 自带的文字缩到 {smallest:.1f}px，看不清",
                 advice="这个素材是带文字的示意图、不是单图形图标：换一个更简单的，"
                        "或把图标高度调大。"))
+    return out + icon_contrast_issues(spec, lookup)
+
+
+# 图标与它所在节点底色对比度低于这个值，基本就看不见了。**待验证**。
+ICON_FILL_CONTRAST_MIN = 1.5
+
+
+def icon_contrast_issues(spec: dict, lookup: dict) -> list:
+    """图标自带的颜色与它所在节点的底色撞车 —— 撞了就看不见。
+
+    ## 为什么需要这条
+
+    素材自带品牌色（黑 / 蓝 / 红），**不随主题变**。在浅色主题下没问题，
+    换到深色主题就会出现"黑底图标压在深色填充上"——图长得没错，是它看不见。
+
+    这件事只有把"图标的颜色"和"节点的填充"放在一起算才知道，
+    而且纯机械（算对比度），所以做成检查而不是写在文档里让人自己注意。
+
+    ## 为什么不自动改色
+
+    改色会破坏品牌标识的识别性（一个被改成蓝紫色的 AWS logo 更糟）。
+    所以只报，并建议换一个**同义但亮一些**的素材。
+    """
+    out = []
+    for node in spec.get("nodes", []):
+        name = node.get("icon")
+        if not name or name not in lookup:
+            continue
+        try:
+            fill = palette.emphasis_fill(node.get("kind"),
+                                         node.get("emphasis", palette.DEFAULT_EMPHASIS))
+        except KeyError:
+            continue          # kind / emphasis 不合法的问题由 check_palette 报
+        colours = icons.visible_colours(lookup[name])
+        if not colours:
+            continue
+        worst = min((palette.contrast(c, fill), c) for c in colours)
+        if worst[0] < ICON_FILL_CONTRAST_MIN:
+            out.append(_check_layout().Issue(
+                "icon", False, node["id"],
+                f"图标 {name!r} 自带的颜色与它所在节点的底色几乎一样"
+                f"（对比度 {worst[0]:.2f}），在当前主题下看不见",
+                advice="换成同义但亮一些的素材；或换回浅色主题。"
+                       "不建议自动改色 —— 那会破坏品牌标识的识别性。"))
     return out
 
 
@@ -769,6 +813,7 @@ def emit(spec: dict, *, params=None, library: str | None = None,
         raise SpecError(f"规格不通过，没有出图：\n{detail}")
 
     # 主题在**一切之前**定：颜色要被尺寸/校验/标签各处读到，切晚了会前后不一致。
+    palette.set_auto_type(spec.get("type"))
     palette.use_theme(spec.get("theme"))
 
     # 图标必须在算盒子**之前**解析出来 —— 它会影响节点尺寸（第一个外部尺寸来源）

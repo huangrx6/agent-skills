@@ -101,6 +101,42 @@ DETOUR_STEP = 28.0
 DETOUR_MAX_OFFSET = 280.0
 # 最多几轮。一轮解决一处，多轮是给“推完之后又撞上别的”留的余地。
 DETOUR_ROUNDS = 6
+
+# ── 枢纽节点：扇出大的节点在**交叉轴**上长一点（P12）──────────
+#
+# 为什么：边的落点是沿节点边缘均分的，节点太小就摊不开。实测 order 有 7 条边、
+# 节点只有 64px 高 → 7 个锚点挤在 46px 里，相邻只差 6.6px，远处看还是一束。
+#
+# 为什么只长交叉轴：主轴方向长大会把层间距顶开、整张图被拉长；交叉轴长一点
+# 只是在那一列/那一行里多占一点，代价小得多。
+#
+# 代价（实测过）：节点变高 → 那一层变高变宽 → 整图长宽比跟着动。
+# 对 04-state（9.7:1 太宽）和 02-flow（0.3:1 太高）这两种极端反倒是**改善**。
+HUB_MIN_FANOUT = 3          # 低于这个数不算枢纽，长它没意义
+HUB_GROWTH_PER_EDGE = 14.0  # 每多一条边长这么多
+HUB_GROWTH_MAX = 60.0       # 最多长这么多（不封顶的话大枢纽会失衡）
+
+
+def hub_extra(fanout: int) -> float:
+    """这个扇出数该让交叉轴多长。"""
+    if fanout < HUB_MIN_FANOUT:
+        return 0.0
+    return min(HUB_GROWTH_MAX, (fanout - HUB_MIN_FANOUT + 1) * HUB_GROWTH_PER_EDGE)
+
+
+def fanout_of(spec: dict) -> dict:
+    """每个节点连了几条边（进出都算）—— 落点是沿边缘摊开的，两边都占地方。"""
+    counts: dict[str, int] = {}
+    for edge in spec.get("edges") or []:
+        for end in ("from", "to"):
+            if edge.get(end):
+                counts[edge[end]] = counts.get(edge[end], 0) + 1
+    return counts
+
+
+def main_axis(spec: dict) -> str:
+    """这张图的主轴方向 —— 决定“交叉轴”是宽还是高。"""
+    return spec.get("direction") or DIRECTION_FOR_TYPE.get(spec.get("type", ""), "LR")
 # 同一侧挂多条边时，贴点沿这侧铺开的跨度占边长多少。
 #
 # 为什么留边距：贴点贴到角上，线与节点的邻边会“粘”在一起；
@@ -880,11 +916,19 @@ def boxes_from_spec(spec: dict, icon_sizes: dict | None = None) -> dict[str, Any
     tm = load_sibling("text_metrics")
     sh = load_sibling("shapes")
     sizes = icon_sizes or {}
+    fans = fanout_of(spec)
+    cross_axis_is_width = main_axis(spec) == "TB"
     out: dict[str, NodeBox] = {}
     for n in spec.get("nodes", []):
         text = tm.measure(n.get("label", ""), n.get("detail", ""))
         shape = sh.resolve(n)
         width, height = sh.box_for(shape, text.width, text.height)
+        # 枢纽节点：扇出越大，交叉轴上越长 —— 落点才摊得开（P12）
+        extra = hub_extra(fans.get(n["id"], 0))
+        if cross_axis_is_width:
+            width += extra
+        else:
+            height += extra
         if n.get("icon"):
             # 图标放左边，文字排在它右边（见 emit 的 node_elements）。
             # 拿不到尺寸就用一个保守的占位 —— 宁可多留白，也不能让图标盖住文字。

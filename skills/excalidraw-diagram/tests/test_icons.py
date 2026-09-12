@@ -6,8 +6,11 @@
 从有这个模块起就不成立了（已按约定先改文档，再改 `TestSizeSourcePremise`）。
 """
 import importlib.util
+import json
 import os
+import shutil
 import sys
+import tempfile
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -463,5 +466,70 @@ class TestGlyphOnly(unittest.TestCase):
         self.assertGreaterEqual(small, I.ICON_MIN, "不能小到看不清")
         self.assertLessEqual(big, I.ICON_MAX, "不能大到失衡")
         self.assertEqual(I.ICON_MAX, I.height_for(500.0), "要夹住上限")
+
+
+class TestIconColourClash(unittest.TestCase):
+    """图标自带品牌色**不随主题变** —— 在深色主题下可能直接看不见（#91）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        path = os.path.join(SCRIPTS, "emit_excalidraw.py")
+        spec = importlib.util.spec_from_file_location("emit_clash", path)
+        if spec is None or spec.loader is None:
+            raise RuntimeError(f"加载不了 {path}")
+        cls.E = importlib.util.module_from_spec(spec)
+        sys.modules["emit_clash"] = cls.E
+        spec.loader.exec_module(cls.E)
+
+    def test_visible_colours_skips_transparent(self):
+        """线框图标只有描边色 —— 把 transparent 也拿去算对比度是无意义的。"""
+        got = I.visible_colours([
+            {"strokeColor": "#333333", "backgroundColor": "transparent"},
+            {"strokeColor": "#888888", "backgroundColor": "#EEEEEE"},
+        ])
+        self.assertEqual(["#333333", "#888888", "#EEEEEE"], got)
+
+    @staticmethod
+    def _spec(theme=None):
+        """主题要写进**规格**，不能用 `palette.use_theme()` —— emit 会按规格重置它。
+
+        这条踩过：测试里切了主题，emit 一进来就按规格（没有 theme 字段）重置回默认，
+        于是两次跑的都是同一个主题，断言看起来像"行为反了"。
+        """
+        spec = json.loads(json.dumps(ICON_SPEC))
+        if theme:
+            spec["theme"] = theme
+        return spec
+
+    def test_dark_icon_on_dark_fill_is_reported(self):
+        """合成素材的元素是 #333333 描边；放到深色主题的深填充上就该报。"""
+        _, _, light_outcome, _ = self.E.emit(self._spec(), library=V2)
+        _, _, dark_outcome, _ = self.E.emit(self._spec("dark-tech"), library=V2)
+        light = [i for i in light_outcome.issues if i.check == "icon"]
+        dark = [i for i in dark_outcome.issues if i.check == "icon"]
+        self.assertEqual([], light, "浅色主题下不该报撞色")
+        self.assertEqual(1, len(dark), f"深色主题下应当报 1 条，实得 {len(dark)}")
+        self.assertIn("看不见", dark[0].detail)
+        self.assertFalse(dark[0].blocking, "这是选型提示，不该阻塞出图")
+        self.assertIn("不建议自动改色", dark[0].advice or "",
+                      "建议里要说明为什么不自动改色")
+
+    def test_bright_icon_on_dark_fill_is_fine(self):
+        """亮色图标在深色底上没问题 —— 这条检查不能把所有图标都报一遍。"""
+        lib = I.load(V2)
+        bright = json.loads(json.dumps(lib["items"]["Bound Box"]))
+        for el in bright:
+            el["strokeColor"] = "#EEEEEE"
+        directory = tempfile.mkdtemp(prefix="bright-")
+        path = os.path.join(directory, "lib.excalidrawlib")
+        try:
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump({"type": "excalidrawlib", "version": 2, "libraryItems": [
+                    {"id": "i", "name": "Bound Box", "elements": bright}]},
+                    fh, ensure_ascii=False)
+            _, _, outcome, _ = self.E.emit(self._spec("dark-tech"), library=path)
+            self.assertEqual([], [i for i in outcome.issues if i.check == "icon"])
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
 
 
