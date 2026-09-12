@@ -20,6 +20,7 @@ fixture 在 setUp 里生成到临时目录，不落盘成真实 skill。
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import re
 import shutil
@@ -248,3 +249,84 @@ class ValidateSkillTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+# ── evals 的形状 ───────────────────────────────────────────────────────────
+# 防线：evals 是「规则有没有被执行」的标尺，而标尺自己写错是**看不见**的 ——
+# 它不会让任何测试失败，只会让评审时照着一条过期的标准看。这些用例盯的就是它。
+def _with_evals(root: str, name: str, payload) -> str:
+    """造一个带 evals/ 的 skill。payload 传字符串时原样写入（用来造坏 JSON）。"""
+    path = _skill(root, name)
+    evals_dir = os.path.join(path, "evals")
+    os.makedirs(evals_dir, exist_ok=True)
+    text = payload if isinstance(payload, str) else json.dumps(payload, ensure_ascii=False)
+    with open(os.path.join(evals_dir, "evals.json"), "w", encoding="utf-8") as handle:
+        handle.write(text)
+    return path
+
+
+class EvalShapeTest(unittest.TestCase):
+    def setUp(self):
+        self.mod = _load_validate()
+        self.tmp = tempfile.mkdtemp(prefix="validate-evals-")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def fails(self, path: str) -> bool:
+        return bool(self.mod.check_skill(path)["errors"])
+
+    def make(self, name: str = "with-evals", payload=None) -> str:
+        if payload is None:
+            payload = {"skill_name": name, "evals": [
+                {"id": 1, "prompt": "做点什么", "expected_output": "应该这样那样",
+                 "files": []}]}
+        return _with_evals(self.tmp, name, payload)
+
+    def test_well_formed_evals_pass(self):
+        self.assertFalse(self.fails(self.make()))
+
+    def test_skill_without_evals_dir_is_fine(self):
+        """没有 evals 不算错 —— 这条只查「写了的话形状对不对」。"""
+        self.assertFalse(self.fails(_skill(self.tmp, "no-evals")))
+
+    def test_skill_name_must_match_directory(self):
+        self.assertTrue(self.fails(self.make(payload={"skill_name": "别的名字", "evals": [
+            {"id": 1, "prompt": "p", "expected_output": "e"}]})))
+
+    def test_duplicate_ids_are_flagged(self):
+        self.assertTrue(self.fails(self.make(payload={"skill_name": "with-evals", "evals": [
+            {"id": 1, "prompt": "p", "expected_output": "e"},
+            {"id": 1, "prompt": "p2", "expected_output": "e2"}]})))
+
+    def test_missing_field_is_flagged(self):
+        for field in ("id", "prompt", "expected_output"):
+            payload = {"skill_name": "with-evals",
+                       "evals": [{"id": 1, "prompt": "p", "expected_output": "e"}]}
+            del payload["evals"][0][field]
+            self.assertTrue(self.fails(self.make(payload=payload)), f"缺 {field} 应当失败")
+
+    def test_referenced_file_must_exist(self):
+        self.assertTrue(self.fails(self.make(payload={"skill_name": "with-evals", "evals": [
+            {"id": 1, "prompt": "p", "expected_output": "e",
+             "files": ["tests/并没有这个.txt"]}]})))
+
+    def test_existing_referenced_file_passes(self):
+        """files 指向真实存在的文件时应当放过；files 整个缺掉也行。"""
+        path = self.make()
+        os.makedirs(os.path.join(path, "fixtures"), exist_ok=True)
+        with open(os.path.join(path, "fixtures/sample.md"), "w", encoding="utf-8") as handle:
+            handle.write("样例\n")
+        payload = {"skill_name": "with-evals", "evals": [
+            {"id": 1, "prompt": "p", "expected_output": "e", "files": ["fixtures/sample.md"]},
+            {"id": 2, "prompt": "p", "expected_output": "e"}]}   # files 可以整个缺
+        with open(os.path.join(path, "evals/evals.json"), "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, ensure_ascii=False)
+        self.assertFalse(self.fails(path))
+
+    def test_broken_json_is_flagged(self):
+        self.assertTrue(self.fails(self.make(payload="{ 这不是 json")))
+
+    def test_empty_evals_list_is_flagged(self):
+        self.assertTrue(self.fails(self.make(payload={"skill_name": "with-evals", "evals": []})))
+

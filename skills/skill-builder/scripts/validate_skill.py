@@ -144,6 +144,78 @@ def load_yaml(text: str):
         return None, str(exc)
 
 
+# ── evals 的形状校验 ──────────────────────────────────────────────────────
+EVAL_REQUIRED = ("id", "prompt", "expected_output")
+
+
+def check_evals(skill_dir: str, name: str, add) -> None:
+    """校验 evals/ 下每个 .json 的形状。
+
+    为什么要有这条：evals 是「规则有没有被执行」的标尺，而标尺自己写错是**看不见**的 ——
+    它不会让任何测试失败，只会让评审时照着一条过期的标准看（这个洞察在本仓踩过一次：
+    规则改了、eval 的 expected_output 还停在旧措辞上）。所以这里只查客观事实：
+    能不能解析、字段在不在、引用的文件在不在 —— 不猜内容写得好不好。
+    """
+    evals_dir = os.path.join(skill_dir, "evals")
+    if not os.path.isdir(evals_dir):
+        return
+    try:
+        names = sorted(f for f in os.listdir(evals_dir)
+                       if f.endswith(".json") and not f.startswith("."))
+    except OSError:
+        return
+    if not names:
+        add("evals 目录非空", False, f"{evals_dir} 里没有 .json")
+        return
+
+    for filename in names:
+        label = f"evals/{filename}"
+        try:
+            with open(os.path.join(evals_dir, filename), encoding="utf-8") as handle:
+                payload = json.load(handle)
+        except (OSError, ValueError) as exc:
+            add(f"{label} 能解析", False, str(exc))
+            continue
+        add(f"{label} 能解析", True)
+        if not isinstance(payload, dict):
+            add(f"{label} 顶层是对象", False, type(payload).__name__)
+            continue
+
+        add(f"{label} skill_name 与目录一致", payload.get("skill_name") == name,
+            f"skill_name={payload.get('skill_name')!r} 目录={name!r}")
+
+        cases = payload.get("evals")
+        if not isinstance(cases, list) or not cases:
+            add(f"{label} evals 是非空列表", False, repr(cases)[:60])
+            continue
+        add(f"{label} evals 是非空列表", True)
+
+        ids: list = []
+        broken: list[str] = []
+        missing: list[str] = []
+        for position, case in enumerate(cases, start=1):
+            where = f"第 {position} 条"
+            if not isinstance(case, dict):
+                broken.append(f"{where}不是对象")
+                continue
+            for field in EVAL_REQUIRED:
+                if not case.get(field):
+                    broken.append(f"{where}缺 {field}")
+            ids.append(case.get("id"))
+            refs = case.get("files")
+            if refs is None:
+                continue
+            if not isinstance(refs, list):
+                broken.append(f"{where}的 files 不是列表")
+                continue
+            for ref in refs:
+                if not os.path.exists(os.path.join(skill_dir, str(ref))):
+                    missing.append(f"{where}引用了不存在的 {ref}")
+        add(f"{label} 每条都有 id/prompt/expected_output", not broken, "；".join(broken[:4]))
+        add(f"{label} id 不重复", len(ids) == len(set(ids)), f"ids={ids}")
+        add(f"{label} 引用的文件存在", not missing, "；".join(missing[:4]))
+
+
 def check_skill(path: str) -> dict:
     """校验单个 skill 目录，返回结果字典。"""
     name = os.path.basename(os.path.normpath(path))
@@ -204,6 +276,8 @@ def check_skill(path: str) -> dict:
             f"已改成从配置读路径的话，同一次里删掉绑定声明")
     else:
         add("无「绑定本机 + 从配置读」矛盾", True)
+
+    check_evals(path, name, add)
 
     for sub in ("references", "evals"):
         d = os.path.join(path, sub)
