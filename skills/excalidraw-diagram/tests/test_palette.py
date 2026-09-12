@@ -183,17 +183,27 @@ class TestLevelsAreDistinguishable(unittest.TestCase):
                     self.assertGreaterEqual(got, VISIBLE_DE)
 
     def test_tint_stays_close_to_canvas(self):
-        """§5：tint 与画布的差**非常克制** —— 它不是"比 neutral 深一点的灰色"。
+        """§5：tint 是"退到背景里的那一片" —— 必须**看得出来**，但不能抢注意力。
 
-        所以这里断言的是**上界**：差得太大就说明 tint 又在抢注意力了。
+        这条原来断言的是**绝对** ΔE < 12（"与画布的差非常克制"）。实测下来：
+        同样是 18% 的混合，浅底主题 ΔE≈10、深底主题 ΔE≈20 —— 绝对阈值量的其实是
+        主题本身的明暗差，不是"克不克制"。所以在调配色这一轮把尺子换成**相对**的：
+        它最多走完"画布 → 主色"这段距离的 30%，并且至少走 8%。
+
+        下界是这次加的：tint 现在是**区域**的填充 —— 一张图上唯一的整片颜色。
+        太淡就等于没有，而"没有色块"正是那张图看着沉闷的原因（0.085 的旧值就是
+        只有 8.5% 覆盖，画出来几乎看不出颜色）。
         """
         for direction, seed in _all_seeds():
             with P.direction_context(direction, seed):
                 with self.subTest(direction=direction, seed=seed):
-                    got = delta_e(P.LEVELS["tint"]["fill"],
-                                  P.CANVAS["background"])
-                    self.assertLess(got, 12.0, f"tint 与画布差得太多（ΔE {got:.1f}）")
-
+                    got = delta_e(P.LEVELS["tint"]["fill"], P.CANVAS["background"])
+                    span = delta_e(P.LEVELS["accent"]["stroke"], P.CANVAS["background"])
+                    self.assertGreater(span, 1e-6)
+                    self.assertLess(got / span, 0.30,
+                                    f"tint 在抢注意力（走完 {got / span:.0%}）")
+                    self.assertGreater(got / span, 0.08,
+                                       f"tint 太淡，等于看不见（只走 {got / span:.0%}）")
 
 class TestNoGreyBlueDefault(unittest.TestCase):
     """§20 —— 把"禁止灰蓝成为默认答案"写成能算的判据。

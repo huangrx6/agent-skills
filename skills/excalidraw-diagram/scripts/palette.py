@@ -55,7 +55,7 @@ import math
 #   普通  →  轻微区分  →  重点  →  异常 / 关键状态
 #
 # `tint` 是"退到背景里的那一片"（极轻的分组 / 次级区域），
-# 它与画布的差**故意非常小** —— 见 WASH_MIX。
+# 它与画布的差**不大**，但必须**看得出来** —— 见 WASH_MIX 那行的实测记录。
 VISUAL_LEVELS = ("neutral", "tint", "accent", "critical")
 _LEVEL_ORDER = {name: i for i, name in enumerate(VISUAL_LEVELS)}
 
@@ -68,9 +68,9 @@ LEVEL_ROLES: dict[str, tuple[str, str]] = {
 }
 
 # 派生配比。放一起，方便一眼看出"深浅关系"是从哪来的。
-WASH_MIX = 0.085       # tint 填充：与画布的差要**非常克制**（§5）
-SOFT_MIX = 0.34        # accent 填充
-CRITICAL_MIX = 0.26    # critical 填充：一层极浅的洗染，警示靠描边 + 线宽
+WASH_MIX = 0.18        # tint 填充：**要能被看见**（见下面那条实测）
+SOFT_MIX = 0.44        # accent 填充
+CRITICAL_MIX = 0.34    # critical 填充：一层浅洗染，警示主要靠描边 + 线宽
 EDGE_MIX = 0.42        # 普通连线：画布与墨色之间
 EDGE_MUTED_MIX = 0.24  # 弱连线：更靠近画布
 
@@ -109,10 +109,10 @@ VISUAL_DIRECTIONS: dict[str, dict] = {
         },
         "seeds": {
             # 大面积空气感 + 少量自然色渗进去 —— 不是满屏绿色
-            "mature-natural": {"canvas": "#FBF9F3", "ink": "#26301F",
-                               "accent": "#2F5D46", "critical": "#B5644A"},
-            "lively-leaf": {"canvas": "#FCFDF6", "ink": "#1F2E22",
-                            "accent": "#4E8C6A", "critical": "#C26E4A"},
+            "mature-natural": {"canvas": "#FBFAF2", "ink": "#243024",
+                               "accent": "#2E9E63", "critical": "#D2663C"},
+            "lively-leaf": {"canvas": "#FCFDF4", "ink": "#1E2E22",
+                            "accent": "#3FAB73", "critical": "#DE7748"},
         },
     },
     "editorial": {
@@ -127,10 +127,10 @@ VISUAL_DIRECTIONS: dict[str, dict] = {
         },
         "seeds": {
             # 高对比、单一主色、极少量强调 —— 像设计作品集
-            "warm-editorial": {"canvas": "#FCFBF7", "ink": "#1A1815",
-                               "accent": "#6B5B4A", "critical": "#A33B2A"},
+            "warm-editorial": {"canvas": "#FCFBF6", "ink": "#1A1815",
+                               "accent": "#8F5A32", "critical": "#B23A24"},
             "neutral-editorial": {"canvas": "#FAFAF8", "ink": "#141414",
-                                  "accent": "#4A4A52", "critical": "#8C3A2B"},
+                                  "accent": "#3A4A6B", "critical": "#9C3A28"},
         },
     },
     "fresh": {
@@ -145,10 +145,10 @@ VISUAL_DIRECTIONS: dict[str, dict] = {
         },
         "seeds": {
             # 高明度、通透、冷暖交替
-            "spring": {"canvas": "#FFFFFB", "ink": "#2B3A2E",
-                       "accent": "#5FA88C", "critical": "#E08A4F"},
-            "clear": {"canvas": "#FCFDFD", "ink": "#25343C",
-                      "accent": "#57A5B8", "critical": "#E0916A"},
+            "spring": {"canvas": "#FFFFFA", "ink": "#28382C",
+                       "accent": "#48B88C", "critical": "#F0803C"},
+            "clear": {"canvas": "#FBFDFD", "ink": "#22343C",
+                      "accent": "#3FA9C4", "critical": "#EE8B52"},
         },
     },
     "coastal": {
@@ -163,10 +163,10 @@ VISUAL_DIRECTIONS: dict[str, dict] = {
         },
         "seeds": {
             # 阳光 / 海 / 空气 —— **不是科技蓝**（那是被否掉的那条路）
-            "sea-air": {"canvas": "#FDFDFB", "ink": "#1F2E3A",
-                        "accent": "#2E8B96", "critical": "#D98E5B"},
-            "sun-washed": {"canvas": "#FEFDF8", "ink": "#2A3038",
-                           "accent": "#3E9AA6", "critical": "#D8834F"},
+            "sea-air": {"canvas": "#FCFDFB", "ink": "#1C2E3A",
+                        "accent": "#1E9BB0", "critical": "#E0873F"},
+            "sun-washed": {"canvas": "#FDFDF8", "ink": "#272F38",
+                           "accent": "#2AA3B8", "critical": "#E07C3A"},
         },
     },
     "night": {
@@ -182,9 +182,9 @@ VISUAL_DIRECTIONS: dict[str, dict] = {
         "seeds": {
             # 暖墨底 + 暖白字 + 一个有性格的颜色 —— 不是"程序员深色"
             "warm-night": {"canvas": "#14110F", "ink": "#F2EDE4",
-                           "accent": "#C9A227", "critical": "#C45B43"},
+                           "accent": "#E0B32E", "critical": "#E06045"},
             "amber-night": {"canvas": "#161310", "ink": "#F0E9DE",
-                            "accent": "#D08A3C", "critical": "#C45B43"},
+                            "accent": "#E09540", "critical": "#E06045"},
         },
     },
 }
