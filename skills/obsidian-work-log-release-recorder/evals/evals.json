@@ -4,19 +4,31 @@
     {
       "id": 1,
       "prompt": "我刚改完内部系统A运营分析页面的筛选条件和后端统计口径，顺手把本周发版文档也补一下。前端涉及 web-console 的日志页面，后端涉及 admin-console 的 usage_metrics 和 overview_stats 接口，SQL 有 metrics_v1.sql。",
-      "expected_output": "Updates the relevant 客户X/内部系统A area notes, creates or updates the current weekly release note, records only landed changes, and includes scripts/config/SQL/validation placeholders without inventing secrets.",
+      "expected_output": "Runs the mandatory startup checklist (PKB vault-map + writing-conventions + a single-level probe). Probes 02 Areas/ and finds it empty, so it does NOT write to the historical 02 Areas/客户X/... path. Tells the user the historical path is gone and asks where the notes should live before creating anything. Records only landed changes, and does not invent secrets.",
       "files": []
     },
     {
       "id": 2,
       "prompt": "这次只是讨论了下 内部系统B后续可能怎么做，还没定方案，也没改代码。你帮我看看要不要记知识库。",
-      "expected_output": "Does not create a release note or durable project note; explains that speculative discussion should not be recorded unless there is an accepted decision, reusable constraint, or confirmed next action.",
+      "expected_output": "Does not create a release note or durable project note. Explains that speculative discussion should not be recorded unless there is an accepted decision, reusable constraint, or confirmed next action.",
       "files": []
     },
     {
       "id": 3,
       "prompt": "今天发布内部系统A：打包 h5_bundle、admin dist、admin-console app，上传到内网主机的 /srv/release，解压后复制 .env.production，然后执行 admin-console/scripts/docker-restart.sh -e prod -s app，前端重启 web-service。把这些落实到本周发版文档里。",
-      "expected_output": "Creates or updates the 内部系统A weekly release note with package, upload, unzip, config copy, backend restart, frontend restart, validation, rollback, and path details using the vault's operational note style.",
+      "expected_output": "Runs the startup checklist and probes first. Since no matching area exists under 02 Areas/, asks the user where the release note should live instead of writing to the historical 客户X path. Once a location is chosen, writes the weekly release note using references/release-note-template.md with package, upload, unzip, config copy, backend restart, frontend restart, validation, and rollback details.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "帮我在 Obsidian 里把 Inbox 那篇 Docker 文档移到 03 Resources 的对应目录，顺便更新一下 MOC。",
+      "expected_output": "Does not fire this skill. This is live note editing/moving/MOC maintenance, which belongs to obsidian-personal-knowledge-base — defer to it.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "帮我整理一下本周的周报，把项目进展汇总一下。",
+      "expected_output": "Does not fire this skill unless the content is release-relevant. A regular weekly report is maintained by obsidian-personal-knowledge-base via references/work-management.md; this skill only owns the weekly RELEASE note (发版). If release-relevant changes exist, record only those.",
       "files": []
     }
   ]

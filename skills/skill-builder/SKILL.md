@@ -30,6 +30,8 @@ Skill 解决"Agent 该做但反复做"的事。如果只是单次任务,不要�
 | 是 prompt / alias / config toggle 就能解决的 | 不是 skill 问题 |
 | 用户已经把流程写成 SOP / runbook | 可以考虑 skill 化,但先确认 Q2 |
 
+**怎么验证频率**:去查会话日志、git log、自己的笔记,数出具体次数。数不出来就说"数不出来",不要用"感觉经常"充当证据。
+
 ### Q2. 触发关键词能不能写在 1-3 句话里?
 
 description 字段决定 Agent 何时触发。模糊 description = 永不触发 / 永远误触发。
@@ -38,11 +40,21 @@ description 字段决定 Agent 何时触发。模糊 description = 永不触发 
 
 ### Q3. 这个 skill 的"做什么"和"不做什么"边界清不清?
 
-边界不清的 skill 会跟现有 skill 打架(尤其是 obsidian 类)。如果边界说不清:
+先做一件事:**列出现有 skill 的 description,逐个对照**。边界只有相对现有 skill 才有意义。
+
+| 检查 | 处理 |
+| --- | --- |
+| 现有 skill 里有没有覆盖同一批动词? | 有 → 要么合并,要么把差异写进 Do NOT use |
+| 触发现场有没有可能同时命中两个 skill? | 会 → **双方**的 description 都要写明排他边界 |
+| 能不能用一句话说清"这个 skill 不做什么"? | 不能 → 边界还没想清,别建 |
+
+如果边界说不清:
 
 - 太宽:拆成 P0 skill + 引用
 - 太窄:合并到现有 skill
 - 不清:先写一版 Do NOT use this skill when,看能不能收紧;收不紧就别建
+
+> ⚠ **边界必须写进 description,不能只写在正文。** 触发决策只看 description;正文要等触发后才被读到——写在正文的边界等于没有。
 
 ### Q4. 范围是 P0 / P1 / P2 哪一档?
 
@@ -118,7 +130,8 @@ description: >-
 在宣布 skill 完成前,逐项确认:
 
 - [ ] 目录名 = frontmatter `name` 字段(强制一致,大小写敏感)
-- [ ] frontmatter 含 `name` + `description`,YAML 合法
+- [ ] frontmatter 含 `name` + `description`
+- [ ] **用解析器实测** frontmatter 能解析通过(不是目测)。常见坑:单行 description 里出现 `: ` (冒号+空格)会被 YAML 当成映射分隔符,必须去掉冒号或改成 `>-` 折叠块
 - [ ] description 第一段是"Use this skill when..."(或等价表达)
 - [ ] description 含 3-6 个具体动词 + 1-3 个对象,不是模糊词
 - [ ] description 含"Do NOT use this skill when..."边界
