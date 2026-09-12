@@ -126,11 +126,25 @@ def create_refusals(state: dict, branch: str, target: str) -> list[str]:
     parent = os.path.dirname(target)
     if not S.is_dir(parent):
         reasons.append(f"上一级目录不存在：{parent}")
-    # 同级目录落在**另一个**仓库里的话，那个仓库会把新目录当成未跟踪内容收进去
+    # 落在**本仓库**里同样要拒，而且更该拒：那样 `git status` 会把新目录当成未跟踪
+    # 内容收进来、`clean -fd` 也会去删它 —— 正是「放仓库同级」要避开的事。
+    # （实测踩过：`--at <本仓库>/sub` 被放行，输出还写着「这个目录在仓库之外」——假话。）
     outer = _toplevel_of(parent)
-    if outer and not S.same_path(outer, state["root"]):
+    if outer and S.same_path(outer, state["root"]):
+        reasons.append(f"目标落在本仓库的工作树里（{target}）—— 那会让 git status 把它"
+                       "当成未跟踪内容收进来；换成仓库之外的位置（默认是仓库同级）")
+    elif outer:
         reasons.append(f"同级目录落在另一个 git 仓库里（{outer}）—— 换个位置，"
                        "或者把那个仓库排除掉")
+    git_dir = S.git_dir(state["root"])
+    if git_dir:
+        # 比之前先解析符号链接：macOS 上 git 给的是 `/private/var/...`，而
+        # 用户传进来的可能是 `/var/...` —— 直接 startswith 会漏判（本仓的
+        # `S.same_path` 就是为这个坑写的，前缀判断得自己再做一次）。
+        real_target = os.path.realpath(target)
+        real_git = os.path.realpath(git_dir).rstrip("/")
+        if real_target == real_git or real_target.startswith(real_git + "/"):
+            reasons.append("目标落在 .git 目录里 —— 那里是 git 自己放东西的地方")
     return reasons
 
 
@@ -143,8 +157,6 @@ def recyclable(state: dict, path: str) -> int:
 def render_list(state: dict, stale_only: bool) -> str:
     rows = []
     for item in state["worktrees"]:
-        if item["exists"] and item["prunable"]:
-            pass
         level = recyclable(state, item["path"])
         if stale_only and level != SAFE:
             continue
@@ -167,7 +179,8 @@ def render_list(state: dict, stale_only: bool) -> str:
         note = "  [" + ", ".join(row["flags"]) + "]" if row["flags"] else ""
         lines.append(f"{row['verdict']:<6} {row['branch']:<30} {row['head']:<9} "
                      f"{row['path']}{note}")
-    lines.append("（结论来自 git_guard.py 的三项前置：已并入基线 / 无未推送 / 无未提交）")
+    lines.append("（结论来自 git_guard.py 的判据：脏 → BLOCK；未并入基线 → WARN；"
+                 "干净且已并入 → SAFE）")
     return "\n".join(lines)
 
 
@@ -205,8 +218,13 @@ def run(args) -> tuple[int, str]:
         after = S.snapshot(args.repo)
         item = next((w for w in after["worktrees"] if S.same_path(w["path"], target)), None)
         where = f"{item['branch']} @ {item['head']}" if item else "(刚建出来，快照里还没出现)"
+        # 上面已经把「落在仓库里」的两种情况都拒了，所以这里说「在仓库之外」是真话；
+        # 但要说清这个位置是默认的还是你指定的 —— 换过位置的人得知道默认在哪。
+        beside = "（默认位置：仓库同级）" if S.same_path(
+            target, target_path(state["root"], branch)) else \
+            f"（你指定的位置；默认是 {target_path(state['root'], branch)}）"
         return 0, (f"建好了：{target}\n  {where}\n"
-                   f"  注意：这个目录在仓库之外，不用改 .gitignore")
+                   f"  这个目录在仓库之外 {beside}：不用改 .gitignore，git status 也看不见它")
 
     if args.command == "prune":
         before = len(state["worktrees"])
@@ -214,13 +232,20 @@ def run(args) -> tuple[int, str]:
         if code != 0:
             return 1, f"prune 失败：{err.strip()}"
         after = S.snapshot(args.repo)
-        removed = [line for line in out.splitlines() if line.strip()]
+        # 判据用**条目数有没有变**，不用「git 自己有没有打印」：实测 `worktree prune -v`
+        # 会静默地清掉已不存在目录的记录，而输出是空的 —— 照着输出判，就会出现
+        # 「没有需要清理的记录」和「条目：2 → 1」同一屏摆着。自相矛盾的报告比不说更糟。
+        gone = [w["path"] for w in state["worktrees"]
+                if not any(S.same_path(w["path"], entry["path"])
+                           for entry in after["worktrees"])]
         lines = [f"worktree 条目：{before} → {len(after['worktrees'])}"]
-        if removed:
+        if gone:
             lines.append("清理掉的记录：")
-            lines.extend(f"  {line}" for line in removed)
+            lines.extend(f"  {path}" for path in gone)
+            detail = [line for line in (out + err).splitlines() if line.strip()]
+            lines.extend(f"  （git 说：{line}）" for line in detail)
         else:
-            lines.append("没有需要清理的记录（prunable 的那些目录可能又回来了）")
+            lines.append("没有可以清理的记录（prunable 的那些目录可能又回来了）")
         return 0, "\n".join(lines)
 
     if args.command == "remove":
@@ -228,7 +253,7 @@ def run(args) -> tuple[int, str]:
         verdict = GUARD.evaluate("delete-worktree", state, _GuardArgs(path))
         if verdict.level != SAFE:
             return verdict.level, (GUARD.render(verdict)
-                                   + "\n\n（三项前置没全过，这里不会替你动手）")
+                                   + "\n\n（结论不是 SAFE，所以这里不替你动手）")
         item = next((w for w in state["worktrees"] if S.same_path(w["path"], path)), None)
         if item is None:
             return 1, f"worktree 清单里没有这个路径：{path}"
@@ -276,7 +301,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("prune", parents=[common], help="清掉目录已经不存在的 worktree 记录")
 
     p_remove = sub.add_parser("remove", parents=[common],
-                              help="回收一个 worktree（过三项前置）")
+                              help="回收一个 worktree（先过 git_guard.py 的判据）")
     p_remove.add_argument("path", help="worktree 路径")
 
     args = parser.parse_args(argv)

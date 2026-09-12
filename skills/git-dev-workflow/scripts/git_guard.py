@@ -110,9 +110,12 @@ def render(verdict: Verdict) -> str:
     lines.extend(f"         原因：{reason}" for reason in verdict.reasons)
     if verdict.caveat:
         lines.append(f"         注意：{verdict.caveat}")
-    if verdict.command:
+    if verdict.command and verdict.level != BLOCK:
         lines.append("确认要这么做的话，执行这一条")
         lines.append(f"         {verdict.command}")
+    elif verdict.command:
+        lines.append("（被拦时不给命令 —— 给了就等于在暗示它可以做。"
+                     "先把上面的原因解决掉，再重新跑一次这个判据。）")
     return "\n".join(lines)
 
 
@@ -152,6 +155,13 @@ def guard_discard_worktree(state: dict) -> Verdict:
     unprotected = dirty["protected"]
     if unprotected:
         evidence.append("疑似凭据也在里面：" + "、".join(e["path"] for e in unprotected))
+    if state.get("submodules", {}).get("present"):
+        # 说清范围，不然会被读成「顺手也把子模块清了」：reset --hard 不动子模块工作树，
+        # clean -fd 也不会删嵌套的 git 仓库（要 -ff 才行）。
+        count = len(state["submodules"].get("items", []))
+        evidence.append(f"子模块 {count} 个：这个动作只作用于当前工作树 —— "
+                        "reset --hard 与 clean -fd 都不进子模块，"
+                        "所以子模块里那些未提交的改动不在它的范围里")
     if not files:
         evidence.append("工作区是干净的")
     blocking: list[str] = []
@@ -212,6 +222,8 @@ def guard_delete_branch(state: dict, name: str) -> Verdict:
     baseline = state["branch"]["baseline"]
     if branch["current"]:
         evidence.append(f"{name} 就是当前分支")
+    if name == baseline:
+        evidence.append(f"{name} 就是基线分支本身")
     if branch["merged"] is None:
         evidence.append(f"没有基线分支可比（这个仓库没有 main/dev/master）—— 无法确认它是否已并入")
     else:
@@ -224,6 +236,11 @@ def guard_delete_branch(state: dict, name: str) -> Verdict:
     warning: list[str] = []
     if branch["current"]:
         blocking.append("它是当前分支：先切到别的分支（或别的 worktree）上再删")
+    if name == baseline:
+        # 删基线不是「清理分支」，是换主干：主干上的提交可能只被它指着，
+        # 而且删掉它之后这个工具的所有判断都没有参照了。
+        blocking.append(f"它是基线分支（{baseline}）：所有判断都以它为准 —— "
+                        "这在「清理分支」的范围之外，真要换主干就先做迁移")
     if branch["merged"] is None:
         blocking.append("确认不了它是否已并入别处 —— 拿不到信息时按最坏处理")
     elif not branch["merged"] and branch["unpushed"]:
@@ -296,9 +313,16 @@ def _patch_id(repo: str, args: list[str]) -> str:
 
 
 def _commit_patch_ids(repo: str, limit: int) -> dict[str, str]:
-    """最近 limit 条提交的 patch-id → sha。**有界**，并在报告里说明这个界。"""
+    """最近 limit 条提交的 patch-id → sha。**有界**，并在报告里说明这个界。
+
+    `--exclude=refs/stash` 不能省，且必须写在 `--all` **前面**：`--all` 把
+    `refs/stash` 也算进去，于是 stash 的改动会匹配到它自己 —— 那样
+    「改动在别处找不到」这条分支永远走不到，drop-stash 对任何非空 stash
+    都给 SAFE（实测踩过：整条 WARN 分支成了死代码）。
+    """
     try:
-        log = subprocess.run(["git", "-C", repo, "log", "--all", "-n", str(limit), "-p"],
+        log = subprocess.run(["git", "-C", repo, "log", "--exclude=refs/stash", "--all",
+                              "-n", str(limit), "-p"],
                              capture_output=True, text=True)
         if log.returncode != 0:
             return {}
@@ -333,8 +357,8 @@ def guard_drop_stash(state: dict, ref: str) -> Verdict:
         evidence.append(f"同样的改动已经在提交 {hit} 里 —— 在最近 {PATCH_ID_SCAN} 条里找到的")
         return Verdict(f"drop-stash {ref}", SAFE, [], evidence,
                        command=f"git stash drop {ref}")
-    evidence.append(f"最近 {PATCH_ID_SCAN} 条提交里没有同样的改动"
-                    f"（比对范围有界，更早的历史没查）")
+    evidence.append(f"最近 {PATCH_ID_SCAN} 条提交里没有同样的改动（stash 自身不算；"
+                    f"比对范围有界，更早的历史没查）")
     return Verdict(f"drop-stash {ref}", WARN,
                    ["这条 stash 的改动在近期历史里找不到对应 —— 丢了就要去 reflog 捞"],
                    evidence, command=f"git stash drop {ref}")
@@ -401,15 +425,17 @@ def guard_force_push(state: dict, branch: str, remote: str) -> Verdict:
                        "拿不到远端现在在哪，按最坏处理（先 fetch 一次）")
         return Verdict(f"force-push {remote_ref}", BLOCK, reasons, evidence,
                        command=f"git fetch {remote} && git status -sb")
-    theirs = S.as_int(S.git_text(state["root"], "rev-list", "--count",
-                                 f"{remote_ref}..HEAD"))
-    ours_only = S.as_int(S.git_text(state["root"], "rev-list", "--count",
-                                    f"HEAD..{remote_ref}"))
-    evidence.append(f"远端有而本地没有：{ours_only} 条；本地有而远端没有：{theirs} 条")
-    if ours_only:
-        reasons.append(f"远端有 {ours_only} 条本地没有的提交 —— 强推会把它们从远端抹掉")
+    # 变量名按**方向**取，不按“谁的”——上一版把两个名字写反了（逻辑对、名字反），
+    # 读代码的人会以为 `remote_ref..HEAD` 是“远端的”。方向按 `A..B` 读就是 B 独有。
+    local_only = S.as_int(S.git_text(state["root"], "rev-list", "--count",
+                                     f"{remote_ref}..HEAD"))
+    remote_only = S.as_int(S.git_text(state["root"], "rev-list", "--count",
+                                      f"HEAD..{remote_ref}"))
+    evidence.append(f"远端有而本地没有：{remote_only} 条；本地有而远端没有：{local_only} 条")
+    if remote_only:
+        reasons.append(f"远端有 {remote_only} 条本地没有的提交 —— 强推会把它们从远端抹掉")
         return Verdict(f"force-push {remote_ref}", BLOCK, reasons, evidence, command="")
-    if not theirs:
+    if not local_only:
         reasons.append("本地并不领先 —— 这条强推没有内容可推，普通 push 就够")
         return Verdict(f"force-push {remote_ref}", WARN, reasons, evidence,
                        command=f"git push {remote}")
@@ -444,6 +470,11 @@ ACTIONS = {
 
 
 def evaluate(action: str, state: dict, args) -> Verdict:
+    # 先清一次去重缓存。**这行是双保险，不是承重的**：判档读的都是传进来的 state，
+    # 每次 snapshot() 开头已经清过了（承重的是那一句 —— 用例盯着它）。这里清一次是防
+    # 「直接调 evaluate、state 是别处取的」那条路径（worktree.py 就是这么调的）下，
+    # 证据文本里重问 git 时拿到更早一次读取的旧事实。别把它当成判档的保障。
+    S.clear_cache()
     if action not in ACTIONS:
         return Verdict(action, BLOCK, [f"不认识的动作；可用：{'、'.join(ACTIONS)}"], [])
     # 中间态下一律先拦：rebase/merge 没结束时，这些命令的含义和平时不一样

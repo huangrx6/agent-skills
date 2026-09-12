@@ -120,6 +120,30 @@ class TestSpecViolations(StyleCase):
         self.assertIn("规则 12", self.spec_rules(message))
 
 
+class TestDiagnosisPointsAtTheRightThing(StyleCase):
+    """诊断必须指出**真正的**病因。
+
+    两类问题都会让正则匹配不上，如果按"匹配不上就报规则 1"，读的人会去改冒号 ——
+    而冒号本来是对的。两个都真实发生过：
+    """
+
+    def test_misplaced_bang_is_rule_13_not_rule_1(self):
+        """`feat!(api): x` —— `!` 位置错，但会先被误报成"没有冒号"。"""
+        rules = self.spec_rules("feat!(api): 去掉分页参数")
+        self.assertIn("规则 13", rules)
+        self.assertNotIn("规则 1", rules, "病因说错了：冒号是在的，错的是 `!` 的位置")
+
+    def test_hyphenated_type_is_not_reported_as_missing_colon(self):
+        """`e2e-ops: x` —— type 不在表里，但会先被误报成"没有冒号"。"""
+        rules = self.spec_rules("e2e-ops: 36/36 全过")
+        self.assertNotIn("规则 1", rules, "病因说错了：冒号是在的，问题是 type 不在表里")
+
+    def test_valid_bang_placement_is_clean(self):
+        for message in ("feat!: 去掉分页参数", "feat(api)!: 去掉分页参数"):
+            with self.subTest(message=message):
+                self.assertEqual(set(), self.spec_rules(message))
+
+
 class TestCaseSensitivityIsNotARule(StyleCase):
     def test_rule_15_uppercase_type_is_not_a_violation(self):
         """规则 15 明说实现者**不得**区分大小写 —— 所以 `FEAT:` 不违规。
@@ -218,6 +242,27 @@ class TestCli(StyleCase):
         self.addCleanup(os.unlink, path)
         code, _ = self.run_cli(["--check-file", path])
         self.assertEqual(0, code)
+
+    def test_check_file_when_comments_come_first(self):
+        """回归：注释写在**前面**时，剥掉注释后正文顶部会剩下一个空行。
+
+        去掉首尾空行是 git 默认就会做的事（cleanup=strip）—— 不做的话，完全合规
+        的信息会被报成「规则 1：看不出一行以 type 开头」，诊断指到了错的地方。
+        上面那条用例把注释放在**末尾**（用户手打的顺序），正好绕开了这个朝向。
+        """
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False,
+                                         encoding="utf-8") as handle:
+            handle.write("# 注释在前（git 的模板就是这样）\n\nfix: 从文件读\n")
+            path = handle.name
+        self.addCleanup(os.unlink, path)
+        code, output = self.run_cli(["--check-file", path])
+        self.assertEqual(0, code, output)
+
+    def test_leading_blank_lines_are_not_a_spec_violation(self):
+        """同一条清理的另一个朝向：开头多了空行，信息本身是合规的。"""
+        code, output = self.run_cli(["--check", "\n\nfix: 从命令行来\n"])
+        self.assertEqual(0, code, output)
 
 
 if __name__ == "__main__":

@@ -10,14 +10,10 @@
 所以每个用例在 `tempfile` 里 `git init` 一个真仓库，用真的 `git` 造出那个状态。
 慢一点（每个用例几十毫秒），但这是唯一能验到判据的办法。
 
-## 环境是干净的
+## 夹具在 `_fixtures.py`
 
-`GIT_CONFIG_GLOBAL` / `GIT_CONFIG_SYSTEM` 都指向 `/dev/null`：本机全局配置
-（比如 `core.hooksPath`、`filter.lfs.required`）不会渗进夹具，不然用例会随机器而变。
-
-`GIT_*` 开头的环境变量全部先清掉：钩子在 `git commit` 期间跑测试时会带进来
-`GIT_DIR` / `GIT_INDEX_FILE` 这类变量，它们会让夹具里的 git 命令操作到**外层仓库**。
-症状很典型：**手动跑全过、在钩子里挂几个**。统一清掉才叫隔离。
+真建仓库这件事三个测试文件都要用，所以抽成一份 —— 复制三份的结果必然是其中两份忘了改。
+环境隔离（`GIT_*` 先清掉、全局配置指向 /dev/null）也写在那里，理由在那边。
 """
 
 from __future__ import annotations
@@ -38,6 +34,7 @@ SCRIPTS = os.path.join(os.path.dirname(HERE), "scripts")
 
 
 def _load(name: str, path: str):
+    """按显式路径加载同目录模块（先注册 sys.modules 再 exec）。"""
     spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"加载不了 {path}")
@@ -50,9 +47,16 @@ def _load(name: str, path: str):
 STATE = _load("git_state", os.path.join(SCRIPTS, "git_state.py"))
 GUARD = _load("git_guard", os.path.join(SCRIPTS, "git_guard.py"))
 WORKTREE = _load("worktree", os.path.join(SCRIPTS, "worktree.py"))
+REPORT = _load("git_report", os.path.join(SCRIPTS, "git_report.py"))
+PLAN = _load("commit_plan", os.path.join(SCRIPTS, "commit_plan.py"))
 
 
 # ── 夹具 ──────────────────────────────────────────────────────────────────
+#
+# 这段在三个测试文件里**故意各留一份**，没有抽成共用模块：抽出去之后基类变成运行时
+# 对象，静态分析就看不见 `state()` / `guard()` 这些继承来的方法，会报一屏
+# “Cannot access attribute”。本仓其它测试文件也是各自定义夹具 —— 不是懒，
+# 是让检查器看得见。真建仓库这件事本身的说明在下面这段 docstring 里。
 class Repo:
     """一个临时建出来的真仓库。"""
 
@@ -62,6 +66,7 @@ class Repo:
     def git(self, *args: str) -> str:
         proc = subprocess.run(["git", "-C", self.path, *args],
                               capture_output=True, text=True, check=False)
+        # merge / checkout 允许失败（用例就是要制造冲突与中间态）
         if proc.returncode != 0 and args[:1] not in (("merge",), ("checkout",)):
             raise AssertionError(f"git {' '.join(args)} 失败：{proc.stderr.strip()}")
         return proc.stdout
@@ -88,7 +93,7 @@ class Repo:
 
 
 class RepoCase(unittest.TestCase):
-    """建/拆一个仓库，并把全局 git 配置隔离掉。"""
+    """建/拆一个仓库，隔离 git 环境，并提供跑脚本的帮手。"""
 
     def setUp(self):
         self._saved_env = dict(os.environ)
@@ -109,18 +114,28 @@ class RepoCase(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
+        # 同级的 worktree（create 建的）也要一起清，不然 /tmp 里会攒东西
+        for suffix in ("-feat-x", "-feat-a", "-side"):
+            shutil.rmtree(self.tmp + suffix, ignore_errors=True)
         os.environ.clear()
         os.environ.update(self._saved_env)
 
+    # ── 帮手：跑脚本、取状态 ───────────────────────────────────────────────
     def state(self) -> dict:
         return STATE.snapshot(self.repo.path)
 
+    def cli(self, module, *argv: str) -> tuple[int, str]:
+        """跑一个脚本的 main()，把 stdout / stderr 一起收下来。"""
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
+            code = module.main(list(argv))
+        return code, buffer.getvalue()
+
     def guard(self, action: str, *extra: str) -> tuple[int, dict]:
         """跑一次 guard，返回 (退出码, JSON 结论)。"""
-        buffer = io.StringIO()
-        with contextlib.redirect_stdout(buffer):
-            code = GUARD.main([action, *extra, "--repo", self.repo.path, "--json"])
-        return code, json.loads(buffer.getvalue())
+        code, output = self.cli(GUARD, action, *extra, "--repo", self.repo.path,
+                                "--json")
+        return code, json.loads(output)
 
 
 # ── git_state ─────────────────────────────────────────────────────────────
@@ -445,7 +460,7 @@ class TestUnknownAction(RepoCase):
 
 # ── worktree ──────────────────────────────────────────────────────────
 class WorktreeCase(RepoCase):
-    def cli(self, *argv: str) -> tuple[int, str]:
+    def wt(self, *argv: str) -> tuple[int, str]:
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
             code = WORKTREE.main([*argv, "--repo", self.repo.path])
@@ -465,7 +480,7 @@ class TestWorktreePlacement(WorktreeCase):
         self.repo.commit("一")
         target = self.beside("feat/x")
         self.addCleanup(shutil.rmtree, target, ignore_errors=True)
-        code, output = self.cli("create", "feat/x")
+        code, output = self.wt("create", "feat/x")
         self.assertEqual(0, code, output)
         self.assertTrue(os.path.isdir(target))
         self.assertEqual(os.path.dirname(os.path.abspath(self.repo.path)),
@@ -481,7 +496,7 @@ class TestWorktreePlacement(WorktreeCase):
     def test_create_refuses_when_the_branch_exists(self):
         self.repo.commit("一")
         self.repo.git("branch", "feat/x")
-        code, output = self.cli("create", "feat/x")
+        code, output = self.wt("create", "feat/x")
         self.assertEqual(1, code)
         self.assertIn("已经有分支", output)
 
@@ -490,7 +505,7 @@ class TestWorktreePlacement(WorktreeCase):
         target = self.beside("feat/x")
         os.makedirs(target, exist_ok=True)
         self.addCleanup(shutil.rmtree, target, ignore_errors=True)
-        code, output = self.cli("create", "feat/x")
+        code, output = self.wt("create", "feat/x")
         self.assertEqual(1, code)
         self.assertIn("已经存在", output)
 
@@ -515,30 +530,30 @@ class TestWorktreePlacement(WorktreeCase):
 class TestWorktreeLifecycle(WorktreeCase):
     def test_prune_clears_records_whose_directory_is_gone(self):
         self.repo.commit("一")
-        self.cli("create", "feat/x")
+        self.wt("create", "feat/x")
         shutil.rmtree(self.beside("feat/x"), ignore_errors=True)
         self.assertEqual(2, len(STATE.snapshot(self.repo.path)["worktrees"]))
-        code, output = self.cli("prune")
+        code, output = self.wt("prune")
         self.assertEqual(0, code, output)
         self.assertEqual(1, len(STATE.snapshot(self.repo.path)["worktrees"]))
 
     def test_remove_refuses_while_there_are_uncommitted_changes(self):
         self.repo.commit("一")
-        self.cli("create", "feat/x")
+        self.wt("create", "feat/x")
         target = self.beside("feat/x")
         self.addCleanup(shutil.rmtree, target, ignore_errors=True)
         with open(os.path.join(target, "dirty.txt"), "w", encoding="utf-8") as handle:
             handle.write("x\n")
-        code, output = self.cli("remove", target)
+        code, output = self.wt("remove", target)
         self.assertEqual(GUARD.BLOCK, code)
         self.assertIn("只存在于那个目录里", output)   # 真正的损失是未提交的改动
         self.assertTrue(os.path.isdir(target), "被拒绝时不许动它")
 
     def test_remove_works_when_clean_and_merged(self):
         self.repo.commit("一")
-        self.cli("create", "feat/x")
+        self.wt("create", "feat/x")
         target = self.beside("feat/x")
-        code, output = self.cli("remove", target)
+        code, output = self.wt("remove", target)
         self.assertEqual(0, code, output)
         self.assertFalse(os.path.isdir(target))
         # 回收 worktree 不该顺手删分支 —— 那是另一件事，另一道判据
@@ -550,21 +565,419 @@ class TestWorktreeLifecycle(WorktreeCase):
         人两个位置都会写（我自己第一次就是这么跑的），所以两边都得认。
         """
         self.repo.commit("一")
-        code, output = self.cli("list")
+        code, output = self.wt("list")
         self.assertEqual(0, code)
         self.assertIn(self.repo.path, output)
 
     def test_list_stale_hides_healthy_worktrees(self):
         self.repo.commit("一")
-        self.cli("create", "feat/x")
+        self.wt("create", "feat/x")
         target = self.beside("feat/x")
         self.addCleanup(shutil.rmtree, target, ignore_errors=True)
         with open(os.path.join(target, "dirty.txt"), "w", encoding="utf-8") as handle:
             handle.write("x\n")
-        code, output = self.cli("list", "--stale")
+        code, output = self.wt("list", "--stale")
         self.assertEqual(0, code)
         self.assertNotIn("feat/x", output, "有未提交的不算可回收")
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ── git_report ────────────────────────────────────────────────────────────
+class ReportCase(RepoCase):
+    def report(self, *argv: str) -> tuple[int, str]:
+        return self.cli(REPORT, *argv, "--repo", self.repo.path)
+
+
+class TestReport(ReportCase):
+    def test_capture_then_unchanged(self):
+        self.repo.commit("一")
+        code, output = self.report("--capture")
+        self.assertEqual(0, code, output)
+        self.assertIn("快照已存", output)
+        code, output = self.report()
+        self.assertEqual(0, code)
+        self.assertIn("没变", output)
+
+    def test_new_commit_shows_up(self):
+        self.repo.commit("一")
+        self.report("--capture")
+        self.repo.commit("二", relpath="b.txt")
+        code, output = self.report()
+        self.assertEqual(0, code)
+        self.assertIn("新增 1 条提交", output)
+        self.assertIn("二", output)
+
+    def test_lost_commit_is_flagged(self):
+        """提交“消失了”要单独标出来 —— 那是 reflog 能救、但必须先知道的事。
+
+        顺序要紧：先在「二」的位置 capture，再 reset 回「一」——
+        这样「二」才是"之前可达、现在不可达"。
+        """
+        self.repo.commit("一")
+        first = self.repo.git("rev-parse", "HEAD").strip()
+        self.repo.commit("二", relpath="b.txt")
+        self.report("--capture")
+        self.repo.git("reset", "--hard", first)
+        code, output = self.report()
+        self.assertEqual(0, code)
+        self.assertIn("消失了", output)
+        self.assertIn("二", output)
+
+    def test_missing_snapshot_says_capture_first(self):
+        self.repo.commit("一")
+        code, output = self.report()
+        self.assertEqual(1, code)
+        self.assertIn("--capture", output)
+
+    def test_snapshot_from_another_repo_is_refused(self):
+        self.repo.commit("一")
+        other = tempfile.mkdtemp(prefix="gitdev-other-")
+        self.addCleanup(shutil.rmtree, other, ignore_errors=True)
+        subprocess.run(["git", "init", "-b", "main", other],
+                       capture_output=True, text=True, check=True)
+        elsewhere = os.path.join(other, "snap.json")
+        code, _ = self.cli(REPORT, "--capture", "--file", elsewhere, "--repo", other)
+        self.assertEqual(0, code)
+        code, output = self.report("--file", elsewhere)
+        self.assertEqual(1, code)
+        self.assertIn("另一个仓库", output)
+
+    def test_raw_block_has_commands_and_real_output(self):
+        """粘贴块必须是「命令 + 原始输出」—— 那才是报告里该出现的东西。"""
+        self.repo.commit("一")
+        self.report("--capture")            # 报告要先有快照比，不然它是拒绝跑的
+        code, output = self.report()
+        self.assertEqual(0, code)
+        self.assertIn("$ git rev-parse --short HEAD", output)
+        self.assertIn(self.repo.git("rev-parse", "--short", "HEAD").strip(), output)
+        self.assertIn("$ git status --porcelain", output)
+        self.assertIn("$ git stash list", output)
+
+    def test_json_is_machine_readable(self):
+        self.repo.commit("一")
+        self.report("--capture")
+        self.repo.write("src/app.py")
+        code, output = self.report("--json")
+        self.assertEqual(0, code)
+        payload = json.loads(output)
+        self.assertEqual(0, payload["before"]["dirty_total"])
+        self.assertEqual(1, payload["after"]["dirty_total"])
+
+
+# ── commit_plan ───────────────────────────────────────────────────────────
+class PlanCase(RepoCase):
+    def plan(self, *argv: str) -> tuple[int, dict]:
+        code, output = self.cli(PLAN, *argv, "--repo", self.repo.path, "--json")
+        return code, json.loads(output) if output.strip().startswith("{") else {}
+
+    def groups_of(self, result: dict) -> dict:
+        return {group["kind"] if group["kind"] != "normal" else group["label"]: group
+                for group in result["groups"]}
+
+
+class TestPlanGroups(PlanCase):
+    def test_secret_is_its_own_group_and_nowhere_else(self):
+        """**硬规矩**：疑似凭据单独成组，且不出现在任何别的组里 —— 它是提交前最该看的。"""
+        self.repo.commit("一")
+        self.repo.write(".env.local", "TOKEN=1\n")
+        self.repo.write("src/app.py")
+        _, result = self.plan()
+        secret = [g for g in result["groups"] if g["kind"] == "secret"]
+        self.assertEqual(1, len(secret))
+        self.assertEqual([".env.local"], secret[0]["files"])
+        others = [path for g in result["groups"] if g["kind"] != "secret"
+                  for path in g["files"]]
+        self.assertNotIn(".env.local", others, "凭据混进别的组就等于会被顺手提交")
+
+    def test_every_group_has_an_add_command(self):
+        self.repo.commit("一")
+        self.repo.write("src/app.py")
+        self.repo.write("docs/readme.md")
+        _, result = self.plan()
+        self.assertTrue(result["groups"])
+        for group in result["groups"]:
+            self.assertTrue(group["add_command"].startswith("git add -- "))
+
+    def test_clean_tree_says_there_is_nothing(self):
+        self.repo.commit("一")
+        code, output = self.cli(PLAN, "--repo", self.repo.path)
+        self.assertEqual(0, code)
+        self.assertIn("干净", output)
+
+    def test_untracked_file_reports_its_line_count(self):
+        self.repo.commit("一")
+        self.repo.write("src/app.py", "one\ntwo\nthree\n")
+        _, result = self.plan()
+        found = [group["untracked_lines"] for group in result["groups"]
+                 if group["untracked_lines"]]
+        self.assertTrue(found)
+        self.assertEqual("3 行", found[0]["src/app.py"])
+
+
+class TestPrefixRule(PlanCase):
+    """前缀规则是纯函数，直接测规则本身。"""
+
+    def test_all_tests_gets_test(self):
+        prefix, _ = PLAN.candidate_prefix(["tests/test_a.py", "tests/test_b.py"], {"M"})
+        self.assertEqual("test", prefix)
+
+    def test_mixed_group_must_not_be_called_test(self):
+        """回归：规则曾经用 `any`，一组 scripts + tests 被报成 test —— 源码改动被盖住。
+
+        候选前缀存在的意义就是「你能一眼反驳它」，指向错的东西比不指更糟。
+        """
+        prefix, reason = PLAN.candidate_prefix(["tests/test_a.py", "scripts/x.py"], {"M"})
+        self.assertEqual("", prefix)
+        self.assertIn("需要你定", reason)
+        self.assertIn("含测试文件", reason)
+
+    def test_docs_ci_build_and_delete_only(self):
+        self.assertEqual("docs", PLAN.candidate_prefix(["a.md", "b.md"], {"M"})[0])
+        self.assertEqual("ci", PLAN.candidate_prefix([".github/workflows/ci.yml"], {"M"})[0])
+        self.assertEqual("build",
+                         PLAN.candidate_prefix(["Dockerfile", "docker-compose.yml"], {"M"})[0])
+        self.assertEqual("chore", PLAN.candidate_prefix(["src/old.py"], {"D"})[0])
+
+    def test_source_only_says_you_decide(self):
+        prefix, reason = PLAN.candidate_prefix(["src/app.py"], {"M"})
+        self.assertEqual("", prefix)
+        self.assertIn("需要你定", reason)
+
+
+# ── stash 回收判据 ────────────────────────────────────────────────────────
+class TestGuardStash(RepoCase):
+    def stash_something(self, relpath: str, text: str) -> None:
+        self.repo.write(relpath, text)
+        self.repo.git("add", "-A")
+        self.repo.git("stash", "push", "-m", "待处理")
+
+    def test_stash_content_nowhere_else_warns(self):
+        """回归：`git log --all` 把 refs/stash 也算进去 → stash 匹配到它自己。
+
+        症状是「drop-stash 对任何非空 stash 都给 SAFE」，那条 WARN 分支成了死代码。
+        实测：stash 的 patch-id 原样出现在 `--all` 的扫描结果里。
+        """
+        self.repo.commit("一")
+        self.stash_something("brand-new.txt", "只在 stash 里\n")
+        code, output = self.cli(GUARD, "drop-stash", "stash@{0}", "--repo", self.repo.path)
+        self.assertEqual(3, code, output)
+        self.assertIn("找不到", output)
+
+    def test_stash_content_already_committed_is_safe(self):
+        """反向：同样的改动已经在提交里 —— 那才是这条判据存在的意义。"""
+        self.repo.commit("一")
+        self.stash_something("brand-new.txt", "内容\n")
+        self.repo.git("stash", "apply")
+        self.repo.git("add", "-A")
+        self.repo.git("commit", "-m", "二")
+        code, output = self.cli(GUARD, "drop-stash", "stash@{0}", "--repo", self.repo.path)
+        self.assertEqual(0, code, output)
+        self.assertIn("已经在提交", output)
+
+
+# ── 基线分支不能当普通分支删 ──────────────────────────────────────────────
+class TestGuardBaseline(RepoCase):
+    def test_baseline_branch_delete_is_blocked(self):
+        """回归：站在别的分支上删基线分支时曾给 SAFE，还递上 `git branch -D main`。
+
+        两件事让它必须拦：主干上的提交可能只被它指着；而且删掉它之后，
+        这个工具所有「已并入基线」的判断都没有参照了。
+        """
+        self.repo.commit("一")
+        self.repo.git("checkout", "-b", "feature")
+        code, output = self.cli(GUARD, "delete-branch", "main", "--repo", self.repo.path)
+        self.assertEqual(4, code, output)
+        self.assertIn("基线分支", output)
+
+    def test_ordinary_merged_branch_still_gets_safe(self):
+        """反向：普通分支该 SAFE 还是 SAFE —— 别顺手把范围放大。"""
+        self.repo.commit("一")
+        self.repo.git("branch", "helper")
+        code, output = self.cli(GUARD, "delete-branch", "helper", "--repo", self.repo.path)
+        self.assertEqual(0, code, output)
+
+
+# ── prune 的报告必须和条目数一致 ───────────────────────────────────────────
+class TestWorktreePrune(WorktreeCase):
+    def test_prune_report_matches_the_count(self):
+        """回归：`git worktree prune -v` 实测会**静默**清记录（输出为空）。
+
+        照它的输出判，就会在同一屏上说「没有可以清理的记录」和「条目：2 → 1」。
+        """
+        self.repo.commit("一")
+        target = self.beside("feat/gone")
+        self.addCleanup(shutil.rmtree, target, ignore_errors=True)
+        code, output = self.wt("create", "feat/gone")
+        self.assertEqual(0, code, output)
+        shutil.rmtree(target)                 # 目录被手删了 → 记录还在，可 prune
+        code, output = self.wt("prune")
+        self.assertEqual(0, code, output)
+        self.assertIn("2 → 1", output)
+        self.assertIn("清理掉的记录", output)
+        self.assertNotIn("没有可以清理的记录", output)
+
+
+# ── 去重缓存的边界：它只活一次读取 ─────────────────────────────────────────
+class TestCacheFreshness(RepoCase):
+    def test_second_snapshot_in_the_same_process_is_fresh(self):
+        """回归：去重缓存**只活一次快照** —— snapshot() 开头必须清它。
+
+        这条是承重的那条。变异测试验证过：把 snapshot() 开头那句 clear_cache()
+        去掉，这里就会失败（第二次快照拿的是第一次的状态）。盯的三件事都是会被
+        缓存的：工作区条目、短 HEAD、已并入基线的分支集合。
+        """
+        self.repo.commit("一")
+        first = self.state()
+        self.assertEqual(0, first["dirty"]["total"])
+        # main 已并入它自己 —— 批量实现就是这么定义的（旧实现同义）
+        self.assertEqual(["main"], [b["name"] for b in first["branches"] if b["merged"]])
+
+        # 提交在前、写文件在后：夹具的 commit() 会把未跟踪文件一起收进去
+        # （和 E2E 脚本那次同一个坑），写在前面的话这个文件已经被提交了。
+        self.repo.commit("二", relpath="b.txt")
+        self.repo.write("new.txt", "新的\n")
+
+        second = self.state()
+        self.assertEqual(1, second["dirty"]["total"], "第二次快照必须看到刚写的文件")
+        self.assertNotEqual(first["branch"]["head"], second["branch"]["head"],
+                            "短 HEAD 必须跟着新提交变（它也是被缓存的那批事实之一）")
+
+    def test_no_stale_facts_after_the_repo_changes(self):
+        """同上，换个朝向：缓存里的「哪些分支已并入基线」也必须跟着变。"""
+        self.repo.commit("一")
+        self.repo.git("checkout", "-b", "work")
+        self.repo.commit("二", relpath="b.txt")
+        self.repo.git("checkout", "main")
+        merged = {b["name"]: b["merged"] for b in self.state()["branches"]}
+        self.assertIs(False, merged["work"])
+        self.repo.git("merge", "--no-ff", "-m", "merge: 并入 work", "work")
+        merged = {b["name"]: b["merged"] for b in self.state()["branches"]}
+        self.assertIs(True, merged["work"], "并入之后不能还报「未并入」")
+
+
+# ── 批量实现 vs 参考实现 ───────────────────────────────────────────────────
+class TestBatchMergedMatchesTheReference(RepoCase):
+    """`for-each-ref --merged=<基线>` 是批量实现，`merge-base --is-ancestor` 是参考实现。
+
+    换实现最怕「结论悄悄变了」，所以拿参考实现逐分支比一遍 —— 只要有一个分支答案
+    不同，这条就失败。（本仓用过同样的做法：给快路径加精确否定，语义一字不变。）
+    """
+
+    def merged_by_reference(self, name: str, baseline: str) -> bool:
+        return subprocess.run(
+            ["git", "-C", self.repo.path, "merge-base", "--is-ancestor", name, baseline],
+            capture_output=True, text=True).returncode == 0
+
+    def test_same_answer_for_every_branch(self):
+        self.repo.commit("一")
+        self.repo.git("branch", "merged-a")
+        self.repo.git("branch", "merged-b")
+        self.repo.git("checkout", "-b", "side")
+        self.repo.commit("二", relpath="b.txt")
+        self.repo.git("checkout", "main")
+        self.repo.git("branch", "from-side", "side")     # 指向未并入的提交
+        for name in ("main", "merged-a", "merged-b", "side", "from-side"):
+            self.assertEqual(self.merged_by_reference(name, "main"),
+                             STATE.merged_into(self.repo.path, name, "main"),
+                             f"{name}：批量实现和参考实现结论不一致")
+
+    def test_missing_baseline_is_still_none(self):
+        """基线不存在时必须是 None（不是 False）—— 这个约定不能因为换实现丢掉。"""
+        self.repo.commit("一")
+        self.assertIsNone(STATE.merged_into(self.repo.path, "main", "并没有这个基线"))
+        self.assertIsNone(STATE.merged_into(self.repo.path, "main", ""))
+
+
+# ── 子进程预算 ─────────────────────────────────────────────────────────────
+class TestSnapshotBudget(RepoCase):
+    """一次快照的子进程数不许涨回去。
+
+    实测（4 分支的仓库）：优化前 46 次 / 492ms，优化后 20 次 / ~300ms。
+    卡在 26：如果以后又往判断路径里加「每个分支问一次」「每个 worktree 问一次」
+    这种调用，这条会先失败 —— 而不是等使用者发现它变慢了。
+    """
+
+    def test_snapshot_stays_within_budget(self):
+        self.repo.commit("一")
+        for name in ("dev", "feat/x", "feat/y"):
+            self.repo.git("branch", name)
+        calls: list[list[str]] = []
+        real = STATE.subprocess.run
+
+        def counting(*args, **kwargs):
+            calls.append(list(args[0]))
+            return real(*args, **kwargs)
+
+        STATE.subprocess.run = counting
+        try:
+            STATE.snapshot(self.repo.path)
+        finally:
+            STATE.subprocess.run = real
+        summary = "\n".join("  " + " ".join(call[:5]) for call in calls)
+        self.assertLessEqual(len(calls), 26,
+                             f"一次快照发了 {len(calls)} 次 git 子进程：\n{summary}")
+
+
+# ── 边界：--at 指到仓库里 / 子模块在不在范围内 ────────────────────────────
+class TestWorktreeAtInRepo(WorktreeCase):
+    def test_target_inside_this_repo_is_refused(self):
+        """回归：`--at <本仓库>/sub` 曾被放行，输出还写着「这个目录在仓库之外」。
+
+        落在本仓库工作树里的话，`git status` 会把它当成未跟踪内容收进来、
+        `clean -fd` 也会去删它 —— 正是「放仓库同级」要避开的事。
+        当时只检查了「落在**别的**仓库里」，同仓库这一支被 `not same_path` 漏掉了。
+        """
+        self.repo.commit("一")
+        inside = os.path.join(self.repo.path, "sub")
+        code, output = self.wt("create", "feat/inside", "--at", inside)
+        self.assertEqual(1, code, output)
+        self.assertIn("本仓库的工作树", output)
+        self.assertFalse(os.path.isdir(inside), "被拒绝了就不该留下目录")
+
+    def test_target_inside_git_dir_is_refused(self):
+        self.repo.commit("一")
+        code, output = self.wt("create", "feat/gitdir", "--at",
+                               os.path.join(self.repo.path, ".git", "wt"))
+        self.assertEqual(1, code, output)
+
+    def test_default_sibling_still_says_where_it_is(self):
+        """默认位置建好之后，报告要说清「在仓库之外」和「这是默认位置」。"""
+        self.repo.commit("一")
+        target = self.beside("feat/beside")
+        self.addCleanup(shutil.rmtree, target, ignore_errors=True)
+        code, output = self.wt("create", "feat/beside")
+        self.assertEqual(0, code, output)
+        self.assertIn("在仓库之外", output)
+        self.assertIn("默认位置", output)
+
+
+class TestSubmoduleScope(RepoCase):
+    def test_submodule_changes_are_out_of_scope_and_said_so(self):
+        """子模块里的未提交改动不在这个动作的范围里 —— 报告必须说明。
+
+        不然「丢弃工作区改动」会被读成「顺手也把子模块清了」，而它其实没清。
+        """
+        source = tempfile.mkdtemp(prefix="gitdev-submodule-")
+        self.addCleanup(shutil.rmtree, source, ignore_errors=True)
+        subprocess.run(["git", "init", "-b", "main", source],
+                       capture_output=True, text=True, check=True)
+        with open(os.path.join(source, "lib.txt"), "w", encoding="utf-8") as handle:
+            handle.write("库\n")
+        for args in (("add", "-A"), ("commit", "-m", "feat: 库的起点")):
+            subprocess.run(["git", *args], cwd=source, capture_output=True, check=True)
+
+        self.repo.commit("一")
+        added = subprocess.run(
+            ["git", "-C", self.repo.path, "-c", "protocol.file.allow=always",
+             "submodule", "add", source, "vendor/lib"],
+            capture_output=True, text=True)
+        if added.returncode != 0:
+            self.skipTest(f"这个环境的 git 不允许本地子模块：{added.stderr.strip()[:80]}")
+
+        code, output = self.cli(GUARD, "discard-worktree", "--repo", self.repo.path)
+        self.assertIn("子模块", output, f"没说清子模块在不在范围里：{output}")
+        self.assertIn("不在它的范围里", output)
+

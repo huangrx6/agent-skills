@@ -37,6 +37,7 @@ import json
 import os
 import subprocess
 import sys
+from typing import Any, Callable
 
 # ── 名字启发式（只用于告警；.gitignore 才是「什么不该进版本库」的权威）──────
 ARTIFACT_DIRS = (
@@ -71,6 +72,29 @@ DOC_SUFFIXES = (".md", ".mdx", ".rst", ".txt", ".adoc", ".org")
 BASELINE_CANDIDATES = ("main", "dev", "master")
 
 CONFLICT_CODES = ("DD", "AU", "UD", "UA", "DU", "AA", "UU")
+
+
+# ── 一次快照内的去重 ────────────────────────────────────────────────────
+# 仓库级的事实（有没有远端、基线是哪个、HEAD 是什么、git 目录在哪）在
+# 分支表、worktree 清单、每一项判据里都会被再问一遍。不去重就是每处重问一次 git：
+# 实测一个 4 分支的仓库里，一次快照发了 46 次子进程、492ms，其中大半是重复的。
+#
+# 缓存**只在一次 snapshot() 期间有效**（snapshot() 开头清空）：同一个进程里连着
+# 做两次快照时仓库是可能变的（用例就是这么干的），常驻缓存会给出过期结论。
+# 键里带 repo 路径：一次快照会跨仓库问（worktree 清单里其它 worktree 的脏文件）。
+_CACHE: dict[tuple, Any] = {}
+
+
+def _memo(key: tuple, factory: Callable[[], Any]) -> Any:
+    """同一个 key 只算一次。factory 抛异常时不落缓存，下次还会重试。"""
+    if key not in _CACHE:
+        _CACHE[key] = factory()
+    return _CACHE[key]
+
+
+def clear_cache() -> None:
+    """清空去重缓存。snapshot() 开头会调它。"""
+    _CACHE.clear()
 
 
 # ── 文件系统小工具：全部吞掉 OSError ────────────────────────────────────────
@@ -152,7 +176,33 @@ def repo_root(start: str) -> str | None:
 
 
 def git_dir(repo: str) -> str:
-    return git_text(repo, "rev-parse", "--absolute-git-dir")
+    """这个 worktree 的 git 目录（主检出是 .git，worktree 里是 .git/worktrees/<名>）。"""
+    return str(_memo((repo, "git-dir"),
+                     lambda: absolute(git_text(repo, "rev-parse", "--absolute-git-dir"),
+                                      repo)))
+
+
+def short_head(repo: str) -> str:
+    """短 HEAD。快照里多处要它，问一次就够。"""
+    return str(_memo((repo, "short-head"),
+                     lambda: git_text(repo, "rev-parse", "--short", "HEAD")))
+
+
+def branch_exists(repo: str, name: str) -> bool:
+    """本地有没有这个分支。一次快照里会反复问（探测基线、逐分支判断），所以去重。"""
+    return bool(_memo((repo, "branch-exists", name),
+                      lambda: git_text(repo, "rev-parse", "--verify", "--quiet",
+                                       f"refs/heads/{name}")))
+
+
+def baseline_of(repo: str) -> str:
+    """基线分支名（main / dev / master 里第一个存在的）。都没有就返回空串。"""
+    def probe() -> str:
+        for candidate in BASELINE_CANDIDATES:
+            if branch_exists(repo, candidate):
+                return candidate
+        return ""
+    return str(_memo((repo, "baseline"), probe))
 
 
 # ── 分类：只看名字 ────────────────────────────────────────────────────────
@@ -201,31 +251,38 @@ def mid_operation(repo: str) -> list[str]:
 
 
 def dirty_entries(repo: str, ignored: bool = False) -> list[dict]:
-    """工作区条目。用 `-z` 解析：路径含空格/中文/换行时不会串行。"""
-    args = ["status", "--porcelain=v1", "-z", "--untracked-files=all"]
-    if ignored:
-        args.append("--ignored=matching")
-    code, out, _ = run_git(repo, *args)
-    if code != 0:
-        return []
-    fields = out.split("\0")
-    entries: list[dict] = []
-    index = 0
-    while index < len(fields):
-        raw = fields[index]
-        index += 1
-        if not raw:
-            continue
-        status = raw[:2]
-        path = raw[3:] if len(raw) > 3 else ""
-        origin = None
-        if status[0] in "RC":            # 重命名/复制：下一段是原路径
-            if index < len(fields):
-                origin = fields[index]
-                index += 1
-        entries.append({"code": status, "path": path, "origin": origin,
-                        "kind": classify(path)})
-    return entries
+    """工作区条目。用 `-z` 解析：路径含空格/中文/换行时不会串行。
+
+    只问一次 `status`：被 ignore 的条目带 `!!` 前缀，要哪一半在 Python 里挑。
+    旧写法按「要不要含 ignored」跑两遍 —— 白花一次子进程，而 status 恰恰是这一串
+    调用里最贵的一个。
+    """
+    def read() -> list[dict]:
+        code, out, _ = run_git(repo, "status", "--porcelain=v1", "-z",
+                               "--untracked-files=all", "--ignored=matching")
+        if code != 0:
+            return []
+        fields = out.split("\0")
+        parsed: list[dict] = []
+        index = 0
+        while index < len(fields):
+            raw = fields[index]
+            index += 1
+            if not raw:
+                continue
+            status = raw[:2]
+            path = raw[3:] if len(raw) > 3 else ""
+            origin = None
+            if status[0] in "RC":            # 重命名/复制：下一段是原路径
+                if index < len(fields):
+                    origin = fields[index]
+                    index += 1
+            parsed.append({"code": status, "path": path, "origin": origin,
+                           "kind": classify(path)})
+        return parsed
+
+    entries = _memo((repo, "status"), read)
+    return [entry for entry in entries if (entry["code"] == "!!") == bool(ignored)]
 
 
 def buckets(entries: list[dict]) -> dict:
@@ -252,19 +309,18 @@ def protected_paths(entries: list[dict]) -> list[dict]:
 
 
 def branch_state(repo: str) -> dict:
-    code, out, _ = run_git(repo, "symbolic-ref", "-q", "--short", "HEAD")
-    branch = out.strip() if code == 0 else ""
-    baseline = ""
-    for candidate in BASELINE_CANDIDATES:
-        if git_text(repo, "rev-parse", "--verify", "--quiet", f"refs/heads/{candidate}"):
-            baseline = candidate
-            break
-    # 在 worktree 里时 git-dir 与 git-common-dir 不同 —— 两个都可能是相对路径，
-    # 所以要先按仓库根解析再比，不然主检出也会被误判成 worktree。
-    common = absolute(git_text(repo, "rev-parse", "--git-common-dir"), repo)
-    return {"branch": branch, "detached": not branch,
-            "head": git_text(repo, "rev-parse", "--short", "HEAD"),
-            "baseline": baseline, "in_worktree": common != git_dir(repo)}
+    def read() -> dict:
+        code, out, _ = run_git(repo, "symbolic-ref", "-q", "--short", "HEAD")
+        branch = out.strip() if code == 0 else ""
+        # 在 worktree 里时 git-dir 与 git-common-dir 不同 —— 两个都可能是相对路径，
+        # 所以要先按仓库根解析再比，不然主检出也会被误判成 worktree。
+        common = str(_memo((repo, "common-dir"),
+                           lambda: absolute(git_text(repo, "rev-parse", "--git-common-dir"),
+                                            repo)))
+        return {"branch": branch, "detached": not branch,
+                "head": short_head(repo),
+                "baseline": baseline_of(repo), "in_worktree": common != git_dir(repo)}
+    return dict(_memo((repo, "branch-state"), read))
 
 
 def upstream_state(repo: str) -> dict:
@@ -280,27 +336,56 @@ def upstream_state(repo: str) -> dict:
     if code != 0:
         return {"upstream": upstream, "ahead": None, "behind": None,
                 "note": "算不出来（上游 ref 可能已失效）"}
-    parts = (out.split() + ["?", "?"])[:2]
-    return {"upstream": upstream, "ahead": as_int(parts[1], -1),
-            "behind": as_int(parts[0], -1), "note": ""}
+    parts = out.split()
+    if len(parts) != 2 or not all(part.lstrip("-").isdigit() for part in parts):
+        # 解析不出来时给 None，不给 0 也不给 -1 —— 这个文件里「问不出来」只有一种写法。
+        return {"upstream": upstream, "ahead": None, "behind": None,
+                "note": f"输出看不懂：{out.strip()!r}"}
+    return {"upstream": upstream, "ahead": as_int(parts[1]),
+            "behind": as_int(parts[0]), "note": ""}
 
 
-def unpushed(repo: str, ref: str = "HEAD") -> dict:
+def unpushed(repo: str, ref: str = "HEAD", with_subjects: bool = True) -> dict:
     """未推送 = 不被任何远端 ref 覆盖。
 
     **没有远端时如实说明**，否则会报出「未推送 = 整个历史」这种吓人的数字，
     让人以为有几百条没推上去。
+
+    `with_subjects=False` 时只数数、不取主题：分支表只用到数字，而每条分支多问一次
+    `git log` 就是 N 次子进程 —— 实测那是快照里最大的一笔开销。
     """
-    if not git_lines(repo, "remote"):
-        return {"has_remote": False,
-                "count": as_int(git_text(repo, "rev-list", "--count", ref)),
-                "subjects": git_lines(repo, "log", "--oneline", "-n", "10", ref),
-                "note": "这个仓库没有任何远端 —— 这个数字是整个历史，不是没推上去的"}
-    return {"has_remote": True,
-            "count": as_int(git_text(repo, "rev-list", "--count", ref, "--not", "--remotes")),
-            "subjects": git_lines(repo, "log", "--oneline", "-n", "10",
-                                  ref, "--not", "--remotes"),
-            "note": ""}
+    def read(with_subjects: bool) -> dict:
+        if not remote_names(repo):
+            note = "这个仓库没有任何远端 —— 这个数字是整个历史，不是没推上去的"
+            return {"has_remote": False,
+                    "count": as_int(git_text(repo, "rev-list", "--count", ref)),
+                    "subjects": git_lines(repo, "log", "--oneline", "-n", "10", ref)
+                    if with_subjects else [],
+                    "note": note}
+        return {"has_remote": True,
+                "count": as_int(git_text(repo, "rev-list", "--count", ref,
+                                         "--not", "--remotes")),
+                "subjects": git_lines(repo, "log", "--oneline", "-n", "10",
+                                      ref, "--not", "--remotes") if with_subjects else [],
+                "note": ""}
+
+    return dict(_memo((repo, "unpushed", ref, with_subjects), lambda: read(with_subjects)))
+
+
+def remote_names(repo: str) -> list[str]:
+    """远端名单。一次快照会问很多次（每条分支的未推送都要先看有没有远端），去重。"""
+    return list(_memo((repo, "remotes"), lambda: git_lines(repo, "remote")))
+
+
+def merged_branch_names(repo: str, baseline: str) -> set[str]:
+    """**一次问完**所有已并入基线的分支。
+
+    旧写法是每个分支问一次 `merge-base --is-ancestor`，分支一多就是 N 次子进程。
+    `for-each-ref --merged=<基线>` 一次给全，语义一样（基线自己也算「已并入」自己）。
+    """
+    return set(_memo((repo, "merged", baseline),
+                     lambda: git_lines(repo, "for-each-ref", f"--merged={baseline}",
+                                       "--format=%(refname:short)", "refs/heads")))
 
 
 def merged_into(repo: str, ref: str, baseline: str) -> bool | None:
@@ -310,11 +395,9 @@ def merged_into(repo: str, ref: str, baseline: str) -> bool | None:
     在两个 ref 不都存在时会静默失败、返回空列表，结果看起来就像「没有任何分支已并入」。
     这个坑踩过 —— 所以每个基线都要先确认它真的存在，再问问题。
     """
-    if not baseline or not git_text(repo, "rev-parse", "--verify", "--quiet",
-                                    f"refs/heads/{baseline}"):
+    if not baseline or not branch_exists(repo, baseline):
         return None
-    code, _, _ = run_git(repo, "merge-base", "--is-ancestor", ref, baseline)
-    return code == 0
+    return ref in merged_branch_names(repo, baseline)
 
 
 def local_branches(repo: str, baseline: str = "") -> list[dict]:
@@ -325,7 +408,8 @@ def local_branches(repo: str, baseline: str = "") -> list[dict]:
             continue
         out.append({"name": name, "current": name == current,
                     "merged": merged_into(repo, name, baseline) if baseline else None,
-                    "unpushed": unpushed(repo, name)["count"]})
+                    # 分支表只要个数 —— 不取主题就少一次 git log/分支。
+                    "unpushed": unpushed(repo, name, with_subjects=False)["count"]})
     return out
 
 
@@ -385,7 +469,7 @@ def worktree_state(repo: str, known: dict | None = None) -> list[dict]:
                     item["unpushed"] = cached["unpushed"]
                 else:
                     item["dirty"] = len(dirty_entries(item["path"]))
-                    item["unpushed"] = unpushed(item["path"])["count"]
+                    item["unpushed"] = unpushed(item["path"], with_subjects=False)["count"]
         out.append(item)
     return out
 
@@ -433,7 +517,12 @@ def hooks_state(repo: str) -> dict:
 
 
 def snapshot(start: str) -> dict:
-    """整个快照。键名稳定 —— 上层脚本与用例都按这些键取值。"""
+    """整个快照。键名稳定 —— 上层脚本与用例都按这些键取值。
+
+    开头清一次去重缓存：下面的分支表、worktree 清单会反复用到同一批仓库级事实，
+    去重能省掉一大半子进程（实测 4 分支的仓库：46 次 → 19 次）。
+    """
+    clear_cache()
     root = repo_root(start)
     if not root:
         return {"is_repo": False, "start": start}

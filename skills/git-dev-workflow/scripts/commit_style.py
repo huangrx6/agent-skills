@@ -129,7 +129,19 @@ def check(message: str) -> tuple[str, list[Finding]]:
                                 "写成 <type>(<scope>)!: <描述>，冒号是 ASCII 的 `:`"))
         return kind, findings
 
-    if full_width and not match.group("colon"):
+    # 规则 13：`!` 必须紧贴在冒号前（`feat(api)!:` ✓；`feat!(api):` ✗）。
+    #
+    # 这个判断必须在规则 1 之前 —— `!` 位置错时正则根本找不到那个冒号，
+    # 于是会报成“type 后面没有冒号”：**病因说错了**，而读的人会去改冒号。
+    # （同一个毛病在 `e2e-ops:` 上犯过一次：正则不认连字符，也报成没冒号。）
+    prefix = subject.split(":", 1)[0]
+    misplaced_bang = "!" in prefix and not prefix.endswith("!")
+
+    if misplaced_bang:
+        findings.append(Finding("spec", "规则 13", "主题行",
+                                f"`!` 的位置不对：{prefix!r}",
+                                "写 `feat(api)!: <描述>` —— `!` 要紧贴在冒号前面"))
+    elif full_width and not match.group("colon"):
         findings.append(Finding("spec", "规则 1", "主题行",
                                 "用了全角冒号「：」",
                                 "换成 ASCII 冒号 `:` —— 规范 1 要求的是 terminal colon"))
@@ -159,7 +171,6 @@ def check(message: str) -> tuple[str, list[Finding]]:
                                     f"scope {scope!r} 里有空格",
                                     "scope 是名词，不能含空格；用 `-` 连起来"))
 
-    # ── 本项目的约定：type 在封闭表里、统一小写 ──
     commit_type = match.group("type")
     if commit_type.lower() not in TYPES:
         findings.append(Finding("project", "type 表",
@@ -287,6 +298,12 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print("要给一条信息：--check \"…\" / --check-file PATH / 从 stdin 读", file=sys.stderr)
         return 1
+
+    # 和 git 自己的清理对齐：默认 cleanup=strip（编辑器路径）与 -m 路径都会
+    # 去掉开头/结尾的空行、去掉行尾空白。不做的后果实测过：COMMIT_EDITMSG 里
+    # 注释写在前面时，剥掉注释后正文顶部会剩一个空行 —— 于是完全合规的信息
+    # 被报成「规则 1：看不出一行以 type 开头」，诊断指到了错的地方。
+    message = "\n".join(line.rstrip() for line in message.splitlines()).strip("\n")
 
     kind, findings = check(message)
     subject = message.strip().splitlines()[0] if message.strip() else ""
