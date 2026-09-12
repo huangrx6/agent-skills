@@ -66,7 +66,10 @@ EMIT = os.path.join(SCRIPTS, "emit_excalidraw.py")
 #   **根因不是形状，是布局根本没有“绕行连线”这个能力** ——
 #   这个弱点以前被“盒子小”掩盖着。真修法是给边加绕行（待办 #81）。
 #
-#   所以下面这两个数字是**回归后的值**，不是“本来就这样”。
+#   所以下面的数字曾是**回归后的值**，不是“本来就这样”。后来靠“连线绕行 +
+#   调参加间距”把它从 4 / 2 降到 1 / 0（网络图跑了 5 轮调参），那张回归标记用例
+#   按约定失败了、已删掉 —— 这就是"缺失能力标记"该有的用法：
+#   修好时它会主动提醒你把放宽撤掉，而不是永远悄悄放宽在那里。
 # `labels_on_lines` 与 `max_fanout` 已从"每张图放宽的值"变成**结构性结果**
 # （锚点按扇出均分、标签搜索的障碍物修好了坐标系 → 0 和 1）。
 # 所以不再按图记上限，改成两条不变量直接断言（见下面的用例）。
@@ -75,8 +78,8 @@ KNOWN_MAX = {
     "02-flow":         {"through_nodes": 0},
     "03-dependency":   {"through_nodes": 0},
     "04-state":        {"through_nodes": 0},
-    "05-network":      {"through_nodes": 4},
-    "06-mindmap":      {"through_nodes": 2},
+    "05-network":      {"through_nodes": 1},
+    "06-mindmap":      {"through_nodes": 0},
 }
 MAX_FANOUT_HARD = 8          # 超过这个数就不只是"不够好看"，是排布坏了
 
@@ -91,7 +94,10 @@ READABLE_ASPECT = (0.45, 4.5)
 # 所以下面的门槛实际上被**悄悄放松**了。换成“内容比例”（去掉标题）才算真实改善；
 # 之所以没换：导出的图里确实有标题，人眼看到的比例就是这里量的这个。
 # 要判断布局到底有没有改善，得看**节点尺寸与坐标**，不是这个比值。
-KNOWN_ASPECT = {"02-flow": 0.30, "04-state": 13.1, "05-network": 5.0}
+# 05-network 从这条里**删掉了**：加大间距后它自己回到可读区间（实测 5.0 → 3.8），
+# 不再是"已知超出"的特例。这是真改善的一种（同一套度量、同一张图），
+# 不同于上面那条"加标题让分母变大"。
+KNOWN_ASPECT = {"02-flow": 0.30, "04-state": 13.1}
 
 
 def aspect_band(name: str) -> tuple[float, float]:
@@ -342,37 +348,6 @@ class TestKnownProblemsDoNotWorsen(unittest.TestCase):
         low, high = aspect_band("04-state")
         self.assertLess(low, 1.0)          # 宽条图的允许带仍然要求它不能变成竖条
         self.assertGreater(high, 4.5)
-
-    def test_shape_inflation_regressed_routing(self):
-        """把这次回归**明确记录下来**，而不是把上限悄悄改大。
-
-        加形状后节点面积涨 4~27%，两张图的连线开始穿过别的节点
-        （网状 3→4、思维导图 0→2）。根因不是形状 —— 是**布局没有绕行连线
-        这个能力**，以前被“盒子小”掩盖着。真修法是给边加绕行（待办 #81）。
-        修好之后这条应该**失败**，那时来把它和 KNOWN_MAX 里那两个放宽值一起删掉。
-        """
-        for name in ("05-network", "06-mindmap"):
-            with self.subTest(fixture=name):
-                path = os.path.join(SPECS, f"{name}.json")
-                self.assertGreater(self.measured(path)["through_nodes"], 0,
-                                   f"{name} 的穿节点已经归零了 —— 那是大好事，"
-                                   f"请把这整条用例与 KNOWN_MAX 里放宽的那两个值一起删掉")
-
-
-        """把"还有哪些没修"写成断言，免得它随时间变成"本来就这样"。
-
-        这条故意会在修好之后失败 —— 那时应该来把上限降下去、并删掉这条。
-        """
-        remaining = {os.path.basename(p).replace(".json", ""): self.measured(p)
-                     for p in spec_paths()}
-        unresolved = [n for n, m in remaining.items()
-                      if m["through_nodes"] or m["labels_on_lines"]]
-        self.assertTrue(unresolved,
-                        "线穿节点/标签压线都归零了 —— 请把 KNOWN_MAX 的上限降到 0 并删掉这条用例")
-
-
-class TestMissingCapabilitiesAreRecorded(unittest.TestCase):
-    """把"还没实现的能力"也钉住 —— 否则它们会静默消失在"图看起来还行"里。"""
 
     def test_every_diagram_now_has_a_title(self):
         """P4 已修：`title` 真的画出来了。

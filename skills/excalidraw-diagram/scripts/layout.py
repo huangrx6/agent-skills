@@ -46,6 +46,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import math
 import os
 import sys
 from dataclasses import dataclass
@@ -82,6 +83,18 @@ PARAM_LIMIT: dict[str, float] = {
     "barycenterRounds": 12.0,
 }
 DUMMY_PREFIX = "__dummy_"
+
+# ── 绕行：连线不许穿过别的节点（P2 / P10）────────────────────
+#
+# 这几个数都是**待验证**的（没有真实数据校准，见 diagram-spec.md 的信任状态总表）：
+# 间隙沿用“元素最小间隙”那一个数，不另起一套。
+NODE_CLEARANCE = 12.0
+# 把挡路的线段推开时，偏移量试探的步长与上限。
+# 上限就是“推不出去就算了”的那条线 —— 病态图里无限推比不推更糟。
+DETOUR_STEP = 28.0
+DETOUR_MAX_OFFSET = 280.0
+# 最多几轮。一轮解决一处，多轮是给“推完之后又撞上别的”留的余地。
+DETOUR_ROUNDS = 6
 # 同一侧挂多条边时，贴点沿这侧铺开的跨度占边长多少。
 #
 # 为什么留边距：贴点贴到角上，线与节点的邻边会“粘”在一起；
@@ -534,6 +547,8 @@ def route_edges(origins: list[dict], segments: list[dict],
     for idx, chain in resolved:
         e = origins[idx]
         pts = _points(chain, placed, direction, starts[idx], ends[idx])
+        # 推开挡路的节点。排除自己的两端 —— 它们本来就贴着线。
+        pts = avoid_nodes(pts, placed, {chain[0], chain[-1]})
         a, b = e["from"], e["to"]
         was_reversed = (b, a) in reversed_set
         if was_reversed:
@@ -637,6 +652,143 @@ def _points(chain: list[str], placed: dict[str, Placed], direction: str,
                        else [cx + end_off, p.y])
         else:
             pts.append([cx, cy])
+    return [[round(x, 2), round(y, 2)] for x, y in pts]
+
+
+def _sample_points(a: list[float], b: list[float], step: float = 2.0):
+    """线段上的采样点。间距取 2px —— 远小于最小间隙（12px），不会漏掉擦边的相交。"""
+    span = math.dist(a, b)
+    count = math.ceil(span / step) + 1
+    return [(a[0] + (b[0] - a[0]) * i / count, a[1] + (b[1] - a[1]) * i / count)
+            for i in range(count + 1)]
+
+
+def _segment_hits_box(a: list[float], b: list[float], p: Placed,
+                      pad: float = 0.0) -> bool:
+    left, top = p.x - pad, p.y - pad
+    right, bottom = p.x + p.width + pad, p.y + p.height + pad
+    return any(left <= x <= right and top <= y <= bottom
+               for x, y in _sample_points(a, b))
+
+
+def _visible_nodes(placed: dict, exclude: set[str]):
+    """图上真正看得见的节点。排除自己的两端与虚节点（虚节点只是路径上的拐点）。"""
+    for nid, p in placed.items():
+        if nid in exclude or nid.startswith(DUMMY_PREFIX):
+            continue
+        if p.width <= 0 or p.height <= 0:
+            continue
+        yield nid, p
+
+
+def _blocking_nodes(pts: list, placed: dict, exclude: set[str],
+                    pad: float = 0.0) -> list[tuple[int, str]]:
+    """折线里“第几段穿过了哪个节点”，按段序返回。"""
+    out: list[tuple[int, str]] = []
+    for i, (a, b) in enumerate(zip(pts, pts[1:])):
+        for nid, p in _visible_nodes(placed, exclude):
+            if _segment_hits_box(a, b, p, pad):
+                out.append((i, nid))
+    return out
+
+
+def nodes_hit_by_polyline(pts: list, placed: dict, exclude: set[str]) -> list[str]:
+    """这条折线穿过了哪些**别的**节点（去重，按首次出现排序）。
+
+    这是“连线是否穿过节点”的**唯一实现** —— 绕行逻辑、校验、测试都调它。
+    同一件几何算两遍必然漂移，而漂移的那一份会让两边给出不同结论（这个坑踩过）。
+    """
+    seen: list[str] = []
+    for _i, nid in _blocking_nodes(pts, placed, exclude):
+        if nid not in seen:
+            seen.append(nid)
+    return seen
+
+
+def _corner_routes(a: list[float], b: list[float], n: Placed,
+                   clearance: float):
+    """绕过节点 n 的候选路径，每次产出一对拐点。
+
+    第一版写的是“把线段中点沿法线推开”，**不够**：推开的那条线会撞上邻居
+    （实测 root→m5 的第一处试探就被 m1 挡住）。原因很直白 —— 单点偏移只是
+    把线挪了一点，并没有让它“绕过这个盒子”。
+
+    所以改成绕着盒子走：横向为主的线从盒子的上面或下面过，纵向为主的从左边或右边过。
+    每侧给出两个拐点（进盒子前、出盒子后），四个候选按顺序试。
+    """
+    horizontal = abs(b[0] - a[0]) >= abs(b[1] - a[1])
+    if horizontal:
+        lanes = (n.y - clearance, n.y + n.height + clearance)
+        for lane in lanes:
+            first = [n.x - clearance, lane]
+            second = [n.x + n.width + clearance, lane]
+            yield (first, second) if a[0] <= b[0] else (second, first)
+    else:
+        lanes = (n.x - clearance, n.x + n.width + clearance)
+        for lane in lanes:
+            first = [lane, n.y - clearance]
+            second = [lane, n.y + n.height + clearance]
+            yield (first, second) if a[1] <= b[1] else (second, first)
+
+
+def _try_detour(pts: list, i: int, blocked: str, placed: dict,
+                exclude: set[str]) -> list[list[float]] | None:
+    """让第 i 段绕过 `blocked`。四个候选都不行就返回 None（不硬拗）。
+
+    判据用**带间隙**的版本（`NODE_CLEARANCE`）而不是“刚好不碰”：
+    擦着节点 1px 过去虽然不算“穿过”，看起来一样难看。
+    """
+    a, b = pts[i], pts[i + 1]
+
+    # 候选顺序是有实测依据的：先试“小幅推开”，再试“绕着盒子走”。
+    # 反过来试过：大绕行会占掉别的边本来能用的空间，整体反而更差
+    # （实测穿节点数 3/1 → 4/2）。所以**小动作优先**。
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    length = math.hypot(dx, dy) or 1.0
+    nx, ny = -dy / length, dx / length
+    mid = [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0]
+    offset = DETOUR_STEP
+    while offset <= DETOUR_MAX_OFFSET:
+        for sign in (1.0, -1.0):
+            trial = pts[:i] + [a, [mid[0] + nx * offset * sign,
+                                   mid[1] + ny * offset * sign], b] + pts[i + 2:]
+            if not _blocking_nodes(trial, placed, exclude, NODE_CLEARANCE):
+                return trial
+        offset += DETOUR_STEP
+
+    for first, second in _corner_routes(a, b, placed[blocked], NODE_CLEARANCE):
+        trial = pts[:i] + [a, first, second, b] + pts[i + 2:]
+        if not _blocking_nodes(trial, placed, exclude, NODE_CLEARANCE):
+            return trial
+    return None
+
+
+def avoid_nodes(pts: list, placed: dict, exclude: set[str]) -> list[list[float]]:
+    """把挡路的线段推开 —— 连线不该穿过别的节点（P2 / P10）。
+
+    做法跟标签定位同一套思路：**不靠一个魔法偏移量，而是试探一个偏移阶梯，
+    取第一个真的把障碍绕开的**。区别是这里改的是线本身。
+
+    为什么必须由脚本做：这是纯几何判断（线段与矩形是否相交），而模型看不到坐标 ——
+    让它“注意别穿过节点”只能靠猜，正是这个 skill 一开始要避免的事。
+
+    推不出去（试完阶梯还是撞）就**原样返回**，不硬拗：病态图里无限推比不推更糟。
+    剩下的那几处由 `check_layout` 报出来，报告给内容级的建议（拆节点 / 换方向）。
+
+    只在**段中点**插一个拐点。这不是通用寻路（不会绕三个节点），但对
+    “一条边恰好压过中间某个节点”这种实际形态够用 —— 也正因为够用，
+    它不需要引入一个真正的路由引擎。
+    """
+    pts = [list(p) for p in pts]
+    for _round in range(DETOUR_ROUNDS):
+        blocked = _blocking_nodes(pts, placed, exclude)
+        if not blocked:
+            break
+        seg_index, blocked_node = blocked[0]
+        moved = _try_detour(pts, seg_index, blocked_node, placed, exclude)
+        if moved is None:
+            break
+        pts = moved
     return [[round(x, 2), round(y, 2)] for x, y in pts]
 
 

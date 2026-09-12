@@ -82,7 +82,13 @@ TOLERANCE = 0.5           # 浮点比较容差（#3 断言用）
 STOP_ON = frozenset({"text", "palette"})
 # 可以靠调参解决的项。注意 #5（交叉数）是**软**项 —— 它不阻塞输出，但仍然是可调的。
 # 只看“阻不阻塞”会让它永远调不动，而 validation.md 明写着它可自动修。
-TUNABLE = frozenset({"gap", "edge", "crossing"})
+TUNABLE = frozenset({"gap", "edge", "crossing", "through"})
+# `_step` 真的会为它动参数的检查项。
+#
+# 这个集合与 `_step` 的映射表**必须一致**，由 tests/test_check_layout.py 里的
+# 一条用例钉住：放进 TUNABLE 却调不动 = 调参循环对它形同虚设。
+# 这个坑踩过两次（`crossing` 一次、`through` 又一次），所以改成机械检查。
+STEPPABLE = frozenset({"gap", "edge", "crossing", "through"})
 
 CHECK_LABEL = {
     "gap": "元素间隙",
@@ -136,12 +142,17 @@ class Outcome:
         return {i.check for i in self.issues if i.check in TUNABLE}
 
     def converged(self) -> bool:
-        """没有阻塞项，也没有待调的交叉项 → 可以出图了。
+        """没有阻塞项，也没有**调得动**的可调项 → 可以出图了。
 
-        交叉项单独判：它是软的，不进 blocking，但没收敛就不该停 ——
-        否则软项一出现就直接出报告，调参循环对它就等于不存在。
+        这里曾经是硬编码的 `and "crossing" not in self.tunable_hits()` ——
+        于是每新加一个可调项都要记得回来改这一行，而“记得”正是这个项目
+        反复证明不可靠的东西（加 `through` 时就又踩了一次：它一出现就直接
+        出报告，调参循环对它等于不存在）。
+
+        现在改成问“有没有 STEPPABLE 里的项”，而 STEPPABLE 与 `_step` 的映射表
+        由一条用例钉住一致 —— 关系机械化，不靠记性。
         """
-        return not self.blocking and "crossing" not in self.tunable_hits()
+        return not self.blocking and not (self.tunable_hits() & STEPPABLE)
 
 
 @dataclass
@@ -321,6 +332,28 @@ def check_crossings(spec: dict, result: ResultT) -> list[Issue]:
 
 
 # ── 汇总 ────────────────────────────────────────────────────
+def check_edges_through_nodes(spec: dict, result: ResultT) -> list[Issue]:
+    """连线穿过**别的**节点。
+
+    为什么要单独一条：“看起来有线压在框上”这件事，当时五条校验里**没有一条在管**，
+    只能靠人看图发现。而它是纯几何判断（线段与矩形相交），完全可以机械检。
+
+    定为**可调项**而不是硬门：布局已经会自己试着绕行（`layout.avoid_nodes`），
+    绕不过去说明图本身密 —— 这时候应该多给点间距重跑，而不是卡死不出图。
+    报告给的是**内容级建议**，不是“再推一推”。
+    """
+    out: list[Issue] = []
+    for edge in result.edges:
+        exclude = {edge["from"], edge["to"]}
+        hit = L.nodes_hit_by_polyline(edge["points"], result.placed, exclude)
+        if hit:
+            out.append(Issue(
+                "through", False, f"{edge['from']}→{edge['to']}",
+                f"这条连线穿过了 {len(hit)} 个别的节点（{', '.join(hit)}）",
+                advice="连线穿过节点：把中间那个节点换个层或换个位置，或把这条边拆成两段。"))
+    return out
+
+
 def check(spec: dict, result: ResultT,
           boxes: dict[str, BoxT]) -> Outcome:
     return Outcome(issues=[
@@ -329,6 +362,7 @@ def check(spec: dict, result: ResultT,
         *check_text_fit(spec, result, boxes),
         *check_palette(spec),
         *check_crossings(spec, result),
+        *check_edges_through_nodes(spec, result),
     ])
 
 
@@ -346,6 +380,13 @@ def _step(params: dict[str, float], outcome: Outcome) -> dict[str, float]:
     if "crossing" in hit:
         out["barycenterRounds"] = min(params["barycenterRounds"] + L.PARAM_STEP["barycenterRounds"],
                                       L.PARAM_LIMIT["barycenterRounds"])
+    if "through" in hit:
+        # 连线穿过节点时先给更多间距 —— 空间富余了绕行才推得开。
+        # 两个方向一起加：穿节点往往横竖都有，分不清该加哪一边。
+        out["nodeSeparation"] = min(params["nodeSeparation"] + L.PARAM_STEP["nodeSeparation"],
+                                    L.PARAM_LIMIT["nodeSeparation"])
+        out["rankSeparation"] = min(params["rankSeparation"] + L.PARAM_STEP["rankSeparation"],
+                                    L.PARAM_LIMIT["rankSeparation"])
     return out
 
 

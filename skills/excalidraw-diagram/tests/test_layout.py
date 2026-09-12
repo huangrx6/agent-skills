@@ -345,5 +345,72 @@ class TestCli(unittest.TestCase):
             os.unlink(path)
 
 
+class TestAvoidNodes(unittest.TestCase):
+    """连线不许穿过别的节点（P2 / P10）。
+
+    这一层的输入是**已经算好的折线**，它只负责把挡路的段推开。
+    """
+
+    @staticmethod
+    def _placed(nid, x, y, w, h):
+        return L.Placed(id=nid, x=x, y=y, width=w, height=h, rank=0)
+
+    def test_clear_line_is_left_exactly_alone(self):
+        """没有障碍时**一个点都不该动** —— 否则每次布局都会莫名漂移。"""
+        placed = {"a": self._placed("a", 0, 0, 40, 40),
+                  "b": self._placed("b", 400, 0, 40, 40),
+                  "far": self._placed("far", 0, 500, 40, 40)}
+        pts = [[40.0, 20.0], [400.0, 20.0]]
+        self.assertEqual(pts, L.avoid_nodes(pts, placed, {"a", "b"}))
+
+    def test_line_through_a_box_is_pushed_out(self):
+        placed = {"a": self._placed("a", 0, 0, 40, 40),
+                  "b": self._placed("b", 400, 0, 40, 40),
+                  "wall": self._placed("wall", 180, -40, 80, 120)}
+        pts = [[40.0, 20.0], [400.0, 20.0]]
+        pushed = L.avoid_nodes(pts, placed, {"a", "b"})
+        self.assertEqual([], L.nodes_hit_by_polyline(pushed, placed, {"a", "b"}),
+                         "推完还是穿过节点")
+
+    def test_endpoints_are_never_moved(self):
+        """两端必须原样 —— 它们连着箭头绑定，动了就对不上了。"""
+        placed = {"a": self._placed("a", 0, 0, 40, 40),
+                  "b": self._placed("b", 400, 0, 40, 40),
+                  "wall": self._placed("wall", 180, -40, 80, 120)}
+        pts = [[40.0, 20.0], [400.0, 20.0]]
+        pushed = L.avoid_nodes(pts, placed, {"a", "b"})
+        self.assertEqual(pts[0], pushed[0])
+        self.assertEqual(pts[-1], pushed[-1])
+
+    def test_own_endpoints_do_not_count_as_obstacles(self):
+        """自己的两端本来就被线贴着一排点，不能当成障碍，否则永远推不完。"""
+        placed = {"a": self._placed("a", 0, 0, 200, 200),
+                  "b": self._placed("b", 400, 0, 200, 200)}
+        pts = [[200.0, 100.0], [400.0, 100.0]]
+        self.assertEqual([], L.nodes_hit_by_polyline(pts, placed, {"a", "b"}))
+
+    def test_dummy_nodes_are_not_obstacles(self):
+        """虚节点只是路径上的拐点，不是看得见的东西。"""
+        placed = {"a": self._placed("a", 0, 0, 40, 40),
+                  "b": self._placed("b", 400, 0, 40, 40),
+                  f"{L.DUMMY_PREFIX}0": self._placed(f"{L.DUMMY_PREFIX}0", 180, 0, 0, 0)}
+        pts = [[40.0, 20.0], [200.0, 20.0], [400.0, 20.0]]
+        self.assertEqual([], L.nodes_hit_by_polyline(pts, placed, {"a", "b"}))
+
+    def test_giving_up_is_bounded(self):
+        """推不出去时要**原样返回**，不能无限加拐点。"""
+        # 一整排节点横在中间，且上下都堵死
+        placed = {"a": self._placed("a", 0, 0, 40, 40),
+                  "b": self._placed("b", 400, 0, 40, 40)}
+        for i, y in enumerate(range(-400, 401, 40)):
+            placed[f"w{i}"] = self._placed(f"w{i}", 180, y, 120, 40)
+        pts = [[40.0, 20.0], [400.0, 20.0]]
+        pushed = L.avoid_nodes(pts, placed, {"a", "b"})
+        self.assertLessEqual(len(pushed), len(pts) + 2 * L.DETOUR_ROUNDS,
+                             "拐点数量要有上限")
+        self.assertEqual(pts[0], pushed[0])
+        self.assertEqual(pts[-1], pushed[-1])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

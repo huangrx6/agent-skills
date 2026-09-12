@@ -430,6 +430,43 @@ class TestSizeSourcePremise(unittest.TestCase):
                          "回去重新判断这条是后置断言还是真实防线")
 
 
+class TestTunableChecksAreSteppable(unittest.TestCase):
+    """**放进 TUNABLE 却调不动 = 调参循环对它形同虚设。**
+
+    这个坑踩过两次：`crossing` 一次（软项被 `checks_hit()` 过滤掉）、
+    `through` 又一次（`converged()` 里硬编码了 "crossing"，新加的可调项
+    一出现就直接出报告）。所以改成机械检查，不靠记性。
+    """
+
+    def test_tunable_equals_steppable(self):
+        self.assertEqual(C.TUNABLE, C.STEPPABLE,
+                         "TUNABLE 与 _step 的映射表不一致 —— 有新项没接上参数")
+
+    def test_every_tunable_check_moves_some_parameter(self):
+        for name in sorted(C.TUNABLE):
+            with self.subTest(check=name):
+                before = dict(C.L.DEFAULT_PARAMS)
+                outcome = C.Outcome(issues=[C.Issue(name, False, "x", "为了测这个")])
+                self.assertIn(name, outcome.tunable_hits())
+                self.assertFalse(outcome.converged(),
+                                 f"{name} 一出现就算收敛 —— 调参循环对它等于不存在")
+                self.assertNotEqual(before, C._step(before, outcome),
+                                    f"{name} 在 TUNABLE 里但 _step 调不动任何参数")
+
+    def test_through_nodes_is_reported_but_never_blocks(self):
+        """穿节点是可调项，不是硬门 —— 布局自己会试着绕行，绕不过去靠加间距。"""
+        spec = {"type": "flow", "direction": "TB",
+                "nodes": [{"id": "a", "kind": "service", "label": "起"},
+                          {"id": "b", "kind": "service", "label": "中"},
+                          {"id": "c", "kind": "service", "label": "终"}],
+                "edges": [{"from": "a", "to": "b"}, {"from": "b", "to": "c"}]}
+        result, outcome, _ = run(spec)
+        for issue in outcome.issues:
+            if issue.check == "through":
+                self.assertFalse(issue.blocking, "穿节点不该阻塞出图")
+                self.assertIn("拆成两段", issue.advice or "", "建议要是内容级的")
+
+
 class TestCli(unittest.TestCase):
     """CLI 退出码。
 
