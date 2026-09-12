@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "我刚改完内部系统 A 的运营分析页面筛选条件和后端统计口径，顺手把本周发版文档也补一下。前端涉及 web-console 的日志页面，后端涉及 admin-console 的 usage_metrics 和 overview_stats 接口，SQL 有 metrics_v1.sql。",
-      "expected_output": "执行强制启动清单（读 PKB 的 vault-map.md 与 writing-conventions.md，再做单层探查）。探查 02 Areas 发现为空，因此不写入任何记忆中的旧领域路径。告知用户历史路径已不存在，并询问记录该放哪，等确认后再写。只记录已落地的事实，不编造密钥。",
+      "expected_output": "执行强制启动清单（读 PKB 的 vault-map.md 与 writing-conventions.md，再做单层探查）。位置判断以探查结果为准，不以 vault-map.md 里的记载为准（那是快照，会变）。所请求的领域目录不存在时不写入任何记忆中的旧路径，告知用户历史路径已不在并询问记录该放哪，等确认后再写；已存在就写进去。只记录已落地的事实，不编造密钥。（这条 eval 测的是行为，不是 02 Areas 当前的状态。）",
       "files": []
     },
     {
@@ -16,7 +16,7 @@
     {
       "id": 3,
       "prompt": "今天发布内部系统 A：打包 h5_bundle、admin dist、admin-console app，上传到内网主机的 /srv/release，解压后复制 .env.production，然后执行 admin-console/scripts/docker-restart.sh -e prod -s app，前端重启 web-service。把这些落实到本周发版文档里。",
-      "expected_output": "先执行启动清单与探查。由于 02 Areas 下没有匹配目录，询问用户发版笔记该放哪，而不是写进任何记忆中的旧路径。位置确认后，用 references/release-note-template.md 的结构写周发版笔记，包含打包、上传、解压、配置拷贝、后端重启、前端重启、验证与回滚。",
+      "expected_output": "先执行启动清单与探查，位置一律以探查结果为准（不得引用 vault-map.md 里对该区状态的记载）。探查不到匹配的领域目录时，询问用户发版笔记该放哪，而不是写进任何记忆中的旧路径；位置确认后，用 references/release-note-template.md 的结构写周发版笔记，包含打包、上传、解压、配置拷贝、后端重启、前端重启、验证与回滚。",
       "files": []
     },
     {

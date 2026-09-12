@@ -11,6 +11,7 @@
     python3 validate_skill.py --json
 
 退出码：0 = 全部通过，1 = 有失败，2 = 路径无效。
+正文余量（见 HEADROOM_MIN）只提示，不影响退出码。
 """
 
 from __future__ import annotations
@@ -24,6 +25,11 @@ import sys
 
 MAX_DESC = 800
 MAX_BODY_LINES = 150
+# 余量低于此值时提示（不判失败）。
+# 2026-09-12 三个 skill 同时逼近上限（146/143/145），意味着下一次“真实需要的新规则”
+# 没有空间直接加进去 —— 那时会被迫先做 references 瘦身。与其等到那一刻才发现，
+# 不如每次校验都把它显出来。只说事实（余量多少、该先做什么），不替人决定要不要加。
+HEADROOM_MIN = 10
 FM_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
 # description 里应出现的触发表达（中英皆可）
 TRIGGER_HINTS = ("Use this skill", "Use when", "用于", "触发")
@@ -100,6 +106,11 @@ def check_skill(path: str) -> dict:
     add("description 含 Do NOT use 边界", bool(re.search(r"[Dd]o NOT use", desc)))
     lines = body.count("\n")
     add(f"正文 {lines} 行 ≤ {MAX_BODY_LINES}", lines <= MAX_BODY_LINES)
+    headroom = MAX_BODY_LINES - lines
+    if 0 <= headroom < HEADROOM_MIN:
+        result.setdefault("notes", []).append(
+            f"正文余量只剩 {headroom} 行：下次要往正文加规则前，先做 references 瘦身"
+        )
     add("正文含表格或清单", "|" in body or "\n- " in body)
 
     for sub in ("references", "evals"):
@@ -156,6 +167,8 @@ def main(argv: list[str] | None = None) -> int:
         if r.get("assets"):
             extra = "  ".join(f"{k}:{v}" for k, v in r["assets"].items())
             print(f"      · {extra}")
+        for note in r.get("notes", []):
+            print(f"      ! {note}")
 
     print(f"\n  检查 {len(results)} 个 skill"
           + (f"，{len(failed)} 个失败" if failed else "，全部通过"))

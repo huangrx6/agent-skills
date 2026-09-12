@@ -91,6 +91,7 @@ git clone https://github.com/<owner>/agent-skills.git
 
 - **目录名 = frontmatter `name` 字段**,保持一致
 - 改完 skill 跑 `python3 skills/skill-builder/scripts/validate_skill.py` —— 机械检查 10 项(YAML 可解析、name 匹配目录名、description < 800 字符、含 Do NOT 边界、正文 ≤ 150 行等),退出码 `0` 通过 / `1` 失败
+- 正文余量不足 10 行时脚本会另提示一行(`!` 前缀,不影响退出码):**下次要往正文加规则前,先做 references 瘦身**。瘦身由下一次真实需求触发,不靠“等哪天有空”——一直没空就一直不做。
 - **Obsidian 类**绑定具体 vault 路径(跨机复用性低)
 - 本仓库的 `.skill-lock.json` 已被 `.gitignore` 排除——那是 pi 工具的本地 lock,每台机器自己生成
 
