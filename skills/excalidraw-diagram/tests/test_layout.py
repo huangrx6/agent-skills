@@ -194,8 +194,12 @@ class TestLongEdges(unittest.TestCase):
     def test_parallel_long_edges_do_not_share_a_chain(self):
         """同一节点出发的两条长边必须各走自己的链。"""
         ad, ae = self.edge("A", "D")["points"], self.edge("A", "E")["points"]
-        self.assertNotEqual(ad[1], ae[1], "两条长边在虚节点处重叠 —— 它们串线了")
-        self.assertLess(ad[1][0], ae[1][0] + 10_000)   # 都存在且不同层
+        # 断「整条路径不相同、而且都不穿节点」—— 比原来的「第 1 个拐点不同」结实：
+        # 正交路由可能把某一条拉成两点直线（没有拐点），那时按下标取点就没有意义了。
+        self.assertNotEqual(ad, ae, "两条长边画成了同一条线 —— 它们串线了")
+        for name, pts in (("A→D", ad), ("A→E", ae)):
+            self.assertEqual([], L.nodes_hit_by_polyline(pts, self.r.placed, {"A", "D", "E"}),
+                             f"{name} 穿过了别的节点")
 
     def test_dummies_are_apart_by_dummy_separation(self):
         """虚节点不能吃掉整个节点间距，但也不能重合（否则平行边看起来是一条）。
@@ -304,12 +308,31 @@ class TestOrdering(unittest.TestCase):
 
 
 class TestCoordinates(unittest.TestCase):
-    def test_same_rank_nodes_are_node_separation_apart(self):
+    def test_same_rank_nodes_never_touch(self):
+        """同层节点之间**任何时候**都不许小于 NODE_CLEARANCE。
+
+        以前这条断的是「间隙正好等于 nodeSeparation」。现在不能再这么断了：主轴拉直
+        （`_align_spine`）会把主线的节点对齐到父节点正下方，挡路的分支被往外推一次 ——
+        于是分支与主线之间的间隙会比默认值小。`nodeSeparation` 是**默认间距**，
+        不是下限；下限是 NODE_CLEARANCE，那才是「挨住了」的判据
+        （`check_layout` 的 gap 检查用的也是它）。
+        """
         s = spec_of("ABC", [("A", "B"), ("A", "C")])
         r = L.layout(s, boxes_for("ABC"))
         b, c = r.placed["B"], r.placed["C"]
         gap = abs(b.y - c.y) - b.height
-        self.assertAlmostEqual(L.DEFAULT_PARAMS["nodeSeparation"], gap, delta=1.0)
+        self.assertGreaterEqual(gap, L.NODE_CLEARANCE - 0.01,
+                                "同层节点贴到一起了")
+
+    def test_spine_alignment_keeps_branches_clear(self):
+        """拉直之后，被推开的分支仍然不许和主线贴住。"""
+        s = spec_of("ABCD", [("A", "B"), ("B", "C"), ("A", "D")])
+        r = L.layout(s, boxes_for("ABCD"))
+        row = [p for p in r.real_nodes().values() if p.rank == r.placed["C"].rank]
+        for i, a in enumerate(row):
+            for b in row[i + 1:]:
+                gap = abs((a.y + a.height / 2) - (b.y + b.height / 2)) - a.height / 2 - b.height / 2
+                self.assertGreaterEqual(gap, L.NODE_CLEARANCE - 0.01)
 
     def test_main_axis_advances_by_rank_separation(self):
         s = spec_of("AB", [("A", "B")])

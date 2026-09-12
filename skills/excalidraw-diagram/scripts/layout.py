@@ -49,7 +49,7 @@ import json
 import math
 import os
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 # **图类型这个枚举只有这一份。** `validate_spec.py` 的类型白名单直接从这里取 ——
@@ -1363,7 +1363,7 @@ def assign_coordinates(order: dict[int, list[str]], boxes: dict[str, Box],
 # ── 边路径 ──────────────────────────────────────────────────
 def route_edges(origins: list[dict], segments: list[dict],
                 placed: dict[str, Placed], direction: str,
-                reversed_set: set[tuple[str, str]]) -> list[dict]:
+                reversed_set: set[tuple[str, str]], align: bool = True) -> list[dict]:
     """把（可能经过虚节点的）原始边连成折线。
 
     遍历的是**原始边**而不是边段 —— 拆出来的首段也带虚节点，按段遍历会把
@@ -1378,6 +1378,10 @@ def route_edges(origins: list[dict], segments: list[dict],
         chain = _follow(idx, e, segments, placed)
         if len(chain) >= 2:
             resolved.append((idx, chain))
+    # 主轴链拉直（只动交叉轴，且先量间隙）。放在锚点分配**之前** ——
+    # 贴点要按最终位置算，先分锚点再挪节点等于白算。
+    if align:
+        _align_spine(placed, origins, direction)
     starts, ends = _anchor_slots(resolved, placed, direction)
 
     for idx, chain in resolved:
@@ -1390,7 +1394,8 @@ def route_edges(origins: list[dict], segments: list[dict],
         waypoints = [[placed[n].x + placed[n].width / 2,
                       placed[n].y + placed[n].height / 2] for n in chain[1:-1]]
         pts = straighten(pts, placed, {chain[0], chain[-1]},
-                         orthogonal=_orthogonal_path(pts[0], pts[-1], waypoints))
+                         orthogonal=_orthogonal_path(pts[0], pts[-1], waypoints,
+                                                     direction))
         a, b = e["from"], e["to"]
         was_reversed = (b, a) in reversed_set
         if was_reversed:
@@ -1481,6 +1486,15 @@ def _slots(groups: dict[str, list], placed: dict[str, Placed],
 
 def _points(chain: list[str], placed: dict[str, Placed], direction: str,
             start_off: float = 0.0, end_off: float = 0.0) -> list[list[float]]:
+    """链上的折点（链是 **DAG 方向**；反向边由调用方把点表反过来）。
+
+    试过给反向边换端口（让它从“对着目标的那一面”进出），**实测没用**：
+    同一批规格（竖版流程 + 五层架构 + 02-flow），换端口 斜段 12.6% / 拐点 78 /
+    主轴绕圈 1，不换 12.8% / 78 / 1 —— 三项都只差 0.2%。
+    原因也清楚：链是按 DAG 方向解的、点位在解完之后才反过来，**几何本来就落在
+    该落的那一侧**（回边从右往左走时，C 的左边缘正是对着 A 的那一面）。
+    所以这一处不需要额外逻辑 —— 加进去只会多一份要维护的分支。
+    """
     pts: list[list[float]] = []
     last = len(chain) - 1
     for i, nid in enumerate(chain):
@@ -1493,7 +1507,7 @@ def _points(chain: list[str], placed: dict[str, Placed], direction: str,
             pts.append([p.x, cy + end_off] if direction == "LR"
                        else [cx + end_off, p.y])
         else:
-            pts.append([cx, cy])
+            pts.append([cx, cy])                    # 中间站（虚节点）取自身中心
     return [[round(x, 2), round(y, 2)] for x, y in pts]
 
 
@@ -1722,31 +1736,193 @@ def _path_rank(pts: list, tier: int) -> tuple:
     return (stub, slanted, tier, corners, round(deviation, 2), round(length / span, 3))
 
 
-def _orthogonal_path(a: list, b: list, waypoints: list) -> list[list[float]]:
+def _align_spine(placed: dict, edges: list, direction: str) -> int:
+    """把主轴上的链**拉直** —— 治「竖着那半段中心点对不上」。
+
+    实测（一份竖版流程，13 节点）：主轴中心从 `build` 的 422 漂到 `profile` 的 362，
+    之后的 `forbid / probe / req / degraded` 全继承了这 60px 偏移。原因很直白：
+    `profile` 有**两个**父节点（mem / prod 分叉），它的位置取的是两者的平均 ——
+    而不是**分叉点自己的正下方**。
+
+    两条规则，都是从结构上看得出来的：
+
+    1. **菱形汇合点对齐分叉点**：一个节点的全部父节点如果只有同一个父节点（那就是分叉），
+       它就站到分叉点的中心线下 —— 主流程直着往下，分支挂在两侧。
+    2. **单入单出的节点对齐邻居**：链上的节点站到上下游中心的中点。
+
+    只动**交叉轴**（TB 动 x、LR 动 y），而且**先量再挪**：挪完若与同层邻居的间隙
+    小于 NODE_CLEARANCE 就放弃这次对齐（宁可歪，不要叠）。返回实际挪动的节点数。
+    """
+    parents: dict[str, list[str]] = {}
+    children: dict[str, list[str]] = {}
+    for e in edges:
+        parents.setdefault(e["to"], []).append(e["from"])
+        children.setdefault(e["from"], []).append(e["to"])
+
+    def centre(nid: str) -> float:
+        q = placed[nid]
+        return (q.x + q.width / 2) if direction == "TB" else (q.y + q.height / 2)
+
+    def cross_size(nid: str) -> float:
+        q = placed[nid]
+        return q.width if direction == "TB" else q.height
+
+    def sibling_gap(nid: str, target: float) -> float:
+        """把这个节点挪到 target 之后，它和同层邻居的最小间隙。"""
+        me = placed[nid]
+        half = cross_size(nid) / 2
+        best = math.inf
+        for other, q in placed.items():
+            if other == nid or q.rank != me.rank or other.startswith(DUMMY_PREFIX):
+                continue
+            other_centre = (q.x + q.width / 2) if direction == "TB" else (q.y + q.height / 2)
+            best = min(best, abs(target - other_centre) - half - cross_size(other) / 2)
+        return best
+
+    # 走到每个节点可达的节点数 —— 分叉时用它认「主线」是哪一支：
+    # 父节点有多个孩子时，只把子树最大的那支拉直，其余当分支挂在侧面
+    # （这正是人画流程图的习惯：主流程直着往下，错误分支甩到一边）。
+    def subtree_size(start: str) -> int:
+        seen: set[str] = set()
+        stack = [start]
+        while stack:
+            cur = stack.pop()
+            if cur in seen:
+                continue
+            seen.add(cur)
+            stack.extend(children.get(cur, []))
+        return len(seen)
+
+    main_child: dict[str, str] = {}
+    for parent, kids in children.items():
+        if len(kids) == 1:
+            main_child[parent] = kids[0]
+        else:
+            main_child[parent] = max(kids, key=lambda k: (subtree_size(k), -kids.index(k)))
+
+    def rank_gaps_ok(rank: int) -> bool:
+        """这一层里任意两个真节点的间隙都不小于 NODE_CLEARANCE。"""
+        items = [p for n, p in placed.items()
+                 if p.rank == rank and not n.startswith(DUMMY_PREFIX)]
+        for i, a in enumerate(items):
+            for b in items[i + 1:]:
+                gap = (abs((a.x + a.width / 2) - (b.x + b.width / 2)) - a.width / 2 - b.width / 2
+                       if direction == "TB" else
+                       abs((a.y + a.height / 2) - (b.y + b.height / 2)) - a.height / 2 - b.height / 2)
+                if gap < NODE_CLEARANCE - 0.01:
+                    return False
+        return True
+
+    def push_aside(nid: str, target: float, touched: dict) -> bool:
+        """把挡住 nid 归位的同层邻居沿交叉轴往外推，腾出 NODE_CLEARANCE 的间隙。
+
+        推的是**位置**，不改任何结构；推完立刻用同一个 `sibling_gap` 复核被推的那个
+        节点 —— 它自己要是因此挤到第三个节点，这次推就作废（返回 False）。
+        """
+        me = placed[nid]
+        half = cross_size(nid) / 2
+        for other, q in placed.items():
+            if other == nid or q.rank != me.rank or other.startswith(DUMMY_PREFIX):
+                continue
+            other_centre = (q.x + q.width / 2) if direction == "TB" else (q.y + q.height / 2)
+            gap = abs(target - other_centre) - half - cross_size(other) / 2
+            if gap >= NODE_CLEARANCE:
+                continue
+            away = 1.0 if other_centre >= target else -1.0
+            new_centre = other_centre + away * (NODE_CLEARANCE - gap + 1.0)
+            if sibling_gap(other, new_centre) < NODE_CLEARANCE:
+                return False                    # 推它会挤到第三个 —— 那就不推
+            touched.setdefault(other, q)
+            if direction == "TB":
+                placed[other] = replace(q, x=new_centre - q.width / 2)
+            else:
+                placed[other] = replace(q, y=new_centre - q.height / 2)
+        return True
+
+    moved = 0
+    for _round in range(6):                     # 让对齐沿着链往下传
+        changed = 0
+        for nid in list(placed):
+            if nid.startswith(DUMMY_PREFIX):
+                continue
+            ins, outs = parents.get(nid, []), children.get(nid, [])
+            target = None
+            if len(ins) >= 2:
+                # 菱形汇合：全部父节点共用一个祖父 → 站到分叉点的中心线下
+                grandparents = {g for parent in ins for g in parents.get(parent, [])}
+                if len(grandparents) == 1:
+                    target = centre(next(iter(grandparents)))
+            elif len(ins) == 1 and main_child.get(ins[0]) == nid:
+                # 主线的一环：站到**父节点**的正下方（不是和邻居取平均 ——
+                # 要的是「继承主线」，不是「把弯抹平」）。
+                target = centre(ins[0])
+            if target is None or abs(target - centre(nid)) < 1.0:
+                continue
+            # 记下这次要动的对象（含可能被推开的分支）—— 动完复核整层，不行就整体回滚。
+            # 第一版只检查了“被推的那个”与**当时**的位置，nid 还没过去 —— 于是推完
+            # 再挪过去就叠在一起了（实测：四对节点间隙 0px，整张图判红）。
+            touched: dict[str, "Placed"] = {}
+            if sibling_gap(nid, target) < NODE_CLEARANCE:
+                # 会挤到邻居。但这个邻居**本来就是分支** —— 主线归位时把它往外推一次
+                # （只推一次、不级联）。实测：竖版流程里 `opt` 是 412px 宽的菱形，
+                # 它要归位就被右边的 `stop` 挡住，而 `stop` 正是那条“是 → 拒绝启动”
+                # 的分支，本来就该往外站。
+                if not push_aside(nid, target, touched):
+                    continue                    # 推不动 —— 宁可歪着
+            node = placed[nid]
+            touched[nid] = node
+            # `Placed` 是 frozen 的 —— 换一个对象写回字典（字典本身是共享的可变对象，
+            # 所以 route_edges 之外的布局结果也能看到新位置）。
+            placed[nid] = (replace(node, x=target - node.width / 2) if direction == "TB"
+                           else replace(node, y=target - node.height / 2))
+            if not rank_gaps_ok(placed[nid].rank):
+                for key, old_value in touched.items():
+                    placed[key] = old_value     # 回滚：宁可歪着，不要叠
+                continue
+            changed += 1
+            moved += 1
+        if not changed:
+            break
+    return moved
+
+
+def _orthogonal_path(a: list, b: list, waypoints: list, direction: str = "LR") -> list[list[float]]:
     """走出只含**横段与竖段**的路径。
 
-    两条规矩，都是从实测的“钩子”里总结出来的：
+    三条规矩，都是从实测的“钩子”里总结出来的：
 
-    1. **竖段走在列间空档里**（源列右边界与目标列左边界之间），不走目标的列 ——
-       走目标那一列的话，竖段会贴着目标上下穿，压到**同层的兄弟节点**；图上表现为
-       线从上面下来、绕过兄弟、再拐进目标，也就是那几处被圈出来的钩子。
-    2. **横段走在虚节点给的行上** —— 虚节点是分层布局为长边预留的空位，
-       它所在的行在它穿过的列里是空的。所以一条多层的边就沿着这些行横向推进。
+    1. **先沿主轴走**：LR 先横、TB 先竖 —— 反过来等于一出来就横穿自己那一行。
+       （第一版只写了 LR 的形态，竖版流程上一直在横着穿同层。）
+    2. **竖段走在列间空档里**（LR）/ **横段走在层间空档里**（TB），不走目标那一列/行 ——
+       走目标那一列的话，线会贴着目标上下穿、压到**同层的兄弟节点**，图上就是钩子。
+    3. **横段走在虚节点给的行上** —— 虚节点是分层布局为长边预留的空位，
+       它所在的行在它穿过的列里是空的。多层的边就沿着这些行推进。
 
-    背景：斜段曾占全部连线长度的 **49.5%**。用户的原话是「就是那种 90 度拐弯的线
-    不行吗」—— 要的是正交 + 90 度角，不是“把斜线拉直”。
+    背景：斜段曾占全部连线长度的 49.5%。用户的原话是「就是那种 90 度拐弯的线不行吗」
+    —— 要的是正交 + 90 度角，不是“把斜线拉直”。
     """
-    gap = (a[0] + b[0]) / 2.0                 # 列间空档（LR）；TB 时按 y 取
+    gap = (a[0] + b[0]) / 2.0 if direction == "LR" else (a[1] + b[1]) / 2.0
     pts: list[list[float]] = [list(a)]
-    pts.append([gap, a[1]])                   # 横段：出源列，进空档
-    row = a[1]
-    for x, y in waypoints:
-        pts.append([x, row])                  # 横段：沿着上一站的行推进
-        pts.append([x, y])                    # 竖段：在它所在的空档里换行
-        row = y
-    pts.append([gap, row])                    # 横段：回到空档
-    pts.append([gap, b[1]])                   # 竖段：在空档里换到目标的行
-    pts.append(list(b))                       # 横段：从空档直接进目标
+    if direction == "LR":
+        pts.append([gap, a[1]])                    # 先横：出源列，进空档
+        row = a[1]
+        for x, y in waypoints:
+            pts.append([x, row])                   # 横段：沿上一站的行推进
+            pts.append([x, y])                     # 竖段：在它所在的空档里换行
+            row = y
+        pts.append([gap, row])                     # 横段：回到空档
+        pts.append([gap, b[1]])                    # 竖段：在空档里换到目标的行
+        pts.append(list(b))                        # 横段：从空档进目标
+    else:
+        pts.append([a[0], gap])                    # 先竖：出源层，进空档
+        column = a[0]
+        for x, y in waypoints:
+            pts.append([column, y])                # 竖段：沿上一站的列推进
+            pts.append([x, y])                     # 横段：在它所在的空档里换列
+            column = x
+        pts.append([column, gap])                  # 竖段：回到空档
+        pts.append([b[0], gap])                    # 横段：在空档里换到目标的列
+        pts.append(list(b))                        # 竖段：从空档进目标
     return _simplify_path(pts)
 
 
@@ -1970,7 +2146,39 @@ def layout(spec: dict, boxes: dict[str, Box],
     coords = assign_coordinates(order, all_boxes, direction,
                                 p["nodeSeparation"], p["rankSeparation"])
     placed = coords.placed
-    routed = route_edges(origins, segments, placed, direction, set(reversed_edges))
+    # 主轴拉直是一把双刃剑：它让主流程直着走，但也可能把某条边推到别的节点上。
+    # **两种都算，挑更干净的** —— 判据是「连线穿节点的处数」，同分时留着拉直版
+    # （那是用户明确要的直）。这跟径向那次「只在遮挡真的变少时才换顺序」是同一套路：
+    # 用一个能量出来的指标决定要不要接受一次“看起来更好”的调整。
+    def quality(routed_edges: list, table: dict) -> tuple[int, float]:
+        """评价一次路由：**先看穿节点，再看斜段占比**。
+
+        只卡穿节点是不够的 —— 对齐之后有些边的正交候选会被节点挡住，于是退回斜的直线弦。
+        实测：五层架构那张在“只卡穿节点”时选了拉直版，斜段从 0% 涨到 20.6%。
+        斜段是用户明确不要的东西，所以它也得进判据（同分时留拉直版 —— 那是要的直）。
+        """
+        hit = sum(len(nodes_hit_by_polyline(e["points"], table, {e["from"], e["to"]}))
+                  for e in routed_edges)
+        diagonal = total = 0.0
+        for e in routed_edges:
+            for a, b in zip(e["points"], e["points"][1:]):
+                dx, dy = abs(b[0] - a[0]), abs(b[1] - a[1])
+                length = math.hypot(dx, dy)
+                total += length
+                if dx > 0.5 and dy > 0.5:
+                    diagonal += length
+        return (hit, round(diagonal / total, 3) if total else 0.0)
+
+    plain_table = dict(placed)
+    plain_routed = route_edges(origins, segments, plain_table, direction,
+                               set(reversed_edges), align=False)
+    aligned_table = dict(placed)
+    aligned_routed = route_edges(origins, segments, aligned_table, direction,
+                                 set(reversed_edges), align=True)
+    if quality(aligned_routed, aligned_table) <= quality(plain_routed, plain_table):
+        placed, routed = aligned_table, aligned_routed
+    else:
+        placed, routed = plain_table, plain_routed
     # 折段之后，两端落在不同段的连线改走空档 —— 直连会横穿两栏。
     if coords.bands:
         for e in routed:
