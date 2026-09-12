@@ -620,16 +620,26 @@ def _aabb_deficit(a: Any, b: Any, want: float) -> float:
     return want - max(dx, dy, 0.0)
 
 
+def support_extent(box: Any, ux: float, uy: float) -> float:
+    """轴对齐盒子在**方向 (ux, uy)** 上的半宽。
+
+    **唯一实现**：径向的半径外推、力导向的碰撞感知斥力都用它 —— 两处各写一份的话
+    就是第二个漂移点（这个项目已经吃过几次这个亏）。
+    单位方向不需要归一化也会错得很自然，所以这里显式归一化。
+    """
+    length = math.hypot(ux, uy) or 1.0
+    return ((box.width / 2.0) * abs(ux / length)
+            + (box.height / 2.0) * abs(uy / length))
+
+
 def _radial_extent(box: Any, theta: float) -> float:
-    """盒子在**半径方向**（角度 theta）上的半宽。"""
-    return ((box.width / 2.0) * abs(math.cos(theta))
-            + (box.height / 2.0) * abs(math.sin(theta)))
+    """盒子在**半径方向**（角度 theta）上的半宽 = 支撑值在径向的分量。"""
+    return support_extent(box, math.cos(theta), math.sin(theta))
 
 
 def _tangential_extent(box: Any, theta: float) -> float:
     """盒子在**切向**上的半宽。"""
-    return ((box.width / 2.0) * abs(math.sin(theta))
-            + (box.height / 2.0) * abs(math.cos(theta)))
+    return support_extent(box, -math.sin(theta), math.cos(theta))
 
 
 def _angular_distance(first: float, second: float) -> float:
@@ -803,6 +813,165 @@ def _leaf_count(node: str, children: dict[str, list[str]],
     return cache[node]
 
 
+# ── 力导向：网状图（#94）────────────────────────────────────────
+#
+# 网状图没有天然层级，分层会把它拉成一条长条（05-network 实测 4.3:1）。
+# 力导向不假设层级：边当弹簧、节点当互相排斥的盒子，结构自己显形。
+#
+# **确定性是硬要求**：同一份规格永远出同一张图（否则"改一个标签，整张图重排"）。
+# 所以初始位置用**确定的圆**（按输入顺序），不用随机数、不做多次重启取最优。
+FORCE_ITERATIONS = 320        # 迭代轮数
+FORCE_COOLING = 0.94          # 每轮温度衰减 = 每步位移的上界
+FORCE_INITIAL_SPREAD = 0.62   # 初始圆半径 = 这个系数 × 理想间距 × √n
+FORCE_OVERLAP_PUSH = 0.8      # 重叠时额外的分离力度（相对重叠深度）
+FORCE_SEPARATION_ROUNDS = 80  # 收尾分离的轮数上界
+# 下面两个系数是**扫出来的**（改源文件 + 子进程跑 emit 完整流水线，12 组各量一次；
+# 之所以要子进程：emit 的布局是经 check_layout 的调参器调的，而 check_layout 每次被
+# `load_sibling` 重新 exec 一份 —— 进程内 monkeypatch 挂不到它用的那份上，量不出差别）。
+#
+#   系数/份额     画布         比例   穿  软项
+#   0.5 / 0.35   907×755      1.2    0    0
+#   0.5 / 0.7    922×755      1.2    0    0   ← 选它
+#   0.8 / 0.7   1070×949      1.1    0    0
+#   1.4 / 0.7   1161×1596     1.4    0    0
+#
+# 12 组**都没有**穿节点、没有软项，所以差别只有"多紧"。选偏紧的那个不只是因为好看：
+# **调参器只会加大间距（单向）** —— 默认偏松就永远不会被收紧，默认偏紧时该松的场合
+# 调参器会自己补上。面积因此降到默认松值的 1/2.2。
+FORCE_IDEAL_EXTRA = 0.5       # 理想中心距 = rankSeparation + 这个系数 × 节点平均长边
+FORCE_CLEARANCE_SHARE = 0.7   # 最小间隙取 nodeSeparation 的多少（下限仍是 NODE_CLEARANCE）
+
+
+def _force_centres(live: list[str], boxes: dict[str, Any],
+                   edges: list[dict], params: dict[str, float]) -> dict[str, list[float]]:
+    """力学迭代，返回每个节点的**中心**坐标。
+
+    两个参数**真的连着**（不然调参那几轮对着它空转 —— 前作就是"有旋钮没人拧"）：
+    - `rankSeparation` → 理想中心距（把连线拉长，对付"连线过短"）
+    - `nodeSeparation` → 盒子之间至少留多少（对付"挨得过近"和"连线穿节点"）
+    """
+    typical = sum(max(boxes[n].width, boxes[n].height) for n in live) / len(live)
+    ideal = (params.get("rankSeparation", DEFAULT_PARAMS["rankSeparation"])
+             + FORCE_IDEAL_EXTRA * typical)
+    clearance = max(NODE_CLEARANCE, FORCE_CLEARANCE_SHARE * params.get(
+        "nodeSeparation", DEFAULT_PARAMS["nodeSeparation"]))
+
+    radius = ideal * math.sqrt(len(live)) * FORCE_INITIAL_SPREAD
+    centre: dict[str, list[float]] = {}
+    for index, node in enumerate(live):
+        theta = 2.0 * math.pi * index / len(live)
+        centre[node] = [radius * math.cos(theta), radius * math.sin(theta)]
+    temperature = radius * 0.35
+
+    for _ in range(FORCE_ITERATIONS):
+        disp = {node: [0.0, 0.0] for node in live}
+        for i in range(len(live)):
+            for j in range(i + 1, len(live)):
+                first, second = live[i], live[j]
+                dx = centre[first][0] - centre[second][0]
+                dy = centre[first][1] - centre[second][1]
+                distance = math.hypot(dx, dy)
+                if distance < 1e-6:
+                    # 完全重合：给一个**确定的**小偏移（按输入顺序），不能靠随机
+                    dx, dy = 0.0, 1e-3 * (i + 1)
+                    distance = math.hypot(dx, dy)
+                ux, uy = dx / distance, dy / distance
+                push = ideal * ideal / distance
+                need = max(clearance, support_extent(boxes[first], ux, uy)
+                           + support_extent(boxes[second], ux, uy))
+                if distance < need:
+                    push += (need - distance) * FORCE_OVERLAP_PUSH
+                disp[first][0] += ux * push
+                disp[first][1] += uy * push
+                disp[second][0] -= ux * push
+                disp[second][1] -= uy * push
+        for edge in edges:
+            a, b = edge.get("from"), edge.get("to")
+            if a not in centre or b not in centre or a == b:
+                continue
+            dx = centre[a][0] - centre[b][0]
+            dy = centre[a][1] - centre[b][1]
+            distance = math.hypot(dx, dy) or 1e-6
+            ux, uy = dx / distance, dy / distance
+            pull = distance * distance / ideal
+            disp[a][0] -= ux * pull
+            disp[a][1] -= uy * pull
+            disp[b][0] += ux * pull
+            disp[b][1] += uy * pull
+        for node in live:
+            dx, dy = disp[node]
+            length = math.hypot(dx, dy)
+            if length < 1e-9:
+                continue
+            step = min(length, temperature)     # 步长上界 = 当前温度
+            centre[node][0] += dx / length * step
+            centre[node][1] += dy / length * step
+        temperature *= FORCE_COOLING
+    return centre
+
+
+def _separate_boxes(placed: dict[str, Any], want: float) -> dict[str, Any]:
+    """收尾分离：**摆出来量，不够就推开**（不指望力学一定收敛到不重叠）。
+
+    用的是同一个 `_aabb_deficit`（径向的半径外推也用它）—— 同一件几何一份实现。
+    推的方向是两个盒心的连线方向，各让一半。轮数有上界；到顶还没分开就如实交出去，
+    由间隙校验报出来（布局层不替校验层兜底，也不假装成功）。
+    """
+    out = dict(placed)
+    ids = sorted(out)
+    for _ in range(FORCE_SEPARATION_ROUNDS):
+        worst = 0.0
+        for position, first in enumerate(ids):
+            for second in ids[position + 1:]:
+                a, b = out[first], out[second]
+                deficit = _aabb_deficit(a, b, want)
+                if deficit <= 0:
+                    continue
+                worst = max(worst, deficit)
+                ax, ay = a.x + a.width / 2.0, a.y + a.height / 2.0
+                bx, by = b.x + b.width / 2.0, b.y + b.height / 2.0
+                dx, dy = ax - bx, ay - by
+                length = math.hypot(dx, dy) or 1.0
+                shift = deficit / 2.0 + 0.5
+                out[first] = _shift(a, dx / length * shift, dy / length * shift)
+                out[second] = _shift(b, -dx / length * shift, -dy / length * shift)
+        if worst <= 0.0:
+            break
+    return out
+
+
+def _shift(box: Any, dx: float, dy: float) -> Any:
+    return Placed(id=box.id, x=round(box.x + dx, 2), y=round(box.y + dy, 2),
+                  width=box.width, height=box.height, rank=box.rank)
+
+
+def force_layout(node_ids: list[str], boxes: dict[str, Any], edges: list[dict],
+                 params: dict[str, float]) -> tuple[dict[str, Any], dict[str, int],
+                                                    dict[int, list[str]], list[dict]]:
+    """力导向布局（网状图）。返回 (placed, depth, order, routed)。
+
+    `depth` 与 `order` 对力导向没有意义（没有层）。给的是**统一的 0** ——
+    没有任何东西消费它们（校验与落笔都只看坐标），但签名与径向保持一致，
+    免得调用方要为两种布局写两套分支。
+    """
+    live = [n for n in node_ids if n in boxes]
+    if not live:
+        return {}, {}, {}, []
+    centre = _force_centres(live, boxes, edges, params)
+    placed = {}
+    for node in live:
+        box = boxes[node]
+        # 力学算的是**中心**；Placed 存左上角
+        placed[node] = Placed(id=node,
+                              x=round(centre[node][0] - box.width / 2.0, 2),
+                              y=round(centre[node][1] - box.height / 2.0, 2),
+                              width=box.width, height=box.height, rank=0)
+    want = max(NODE_CLEARANCE, FORCE_CLEARANCE_SHARE * params.get(
+        "nodeSeparation", DEFAULT_PARAMS["nodeSeparation"]))
+    placed = _separate_boxes(placed, want)
+    return placed, {n: 0 for n in live}, {0: list(live)}, straight_edges(edges, placed)
+
+
 def _assign_sectors(root: str, order: dict[str, list[str]],
                     leaves: dict[str, int]) -> dict[str, tuple[float, float]]:
     """扇区：根占整圆，每个父节点的孩子按**叶子数**切分它的扇区。
@@ -912,7 +1081,7 @@ def _radial_pipeline(order: dict[str, list[str]], root: str,
     angle = {node: sum(bounds) / 2.0 for node, bounds in sector.items()}
     rings = _rings_of(live, depth, angle)
     placed, _radius = _refine_radii(rings, angle, boxes)
-    return placed, rings, radial_edges(edges, placed)
+    return placed, rings, straight_edges(edges, placed)
 
 
 def radial_layout(node_ids: list[str], boxes: dict[str, Any],
@@ -970,11 +1139,12 @@ def _breadth_first(root: str, children: dict[str, list[str]]) -> list[str]:
     return out
 
 
-def radial_edges(edges: list[dict], placed: dict[str, Any]) -> list[dict]:
-    """径向的连线：两个节点中心之间的直线，裁到盒子边上。
+def straight_edges(edges: list[dict], placed: dict[str, Any]) -> list[dict]:
+    """连线 = 两个盒心之间的直线，裁到各自的盒子边上。
 
-    分层那套"按 LR/TB 的四个边贴点"在这里不成立 —— 径向的线是**朝外的辐条**，
-    方向取决于两个节点在环上的相对位置，不是固定的上下左右。
+    **不分层的图共用这一份**（径向的辐条、力导向的弹簧线）。分层那套"按 LR/TB 的
+    四个边贴点"在这里不成立 —— 这类图的线的方向取决于两个节点的相对位置，
+    不是固定的上下左右。
 
     **试过又退掉的方案**：交叉引用（非树边）绕外圈走弧。当时理由是长弦会穿过圆心
     附近的节点；实测确实如此（3 条边各穿 2 个节点），但那是**软项、不阻塞出图** ——
@@ -1543,6 +1713,17 @@ def layout(spec: dict, boxes: dict[str, Box],
             crossings = geometric_crossing_pairs(routed)
             return LayoutResult(
                 direction="RADIAL", params=p, ranks=depth, order=order,
+                placed=placed, edges=routed,
+                crossings=len(crossings), crossing_origins=crossings,
+                dummy_count=0, reversed_edges=[], pin_conflicts=[])
+
+    # 网状图走**力导向**（没有天然层级，分层会把它拉成一条长条）
+    if str(spec_type or "") == "network" and len(node_ids) >= 2:
+        placed, depth, order, routed = force_layout(node_ids, boxes, edges, p)
+        if placed:
+            crossings = geometric_crossing_pairs(routed)
+            return LayoutResult(
+                direction="FORCE", params=p, ranks=depth, order=order,
                 placed=placed, edges=routed,
                 crossings=len(crossings), crossing_origins=crossings,
                 dummy_count=0, reversed_edges=[], pin_conflicts=[])

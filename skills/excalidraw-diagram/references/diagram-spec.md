@@ -8,7 +8,7 @@
 {
   "type": "architecture",           // 必填，决定布局策略（见 SKILL.md 的策略表）
   "title": "鉴权链路",               // 可选，图标题
-  "direction": "LR",                // 可选，仅 LR / TB；type=mindmap 走径向，此项无意义
+  "direction": "LR",                // 可选，仅 LR / TB；那三种算法里，只有分层用得上它
   "detail": "standard",             // executive | standard | diagnostic
   "visual": "auto",                  // 可选，见下方"视觉方向"；不写 = auto
   "groups": [

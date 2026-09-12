@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import os
 import subprocess
 import sys
@@ -607,25 +608,31 @@ class TestEveryCheckHasALabel(unittest.TestCase):
     有问题时才打印，所以一直没被发现，直到径向布局第一次让"穿节点"进了报告。
     """
 
+    @staticmethod
+    def _check_names_in_source() -> set:
+        """从**源码**里扫出所有 Issue 用到的检查名。
+
+        为什么不"跑一遍 fixture，收集真实产生的检查名"：那是**依赖数据有问题**的写法 ——
+        六张图现在一条问题都不出（全部 0 阻塞 0 软项），收集出来的就是空集合，用例空转
+        还看不出来。源码扫描与数据无关，加检查时不改标签照样会被抓到（这正是当初
+        'through' 漏掉的那一次）。
+        """
+        path = os.path.join(HERE, "..", "scripts", "check_layout.py")
+        with open(path, encoding="utf-8") as handle:
+            text = handle.read()
+        return set(re.findall(r'Issue\(\s*"([a-z_]+)"', text))
+
     def test_labels_cover_every_check(self):
-        # 跑一遍六张 fixture，收集真实产生过的检查名
-        specs = os.path.join(HERE, "fixtures", "specs")
-        seen = set()
-        for name in sorted(os.listdir(specs)):
-            with open(os.path.join(specs, name), encoding="utf-8") as handle:
-                spec = json.load(handle)
-            result = L.layout(spec, L.boxes_from_spec(spec))
-            outcome = C.check(spec, result, L.boxes_from_spec(spec))
-            # check() 返回 Outcome，不是列表 —— 列出来的东西在 .issues 里
-            seen.update(i.check for i in outcome.issues)
-        self.assertTrue(seen, "一条检查都没跑到，这个用例就成了空话")
-        missing = seen - set(C.CHECK_LABEL)
+        """每条检查都必须有中文标签 —— 否则**报告一打印就崩**（KeyError）。"""
+        names = self._check_names_in_source()
+        self.assertTrue(names, "一个检查名都没扫到：正则失效了，用例成了空话")
+        missing = names - set(C.CHECK_LABEL)
         self.assertEqual(set(), missing, f"这些检查没有中文标签：{sorted(missing)}")
 
     def test_labels_have_no_orphans(self):
-        # 反过来也要成立：表里不该有已经不存在的检查
-        seen = set(C.STOP_ON) | set(C.TUNABLE) | {"through"}
-        self.assertEqual(set(), set(C.CHECK_LABEL) - seen,
+        """反过来也要成立：表里不该有已经不存在的检查。"""
+        names = self._check_names_in_source()
+        self.assertEqual(set(), set(C.CHECK_LABEL) - names,
                          "CHECK_LABEL 里有已经不存在（或已改名）的检查")
 
     def test_every_issue_can_render_its_line(self):

@@ -526,3 +526,79 @@ class TestFastRejectChangesNothing(unittest.TestCase):
         self.assertTrue(L._segment_may_hit_box([25, -5], [25, 55], box))
         # 贴着盒子外沿擦过：不相交，但也不许误判成交叉
         self.assertFalse(L._segment_may_hit_box([-50, 50.001], [100, 50.001], box))
+
+
+def _network_spec() -> dict:
+    """一张最小的网状图：5 个节点绕成一圈（没有天然层级）。"""
+    return {
+        "type": "network",
+        "nodes": [{"id": f"n{i}", "label": f"服务{i}", "kind": "service"}
+                  for i in range(5)],
+        "edges": [{"from": "n0", "to": "n1"}, {"from": "n1", "to": "n2"},
+                  {"from": "n2", "to": "n3"}, {"from": "n3", "to": "n4"},
+                  {"from": "n4", "to": "n0"}, {"from": "n0", "to": "n3"}],
+    }
+
+
+def _coords(placed: dict) -> list[tuple]:
+    return sorted((n, round(p.x, 3), round(p.y, 3)) for n, p in placed.items())
+
+
+def _spread(placed: dict) -> float:
+    xs = [p.x for p in placed.values()]
+    ys = [p.y for p in placed.values()]
+    return (max(xs) - min(xs)) * (max(ys) - min(ys))
+
+
+class TestForceLayout(unittest.TestCase):
+    """力导向（网状图）的几条硬性质。"""
+
+    def _run(self, params=None):
+        spec = _network_spec()
+        boxes = L.boxes_from_spec(spec)
+        nids = [n["id"] for n in spec["nodes"]]
+        return L.force_layout(nids, boxes, spec["edges"],
+                              dict(L.DEFAULT_PARAMS, **(params or {})))
+
+    def test_same_spec_gives_the_same_picture(self):
+        """**确定性**：同一份规格永远出同一张图。
+
+        力导向最容易在这件事上翻车（随机初始位置、多次重启取最优）—— 那样"改一个
+        标签"就会让整张图重排，用户没法对着图讨论、diff 也失去意义。所以初始位置用
+        确定的圆、不做重启。这条用例跑两遍逐坐标比。
+        """
+        first = self._run()[0]
+        second = self._run()[0]
+        self.assertEqual(_coords(first), _coords(second))
+        self.assertTrue(first, "没摆出任何节点，用例是空话")
+
+    def test_no_two_boxes_overlap(self):
+        """力学收敛**不保证**没有重叠 —— 收尾那步"量出来再推开"必须真的生效。"""
+        placed = self._run()[0]
+        worst = None
+        ids = sorted(placed)
+        for i, first in enumerate(ids):
+            for second in ids[i + 1:]:
+                gap = L.aabb_gap(placed[first], placed[second])
+                if worst is None or gap < worst:
+                    worst = gap
+        self.assertIsNotNone(worst)
+        self.assertGreaterEqual(worst, L.NODE_CLEARANCE,
+                                f"最窄的一对只隔了 {worst:.1f}px")
+
+    def test_the_two_knobs_actually_reach_the_drawing(self):
+        """`rankSeparation` / `nodeSeparation` 必须真的连着画面。
+
+        它们是给调参器用的，而调参器只会**加大**间距（单向）。旋钮没接上的话那几轮
+        调参就是空转 —— 前作正是"有旋钮没人拧"，最后靠人手挪坐标。所以这里不只是
+        "参数变了"，还要断言**变化的方向对**：加大间距必须把图撑开。
+        """
+        base = self._run()[0]
+        wider = self._run({"rankSeparation": 600.0})[0]
+        self.assertNotEqual(_coords(base), _coords(wider), "改参数没影响画面：旋钮没接上")
+        self.assertGreater(_spread(wider), _spread(base),
+                           "加大理想间距反而更挤 —— 力的方向反了")
+
+        roomier = self._run({"nodeSeparation": 260.0})[0]
+        self.assertGreater(_spread(roomier), _spread(base),
+                           "加大最小间隙没有把节点推开")
