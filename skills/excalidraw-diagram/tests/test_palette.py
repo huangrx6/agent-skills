@@ -324,6 +324,17 @@ class TestThemes(unittest.TestCase):
             self.assertEqual("dark-tech", P.active_theme())
         self.assertEqual(before, P.active_theme())
 
+    def test_suggestion_table_only_names_real_diagram_types(self):
+        """这张表曾经把图类型全抄了一遍 —— 于是同一个漂移又发生一次：
+        `component` / `sequence` 早就不是合法类型了，表里还留着。
+
+        类型清单的唯一来源是 `layout.DIRECTION_FOR_TYPE`。
+        """
+        layout = _load("layout_for_palette_test", "layout.py")
+        for name in P.THEME_SUGGESTION:
+            with self.subTest(diagram_type=name):
+                self.assertIn(name, layout.DIRECTION_FOR_TYPE)
+
     def test_themes_are_actually_different_from_each_other(self):
         seen = {}
         for theme in P.available_themes():

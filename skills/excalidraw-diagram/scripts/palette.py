@@ -62,7 +62,7 @@ CANVAS: dict = {}
 # 这是封闭枚举里唯一的例外分支，是未来最容易漏改的地方。
 # 待办：把 morandi 迁进 `THEMES` 的标准结构，去掉 `_rebind()` 的分支。
 
-# ── 主题：`颜色 = THEMES[主题名][语义角色]` ─────────────────────
+# ── 主题：`颜色 = THEMES[主题名][视觉层级]` ─────────────────────
 #
 # 落地机制就是两层封闭枚举：主题名封闭、语义角色封闭 —— 既不给模型自由发挥的空间，
 # 也不逼所有图一个样。
@@ -85,7 +85,6 @@ CANVAS: dict = {}
 # secondary 少量，critical 只在真的异常时用。
 VISUAL_LEVELS = ("neutral", "tint", "accent", "secondary", "critical")
 _LEVEL_ORDER = {name: i for i, name in enumerate(VISUAL_LEVELS)}
-DEFAULT_LEVEL = "tint"
 
 THEMES: dict[str, dict] = {
     "morandi": {
@@ -208,21 +207,19 @@ _active = DEFAULT_THEME
 #
 # 这是**建议**，不是默认：默认永远是 `morandi`（用户明确指定过）。
 # 想用建议就必须显式写 `"theme": "auto"` —— 自动覆盖用户的选择是错的。
+# 只列**例外**：没列到的图类型都用 `DEFAULT_THEME`。
+# 以前这里把 8 个图类型全抄了一遍，于是同一个漂移又发生一次 ——
+# `component` / `sequence` 早就不在合法类型里了，这里还留着。
 THEME_SUGGESTION: dict[str, str] = {
+    # 其余图类型（architecture / dependency / state / network）不列 —— 走 DEFAULT_THEME
     "flow": "bright-clean",          # 流程要明快、有节奏
     "mindmap": "bright-clean",       # 结构图要清爽
-    "architecture": "morandi",       # 技术架构要克制、耐看
-    "component": "morandi",
-    "sequence": "morandi",
-    "dependency": "morandi",
-    "state": "morandi",
-    "network": "morandi",
 }
 AUTO_THEME = "auto"
 
 
 def suggest_theme(diagram_type: str | None) -> str:
-    """按图类型给一个主题建议。没收录的类型回落到默认主题。"""
+    """按图类型给一个主题建议。表里只有例外，其余回落到 `DEFAULT_THEME`。"""
     return THEME_SUGGESTION.get(diagram_type or "", DEFAULT_THEME)
 
 
