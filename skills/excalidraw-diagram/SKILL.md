@@ -84,6 +84,7 @@ layout(参数) → 校验 ──通过──→ 输出
 
 ```sh
 python3 scripts/emit_excalidraw.py x.diagram.json     # 出图：串起整条流水线，写 .excalidraw
+python3 scripts/open_excalidraw_com.py x.excalidraw   # 在 excalidraw.com 官网上打开它、接着手改
 python3 scripts/validate_spec.py x.diagram.json       # 只校验规格（封闭字段集）
 python3 scripts/layout.py x.diagram.json --explain    # 只算布局：分层与层内顺序、坐标、交叉数
 python3 scripts/check_layout.py x.diagram.json        # 只跑校验 + 调参报告
@@ -92,6 +93,22 @@ python3 scripts/palette.py                            # 打印色板与 kind 取
 ```
 
 `check_layout.py` 退出码：0 = 无阻塞项，1 = 有阻塞项，2 = 读不到规格。
+
+## 在官网（excalidraw.com）上接着画
+
+**能做到，已实测跑通。** `scripts/open_excalidraw_com.py` 起一个只服务那一个场景文件、
+且只允许 excalidraw.com 这一个源的本地服务，然后打开：
+
+```text
+https://excalidraw.com/#url=http://localhost:8789/x.excalidraw
+```
+
+`#url=` 是 Excalidraw 的“从外部 JSON 地址导入场景”（PR #2726，无官方 UI 入口）。
+实测结果：官网把 23 个元素全部加载进画布、可以直接接着画；加载完 app 会自己把 hash 清掉。
+
+**两个坑（都踩过）**：`file://` 不会被 fetch 到；而且 excalidraw.com 去 fetch localhost
+**需要 CORS 头**（python 自带的 http.server 不发，现象是“打开后一直空白”）。所以那个脚本
+自己包了一层。**在 Obsidian 插件里用则完全不需要它** —— 文件放进 vault 双击就行。
 
 ## `dev-tools/preview.py` —— 不是运行时的一部分
 
@@ -112,23 +129,18 @@ python3 dev-tools/preview.py x.excalidraw out.png
 
 ## 输出格式：`.excalidraw`（plain JSON）
 
-**不是 `.excalidraw.md`。** 后者的场景是 **lz-string** 压缩的（实测插件 `main.js` 里 24 处
-`LZString`、`compressToBase64`），而 lz-string **没有 stdlib Python 等价物** —— 用它就得手抄
-一份 JS 压缩算法或者引依赖。`*.excalidraw` 是普通 JSON，插件原生读写（同目录的
-`my-obsidian-library.excalidrawlib` 就是 plain JSON）。
+**不是 `.excalidraw.md`** —— 后者的场景用 **lz-string** 压缩，而 lz-string 没有 stdlib Python
+等价物（用它就得手抄一份 JS 压缩算法）。理由与实测证据在 `emit_excalidraw.py` 的文档注释里。
 
-同一份规格每次生成的字节相同（seed 由元素 id 的 sha256 推出，不用随机数），所以图能进 git、diff 有意义。
+同一份规格每次生成的字节相同（seed 由元素 id 的 sha256 推出），所以图能进 git、diff 有意义。
 
-## ⚠ 一处必须知道的限制：Excalidraw 会自己重新排版文字
+## ⚠ 限制：Excalidraw 会自己重新排版文字
 
-`text_metrics` 算出的尺寸是我们对“文字占多大”的**推算**（按 Helvetica 实测的字符宽度表算，一律向上取整）。
-而容器绑定的文字（`containerId`）在 Excalidraw 里是**由它自己按真实字体重新断行**的 ——
-**渲染器是第二个尺寸来源，而且不在我们控制之内。**
+`text_metrics` 的尺寸是我们对“文字占多大”的**推算**，而容器绑定的文字在 Excalidraw 里
+**由它自己按真实字体重新断行** —— **渲染器是第二个尺寸来源，不在我们控制之内。**
+断行不一样多出一行，容器就被撑高、布局随之偏移。
 
-如果它的断行跟我们算的不一样（多出一行），Excalidraw 会把容器撑高，布局随之偏移。
-这不是猜测出来的隐患，是“同一份文字在两套字体度量下必然有偏差”的结果。
-
-**所以：规格与校验全绿不等于渲染出来就是那样。** 详见 `references/validation.md` 第六节。
+**所以：规格与校验全绿不等于渲染出来就是那样。** 已实测的结论与它的边界见 `references/validation.md` 第六节。
 
 ## 引用文件
 
