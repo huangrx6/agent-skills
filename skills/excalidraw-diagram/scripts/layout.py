@@ -1394,11 +1394,20 @@ def route_edges(origins: list[dict], segments: list[dict],
         # 虚节点车道会把跨层边牵着在每一层横移一次（实测偏离直线 324px）。
         waypoints = [[placed[n].x + placed[n].width / 2,
                       placed[n].y + placed[n].height / 2] for n in chain[1:-1]]
-        pts = straighten(pts, placed, {chain[0], chain[-1]},
-                         orthogonal=_orthogonal_path(pts[0], pts[-1], waypoints,
-                                                     direction, gaps,
-                                                     placed[chain[0]].rank,
-                                                     placed[chain[-1]].rank))
+        start_rank, end_rank = placed[chain[0]].rank, placed[chain[-1]].rank
+        # 第二条候选：**丢掉落在首尾跨度之外的虚节点行**，剩下的按行进方向排好 ——
+        # 这样纵向移动是单调的（0 次来回）。实测 3 条来回边都是被“绕出去的行”拖的：
+        # 目标行 547，而某个虚节点行在 572，于是必须先下去再回来。
+        low, high = sorted((pts[0][1], pts[-1][1]))
+        inside = [w for w in sorted(waypoints, key=lambda w: -w[1] if pts[0][1] > pts[-1][1]
+                                    else w[1]) if low - 1 <= w[1] <= high + 1]
+        variants = [_orthogonal_path(pts[0], pts[-1], waypoints, direction, gaps,
+                                     start_rank, end_rank)]
+        if inside != waypoints:
+            variants.append(_orthogonal_path(pts[0], pts[-1], inside, direction, gaps,
+                                             start_rank, end_rank))
+        pts = straighten(pts, placed, {chain[0], chain[-1]}, orthogonals=variants,
+                         endpoints=(chain[0], chain[-1]))
         a, b = e["from"], e["to"]
         was_reversed = (b, a) in reversed_set
         if was_reversed:
@@ -1487,16 +1496,34 @@ def _slots(groups: dict[str, list], placed: dict[str, Placed],
     return out
 
 
+def _port_faces(here: Placed, neighbour: Placed, direction: str) -> tuple[float, float]:
+    """这个节点的端口该开在哪一面 —— **朝着下一站**，而不是照着布局方向的假设。
+
+    踩过的坑：TB 图一向「从底边出去」（假设 rank 往下长），可 02-flow 的 rank 轴
+    是反的（rank 6 的画布 y 反而更小）—— 于是 `scan→stage` 从 scan 的**底边**出去，
+    接着却要往上走，整条线从自己的盒子里穿了过去（图上看就是线从框里冒出来），
+    而 `nodes_hit_by_polyline` 一向排除两端节点，这种路一直没人拦。
+
+    判据只看**下一站的中心在哪边**，跟布局方向、跟 rank 大小都无关：
+    - LR：下一站在左边就开左边，否则右边
+    - TB：下一站在上边就开上边，否则下边
+    回边（往左上走的）因此自动拿到"对着目标"的那一面，不需要额外的分支。
+    """
+    hx, hy = here.x + here.width / 2, here.y + here.height / 2
+    nx, ny = neighbour.x + neighbour.width / 2, neighbour.y + neighbour.height / 2
+    if direction == "LR":
+        return (here.x, hy) if nx < hx else (here.x + here.width, hy)
+    return (hx, here.y) if ny < hy else (hx, here.y + here.height)
+
+
 def _points(chain: list[str], placed: dict[str, Placed], direction: str,
             start_off: float = 0.0, end_off: float = 0.0) -> list[list[float]]:
     """链上的折点（链是 **DAG 方向**；反向边由调用方把点表反过来）。
 
-    试过给反向边换端口（让它从“对着目标的那一面”进出），**实测没用**：
-    同一批规格（竖版流程 + 五层架构 + 02-flow），换端口 斜段 12.6% / 拐点 78 /
-    主轴绕圈 1，不换 12.8% / 78 / 1 —— 三项都只差 0.2%。
-    原因也清楚：链是按 DAG 方向解的、点位在解完之后才反过来，**几何本来就落在
-    该落的那一侧**（回边从右往左走时，C 的左边缘正是对着 A 的那一面）。
-    所以这一处不需要额外逻辑 —— 加进去只会多一份要维护的分支。
+    两端的端口**朝着链上的相邻站**开（见 `_port_faces`）。试过一次"给反向边换端口"
+    就撤掉，结论是"几何本来就落在该落的那一侧" —— **那个结论错了**：当时量的是
+    斜段和拐点，而真正的症状是**穿自己两端节点的盒子**，度量里根本没有这一项。
+    改回按相邻站定方向之后，02-flow 的穿自己从 1 条降到 0。
     """
     pts: list[list[float]] = []
     last = len(chain) - 1
@@ -1504,14 +1531,17 @@ def _points(chain: list[str], placed: dict[str, Placed], direction: str,
         p = placed[nid]
         cx, cy = p.x + p.width / 2, p.y + p.height / 2
         if i == 0:
-            pts.append([p.x + p.width, cy + start_off] if direction == "LR"
-                       else [cx + start_off, p.y + p.height])
+            px, py = _port_faces(p, placed[chain[1]], direction) if last else (cx, cy)
+            # 偏移量沿**所在的那条边**铺开（LR 的端口在左右面上 → 沿 y），
+            # 不跟着面走的话，同一侧的边会全叠在中心线上。
+            pts.append([px, py + start_off] if direction == "LR" else [px + start_off, py])
         elif i == last:
-            pts.append([p.x, cy + end_off] if direction == "LR"
-                       else [cx + end_off, p.y])
+            px, py = _port_faces(p, placed[chain[-2]], direction) if last else (cx, cy)
+            pts.append([px, py + end_off] if direction == "LR" else [px + end_off, py])
         else:
             pts.append([cx, cy])                    # 中间站（虚节点）取自身中心
     return [[round(x, 2), round(y, 2)] for x, y in pts]
+
 
 
 def _sample_points(a: list[float], b: list[float], step: float = 2.0):
@@ -1705,6 +1735,95 @@ def _max_deviation(pts: list) -> float:
     span = math.hypot(dx, dy) or 1e-9
     return max((abs((q[0] - a[0]) * dy - (q[1] - a[1]) * dx) / span
                 for q in pts[1:-1]), default=0.0)
+
+
+ATTACH_STUB = 28.0        # 贴点先往外走这么长，再转向（必须 > EDGE_MIN，它是一段真线）
+
+
+def _outward_normal(anchor: list, box) -> tuple[float, float] | None:
+    """锚点贴在盒子的哪条边上 → 朝外的单位法线。认不出来就返回 None。"""
+    if abs(anchor[0] - (box.x + box.width)) <= 1.5:
+        return (1.0, 0.0)
+    if abs(anchor[0] - box.x) <= 1.5:
+        return (-1.0, 0.0)
+    if abs(anchor[1] - (box.y + box.height)) <= 1.5:
+        return (0.0, 1.0)
+    if abs(anchor[1] - box.y) <= 1.5:
+        return (0.0, -1.0)
+    return None
+
+
+def _crosses_own_nodes(pts: list, placed: dict, head_id: str, tail_id: str) -> bool:
+    """路径是不是穿过了**它自己两端节点**的内部。
+
+    `nodes_hit_by_polyline` 一向把两端节点排除掉（端点在边界上，贴着边不算撞），
+    结果「从底边出来却往上走、整个人从盒子里穿过去」这种路一直是合法的。
+    实测 scan→stage 就是这样：出口锚点在 scan 的**底边**，接着却往上走 74px
+    穿回盒子里 —— 图上就是一条线从框里冒出来。
+
+    判据：把两端盒子**往里收** 1px（免得把贴在边上的端点算成"在里面"），
+    再看路径上的取样点有没有落在里面。
+    """
+    for node_id in (head_id, tail_id):
+        box = placed.get(node_id)
+        if box is None:
+            continue
+        x0, y0 = box.x + 1.0, box.y + 1.0
+        x1, y1 = box.x + box.width - 1.0, box.y + box.height - 1.0
+        for a, b in zip(pts, pts[1:]):
+            for step in range(1, 9):
+                t = step / 8.0
+                x, y = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
+                if x0 < x < x1 and y0 < y < y1:
+                    return True
+    return False
+
+
+def _with_port_stubs(pts: list, placed: dict, head_id: str, tail_id: str) -> list:
+    """**先往外走一点，再转向** —— 让连线不要顺着节点边框滑出去。
+
+    用户的原话：「连线不要直接顺着节点的边框出去，先往外走一点，在向着原来的方向
+    出去，不然会和边框融合，看着也难受」。
+
+    做法：看第一段是不是**平行于锚点所在的那条边**（从底边出来却横着走 = 顺着边框）。
+    是的话，沿法线插一段短出头（垂直于那条边），并把原第二点也推到同一条线上，
+    保证插完每一段仍然是横或竖。入口端对称处理。
+
+    两端各自用**自己那个节点**的盒子判（`head_id` / `tail_id` 由调用方给，
+    不去从集合里猜 —— 集合没有顺序）。
+
+    插完要**复核不穿节点**：出头是朝外的，正常会进空档，但密集图里可能擦到旁边的
+    兄弟节点 —— 那种情况就不插（宁可贴着边框，也不能穿节点）。
+    """
+    out = [list(p) for p in pts]
+    if len(out) < 2:
+        return out
+    for head, node_id in ((True, head_id), (False, tail_id)):
+        box = placed.get(node_id)
+        if box is None:
+            continue
+        anchor = out[0] if head else out[-1]
+        neighbour = out[1] if head else out[-2]
+        normal = _outward_normal(anchor, box)
+        if normal is None:
+            continue
+        dx, dy = neighbour[0] - anchor[0], neighbour[1] - anchor[1]
+        parallel = (abs(dx) < 0.5) if normal[0] != 0 else (abs(dy) < 0.5)
+        if not parallel:
+            continue
+        stub = [anchor[0] + normal[0] * ATTACH_STUB, anchor[1] + normal[1] * ATTACH_STUB]
+        moved = [neighbour[0], stub[1]] if normal[1] != 0 else [stub[0], neighbour[1]]
+        trial = list(out)
+        if head:
+            trial[1] = moved
+            trial.insert(1, stub)
+        else:
+            trial[-2] = moved
+            trial.insert(len(trial) - 1, stub)
+        if not nodes_hit_by_polyline(trial, placed, {head_id, tail_id}) \
+                and not _crosses_own_nodes(trial, placed, head_id, tail_id):
+            out = trial
+    return _simplify_path(out)
 
 
 def _is_slanted(pts: list) -> bool:
@@ -2027,7 +2146,8 @@ def _lane_candidates(a: list[float], b: list[float], placed: dict,
 
 
 def straighten(pts: list, placed: dict, exclude: set[str],
-               orthogonal: list | None = None) -> list[list[float]]:
+               orthogonals: list | None = None,
+               endpoints: tuple[str, str] = ("", "")) -> list[list[float]]:
     """把一条边**能直就直、要弯就最小弯**。
 
     为什么必须有这一遍：跨层的边在分层算法里是被**虚节点**牵着走的 —— 虚节点的 x
@@ -2052,8 +2172,9 @@ def straighten(pts: list, placed: dict, exclude: set[str],
     # 档 0：**轴向**直线（同一行的两点）—— 既直又正交，最好
     if abs(straight[0][1] - straight[1][1]) < 0.5 or abs(straight[0][0] - straight[1][0]) < 0.5:
         candidates.append((0, straight))
-    # 档 1：正交路径（只走横竖段，拐点落在虚节点预留的行/列上）
-    if orthogonal:
+    # 档 1：正交路径（只走横竖段，拐点落在虚节点预留的行/列上）。
+    # 可以给多条（比如“原样”和“丢掉跨度外的行”两条），交给排序键挑。
+    for orthogonal in (orthogonals or []):
         candidates.append((1, orthogonal))
     # 档 2：小动作推开 / 贴着障碍走车道（两者都是轴对齐的）
     candidates.append((2 if _max_deviation(pushed) <= SMALL_DODGE else 4, pushed))
@@ -2070,11 +2191,16 @@ def straighten(pts: list, placed: dict, exclude: set[str],
         # 简化会挪动拐点，可能挪进节点，于是那一份不可用，而「不可用就退回未简化的」
         # 会把带毛刺的原样留下（实测 A→D 就留了一段 3px，用例抓到的）。
         simple = _simplify_path(path)
-        viable.append((tier, simple if not nodes_hit_by_polyline(simple, placed, exclude)
-                       else path))
+        candidate = simple if not nodes_hit_by_polyline(simple, placed, exclude) else path
+        # 穿过自己两端节点的内部 → 直接不用这个候选（见 _crosses_own_nodes）
+        if _crosses_own_nodes(candidate, placed, *endpoints):
+            continue
+        viable.append((tier, candidate))
     if not viable:
         return [[round(x, 2), round(y, 2)] for x, y in pts]
+
     _tier, best = min(viable, key=lambda item: _path_rank(item[1], item[0]))
+    best = _with_port_stubs(best, placed, *endpoints)
     return [[round(x, 2), round(y, 2)] for x, y in best]
 
 
@@ -2113,7 +2239,7 @@ def wrap_route(a: Placed, b: Placed, band: float, lane: float,
     """跨段连线的走法：出源节点 → **先沿主轴绕到本层外缘之外** → 沿交叉轴进空档 →
     沿主轴走到目标那一层 → 进目标。
 
-    三个坑，全是实测踩出来的：
+    五个坑，全是实测踩出来的：
 
     1. **不能直连**。直连是从一栏的末尾斜拉到另一栏的开头，横穿两栏 ——
        实测 `02-flow` 的 `scan → stage` 撞掉 2 个节点（`cache`、`gate`）。
@@ -2122,19 +2248,29 @@ def wrap_route(a: Placed, b: Placed, band: float, lane: float,
        往往就站着同列的下一个节点。实测 `04-state` 的 `paid → refunding`
        就这么撞上了 `cancelled`。
     3. 所以第一步必须是**沿主轴**绕到本层外缘之外那条通道（`lane`），再拐。
+    4. 出入口的**面**不能写死。原先写死"底边中点进、上边中点出"，只在
+       "rank 一路往下"时才成立；02-flow 的 rank 轴是反的，于是出口开在背对通道的
+       那一面 —— 线从源节点的**盒子里面**穿了出去（图上就是线从框里冒出来）。
+       现在按**通道在节点的哪一侧**定面（和 `_port_faces` 一个道理）。
+    5. 入口那一面要**对着通道（band）**，不能对着上/下边 —— 否则最后一段是横着
+       **贴着目标的上边框**滑进去的（用户原话："会和边框融合，看着也难受"）。
 
     `lane` 由调用方按源节点所在层的实际外缘算出（主轴方向）。
     """
     if direction == "TB":
-        start = [a.x + a.width / 2.0, a.y + a.height]        # 底边中点
-        end = [b.x + b.width / 2.0, b.y]                     # 顶边中点
-        pts = [start, [start[0], lane], [band, lane],
-               [band, end[1]], end]
+        # 出口朝着通道那一侧（通道在节点上方就从顶边出）
+        start = ([a.x + a.width / 2.0, a.y] if lane < a.y
+                 else [a.x + a.width / 2.0, a.y + a.height])
+        # 入口朝着 band 那一侧 —— 最后一段是**横**着进去，垂直于左右边
+        end = ([b.x, b.y + b.height / 2.0] if band < b.x + b.width / 2.0
+               else [b.x + b.width, b.y + b.height / 2.0])
+        pts = [start, [start[0], lane], [band, lane], [band, end[1]], end]
     else:
-        start = [a.x + a.width, a.y + a.height / 2.0]        # 右边中点
-        end = [b.x, b.y + b.height / 2.0]                    # 左边中点
-        pts = [start, [lane, start[1]], [lane, band],
-               [end[0], band], end]
+        start = ([a.x, a.y + a.height / 2.0] if lane < a.x
+                 else [a.x + a.width, a.y + a.height / 2.0])
+        end = ([b.x + b.width / 2.0, b.y] if band < b.y + b.height / 2.0
+               else [b.x + b.width / 2.0, b.y + b.height])
+        pts = [start, [lane, start[1]], [lane, band], [end[0], band], end]
     # 各段宽度相同时，中间两个拐点会落在同一个位置 —— 那一段长度是 0，
     # 会被"最短连线"校验判成 0px。去掉重复点（保留首尾）。
     out = [pts[0]]
@@ -2142,6 +2278,7 @@ def wrap_route(a: Placed, b: Placed, band: float, lane: float,
         if point != out[-1]:
             out.append(point)
     return out
+
 
 
 def layout(spec: dict, boxes: dict[str, Box],
@@ -2209,8 +2346,8 @@ def layout(spec: dict, boxes: dict[str, Box],
     # **两种都算，挑更干净的** —— 判据是「连线穿节点的处数」，同分时留着拉直版
     # （那是用户明确要的直）。这跟径向那次「只在遮挡真的变少时才换顺序」是同一套路：
     # 用一个能量出来的指标决定要不要接受一次“看起来更好”的调整。
-    def quality(routed_edges: list, table: dict) -> tuple[int, float]:
-        """评价一次路由：**先看穿节点，再看斜段占比**。
+    def quality(routed_edges: list, table: dict) -> tuple:
+        """评价一次路由：穿节点 → 穿自己 → 贴边滑 → 斜段占比。
 
         只卡穿节点是不够的 —— 对齐之后有些边的正交候选会被节点挡住，于是退回斜的直线弦。
         实测：五层架构那张在“只卡穿节点”时选了拉直版，斜段从 0% 涨到 20.6%。
@@ -2218,6 +2355,26 @@ def layout(spec: dict, boxes: dict[str, Box],
         """
         hit = sum(len(nodes_hit_by_polyline(e["points"], table, {e["from"], e["to"]}))
                   for e in routed_edges)
+        # 「穿自己」和「贴边滑」以前**不在判据里**，所以拉直版把它们带出来也没人管：
+        # 02-flow 就是这样 —— 一条边从源的底边出去却往上走，整条线穿过自己的盒子
+        # （图上就是线从框里冒出来），入口还贴着上边框滑进去（用户说"会和边框融合"）。
+        # 这两项现在参与挑版，和斜段一样属于"结构上不该出现"。
+        own = sum(1 for e in routed_edges
+                  if _crosses_own_nodes(e["points"], table, e["from"], e["to"]))
+        slide = 0
+        for e in routed_edges:
+            pts = e["points"]
+            if len(pts) < 2:
+                continue
+            for anchor, neighbour, nid in ((pts[0], pts[1], e["from"]),
+                                           (pts[-1], pts[-2], e["to"])):
+                box = table.get(nid)
+                normal = _outward_normal(anchor, box) if box is not None else None
+                if normal is None:
+                    continue
+                dx, dy = neighbour[0] - anchor[0], neighbour[1] - anchor[1]
+                if (abs(dx) < 0.5) if normal[0] != 0 else (abs(dy) < 0.5):
+                    slide += 1
         diagonal = total = 0.0
         for e in routed_edges:
             for a, b in zip(e["points"], e["points"][1:]):
@@ -2226,7 +2383,7 @@ def layout(spec: dict, boxes: dict[str, Box],
                 total += length
                 if dx > 0.5 and dy > 0.5:
                     diagonal += length
-        return (hit, round(diagonal / total, 3) if total else 0.0)
+        return (hit, own, slide, round(diagonal / total, 3) if total else 0.0)
 
     plain_table = dict(placed)
     plain_routed = route_edges(origins, segments, plain_table, direction,
