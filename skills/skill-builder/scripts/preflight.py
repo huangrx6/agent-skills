@@ -41,9 +41,25 @@ import subprocess
 import sys
 
 FM_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
-DESC_RE = re.compile(r"^description:\s*(.+)$", re.M)
 RAN_RE = re.compile(r"Ran (\d+) test")
 MAX_BODY_LINES = 150
+
+
+def _load_sibling(name: str):
+    """动态加载同目录脚本。先注册进 sys.modules 再 exec（否则 @dataclass 会炸）。"""
+    import importlib.util
+
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"{name}.py")
+    spec = importlib.util.spec_from_file_location(f"_sb_{name}", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"加载不了同目录模块：{path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_vs = _load_sibling("validate_skill")
 
 
 def _safe_listdir(path: str) -> list[str]:
@@ -121,7 +137,11 @@ def skill_facts(root: str) -> list[dict]:
         raw = _safe_read(skill_md)
         fm = FM_RE.match(raw)
         body = raw[fm.end():] if fm else raw
-        desc = DESC_RE.search(fm.group(1)) if fm else None
+        # description 用 validate_skill.py 的解析器 —— 它是折叠标量（`>-`）感知的。
+        # 本文件最初用单行正则，结果把 `>-` 后面的折叠正文全漏掉，报出“2 字符”
+        # 而真值是 754/636。一个“数字要准”的工具，自己的数字不准，所以改成复用。
+        data, _err = _vs.load_yaml(fm.group(1)) if fm else (None, None)
+        desc_val = (data or {}).get("description") or ""
         doc_text = _skill_doc_text(path)
 
         def count_sub(sub: str) -> int:
@@ -138,7 +158,7 @@ def skill_facts(root: str) -> list[dict]:
             "body_lines": lines,
             "headroom": MAX_BODY_LINES - lines,
             "over_limit": lines > MAX_BODY_LINES,
-            "description_chars": len(desc.group(1)) if desc else 0,
+            "description_chars": len(desc_val),
             "references": count_sub("references"),
             "scripts": scripts,
             "orphan_scripts": orphans,
