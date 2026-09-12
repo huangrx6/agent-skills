@@ -1,380 +1,533 @@
 #!/usr/bin/env python3
-"""色板 —— 图表语义角色与颜色的**唯一真相源**。
+"""颜色不是模板，而是**有审美锚点的自适应系统**：规则决定颜色如何工作，
+Seed 决定颜色往哪里走，视觉层级最终由构图、尺寸、留白、线条、文字与颜色共同完成。
 
-为什么这一个文件同时定义两件事：`kind` 的封闭枚举 与 它的颜色映射，本来就该是
-同一份数据的两个视图。分开定义只会制造第二个漂移点（`diagram-spec.md` 里写着
-"唯一真相源"就是这个意思）。
+## 这套系统回答的是什么问题
 
-校验器从这里读，不从别处抄；文档只描述规则，不复述取值表 —— 复述就会漂移。
+不是"这张图用什么颜色"，而是"**这张图应该是什么气质，以及怎么用最少的颜色把它表达出来**"。
+前一版把它当配色模板做（六种语义六种颜色 → 五档层级五个色相），工程上干净，
+视觉上一定丑 —— 实测色相跨度 310°、一张 14 节点的图出现 9 种颜色，
+最后的效果是"看起来专业，但没有生命力"。
 
-**未知 kind 一律判失败，不 fallback。** fallback 之所以最危险，是因为它会让
-"颜色必须落在色板内"这条校验**自己绕过自己**：程序补的默认色当然合法，校验通过了，
-但语义已经错了。
+## 三层各自负责什么
 
-取值全部来自 Excalidraw 内置色板。理由：与手绘线条风格协调、都是浅色（符合 vault 的
-"浅色系 / 白底 / 排除深色"）、且用户在 Excalidraw 里认得出来。
+    用户意图 / 图表内容
+            ↓
+    Visual Direction（视觉母体：什么气质）
+            ↓
+    Character（形容词，给**模型**判断"该选哪个方向"用）
+    Seed（人工审美锚点，给**代码**一个品味基准）
+            ↓
+    Adaptive Color System（wash / soft / edge / muted 全部派生）
+            ↓
+    Semantic Role → Visual Level → 实际 Excalidraw 颜色
+
+**Character 是给模型读的，Seed 是给代码读的** —— 这是两者唯一的区别。
+形容词生成不出 `#2F5D46`；而"哪一个是高级的绿"恰恰就是审美本身。
+
+## 颜色数量 ≠ 语义数量
+
+语义角色可以自由增加（`plain` 就是这么来的），**颜色只有 4 档层级**。
+加一个角色只是让它指向已有的层级之一，不会多出一个颜色。
+
+## 两条不可协商的规矩
+
+1. **未知值判失败，绝不 fallback。** fallback 会让"颜色必须落在板内"这条校验
+   自己绕过自己 —— 程序补的默认色当然合法，校验通过了，但语义已经错了。
+2. **禁止灰蓝企业风成为默认。** 白底 + 灰字 + 灰蓝节点 + 蓝灰线这一套
+   （`#6E879B` / `#7F96A5` / `#AAB8C0` 那一路）是被明确否掉的结果。
+   `tests/test_palette.py` 里有用例守着这条。
 """
 
 from __future__ import annotations
 
+import colorsys
 import contextlib
+import math
 
-# kind → 语义角色 + 颜色。加第 7 项之前先问"能不能归并进已有类"：
-# 超过 6 类语义就无法靠颜色区分了。
+# ══════════════════════════════════════════════════════════════════
+# Visual Levels —— 只有 4 档
+# ══════════════════════════════════════════════════════════════════
 #
-# 【用户指定】莫兰迪色系（去饱和、灰调、偏浅、清透）。这不是从别处继承的数，
-# 是用户明确要的风格，所以优先级高于任何"前作用过的颜色"。
-# 文字在其上的可读性已实测（对比度 ≥ 7:1），见 tests/test_palette.py。
-# 信任状态总表见 references/diagram-spec.md。
-# 描边：底色压暗而来，与自己的底色对比度**已实测** ≥ 3.0（非文字元素的 WCAG 门槛）。
-# 在画布上也查过（3.5 ~ 4.5），不会“碰巧和背景同色”。
-# 数字由 tests/test_palette.py 守住。
-# kind → 语义角色 + 颜色。加第 7 项之前先问"能不能归并进已有类"：
-# 超过 6 类语义就无法靠颜色区分了。
+# 上一版有 5 档（多一个 `secondary`）。删掉它是因为：**多一档就多诱惑一次** ——
+# "这个也重要、那个也重要"最后会变成每个节点都有颜色。4 档已经把该说的说完：
 #
-# 【用户指定】莫兰迪色系（去饱和、灰调、偏浅、清透）。这不是从别处继承的数，
-# 是用户明确要的风格，所以优先级高于任何"前作用过的颜色"。
+#   普通  →  轻微区分  →  重点  →  异常 / 关键状态
 #
-# 描边保持柔和**且保留色相**。曾经试过把描边压到与底色 3:1 对比度，结果六条
-# 全部变成近似的深灰（#8A857E / #71797D / #77737B …）—— 色相识别没了，
-# 而那正是客户要的风格。所以判据改成：
-#   文字 vs 底色 ≥ 4.5（WCAG AA，实测 6.15~7.79）
-#   描边 vs 底色 ≥ 1.8（框边界看得见；实测 ~2.4）
-#   底色 vs 画布 ΔE ≥ 5（浅色块也要从背景里分得出来）
-# 全部由 tests/test_palette.py 守住。
-# 当前主题的颜色。由 `_rebind()` 在导入时与切换主题时填充 ——
-# 声明放这里（而不是文件末尾），是为了让静态检查看得到这两个名字：
-# 声明放在使用之后，运行时没问题，但分析会说"未绑定"。
-LEVELS: dict[str, dict[str, str]] = {}   # 层级名 → {stroke, fill}
-KINDS: dict[str, str] = {}               # 语义角色 → **层级名**（不是颜色）
-EDGE_KINDS: dict[str, dict[str, str]] = {}
-CANVAS: dict = {}
-
-# ── 主题 = 一套**视觉语言**，不是一套色值套餐 ────────────────────
-#
-# 一个主题**只手写两个色相**：一个主色（accent）+ 一个状态色（critical）。
-# 其余颜色全部由这两个 + 画布 / 墨色派生出来。
-#
-# 为什么必须这样：只要 accent 和 secondary 是两个各自手写的色相，图上就会同时
-# 出现**两个视觉中心** —— 看起来"柔和"，但不高级。**高级感不是颜色淡，是视觉关系简单。**
-# 派生之后，"一张图最多一个主色系 + 一个状态色系"是**构造上保证**的事实，
-# 而不是一条靠自觉遵守的约定。
-#
-#   canvas ──┬─→ ink ──┬─→ accent-wash  （tint 的填充：主色的极浅）
-#            │         ├─→ accent-soft  （accent 的填充）
-#            │         ├─→ accent-mid   （secondary 的填充：更深一档）
-#            │         └─→ accent-deep  （secondary 的描边：往墨色靠）
-#            ├─→ edge          （普通连线：画布与墨色之间）
-#            └─→ edge-muted    （弱连线：更靠近画布）
-#   accent ──→ …（上同）
-#   critical ──→ critical-soft（唯一允许跳出主色系的色相）
-#
-# 主题名代表的是**气质**，不是某一组具体 HEX —— 换主题换的是整体视觉语言，
-# 不是"把蓝色换成紫色"。
-
-VISUAL_LEVELS = ("neutral", "tint", "accent", "secondary", "critical")
+# `tint` 是"退到背景里的那一片"（极轻的分组 / 次级区域），
+# 它与画布的差**故意非常小** —— 见 WASH_MIX。
+VISUAL_LEVELS = ("neutral", "tint", "accent", "critical")
 _LEVEL_ORDER = {name: i for i, name in enumerate(VISUAL_LEVELS)}
 
-# 层级 → **视觉角色**（描边角色, 填充角色）。这一层把"我有多重要"翻译成"用哪几个颜色"。
+# 层级 → 视觉角色（描边角色, 填充角色）。这一层把"我有多重要"翻译成"用哪几个颜色"。
 LEVEL_ROLES: dict[str, tuple[str, str]] = {
-    "neutral":   ("ink",         "canvas"),        # 完全中性：填充就是画布色
-    "tint":      ("ink",         "accent-wash"),   # 中性 + 一点主色倾向（**不是第二种颜色**）
-    "accent":    ("accent",      "accent-soft"),   # 整张图真正的视觉重点
-    "secondary": ("accent-deep", "accent-mid"),    # 仍是主色家族，只是更深
-    "critical":  ("critical",    "critical-soft"), # 唯一允许跳出主色系
+    "neutral":  ("ink",      "canvas"),         # 完全中性：填充就是画布色
+    "tint":     ("ink",      "accent-wash"),    # 极轻的一片，**不是第二种颜色**
+    "accent":   ("accent",   "accent-soft"),    # 整张图真正的视觉重点
+    "critical": ("critical", "critical-soft"),  # 唯一允许跳出主色系的
 }
 
-# 派生配比。数字放在一起，方便一眼看出"深浅关系"是从哪来的。
-WASH_MIX = 0.12       # tint 填充：只比画布深一点点
-SOFT_MIX = 0.32       # accent 填充
-MID_MIX = 0.55        # secondary 填充：同一个主色的更深一档
-DEEP_MIX = 0.60       # secondary 描边：主色往墨色靠
-# critical 填充。它只是一层极浅的洗染 —— 警示主要靠**描边色 + 线宽**表达，
-# 填充只负责"这一块也带着那个调子"。再谈就变成大色块，那就成了它想避免的东西。
-CRITICAL_MIX = 0.26
-EDGE_MIX = 0.45       # 普通连线：画布与墨色之间
-EDGE_MUTED_MIX = 0.28 # 弱连线：更靠近画布
+# 派生配比。放一起，方便一眼看出"深浅关系"是从哪来的。
+WASH_MIX = 0.085       # tint 填充：与画布的差要**非常克制**（§5）
+SOFT_MIX = 0.34        # accent 填充
+CRITICAL_MIX = 0.26    # critical 填充：一层极浅的洗染，警示靠描边 + 线宽
+EDGE_MIX = 0.42        # 普通连线：画布与墨色之间
+EDGE_MUTED_MIX = 0.24  # 弱连线：更靠近画布
 
-# 边型 → 视觉角色。**不再全用同一个灰** —— 全同色的线配上手绘效果，很容易糊成
-# "一层脏脏的灰"。但也不能各走各的色：只有真正承载数据的那条用主色。
-EDGE_ROLES: dict[str, str] = {
-    "sync":     "edge",        # 普通调用：中性
-    "data":     "accent",      # 数据流：值得用主色（信息在哪，眼睛就该去哪）
-    "async":    "edge",        # 异步：靠线型（虚线）区分，不靠颜色
-    "optional": "edge-muted",  # 可选 / 间接：再弱一档
+# ══════════════════════════════════════════════════════════════════
+# Visual Directions —— 5 个视觉母体，每个 1~2 个 Seed
+# ══════════════════════════════════════════════════════════════════
+#
+# ⚠️ 这些不是"五套主题色"。它们是 5 个**母体**：Character 说"应该什么感觉"，
+# Seed 给一个品味基准，实际颜色仍然由下面的派生规则算出来。
+#
+# ⚠️ Seed 的色值状态：**待验证** —— 是按 Character 的描述人工定的品味锚点，
+# 没有经过真实使用校准。按本项目的规矩，量过之前不标"已确认"。
+#
+# Seeds are curated visual anchors, not fixed output palettes.
+#
+# A seed establishes the aesthetic baseline for:
+# - canvas temperature
+# - ink character
+# - accent hue
+# - critical hue
+#
+# All secondary colors are derived from these seeds.
+#
+# The renderer may select among seeds based on context,
+# but must preserve the visual direction's character.
+VISUAL_DIRECTIONS: dict[str, dict] = {
+    "botanical": {
+        "zh": "自然 / 植物",
+        "character": {
+            "temperature": "warm",
+            "density": "sparse",
+            "contrast": "moderate",
+            "accent_character": "botanical",
+            "canvas_character": "warm-airy",
+            "use_for": "架构、关系图、知识体系",
+        },
+        "seeds": {
+            # 大面积空气感 + 少量自然色渗进去 —— 不是满屏绿色
+            "mature-natural": {"canvas": "#FBF9F3", "ink": "#26301F",
+                               "accent": "#2F5D46", "critical": "#B5644A"},
+            "lively-leaf": {"canvas": "#FCFDF6", "ink": "#1F2E22",
+                            "accent": "#4E8C6A", "critical": "#C26E4A"},
+        },
+    },
+    "editorial": {
+        "zh": "杂志 / 精炼",
+        "character": {
+            "temperature": "neutral-warm",
+            "density": "sparse",
+            "contrast": "high",
+            "accent_character": "restrained",
+            "canvas_character": "ivory-neutral",
+            "use_for": "产品架构、方案、展示型图",
+        },
+        "seeds": {
+            # 高对比、单一主色、极少量强调 —— 像设计作品集
+            "warm-editorial": {"canvas": "#FCFBF7", "ink": "#1A1815",
+                               "accent": "#6B5B4A", "critical": "#A33B2A"},
+            "neutral-editorial": {"canvas": "#FAFAF8", "ink": "#141414",
+                                  "accent": "#4A4A52", "critical": "#8C3A2B"},
+        },
+    },
+    "fresh": {
+        "zh": "轻盈 / 春夏",
+        "character": {
+            "temperature": "bright",
+            "density": "sparse",
+            "contrast": "moderate",
+            "accent_character": "youthful",
+            "canvas_character": "bright-airy",
+            "use_for": "流程、产品、轻量知识图",
+        },
+        "seeds": {
+            # 高明度、通透、冷暖交替
+            "spring": {"canvas": "#FFFFFB", "ink": "#2B3A2E",
+                       "accent": "#5FA88C", "critical": "#E08A4F"},
+            "clear": {"canvas": "#FCFDFD", "ink": "#25343C",
+                      "accent": "#57A5B8", "critical": "#E0916A"},
+        },
+    },
+    "coastal": {
+        "zh": "清透 / 海风",
+        "character": {
+            "temperature": "cool",
+            "density": "sparse",
+            "contrast": "moderate",
+            "accent_character": "airy",
+            "canvas_character": "clean-air",
+            "use_for": "数据流、网络、流动关系",
+        },
+        "seeds": {
+            # 阳光 / 海 / 空气 —— **不是科技蓝**（那是被否掉的那条路）
+            "sea-air": {"canvas": "#FDFDFB", "ink": "#1F2E3A",
+                        "accent": "#2E8B96", "critical": "#D98E5B"},
+            "sun-washed": {"canvas": "#FEFDF8", "ink": "#2A3038",
+                           "accent": "#3E9AA6", "critical": "#D8834F"},
+        },
+    },
+    "night": {
+        "zh": "墨夜 / 深色",
+        "character": {
+            "temperature": "warm-dark",
+            "density": "sparse",
+            "contrast": "high",
+            "accent_character": "characterful",
+            "canvas_character": "warm-dark",
+            "use_for": "深色场景、技术 / 复杂架构",
+        },
+        "seeds": {
+            # 暖墨底 + 暖白字 + 一个有性格的颜色 —— 不是"程序员深色"
+            "warm-night": {"canvas": "#14110F", "ink": "#F2EDE4",
+                           "accent": "#C9A227", "critical": "#C45B43"},
+            "amber-night": {"canvas": "#161310", "ink": "#F0E9DE",
+                            "accent": "#D08A3C", "critical": "#C45B43"},
+        },
+    },
 }
 
-THEMES: dict[str, dict] = {
-    "soft-light": {
-        "zh": "柔和浅色（默认，用户指定）",
-        "canvas": "#FDFCFA",
-        "grid": "#F1EDE8",
-        "ink": "#4A4744",
-        "accent": "#6E879B",
-        "critical": "#AE7F7D",
-    },
-    "clean-light": {
-        "zh": "明快清爽",
-        "canvas": "#FFFFFF",
-        "grid": "#EEF2F6",
-        "ink": "#2E3440",
-        "accent": "#3F7C8C",
-        "critical": "#B06070",
-    },
-    "dark": {
-        "zh": "深色",
-        "canvas": "#12161C",
-        "grid": "#1D232B",
-        "ink": "#E6E9EE",
-        "accent": "#6FA8D0",
-        "critical": "#D08F8F",
-    },
+# 默认方向。**auto 不是"随便挑一个"** —— 它按图类型 + 内容 + 用户意图选，
+# 见 `suggest_direction()`。默认走 auto 是刻意的：不让某一个方向成为"永远的结果"。
+DEFAULT_DIRECTION = "auto"
+AUTO_DIRECTION = "auto"
+
+# 图类型 → 倾向的方向。**只列倾向，不是强制映射**。
+# 用户说了风格意图时，用户意图优先（见 `resolve_direction`）。
+DIRECTION_FOR_TYPE: dict[str, list[str]] = {
+    "architecture": ["botanical", "editorial"],
+    "dependency":   ["botanical", "editorial"],
+    "flow":         ["fresh", "coastal"],
+    "state":        ["editorial", "fresh"],
+    "mindmap":      ["botanical", "fresh"],
+    "network":      ["coastal", "editorial"],
 }
 
-# 语义角色 → 默认层级。**不随主题变** —— "这是个什么角色"和"这张图什么气质"
-# 是两个正交的问题。放在主题里就变成三份要同步的数据（这个坑已经踩过）。
-# 注意 `secondary` **不在**这张表的右边 —— 和 `critical` 一样，"第二档重要程度"
-# 不是某个角色天生就该占的位置，它只能由 `emphasis: primary` 提升到达。
-# 第一版把 `async` 放在 secondary，理由是"队列很重要" —— 那是把**结构角色**
-# 当成了**重要程度**。队列是支撑设施，不该跟主色抢注意力。
+# 用户嘴里的话 → 方向。**用户意图优先于图类型**。
+# 例如"做一个很有春天气息的架构图"：不能因为 type=architecture 就强行 editorial。
+DIRECTION_FOR_MOOD: dict[str, str] = {
+    "春天": "fresh", "spring": "fresh", "夏": "fresh", "轻": "fresh", "明亮": "fresh",
+    "自然": "botanical", "植物": "botanical", "绿": "botanical", "生命": "botanical",
+    "海": "coastal", "夏威夷": "coastal", "水": "coastal", "清透": "coastal", "流动": "coastal",
+    "杂志": "editorial", "高级": "editorial", "克制": "editorial", "设计感": "editorial",
+    "深色": "night", "夜": "night", "dark": "night", "墨": "night",
+}
+
+# ══════════════════════════════════════════════════════════════════
+# 语义角色 → 默认层级
+# ══════════════════════════════════════════════════════════════════
+#
+# ⚠️ **没有角色默认拿到 accent。** 这是刻意的，也是这一版最重要的解耦：
+# `service` 不等于"重要" —— 一张图里有五个 service 是常事。谁是重点由**每张图**
+# 决定（`emphasis: primary`），不是由角色的名字决定。
+#
+# 上一版 `service → accent`，结果 01-architecture 里 4 个服务全是强调色。
 DEFAULT_KIND_LEVELS: dict[str, str] = {
-    "client":   "tint",
-    "service":  "accent",
-    "data":     "tint",
-    "async":    "tint",
+    "client":   "neutral",
+    "service":  "neutral",
+    "data":     "neutral",
+    "async":    "neutral",
     "security": "neutral",
     "external": "neutral",
     # 通用角色：流水线步骤 / 状态机状态 / 普通模块 / 思维导图叶子。
-    # 没有它的时候这些节点只能硬套 service，整张图就变成强调色
-    # （实测 04-state 75%、05-network 75%）。加角色**不会**加颜色。
-    "plain":    "tint",
+    # 没有它的时候这些节点只能硬套 service。
+    "plain":    "neutral",
 }
 
-# 边型的中文名与线型。**也不随主题变** —— 颜色由 EDGE_ROLES 从主题派生。
-DEFAULT_EDGE_STYLES: dict[str, tuple[str, str]] = {
+# 边型 → 视觉角色。**边默认全部退出颜色竞争**（§10）：
+# "大量蓝色关系线"是上一版最明显的问题之一 —— 节点控制得再好，线也能把整张图染色。
+# 语义靠**线型**表达，颜色留给节点。
+EDGE_ROLES: dict[str, str] = {
+    "sync":     "edge",
+    "data":     "edge",        # 不是"数据流 = 蓝" —— 重要与否由 emphasis 决定
+    "async":    "edge-muted",
+    "optional": "edge-muted",
+}
+
+EDGE_STYLES: dict[str, tuple[str, str]] = {
     "sync":     ("同步调用", "solid"),
     "data":     ("数据读写", "solid"),
     "async":    ("异步 / 事件", "dashed"),
     "optional": ("可选 / 条件分支", "dashed"),
 }
 
-DEFAULT_THEME = "soft-light"
-AUTO_THEME = "auto"
-
-
-# 当前生效的主题。为什么用模块级状态而不是把主题一路传参：
-# `stroke_for` / `background_for` / `CANVAS` 被几十处调用，全改成带主题参数会把
-# "颜色"这件事的调用面铺得很大，而主题在**一次出图里只有一个**。
-# 所以入口处 `use_theme()` 定一次，其余照旧读。
-# **测试里必须用 `theme_context()`** —— 否则用例之间会互相污染。
-_active = DEFAULT_THEME
-
-
-# 图类型 → 建议主题（#76）。**只引用已实现的主题** —— 指向一个不存在的主题名
-# 就是"指向空文件的指针"，写规格的人会照着一个永远报错的值去写。
+# ══════════════════════════════════════════════════════════════════
+# 强调：层级 + 尺寸 + 线宽（颜色不再是唯一手段）
+# ══════════════════════════════════════════════════════════════════
 #
-# 这是**建议**，不是默认：默认永远是 `soft-light`（用户明确指定过）。
-# 想用建议就必须显式写 `"theme": "auto"` —— 自动覆盖用户的选择是错的。
-# 只列**例外**：没列到的图类型都用 `DEFAULT_THEME`。
-# 以前这里把 8 个图类型全抄了一遍，于是同一个漂移又发生一次 ——
-# `component` / `sequence` 早就不在合法类型里了，这里还留着。
-THEME_SUGGESTION: dict[str, str] = {
-    # 其余图类型（architecture / dependency / state / network）不列 —— 走 DEFAULT_THEME
-    "flow": "clean-light",           # 流程要明快、有节奏
-    "mindmap": "clean-light",        # 结构图要清爽
+# 优先级（视觉层级从强到弱）：构图 / 位置 > 留白 / 间距 > 尺寸 > 线宽 > 字体 > 颜色。
+#
+# `scale` 只是**建议值**，由布局层在盒子上应用 —— **不要**把它硬编码进
+# 每个元素的 width/height，那样会把文字从容器里挤出去（盒子是从文字反推的）。
+#
+# 幅度刻意小：0.92 / 1.00 / 1.06 / 1.03。我们要的是"有层次"，不是海报式跳跃。
+# 实测（#114）1.08 的放大在整图尺度上几乎看不见 —— 所以尺寸是**辅助**，
+# 第一眼看到哪里仍然由颜色和位置决定。
+EMPHASIS: dict[str, dict] = {
+    "muted":    {"zh": "次要", "level": "neutral",  "scale": 0.94, "stroke_width": 1.0},
+    "normal":   {"zh": "常规", "level": None,       "scale": 1.00, "stroke_width": 1.5},
+    "primary":  {"zh": "重点", "level": "accent",   "scale": 1.06, "stroke_width": 2.5},
+    "critical": {"zh": "警示", "level": "critical", "scale": 1.03, "stroke_width": 2.5},
 }
-AUTO_THEME = "auto"
+DEFAULT_EMPHASIS = "normal"
+
+# ══════════════════════════════════════════════════════════════════
+# 当前生效状态（模块级）
+# ══════════════════════════════════════════════════════════════════
+#
+# 为什么用模块级状态而不是把方向一路传参：`stroke_for` / `fill_for` / `CANVAS`
+# 被几十处调用，全改成带参数会把"颜色"这件事的调用面铺得很大，
+# 而**一次出图里只有一个方向**。入口处定一次，其余照旧读。
+#
+# ⚠️ **测试里必须用 `direction_context()`** —— 否则用例之间会互相污染。
+_active_direction = "botanical"     # 内部值；入口是 use_direction()
+_active_seed: str | None = None
+_active_mood: str | None = None
+
+ROLES: dict[str, str] = {}
+LEVELS: dict[str, dict[str, str]] = {}
+KINDS: dict[str, str] = {}
+EDGE_KINDS: dict[str, dict[str, str]] = {}
+CANVAS: dict = {}
 
 
-def suggest_theme(diagram_type: str | None) -> str:
-    """按图类型给一个主题建议。表里只有例外，其余回落到 `DEFAULT_THEME`。"""
-    return THEME_SUGGESTION.get(diagram_type or "", DEFAULT_THEME)
-
-
-def available_themes() -> list[str]:
-    return sorted(THEMES)
-
-
-def is_known_theme(name: str) -> bool:
-    """`auto` 也算已知 —— 它是"按图类型自己挑"，不是未知值。"""
-    return name in THEMES or name == AUTO_THEME
-    return sorted(THEMES)
-
-
-def active_theme() -> str:
-    return _active
-
-
-def use_theme(name: str | None) -> str:
-    """切换主题。未知主题名**判失败不 fallback** —— 同 kind / shape 一条规矩。
-
-    `"auto"` 是特例：按图类型查表（见 `suggest_theme`）。它必须由调用方把图类型
-    一起传进来，所以 emit 里是 `use_theme(spec.get("theme"), spec.get("type"))`。
-    """
-    global _active
-    name = name if name else DEFAULT_THEME
-    if name == AUTO_THEME:
-        name = suggest_theme(_auto_type)
-    if name not in THEMES:
-        raise KeyError(f"未知主题 {name!r}；可用的：{available_themes()} 或 {AUTO_THEME!r}")
-    _active = name
-    _rebind()
-    return name
-
-
-_auto_type: str | None = None
-
-
-def set_auto_type(diagram_type: str | None) -> None:
-    """给 `"auto"` 用：记下当前图类型。"""
-    global _auto_type
-    _auto_type = diagram_type
-
-
-@contextlib.contextmanager
-def theme_context(name: str):
-    """测试用：进出一个主题，出来时恢复原状。"""
-    before = active_theme()
-    use_theme(name)
-    try:
-        yield name
-    finally:
-        use_theme(before)
-
-# 画布与画风：与主题无关的部分（三个主题共用）。画风偏好和字体都不该随配色变。
-CANVAS_STYLE = {
-    "stroke_style": "hand-drawn",
-    "font_family": 2,  # native Excalidraw scene 里 CJK-safe 的那一档
-}
-
-# 明确排除的风格。不只是审美偏好 —— 它们都会破坏"这张图是拿来理解系统的"这个前提。
-EXCLUDED_STYLES = (
-    "灰色底色",
-    "深色背景",
-    "海报风",
-    "3D",
-    "商业宣传风",
-    "装饰性插画",
-    "为了显得丰富而添加的重复图",
-)
-
-
-# ── 颜色数学：**唯一实现**在 palette 里 ────────────────────────
+# ══════════════════════════════════════════════════════════════════
+# 颜色数学：**唯一实现**在这里
+# ══════════════════════════════════════════════════════════════════
+#
 # 以前这套公式只写在 tests/test_palette.py 里，于是"检查颜色"的地方（图标撞色、
-# 报告里的可读性）只能自己再写一份 —— 两份必然漂移，而漂移的那一份会让两边
-# 给出不同结论（这个坑在这个项目里踩过好几次）。
-# 测试仍然会用已知值把这几把尺子钉住（白对黑 = 21 之类），尺子本身照样是验过的。
+# 报告里的可读性）只能自己再写一份 —— 两份必然漂移。测试仍然会用已知值把这几把
+# 尺子钉住（白对黑 = 21 之类），尺子本身照样是验过的。
+
 def hex_to_rgb(colour: str) -> tuple[int, int, int]:
-    if not colour.startswith("#") or len(colour) != 7:
-        raise ValueError(f"不是 #RRGGBB：{colour!r}")
-    return (int(colour[1:3], 16), int(colour[3:5], 16), int(colour[5:7], 16))
+    return _parse_hex(colour)
+
+
+def _parse_hex(value: str) -> tuple[int, int, int]:
+    text = value.lstrip("#")
+    if len(text) != 6:
+        raise ValueError(f"只接受 #RRGGBB 形式，收到 {value!r}")
+    try:
+        return (int(text[0:2], 16), int(text[2:4], 16), int(text[4:6], 16))
+    except ValueError as error:
+        raise ValueError(f"不是合法的十六进制颜色：{value!r}") from error
 
 
 def relative_luminance(colour: str) -> float:
+    """WCAG 相对亮度。"""
     channels = []
-    for value in hex_to_rgb(colour):
-        c = value / 255.0
-        channels.append(c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4)
-    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+    for value in _parse_hex(colour):
+        srgb = value / 255.0
+        channels.append(srgb / 12.92 if srgb <= 0.03928
+                        else ((srgb + 0.055) / 1.055) ** 2.4)
+    red, green, blue = channels
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue
 
 
 def contrast(a: str, b: str) -> float:
-    """WCAG 对比度。1.0 = 完全一样，21 = 纯黑对纯白。"""
+    """WCAG 对比度（1 ~ 21）。"""
     la, lb = relative_luminance(a), relative_luminance(b)
-    high, low = max(la, lb), min(la, lb)
-    return (high + 0.05) / (low + 0.05)
+    lighter, darker = max(la, lb), min(la, lb)
+    return (lighter + 0.05) / (darker + 0.05)
 
 
 def saturation(colour: str) -> float:
-    """**HSV** 里的 S（`(max-min)/max`）。莫兰迪那一族靠它判"去饱和"。
+    """HSV 饱和度 = (max - min) / max。
 
-    ⚠ 别"顺手改成 HSL"：搬进本文件时我就这么干过一次，三个"填充要去饱和"的用例
-    立刻变红 —— 两种饱和度的定义不同（HSL 的 S 在浅色上数值差别很大，
-    而莫兰迪全是浅色）。测试挡住了它，但这条注释是为了别再犯第二次。
+    ⚠️ **不要"顺手改成 HSL"** —— HSL 的分母不同，中间值会变，而"填充要去饱和"
+    那几个用例是按 HSV 定的阈值。搬家的那一次真发生过，三个用例变红才挡住。
     """
-    r, g, b = (v / 255.0 for v in hex_to_rgb(colour))
-    high = max(r, g, b)
-    if high <= 0:
-        return 0.0
-    return (high - min(r, g, b)) / high
+    red, green, blue = (value / 255.0 for value in _parse_hex(colour))
+    high, low = max(red, green, blue), min(red, green, blue)
+    return 0.0 if high == 0 else (high - low) / high
+
+
+def hue(colour: str) -> float:
+    """HSV 色相（度）。
+
+    ⚠️ 只对**有饱和度**的颜色有意义：`#FDFCFA` 这种近无彩色的色相是噪声，
+    拿它去比"色相跨度"会得出荒谬的结论（这个坑踩过）。
+    """
+    red, green, blue = (value / 255.0 for value in _parse_hex(colour))
+    return colorsys.rgb_to_hsv(red, green, blue)[0] * 360.0
 
 
 def to_lab(colour: str) -> tuple[float, float, float]:
-    r, g, b = (v / 255.0 for v in hex_to_rgb(colour))
-
-    def lin(c: float) -> float:
-        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
-
-    r, g, b = lin(r), lin(g), lin(b)
-    x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047
-    y = r * 0.2126 + g * 0.7152 + b * 0.0722
-    z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883
-
-    def f(t: float) -> float:
-        return t ** (1.0 / 3.0) if t > 0.008856 else 7.787 * t + 16.0 / 116.0
-
+    red, green, blue = (value / 255.0 for value in _parse_hex(colour))
+    to_linear = lambda c: c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+    red, green, blue = to_linear(red), to_linear(green), to_linear(blue)
+    x = (red * 0.4124 + green * 0.3576 + blue * 0.1805) / 0.95047
+    y = (red * 0.2126 + green * 0.7152 + blue * 0.0722) / 1.00000
+    z = (red * 0.0193 + green * 0.1192 + blue * 0.9505) / 1.08883
+    f = lambda t: t ** (1 / 3) if t > 0.008856 else (7.787 * t + 16 / 116)
     fx, fy, fz = f(x), f(y), f(z)
     return (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
 
 
 def delta_e(a: str, b: str) -> float:
-    """CIE76 色差。两个颜色"看起来差多少"，跟亮度差不是一回事。"""
+    """CIE76 色差。可区分性用它，**不要用对比度** ——
+    本系统的相邻色特点正是"亮度相近、色相不同"，对比度量不出来。"""
     la, lb = to_lab(a), to_lab(b)
-    return sum((x - y) ** 2 for x, y in zip(la, lb)) ** 0.5
-
-
-def _parse_hex(value: str) -> tuple[int, int, int]:
-    raw = value.lstrip("#")
-    if len(raw) != 6:
-        raise ValueError(f"只接受 #RRGGBB，收到 {value!r}")
-    return (int(raw[0:2], 16), int(raw[2:4], 16), int(raw[4:6], 16))
+    return math.sqrt(sum((x - y) ** 2 for x, y in zip(la, lb)))
 
 
 def _mix(a: str, b: str, ratio: float) -> str:
-    """把 `a` 按 `ratio` 往 `b` 混。ratio=0 就是 a 本身。"""
-    ra, ga, ba = _parse_hex(a)
-    rb, gb, bb = _parse_hex(b)
-    blend = lambda x, y: round(x + (y - x) * ratio)  # noqa: E731
-    return f"#{blend(ra, rb):02X}{blend(ga, gb):02X}{blend(ba, bb):02X}"
+    """在 a 与 b 之间线性插值。ratio=0 得到 a，ratio=1 得到 b。
+
+    **所有派生颜色都走这里** —— 这是"一张图只有一个主色系"的实现处：
+    wash / soft / edge 都是同一个主色与画布 / 墨色按固定配比混出来的，
+    想弄出第二个色相都做不到。
+    """
+    ar, ag, ab = _parse_hex(a)
+    br, bg, bb = _parse_hex(b)
+    mixed = (
+        round(ar + (br - ar) * ratio),
+        round(ag + (bg - ag) * ratio),
+        round(ab + (bb - ab) * ratio),
+    )
+    return "#{:02X}{:02X}{:02X}".format(*mixed)
 
 
-# ── 强调：**在层级上上下挪一档**，而不是另给一套颜色 ──────────────
-#
-# 两个能力分开：
-#   `kind`     决定**默认层级**（这是语义，"这是个什么角色"）
-#   `emphasis` 决定**在这基础上提/降多少**（这是强调，"这一处要不要突出"）
-#
-# 视觉重点靠"描边粗细 + 层级升降"表达，**不靠尺寸** —— 尺寸会进尺寸链
-# （文字 → 盒子 → 坐标），改它就得重新验证 12px 最小间隙那一套阈值。
-EMPHASIS: dict[str, dict] = {
-    "muted":    {"zh": "次要", "stroke_width": 1.0, "promote": -1},
-    "normal":   {"zh": "常规", "stroke_width": 1.5, "promote": 0},
-    "primary":  {"zh": "重点", "stroke_width": 2.5, "promote": 1},
-    # 警示是**唯一**能进 critical 的入口，而且只给"真的异常/危险"用。
-    # 不要把某个语义角色永久绑成红色（"security = 红"就是那种绑定）。
-    "critical": {"zh": "警示", "stroke_width": 2.5, "promote": 0, "level": "critical"},
-}
-DEFAULT_EMPHASIS = "normal"
+# ══════════════════════════════════════════════════════════════════
+# 派生：Seed → ROLES → LEVELS / EDGE_KINDS / CANVAS
+# ══════════════════════════════════════════════════════════════════
 
+def _rebind() -> None:
+    global ROLES, LEVELS, KINDS, EDGE_KINDS, CANVAS
+    spec = VISUAL_DIRECTIONS[_active_direction]
+    seeds = spec["seeds"]
+    name = _active_seed if _active_seed in seeds else next(iter(seeds))
+    seed = seeds[name]
+
+    canvas, ink = seed["canvas"], seed["ink"]
+    accent, critical = seed["accent"], seed["critical"]
+    ROLES = {
+        "canvas":        canvas,
+        "ink":           ink,
+        "accent":        accent,
+        "accent-wash":   _mix(canvas, accent, WASH_MIX),
+        "accent-soft":   _mix(canvas, accent, SOFT_MIX),
+        "critical":      critical,
+        "critical-soft": _mix(canvas, critical, CRITICAL_MIX),
+        "edge":          _mix(canvas, ink, EDGE_MIX),
+        "edge-muted":    _mix(canvas, ink, EDGE_MUTED_MIX),
+    }
+    # 层级 → 描边 / 填充，全部走**角色**，没有一处直接写十六进制
+    LEVELS = {level: {"stroke": ROLES[LEVEL_ROLES[level][0]],
+                      "fill": ROLES[LEVEL_ROLES[level][1]]}
+              for level in VISUAL_LEVELS}
+    KINDS = dict(DEFAULT_KIND_LEVELS)
+    EDGE_KINDS = {kind: {"zh": zh, "style": style, "stroke": ROLES[EDGE_ROLES[kind]]}
+                  for kind, (zh, style) in EDGE_STYLES.items()}
+    CANVAS = {"background": canvas, "grid": _mix(canvas, ink, 0.06), "text": ink,
+              "stroke_style": "hand-drawn",
+              "font_family": 2}      # native Excalidraw scene 里 CJK-safe 的那一档
+
+
+# ── 选择方向：AUTO 与用户意图 ────────────────────────────────────
+
+def available_directions() -> list[str]:
+    return sorted(VISUAL_DIRECTIONS)
+
+
+def available_seeds(direction: str | None = None) -> list[str]:
+    spec = VISUAL_DIRECTIONS[direction or _active_direction]
+    return sorted(spec["seeds"])
+
+
+def is_known_direction(name: str) -> bool:
+    return name in VISUAL_DIRECTIONS or name == AUTO_DIRECTION
+
+
+def suggest_direction(diagram_type: str | None,
+                      mood: str | None = None) -> str:
+    """按**用户意图 → 图类型**的优先级选一个方向。
+
+    用户意图优先：说了"春天气息"就不该因为 type=architecture 强行走 editorial。
+    两样都没有时回落到 `botanical`（默认推荐方向）。
+    """
+    if mood:
+        for word, direction in DIRECTION_FOR_MOOD.items():
+            if word in mood:
+                return direction
+    for direction in DIRECTION_FOR_TYPE.get(diagram_type or "", []):
+        return direction
+    return "botanical"
+
+
+def resolve_direction(name: str | None, diagram_type: str | None = None,
+                      mood: str | None = None) -> str:
+    """把外部给的方向名解成真实方向。`auto` / 空 → 按内容选。"""
+    if not name or name == AUTO_DIRECTION:
+        return suggest_direction(diagram_type, mood)
+    if name not in VISUAL_DIRECTIONS:
+        raise KeyError(
+            f"未知视觉方向 {name!r}；可用的：{available_directions()} 或 {AUTO_DIRECTION!r}。"
+            f"（旧主题名 soft-light / morandi 之类已经废弃 —— 它们代表的正是被否掉的"
+            f"灰蓝企业风，静默映射过来只会让人以为改动没生效。）"
+        )
+    return name
+
+
+def use_direction(name: str | None = None, seed: str | None = None,
+                  diagram_type: str | None = None,
+                  mood: str | None = None) -> str:
+    """切换视觉方向。**未知方向判失败，不 fallback** —— 同 kind 一条规矩。"""
+    global _active_direction, _active_seed
+    resolved = resolve_direction(name, diagram_type, mood)
+    if seed and seed not in VISUAL_DIRECTIONS[resolved]["seeds"]:
+        raise KeyError(
+            f"方向 {resolved!r} 下没有 seed {seed!r}；可用的："
+            f"{available_seeds(resolved)}"
+        )
+    _active_direction = resolved
+    _active_seed = seed
+    _rebind()
+    return resolved
+
+
+def set_context(mood: str | None = None) -> None:
+    """给 `auto` 用：记下用户的风格意图（原话即可）。"""
+    global _active_mood
+    _active_mood = mood
+
+
+def active_direction() -> str:
+    return _active_direction
+
+
+def active_seed() -> str:
+    return _active_seed or next(iter(VISUAL_DIRECTIONS[_active_direction]["seeds"]))
+
+
+@contextlib.contextmanager
+def direction_context(name: str | None = None, seed: str | None = None):
+    """测试用：进出一个方向，出来时恢复原状。"""
+    global _active_direction, _active_seed
+    before = (_active_direction, _active_seed)
+    use_direction(name, seed)
+    try:
+        yield _active_direction
+    finally:
+        _active_direction, _active_seed = before
+        _rebind()
+
+
+# ── 层级与颜色 ───────────────────────────────────────────────────
 
 def level_for(kind: str, emphasis: str = DEFAULT_EMPHASIS) -> str:
-    """这个角色在这档强调下，落在哪个视觉层级。**颜色的唯一入口。**
+    """这个角色在这档强调下落在哪个视觉层级。**颜色的唯一入口。**
 
-    未知 kind / emphasis 都抛错，不 fallback（fallback 会让"颜色必须落在板内"
-    这条校验自己绕过自己）。
-
-    提级**封顶在 secondary**：普通节点被"强调"不该变成警示色 ——
-    critical 只能由 `emphasis: critical` 显式指定。
+    未知 kind / emphasis 都抛错，不 fallback。
     """
     if emphasis not in EMPHASIS:
         raise KeyError(f"未知 emphasis: {emphasis!r}；允许的取值：{sorted(EMPHASIS)}")
     if kind not in KINDS:
         raise KeyError(f"未知 kind: {kind!r}；允许的取值：{sorted(KINDS)}")
-    if "level" in EMPHASIS[emphasis]:
-        return EMPHASIS[emphasis]["level"]
-    index = _LEVEL_ORDER[KINDS[kind]] + EMPHASIS[emphasis]["promote"]
-    ceiling = _LEVEL_ORDER["secondary"]
-    return VISUAL_LEVELS[max(0, min(index, ceiling))]
+    override = EMPHASIS[emphasis]["level"]
+    return override if override else KINDS[kind]
 
 
 def stroke_for(kind: str, emphasis: str = DEFAULT_EMPHASIS) -> str:
@@ -383,14 +536,24 @@ def stroke_for(kind: str, emphasis: str = DEFAULT_EMPHASIS) -> str:
 
 
 def fill_for(kind: str, emphasis: str = DEFAULT_EMPHASIS) -> str:
-    """取节点填充色。**唯一来源是主题的层级表**，没有第二张表。"""
+    """取节点填充色。**唯一来源是方向派生出的层级表**，没有第二张表。"""
     return LEVELS[level_for(kind, emphasis)]["fill"]
+
+
+def emphasis_scale(emphasis: str) -> float:
+    """这档强调建议的尺寸倍数。**由布局层应用在盒子上**，不要写进元素宽高。"""
+    try:
+        return float(EMPHASIS[emphasis]["scale"])
+    except KeyError:
+        raise KeyError(
+            f"未知 emphasis: {emphasis!r}；允许的取值：{sorted(EMPHASIS)}"
+        ) from None
 
 
 def emphasis_stroke_width(emphasis: str) -> float:
     """未知 emphasis 直接抛错 —— 与 kind / shape 同一条规矩。"""
     try:
-        return EMPHASIS[emphasis]["stroke_width"]
+        return float(EMPHASIS[emphasis]["stroke_width"])
     except KeyError:
         raise KeyError(
             f"未知 emphasis: {emphasis!r}；允许的取值：{sorted(EMPHASIS)}"
@@ -406,54 +569,31 @@ def edge_style_for(kind: str) -> str:
         ) from None
 
 
-def _rebind() -> None:
-    """把当前主题装进 LEVELS / KINDS（角色→层级）/ EDGE_KINDS / CANVAS。
-
-    三个主题**同一套结构**，这里没有特例分支。（`soft-light` 曾经是个例外 ——
-    定义散在三个独立常量里 —— 已在重构颜色模型时合并掉了。）
-    """
-    global LEVELS, KINDS, EDGE_KINDS, CANVAS, ROLES
-    spec = THEMES[_active]
-    canvas, ink = spec["canvas"], spec["ink"]
-    accent, critical = spec["accent"], spec["critical"]
-    ROLES = {
-        "canvas":       canvas,
-        "ink":          ink,
-        "accent":       accent,
-        # 同一个主色的四档深浅 —— 由一个色相派生，所以**不可能**出现两个视觉中心
-        "accent-wash":  _mix(canvas, accent, WASH_MIX),
-        "accent-soft":  _mix(canvas, accent, SOFT_MIX),
-        "accent-mid":   _mix(canvas, accent, MID_MIX),
-        "accent-deep":  _mix(ink,    accent, DEEP_MIX),
-        "critical":     critical,
-        "critical-soft": _mix(canvas, critical, CRITICAL_MIX),
-        "edge":         _mix(canvas, ink, EDGE_MIX),
-        "edge-muted":   _mix(canvas, ink, EDGE_MUTED_MIX),
-    }
-    # 层级 → 描边 / 填充，全部走**角色**，没有一处直接写十六进制
-    LEVELS = {name: {"stroke": ROLES[LEVEL_ROLES[name][0]],
-                     "fill":   ROLES[LEVEL_ROLES[name][1]]}
-              for name in VISUAL_LEVELS}
-    KINDS = dict(DEFAULT_KIND_LEVELS)
-    EDGE_KINDS = {name: {"zh": zh, "style": style, "stroke": ROLES[EDGE_ROLES[name]]}
-                  for name, (zh, style) in DEFAULT_EDGE_STYLES.items()}
-    CANVAS = {"background": canvas, "grid": spec["grid"], "text": ink,
-              **CANVAS_STYLE}
-
-
 _rebind()
 
 
 if __name__ == "__main__":
-    # 人类可读的清单：python3 palette.py
-    print(f"视觉层级（{len(VISUAL_LEVELS)} 档）")
-    for name in VISUAL_LEVELS:
-        v = LEVELS[name]
-        print(f"  {name:<10} 描边 {v['stroke']}  填充 {v['fill']}")
-    print(f"\n语义角色（{len(KINDS)} 类）—— 它们映射到上面的层级（角色数不设限，颜色只有 5 档）")
-    for k, level in KINDS.items():
-        v = LEVELS[level]
-        print(f"  {k:<9} → {level:<9} 描边 {v['stroke']}  填充 {v['fill']}")
-    print(f"\n边型（{len(EDGE_KINDS)} 类）—— 默认全部中性，只有线型表达语义")
-    for k, v in EDGE_KINDS.items():
-        print(f"  {k:<9} {v['zh']:<12} {v['style']:<7} {v['stroke']}")
+    print("视觉方向（5 个母体，各有 1~2 个 seed）")
+    for name in available_directions():
+        spec = VISUAL_DIRECTIONS[name]
+        char = spec["character"]
+        print(f"  {name:<11} {spec['zh']:<12} {char['temperature']:<12} "
+              f"{char['canvas_character']:<14} 用于：{char['use_for']}")
+        for seed_name, seed in spec["seeds"].items():
+            print(f"      {seed_name:<18} 画布 {seed['canvas']}  墨 {seed['ink']}  "
+                  f"主色 {seed['accent']}  警示 {seed['critical']}")
+    print(f"\n视觉层级（{len(VISUAL_LEVELS)} 档）—— 当前方向 {active_direction()} / "
+          f"seed {active_seed()}")
+    for level in VISUAL_LEVELS:
+        entry = LEVELS[level]
+        print(f"    {level:<10} 描边 {entry['stroke']}  填充 {entry['fill']}")
+    print("\n语义角色 → 默认层级（**没有角色默认拿到 accent**）")
+    for kind, level in KINDS.items():
+        print(f"    {kind:<10} → {level}")
+    print("\n边型 —— 默认全部退出颜色竞争，语义靠线型")
+    for kind, entry in EDGE_KINDS.items():
+        print(f"    {kind:<10} {entry['zh']:<12} {entry['style']:<7} {entry['stroke']}")
+    print("\n强调（层级 + 尺寸 + 线宽）")
+    for name, entry in EMPHASIS.items():
+        print(f"    {name:<10} 层级 {entry['level'] or '(随 kind)':<10} "
+              f"尺寸 ×{entry['scale']}  线宽 {entry['stroke_width']}")

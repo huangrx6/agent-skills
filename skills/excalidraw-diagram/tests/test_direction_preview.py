@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""theme_preview.py 的回归测试。
+"""direction_preview.py 的回归测试。
 
 这个脚本存在的理由是"让用户在出图前挑主题"，所以它自己的产物**必须是对的** ——
 一个看起来正常但打不开的对照图，比没有更糟（用户会以为自己不喜欢那些主题）。
@@ -30,7 +30,7 @@ def _load(name: str, filename: str):
     return module
 
 
-TP = _load("theme_preview_under_test", "theme_preview.py")
+TP = _load("direction_preview_under_test", "direction_preview.py")
 
 
 class TestThemePreview(unittest.TestCase):
@@ -41,11 +41,11 @@ class TestThemePreview(unittest.TestCase):
 
     def test_it_draws_every_theme(self):
         palette = TP._load("palette")
-        for theme in palette.available_themes():
-            with self.subTest(theme=theme):
-                self.assertTrue(any(e["id"].startswith(f"panel-bg-{theme}")
+        for direction in palette.available_directions():
+            with self.subTest(direction=direction):
+                self.assertTrue(any(e["id"].startswith(f"panel-bg-{direction}")
                                     for e in self.scene["elements"]),
-                                f"{theme} 的面板没画出来")
+                                f"{direction} 的面板没画出来")
 
     def test_element_ids_are_unique_across_panels(self):
         """三个面板共用同一份节点 id，不隔离就会互相覆盖。"""
@@ -69,8 +69,8 @@ class TestThemePreview(unittest.TestCase):
     def test_it_uses_the_palette_theme_names(self):
         """主题名以 `THEMES` 为准 —— 别的地方再抄一份就会漂移（这个坑踩过）。"""
         palette = TP._load("palette")
-        self.assertEqual(sorted(palette.available_themes()),
-                         sorted(palette.THEMES))
+        self.assertEqual(sorted(palette.available_directions()),
+                         sorted(palette.VISUAL_DIRECTIONS))
 
 
 if __name__ == "__main__":

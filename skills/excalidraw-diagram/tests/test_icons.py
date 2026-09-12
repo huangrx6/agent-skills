@@ -491,20 +491,20 @@ class TestIconColourClash(unittest.TestCase):
 
     @staticmethod
     def _spec(theme=None):
-        """主题要写进**规格**，不能用 `palette.use_theme()` —— emit 会按规格重置它。
+        """方向要写进**规格**，不能用 `palette.use_direction()` —— emit 会按规格重置它。
 
         这条踩过：测试里切了主题，emit 一进来就按规格（没有 theme 字段）重置回默认，
         于是两次跑的都是同一个主题，断言看起来像"行为反了"。
         """
         spec = json.loads(json.dumps(ICON_SPEC))
         if theme:
-            spec["theme"] = theme
+            spec["visual"] = theme
         return spec
 
     def test_dark_icon_on_dark_fill_is_reported(self):
         """合成素材的元素是 #333333 描边；放到深色主题的深填充上就该报。"""
         _, _, light_outcome, _ = self.E.emit(self._spec(), library=V2)
-        _, _, dark_outcome, _ = self.E.emit(self._spec("dark"), library=V2)
+        _, _, dark_outcome, _ = self.E.emit(self._spec("night"), library=V2)
         light = [i for i in light_outcome.issues if i.check == "icon"]
         dark = [i for i in dark_outcome.issues if i.check == "icon"]
         self.assertEqual([], light, "浅色主题下不该报撞色")
@@ -527,7 +527,7 @@ class TestIconColourClash(unittest.TestCase):
                 json.dump({"type": "excalidrawlib", "version": 2, "libraryItems": [
                     {"id": "i", "name": "Bound Box", "elements": bright}]},
                     fh, ensure_ascii=False)
-            _, _, outcome, _ = self.E.emit(self._spec("dark"), library=path)
+            _, _, outcome, _ = self.E.emit(self._spec("night"), library=path)
             self.assertEqual([], [i for i in outcome.issues if i.check == "icon"])
         finally:
             shutil.rmtree(directory, ignore_errors=True)

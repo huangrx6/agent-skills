@@ -32,7 +32,8 @@ import sys
 
 # 封闭字段集。加字段要同时改这里和 references/diagram-spec.md —— 这正是设计意图：
 # 让"顺手加一个"变得有摩擦。
-TOP_FIELDS = {"type", "title", "direction", "detail", "groups", "nodes", "edges", "theme"}
+TOP_FIELDS = {"type", "title", "direction", "detail", "groups", "nodes", "edges",
+              "visual", "mood"}
 GROUP_FIELDS = {"id", "label", "description"}
 NODE_FIELDS = {"id", "label", "kind", "shape", "emphasis", "icon", "group",
                "detail", "rank", "pin"}
@@ -135,13 +136,14 @@ def validate(spec: dict) -> Issues:
     if "direction" in spec and spec["direction"] not in DIRECTIONS:
         issues.error("BAD_DIRECTION", "$.direction",
                      f"direction 只允许 {sorted(DIRECTIONS)}")
-    theme = spec.get("theme")
-    if theme is not None and not palette.is_known_theme(theme):
-        # 同 kind / shape 一条原则：不 fallback。静默换主题会让"风格"这件事
+    visual = spec.get("visual")
+    if visual is not None and not palette.is_known_direction(visual):
+        # 同 kind / shape 一条原则：不 fallback。静默换方向会让"风格"这件事
         # 变成"我明明写了 A 出来的是 B"，而且看图的人不知道为什么。
-        issues.error("UNKNOWN_THEME", "$.theme",
-                     f"未知主题 {theme!r}；可用的：{palette.available_themes()}"
-                     f" 或 {palette.AUTO_THEME!r}（按图类型自己挑）")
+        issues.error("UNKNOWN_VISUAL", "$.visual",
+                     f"未知视觉方向 {visual!r}；可用的："
+                     f"{palette.available_directions()}"
+                     f" 或 {palette.AUTO_DIRECTION!r}（按图类型和用户意图自己挑）")
     if "detail" in spec and spec["detail"] not in DETAIL_LEVELS:
         issues.error("BAD_DETAIL", "$.detail",
                      f"detail 只允许 {sorted(DETAIL_LEVELS)}")

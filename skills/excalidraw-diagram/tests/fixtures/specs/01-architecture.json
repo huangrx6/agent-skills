@@ -34,8 +34,7 @@
     {
       "id": "pay",
       "kind": "plain",
-      "label": "支付服务",
-      "emphasis": "primary"
+      "label": "支付服务"
     },
     {
       "id": "stock",

@@ -113,7 +113,7 @@ class ValidateSpecTest(unittest.TestCase):
 
     def test_unknown_top_and_edge_fields_rejected(self):
         s = valid_spec()
-        s["theme"] = "dark"
+        s["visual"] = "night"
         s["edges"][0]["arrowhead"] = "dot"
         got = self.codes(s)
         self.assertIn("UNKNOWN_FIELD", got)

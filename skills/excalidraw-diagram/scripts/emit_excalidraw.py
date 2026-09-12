@@ -815,8 +815,10 @@ def emit(spec: dict, *, params=None, library: str | None = None,
         raise SpecError(f"规格不通过，没有出图：\n{detail}")
 
     # 主题在**一切之前**定：颜色要被尺寸/校验/标签各处读到，切晚了会前后不一致。
-    palette.set_auto_type(spec.get("type"))
-    palette.use_theme(spec.get("theme"))
+    # `visual` 是视觉方向（旧字段 `theme` 已废弃）；`mood` 是**用户的原话**，
+    # 用于 §19"用户明确指定风格时优先用户意图"。
+    palette.set_context(spec.get("mood"))
+    palette.use_direction(spec.get("visual"), diagram_type=spec.get("type"))
 
     # 图标必须在算盒子**之前**解析出来 —— 它会影响节点尺寸（第一个外部尺寸来源）
     lookup, icon_sizes, icon_heights = load_icons(spec, library, icon_height,
