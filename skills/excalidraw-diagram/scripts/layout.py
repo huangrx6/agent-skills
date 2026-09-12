@@ -82,6 +82,12 @@ PARAM_LIMIT: dict[str, float] = {
     "barycenterRounds": 12.0,
 }
 DUMMY_PREFIX = "__dummy_"
+# 同一侧挂多条边时，贴点沿这侧铺开的跨度占边长多少。
+#
+# 为什么留边距：贴点贴到角上，线与节点的邻边会“粘”在一起；
+# 而 0.72 是**待验证**值（没有真实数据校准过，见 diagram-spec.md 的信任状态总表）。
+# 只有一条边时**不铺开**，贴点就是边中点 —— 与改之前完全一致（零回归）。
+ATTACH_SPAN = 0.72
 # 虚节点在交叉轴上的间距。不复用 nodeSeparation（70）—— 虚节点高度为 0，
 # 给它一整个节点间距会把层横向撑得很空；但也不能是 0，否则自同一节点出发的
 # 平行长边会完全重叠、看上去是一条线。20 取自 Dagre 的 edgesep 默认值。
@@ -516,11 +522,18 @@ def route_edges(origins: list[dict], segments: list[dict],
     被反转过的边在绘制时要再反回来 —— 否则箭头方向就错了。
     """
     out: list[dict] = []
+    # 先把所有链解出来 —— 贴点要**跨边**协调（同一个节点上的几条边得均分），
+    # 逐条遍历时看不到别人。注意链的方向是 DAG 方向，可能与原始边的 from/to 相反。
+    resolved = []
     for idx, e in enumerate(origins):
         chain = _follow(idx, e, segments, placed)
-        if len(chain) < 2:
-            continue
-        pts = _points(chain, placed, direction)
+        if len(chain) >= 2:
+            resolved.append((idx, chain))
+    starts, ends = _anchor_slots(resolved, placed, direction)
+
+    for idx, chain in resolved:
+        e = origins[idx]
+        pts = _points(chain, placed, direction, starts[idx], ends[idx])
         a, b = e["from"], e["to"]
         was_reversed = (b, a) in reversed_set
         if was_reversed:
@@ -559,16 +572,69 @@ def _follow(origin_idx: int, origin_edge: dict, segments: list[dict],
     return [c for c in chain if c in placed]
 
 
-def _points(chain: list[str], placed: dict[str, Placed], direction: str) -> list[list[float]]:
+def _anchor_slots(resolved: list, placed: dict[str, Placed],
+                  direction: str) -> tuple[dict, dict]:
+    """给每个节点两侧的贴点分配位置 —— **治 P1（喷泉）**。
+
+    以前所有边都连到节点的同一个边中点：实测一个节点同时喷出 6 条线，
+    三种图型（架构 / 思维导图 / 状态机）上都是目视最刺眼的一处。
+
+    两件事：
+      1. **排序**：按另一端的横向坐标排 —— 往上的目标配上面的贴点。
+         这不只是为了好看，它会直接减少交叉（可以从交叉数上量出来）。
+      2. **均分**：k 条边就把跨度均分 k 份，每条取每份的中夹（单条 = 中点）。
+
+    返回 `(起点偏移, 终点偏移)`，两个都是 `{origin_idx: 偏移像素}`。
+    偏移参照节点在交叉轴上的中心，沿贴点所在边量。
+    """
+    starts: dict[str, list] = {}
+    ends: dict[str, list] = {}
+    for idx, chain in resolved:
+        starts.setdefault(chain[0], []).append((idx, chain[-1]))
+        ends.setdefault(chain[-1], []).append((idx, chain[0]))
+    return (_slots(starts, placed, direction), _slots(ends, placed, direction))
+
+
+def _slots(groups: dict[str, list], placed: dict[str, Placed],
+           direction: str) -> dict:
+    """一张贴点表：同一节点上的多条边沿这一侧均分。"""
+    out: dict[int, float] = {}
+    for nid, items in groups.items():
+        p = placed[nid]
+        if direction == "LR":
+            span = p.height * ATTACH_SPAN
+        else:
+            span = p.width * ATTACH_SPAN
+
+        def other_axis(item, _p=p):
+            """另一端在交叉轴上的坐标（LR 的交叉轴是 y，TB 是 x）。"""
+            q = placed[item[1]]
+            return (q.y + q.height / 2) if direction == "LR" else (q.x + q.width / 2)
+
+        # idx 参与排序键：位置相同时仍然稳定，不会因遍历顺序不同而抖动
+        ordered = sorted(items, key=lambda it: (other_axis(it), it[0]))
+        count = len(ordered)
+        for j, (idx, _other) in enumerate(ordered):
+            if count == 1:
+                out[idx] = 0.0
+            else:
+                out[idx] = ((j + 0.5) / count - 0.5) * span
+    return out
+
+
+def _points(chain: list[str], placed: dict[str, Placed], direction: str,
+            start_off: float = 0.0, end_off: float = 0.0) -> list[list[float]]:
     pts: list[list[float]] = []
     last = len(chain) - 1
     for i, nid in enumerate(chain):
         p = placed[nid]
         cx, cy = p.x + p.width / 2, p.y + p.height / 2
         if i == 0:
-            pts.append([p.x + p.width, cy] if direction == "LR" else [cx, p.y + p.height])
+            pts.append([p.x + p.width, cy + start_off] if direction == "LR"
+                       else [cx + start_off, p.y + p.height])
         elif i == last:
-            pts.append([p.x, cy] if direction == "LR" else [cx, p.y])
+            pts.append([p.x, cy + end_off] if direction == "LR"
+                       else [cx + end_off, p.y])
         else:
             pts.append([cx, cy])
     return [[round(x, 2), round(y, 2)] for x, y in pts]

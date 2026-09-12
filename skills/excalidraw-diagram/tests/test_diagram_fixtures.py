@@ -67,13 +67,16 @@ EMIT = os.path.join(SCRIPTS, "emit_excalidraw.py")
 #   这个弱点以前被“盒子小”掩盖着。真修法是给边加绕行（待办 #81）。
 #
 #   所以下面这两个数字是**回归后的值**，不是“本来就这样”。
+# `labels_on_lines` 与 `max_fanout` 已从"每张图放宽的值"变成**结构性结果**
+# （锚点按扇出均分、标签搜索的障碍物修好了坐标系 → 0 和 1）。
+# 所以不再按图记上限，改成两条不变量直接断言（见下面的用例）。
 KNOWN_MAX = {
-    "01-architecture": {"through_nodes": 0, "labels_on_lines": 1, "max_fanout": 6},
-    "02-flow":         {"through_nodes": 0, "labels_on_lines": 0, "max_fanout": 2},
-    "03-dependency":   {"through_nodes": 0, "labels_on_lines": 0, "max_fanout": 3},
-    "04-state":        {"through_nodes": 0, "labels_on_lines": 0, "max_fanout": 2},
-    "05-network":      {"through_nodes": 4, "labels_on_lines": 0, "max_fanout": 4},
-    "06-mindmap":      {"through_nodes": 2, "labels_on_lines": 0, "max_fanout": 6},
+    "01-architecture": {"through_nodes": 0},
+    "02-flow":         {"through_nodes": 0},
+    "03-dependency":   {"through_nodes": 0},
+    "04-state":        {"through_nodes": 0},
+    "05-network":      {"through_nodes": 4},
+    "06-mindmap":      {"through_nodes": 2},
 }
 MAX_FANOUT_HARD = 8          # 超过这个数就不只是"不够好看"，是排布坏了
 
@@ -173,11 +176,16 @@ def measure(scene: dict) -> dict:
                 break
         crossed += 1 if hit else 0
 
-    # P1：同一节点同一锚点射出几条
+    # P1：同一节点同一**锚点**射出几条
+    #
+    # ⚠ 这里踩过一次：`arrow["points"][0]` 是**相对坐标**，而 `arrow["x"]`/`y` 就是首点，
+    # 所以那个 key 永远是 (0,0) —— 它实际上在数“这个节点射出几条”，从来没量过锚点。
+    # 直接拿它判断“分散锚点有没有生效”，得到的是“没变”（因为量的是另一件事）。
+    # 绝对起点就是 x/y。
     fanout: dict[tuple, int] = {}
     for arrow in arrows:
         key = (arrow["startBinding"]["elementId"],
-               round(arrow["points"][0][0], 1), round(arrow["points"][0][1], 1))
+               round(arrow["x"], 1), round(arrow["y"], 1))
         fanout[key] = fanout.get(key, 0) + 1
 
     # P4：有没有标题（字号 >= 20 才算标题，节点标题是 16）
@@ -273,6 +281,46 @@ class TestKnownProblemsDoNotWorsen(unittest.TestCase):
                 m = self.measured(path)
                 self.assertLessEqual(m["max_fanout"], MAX_FANOUT_HARD,
                                      f"{name} 同一锚点射出 {m['max_fanout']} 条")
+
+    def test_no_two_edges_share_an_anchor(self):
+        """**结构性不变量**：每个锚点恰好一条边。
+
+        以前所有边都连到节点边中点 —— 实测一个节点上喷出 6 条，三种图型上都是
+        目视最刺眼的一处。现在按扇出均分，不再依赖"看起来如何"。
+
+        但要说清：锚点分散**不等于**扇出的观感消失了。枢纽节点只有 64px 高时，
+        6 个锚点摊开也就 ~8px 间距，远端照样是扇形 —— 那是"枢纽太小 + 目标太远"
+        的结果，不是锚点算法能解决的。
+        """
+        for path in spec_paths():
+            with self.subTest(fixture=os.path.basename(path)):
+                scene, _, _, _ = E.emit(json.load(open(path, encoding="utf-8")))
+                anchors: dict[tuple, int] = {}
+                for a in scene["elements"]:
+                    if a["type"] != "arrow":
+                        continue
+                    # 绝对起点就是 x/y。points 是**相对**坐标 —— 这里踩过一次：
+                    # 用 points[0] 的话 key 永远是 (0,0)，量到的是另一件事。
+                    key = (a["startBinding"]["elementId"],
+                           round(a["x"], 1), round(a["y"], 1))
+                    anchors[key] = anchors.get(key, 0) + 1
+                worst = max(anchors.values()) if anchors else 0
+                self.assertEqual(1, worst, f"有锚点挂了 {worst} 条边")
+
+    def test_no_label_sits_on_a_line(self):
+        """标签不许压在任何连线上。
+
+        这条以前**修不掉**：标签搜索一直在躲一份被平移过的假线 ——
+        `build_scene` 把已经是绝对坐标的 points 又加了一遍起点，
+        搜索在自己眼里是干净的，落到图上却压着真线。
+
+        搜索本身（候选方向 × 递增退让 × 沿边滑动）没问题，错的是喂给它的障碍物。
+        """
+        for path in spec_paths():
+            with self.subTest(fixture=os.path.basename(path)):
+                scene, _, _, _ = E.emit(json.load(open(path, encoding="utf-8")))
+                self.assertEqual(0, measure(scene)["labels_on_lines"],
+                                 "有标签压在连线上")
 
     def test_aspect_ratio_does_not_get_worse(self):
         """极长或极窄的条状图读不了。

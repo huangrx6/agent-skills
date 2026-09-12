@@ -86,11 +86,21 @@ def find_pointers(path: str) -> list[dict]:
         if line.startswith("```"):
             in_fence = not in_fence
             continue
-        if in_fence or not re.search(POINTER_VERBS, line):
+        if in_fence:
             continue
-        for target in PATH_IN_TICK.findall(line):
+        # 以点开头的不是路径而是扩展名（`.excalidraw.md`），排除掉避免误报
+        targets = [t for t in PATH_IN_TICK.findall(line) if not t.startswith(".")]
+        if not targets:
+            continue
+        # `pointer` 区分“这句话在指路”与“只是提到了一个文件名”。
+        #
+        # 为什么两者都要收：以前只收含“见 / 参见”这类动词的行，于是
+        # 「图标（`references/icons.md`）**遵循**同一条纪律」这种句子被整行跳过 ——
+        # 而那个文件根本不存在。**假阴性**比误报危险：误报会被人忽略，假阴性没人看得见。
+        is_pointer = bool(re.search(POINTER_VERBS, line))
+        for target in targets:
             found.append({"file": path, "line": lineno, "target": target,
-                          "sentence": line.strip()})
+                          "pointer": is_pointer, "sentence": line.strip()})
     return found
 
 
@@ -128,27 +138,47 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     ptrs = run(list(iter_docs(targets)), args.root)
-    missing = [p for p in ptrs if not p["target_exists"]]
+    # 分两级，因为这两类**确定性不同**：
+    #   broken   —— 含"见 / 参见"这类动词，解析不到：这句话在明确指路，路是断的。**阻塞。**
+    #   suspect  —— 只是提到一个长得像路径的词，解析不到：可能只是举了个例子（"假如有
+    #               决策树图就放 references/decision-tree.md"），也可能指向仓库外的东西
+    #               （vault 里的 `better-export-pdf/data.json`）。**列出但不阻塞。**
+    # 全都不阻塞会让真正的悬空引用被淹掉；全都阻塞会制造误报，而误报会训练人忽略整个检查
+    # （前作 lint 全 warn 没人看就是这个失败模式）。
+    broken = [p for p in ptrs if not p["target_exists"] and p.get("pointer")]
+    suspect = [p for p in ptrs if not p["target_exists"] and not p.get("pointer")]
 
     if args.json:
-        print(json.dumps({"pointer_count": len(ptrs), "missing_count": len(missing),
-                          "pointers": ptrs}, ensure_ascii=False, indent=2))
-        return 1 if missing else 0
+        print(json.dumps({"pointer_count": len(ptrs), "broken_count": len(broken),
+                          "suspect_count": len(suspect), "pointers": ptrs},
+                         ensure_ascii=False, indent=2))
+        return 1 if broken else 0
 
     if not ptrs:
         print("✓ 没有找到指针语句")
         return 0
 
+    for p in broken:
+        print(f"  ✗ {p['file']}:{p['line']} → {p['target']} 不存在")
+    if broken:
+        print(f"\n  ✗ {len(broken)} 处悬空引用（这句话在指路，但路是断的）")
+
+    if suspect:
+        print(f"\n  ⚠ 另有 {len(suspect)} 处「看起来像路径但解析不到」，不阻塞。逐条看是不是真悬空：")
+        for p in suspect:
+            print(f"      {p['file']}:{p['line']} → {p['target']}")
+
     print(f"指针语句（{len(ptrs)} 条）—— 目标是“哪些文件在说这事定义在别处”\n")
     for p in ptrs:
+        if not p.get("pointer"):
+            continue          # 只在提到文件名、没在指路的行不列进来（上面已单独报过）
         rel = os.path.relpath(p["file"], args.root)
         mark = "✓" if p["target_exists"] else "✗ 目标找不到"
         loc = p.get("resolved") or p["target"]
         print(f"  {rel}:{p['line']}")
         print(f"      → {loc}   {mark}")
 
-    if missing:
-        print(f"\n✗ {len(missing)} 条指针的目标找不到")
+    if broken:
         return 1
 
     print("\n✓ 所有指针的目标都存在")

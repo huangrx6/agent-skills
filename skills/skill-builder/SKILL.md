@@ -100,7 +100,7 @@ description: >-
 | 归属 | 内容 |
 | --- | --- |
 | 写进 SKILL.md | 起手流程(用户在第一句问“怎么办”时就能跑)、 1-3 个核心决策表、 anti-pattern(明确的“不要做”)、 一两个例子(如果有) |
-| 移到 `references/` 或 `examples/` | 长文背景知识、 完整决策树图(mermaid 放 `references/decision-tree.md`)、 工具 / 库的安装说明、 重复的引用、 跨 skill 共用写作约定(那是根 README 或单独的 style-guide) |
+| 移到 `references/` 或 `examples/` | 长文背景知识、 完整决策树图(mermaid 单独占一个 references 文件)、 工具 / 库的安装说明、 重复的引用、 跨 skill 共用写作约定(那是根 README 或单独的 style-guide) |
 | **永不写进 skill** | 个人吐槽、临时想法、试验性段落、 没经过验证的“最佳实践”、 “读者复制代码”“这里要提醒读者”“给作者自己看”这类后台话术 |
 
 ## Minimum Viable SKILL.md Checklist

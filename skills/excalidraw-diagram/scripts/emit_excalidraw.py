@@ -269,12 +269,15 @@ def polyline_midpoint(pts: list) -> list:
     return _midpoint_frame(pts)[0]
 
 
-def _midpoint_frame(pts: list) -> tuple[list, tuple[float, float], tuple[float, float]]:
-    """中点 + 该处的两个方向（反向的入边、出边）。
+def _midpoint_frame(pts: list, frac: float = 0.5) -> tuple[list, tuple[float, float], tuple[float, float]]:
+    """折线上某个位置 + 该处的两个方向（反向的入边、出边）。
 
     两个方向都是相对“沿折线前进”而言的：`back` 指回到来处，`fwd` 指向前方。
     落在一条直段中间时两者共线（角平分退化，只能用法线）；
     落在拐点上时两者不同向 —— 那是真正需要区别对待的情况。
+
+    `frac` 是沿**弧长**的比例，默认 0.5（中点）。之所以可调：标签本来就可以
+    沿边滑动，死守中点会把“附近明明有位置”变成“只能压线”。
     """
     if not pts:
         return [0.0, 0.0], (-1.0, 0.0), (1.0, 0.0)
@@ -285,7 +288,7 @@ def _midpoint_frame(pts: list) -> tuple[list, tuple[float, float], tuple[float, 
     total = sum(s[2] for s in segs)
     if total <= 0:
         return list(pts[0]), (-1.0, 0.0), (1.0, 0.0)
-    half = total / 2.0
+    half = total * frac
     walked = 0.0
 
     def _dir(seg):
@@ -407,22 +410,26 @@ def label_position(pts: list, width: float, height: float,
     候选（法线朝上）—— 那种情况说明图太密，应该由报告建议拆节点，而不是在这里硬拗。
     """
     obstacles = obstacles or [list(pts)]
-    mid, back, fwd = _midpoint_frame(pts)
-    directions = _candidate_directions(back, fwd)
     radius = math.hypot(width, height) / 2
+    # 先试中点，不行再沿边滑 —— 标签本来就可以不在中点，
+    # 而死守中点会把“附近明明有位置”变成“只能压线”。
+    # 顺序是“离中点由近到远”，所以能用中点时一定用中点。
     first: tuple[float, float] | None = None
-    for extra in (0.0, 6.0, 12.0, 20.0, 30.0, 45.0, 65.0):
-        for dx, dy in directions:
-            reach = radius + gap + extra
-            x = mid[0] + dx * reach - width / 2
-            y = mid[1] + dy * reach - height / 2
-            if first is None:
-                first = (x, y)
-            if not _hits_lines(x, y, width, height, obstacles):
-                return round(x, 2), round(y, 2)
+    for frac in (0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74):
+        mid, back, fwd = _midpoint_frame(pts, frac)
+        directions = _candidate_directions(back, fwd)
+        for extra in (0.0, 6.0, 12.0, 20.0, 30.0, 45.0, 65.0):
+            for dx, dy in directions:
+                reach = radius + gap + extra
+                x = mid[0] + dx * reach - width / 2
+                y = mid[1] + dy * reach - height / 2
+                if first is None:
+                    first = (x, y)
+                if not _hits_lines(x, y, width, height, obstacles):
+                    return round(x, 2), round(y, 2)
     if first is None:                       # 理论上不可达（候选方向非空），但不靠 assert
-        reach = radius + gap
-        first = (mid[0] - width / 2, mid[1] - reach - height / 2)
+        mid = _midpoint_frame(pts)[0]
+        first = (mid[0] - width / 2, mid[1] - radius - gap - height / 2)
     return round(first[0], 2), round(first[1], 2)
 
 
@@ -564,9 +571,14 @@ def build_scene(spec: dict, result, boxes: dict) -> dict:
         elements += node_elements(by_id[nid], placed, boxes[nid],
                                   arrows_out.get(nid, []), arrows_in.get(nid, []))
 
-    # 折线点存的是相对坐标，障碍物列表要用绝对坐标 —— 否则搜位置时会搜到一个不存在的地方
-    polylines = [[(edge["points"][0][0] + p[0], edge["points"][0][1] + p[1])
-                  for p in edge["points"]] for edge in result.edges]
+    # `result.edges` 里的 points **已经是绝对坐标**（`layout._points` 用的是 placed 的坐标），
+    # 所以这里直接用，**不能再加一遍起点**。
+    #
+    # 以前写的是 `edge["points"][0] + p`，把一条真线平移成了另一条假线 ——
+    # 标签搜索于是一直在躲不存在的障碍：它返回的位置在自己眼里是干净的，
+    # 落到图上却压在真线上（实测某条边被压 19 个采样点）。
+    # 这就是 P3“标签压线”反复修不掉的根因。
+    polylines = [list(edge["points"]) for edge in result.edges]
     for i, (edge, _) in enumerate(arrow_specs):
         elements.append(arrow_element(edge, i))
         label = edge_label_element(edge, i, polylines)
