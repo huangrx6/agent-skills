@@ -127,20 +127,22 @@ description: >-
 
 ## Minimum Viable SKILL.md Checklist
 
-在宣布 skill 完成前,逐项确认:
+**先跑脚本**（前 10 项是机械检查，不要靠肉眼——实测中“正文 ≤ 150 行”被连续违反两次都没看出来）：
 
-- [ ] 目录名 = frontmatter `name` 字段(强制一致,大小写敏感)
-- [ ] frontmatter 含 `name` + `description`
-- [ ] **用解析器实测** frontmatter 能解析通过(不是目测)。常见坑:单行 description 里出现冒号加空格会被 YAML 当成映射分隔符,必须去掉冒号或改成 `>-` 折叠块
-- [ ] description 第一段是"Use this skill when..."(或等价表达)
-- [ ] description 含 3-6 个具体动词 + 1-3 个对象,不是模糊词
-- [ ] description 含"Do NOT use this skill when..."边界
-- [ ] description 总长度 < 800 字符
-- [ ] SKILL.md 正文 ≤ ~150 行(超过则拆 `references/`)
-- [ ] 正文有 1-3 个表格 / 清单,Agent 能直接照做
-- [ ] 没有"个人吐槽 / 临时想法 / 试验性"段落
+```sh
+python3 scripts/validate_skill.py            # 扫本仓库全部 skill
+python3 scripts/validate_skill.py <skill 目录>
+```
+
+脚本覆盖：SKILL.md 存在 / 可读 / frontmatter 存在 / YAML 可解析 / `name` == 目录名 / description < 800 字符 / 含触发表达 / 含 Do NOT 边界 / 正文 ≤ 150 行 / 含表格或清单。退出码 `0` 通过、`1` 失败。
+
+**脚本查不到的，人工确认**：
+
+- [ ] description 里的动词是用户真会说的话，不是“处理”“搞定”这类模糊词
+- [ ] Do NOT 边界是真边界，不是凑数
+- [ ] 没有“个人吐槽 / 临时想法 / 试验性”段落
 - [ ] 同步更新根 README 索引表 + Roadmap
-- [ ] 同步更新 `skills-lock.json`,新增一条 entry
+- [ ] 同步更新 `skills-lock.json`，新增一条 entry
 
 ## Anatomy & Out-of-Scope
 
