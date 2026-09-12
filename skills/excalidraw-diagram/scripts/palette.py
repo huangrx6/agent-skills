@@ -146,6 +146,26 @@ def frame_stroke(level: str) -> str:
     return _mix(CANVAS["background"], LEVELS[level]["stroke"], 1.0 - FRAME_MIX)
 
 
+def merge_style(base: dict | None, override: dict | None) -> dict:
+    """把**已解析**的样式与一份**局部覆盖**合并：覆盖里没写的轴保持原值。
+
+    用途只有一个：区域的局部覆盖（`groups[].style`）。用户要过「只让区域用虚线、
+    节点保持实线」—— 全局 `style` 做不到，得有一条"只改这一块"的路径。
+
+    ⚠️ 与 `resolve_style` 的区别：那个是**补默认值**（缺的轴按默认），这个是**盖在上层**
+    （缺的轴继承下层）。两件事混在一起会出现"局部覆盖把别的轴悄悄打回默认"的怪事。
+    """
+    out = dict(base) if base else dict(STYLE_DEFAULT)
+    for key, value in (override or {}).items():
+        if key not in STYLE_AXES:
+            raise ValueError(f"style 里没有 {key!r} 这一项，可用 {sorted(STYLE_AXES)}")
+        if value not in STYLE_AXES[key]:
+            raise ValueError(f"style.{key} = {value!r} 不在档位里，可用 "
+                             f"{list(STYLE_AXES[key])}")
+        out[key] = value
+    return out
+
+
 def roundness_of(style: dict, shape_default: dict | None) -> dict | None:
     """圆角给 Excalidraw 的 roundness 对象，直角给 None（不是 type 0）。
 

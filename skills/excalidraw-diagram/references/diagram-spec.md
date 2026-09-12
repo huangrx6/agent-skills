@@ -11,7 +11,10 @@
   "direction": "LR",                // 可选，仅 LR / TB；那三种算法里，只有分层用得上它
   "detail": "standard",             // executive | standard | diagnostic
   "visual": "auto",                  // 可选，见下方"视觉方向"；不写 = auto
-  "groups": [],                     // 可选：区域（一整个色块 + 顶部标题，见下）
+  "groups": [                        // 可选：区域（一整个色块 + 顶部标题，见下）
+    // { "id": "boot", "label": "装配与启动校验", "level": "tint",
+    //   "style": { "stroke": "dashed" } }   ← style 只覆盖这一个区域
+  ],
   "style": {                        // 可选：四组样式轴，见下方"样式轴"；不写就是默认
     "fill": "hachure",              // hachure 斜条纹 | cross-hatch 网格 | solid 实心
     "stroke": "shape",              // shape 听形状的 | solid | dashed | dotted（只管框）
@@ -65,7 +68,11 @@
 "nodes": [ { "id": "load", "kind": "plain", "label": "load_settings", "group": "boot" } ]
 ```
 
-- `label` 写在区域顶部，**水平居中**；
+- `label` 写在区域顶部，在**标题带里挑一个不被连线穿过**的位置（实测：居中会被
+  进入该区的竖线穿过，端到端夹具一次报出两个区域标题被穿）；
+- `style` 可选：**只覆盖这个区域**的样式轴（`fill` / `stroke` / `corners` / `line`），
+  没写的轴继承顶层 `style`。要「节点实线、区域虚线」就靠它 —— 顶层 `style` 是全局的，
+  表达不了"只改这一块"；
 - `level` 可选，默认 `tint`（极轻的一片）。`critical` 用来圈"这一段是异常路径"；
 - 区域框由成员节点的**实际包围盒**算出来（四周留白 + 顶部标题带），
   所以一定框得住它画的每一个节点，标题也不会压到节点；
@@ -159,6 +166,22 @@
 
 和未知 `kind` 同一条规矩：报错并列出允许值。回退到 `round` 上一眼看不出来，
 但会让“形状与语义有关”这个不变量静默失效。
+
+## `detail`：信息量档位（顶层）
+
+这个字段曾经是**空壳** —— 校验器认它，`layout` / `check_layout` / `emit` 一处都不读，
+而 SKILL.md 的硬规则表里写着「信息量用 `detail` 控制」。现在按那句话字面的意思实现：
+
+| `detail` | 节点次要说明（`detail`） | 用户写的边标签 | 边的 kind 说明 |
+| --- | --- | --- | --- |
+| `executive` | 只留 `emphasis: primary / critical` 的 | 丢掉 | 不补 |
+| `standard`（默认） | 全部 | 全部 | 不补 |
+| `diagnostic` | 全部 | 全部 | **自动补**（同步 / 异步 / 可选 / 数据） |
+
+- 它**会影响布局**：少了那行字，节点盒子就该变小 —— 尺寸与落笔用的是同一份判据
+  （`layout.shows_node_detail`），不是"文字少了盒子还那么大"。
+- 不写 = `standard` = 实现之前的行为，所以任何既有规格都不受影响。
+- `diagnostic` 的那一列是自动补的：用户自己写了 `label` 就听用户的，自动的从不越位。
 
 ## `emphasis`：视觉重点（层级 + 尺寸 + 线宽）
 

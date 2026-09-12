@@ -1,0 +1,108 @@
+{
+  "type": "flow",
+  "title": "区域与样式轴（端到端夹具）",
+  "direction": "TB",
+  "visual": "botanical",
+  "groups": [
+    {
+      "id": "boot",
+      "label": "装配与启动校验（fail-closed）",
+      "level": "tint",
+      "style": {
+        "stroke": "dashed",
+        "fill": "cross-hatch"
+      }
+    },
+    {
+      "id": "guard",
+      "label": "异常兜底",
+      "level": "critical",
+      "style": {
+        "stroke": "dashed"
+      }
+    }
+  ],
+  "style": {
+    "fill": "hachure",
+    "stroke": "solid",
+    "corners": "round",
+    "line": "sketch"
+  },
+  "nodes": [
+    {
+      "id": "main",
+      "label": "进程启动",
+      "kind": "client",
+      "shape": "ellipse",
+      "rank": 0
+    },
+    {
+      "id": "load",
+      "label": "load_settings",
+      "kind": "plain",
+      "group": "boot",
+      "rank": 1
+    },
+    {
+      "id": "check",
+      "label": "校验配置",
+      "kind": "service",
+      "group": "boot",
+      "detail": "缺键即失败",
+      "rank": 2
+    },
+    {
+      "id": "fail",
+      "label": "回退默认值",
+      "kind": "external",
+      "group": "guard",
+      "emphasis": "critical",
+      "rank": 4
+    },
+    {
+      "id": "run",
+      "label": "开始服务",
+      "kind": "service",
+      "rank": 3
+    },
+    {
+      "id": "log",
+      "label": "记录启动日志",
+      "kind": "plain",
+      "group": "boot",
+      "rank": 2
+    }
+  ],
+  "edges": [
+    {
+      "from": "main",
+      "to": "load",
+      "kind": "sync"
+    },
+    {
+      "from": "load",
+      "to": "check",
+      "kind": "sync"
+    },
+    {
+      "from": "load",
+      "to": "log",
+      "kind": "data"
+    },
+    {
+      "from": "check",
+      "to": "run",
+      "kind": "sync"
+    },
+    {
+      "from": "log",
+      "to": "run",
+      "kind": "sync"
+    },
+    {
+      "from": "check",
+      "to": "fail",
+      "kind": "optional"
+    }
+  ]
+}

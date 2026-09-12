@@ -60,7 +60,7 @@ description: >-
 | `kind` 只能取色板里的值 | **未知 kind 直接判失败**，不会 fallback 到默认色 |
 | 一张图一个文件 | 信息量用 `detail` 控制，不拆多视图 |
 | 图标只取图形 | 素材自带的文字缩到节点尺寸会糊成噪点，默认剥掉（见 `references/icons.md`） |
-| 先让用户挑主题 | 出图前跑 `scripts/direction_preview.py`，把 5 个视觉方向的并排对照图给他看，让他挑 |
+| 先让用户挑主题 | **用户没指定风格时**：出图前跑 `scripts/direction_preview.py`，5 个方向并排给他挑。已经说了"要绿色/要深色/像手绘"就直接照办，别再多问一轮 |
 
 ## 校验与「自动调参」循环
 
@@ -109,9 +109,9 @@ https://excalidraw.com/#url=http://localhost:8789/x.excalidraw
 `#url=` 是 Excalidraw 的“从外部 JSON 地址导入场景”（PR #2726，无官方 UI 入口）。
 实测结果：官网把 23 个元素全部加载进画布、可以直接接着画；加载完 app 会自己把 hash 清掉。
 
-**两个坑（都踩过）**：`file://` 不会被 fetch 到；而且 excalidraw.com 去 fetch localhost
-**需要 CORS 头**（python 自带的 http.server 不发，现象是“打开后一直空白”）。所以那个脚本
-自己包了一层。**在 Obsidian 插件里用则完全不需要它** —— 文件放进 vault 双击就行。
+**两个坑（都踩过）**：`file://` fetch 不到；excalidraw.com 去 fetch localhost **需要 CORS 头**
+（`http.server` 不发，现象是"打开后一直空白"），所以脚本自己包了一层。
+**在 Obsidian 插件里不需要它** —— 文件放进 vault 双击即可。
 
 ## `dev-tools/preview.py` —— 不是运行时的一部分
 
@@ -148,8 +148,8 @@ python3 dev-tools/preview.py x.excalidraw out.png
 ## 引用文件
 
 - `references/visual-design.md`：视觉设计规范 —— 总原则（不追求统一颜色，而追求统一审美）、"好看/大气" 这类不可机械校验项与可校验项的**分界**，以及实测出来的 9 条问题清单。
-- `references/diagram-spec.md`：内容层契约 —— 允许写什么、刻意不存在的字段、`kind` 封闭枚举与色板、尺寸档位与字号。
-- `references/validation.md`：五项校验的阈值与级别、自动调参循环的细节、报告该说什么。
+- `references/diagram-spec.md`：内容层契约 —— 允许写什么、刻意不存在的字段、`kind` 封闭枚举与色板、**区域（`groups`）**、**四组样式轴（`style`）**、`detail` 信息量档位、尺寸档位与字号。
+- `references/validation.md`：七项校验的阈值与级别、自动调参循环的细节、报告该说什么。
 - `references/icons.md`：图标/素材库 —— 怎么查、按语义怎么选、怎么写进规格，以及它为什么是第一个**外部尺寸来源**。
 
 ## 与 PKB 的关系

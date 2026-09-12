@@ -143,12 +143,14 @@ def _base(el_id: str, el_type: str, x: float, y: float, w: float, h: float,
 def node_elements(node: dict, placed, box, arrows_out: list[str],
                     arrows_in: list[str], icon_src: list | None = None,
                     icon_height: float | None = None,
-                    style: dict | None = None) -> list[dict]:
+                    style: dict | None = None,
+                    detail_level: str | None = None) -> list[dict]:
     nid = node["id"]
     shape_id = _eid("node", nid)
     title_id = _eid("title", nid)
     detail_id = _eid("detail", nid)
-    has_detail = bool(node.get("detail"))
+    # 档位由 layout 那份判据决定（盒子尺寸也是按它算的，两处必须同一个判据）
+    has_detail = bool(node.get("detail")) and L.shows_node_detail(node, detail_level)
     text = box.text          # 形状包围盒里面的文字信息（见 layout.NodeBox）
 
     bound = [{"type": "text", "id": title_id}]
@@ -288,7 +290,61 @@ REGION_STROKE_WIDTH = 1.0
 REGION_LABEL_SIZE = 20.0
 
 
-def region_elements(region: dict, style: dict | None = None) -> list[dict]:
+def edge_kind_label(edge: dict, level: str | None) -> str | None:
+    """`detail: diagnostic` 时，额外给每条边补上 kind 的中文说明。
+
+    为什么这算「诊断用」：一条虚线的边，光看图分不出它是**异步**还是**可选** ——
+    那是语义差别，排查问题时恰恰要看这个。（放在 emit 而不是 layout，是因为它要用
+    `palette`；layout 里色板叫 `_palette`，那边没必要为这一处多引一个字段。）
+
+    用户自己写了 `label` 就听用户的 —— 自动补的从不让位给人写的东西。
+    """
+    if level != "diagnostic" or edge.get("label"):
+        return None
+    kind = edge.get("kind") or "sync"
+    return palette.EDGE_KINDS.get(kind, {}).get("zh")
+
+
+def _region_label_x(region: dict, width: float,
+                     polylines: list | None) -> tuple[float, bool]:
+    """区域标题在标题带里**挑一个不被连线穿过**的横坐标。
+
+    实测踩到：标题原来固定在区域顶部**居中**，而进入该区第一条边是从上一个区下来的
+    竖段，正好从中间穿过 —— 端到端夹具一次报出两个区域标题被穿（`07-regions`）。
+    区域是背景，可它的标题是要读的字，不能让线从字上过。
+
+    候选是标题带里的一串位置（居中 + 两边各扫若干点）。返回 `(横坐标, 是否脏)` ——
+    第二个值决定要不要给标题铺底色：标题宽过区域时**根本不存在**干净位置
+    （实测 420px 的标题在 468px 的区域里，而竖线正在正中），那时候只能靠底色。
+    打分只看"这条线会不会从这段文字的圈里过" —— 和边标签用的是同一套判据。
+    """
+    if not polylines or width <= 0:
+        return region["label_x"], False
+    # 搜索范围**是整块区域的宽度**，只留 8px 不允许贴到框线后面 ——
+    # 一开始卡了 12px 内边距，结果 `boot` 那个 276px 宽的标题在 [−14, 230] 里
+    # **每一个候选都被穿过**：竖线在区域正中 x=259，而整个候选区间落在 [−17, 259] 内。
+    # 贴着右边缘（268）反而是干净的 —— 标题本来就可以靠边，不必留那么宽的边距。
+    left = region["x"] + 8.0
+    right = region["x"] + region["width"] - 8.0 - width
+    if right < left:                      # 区域比标题还窄：居中，别再折腾
+        return region["label_x"], False
+    centre = region["label_x"] - width / 2.0
+    best, best_hits = region["label_x"], None
+    spans = [0.5, 0.0, 1.0] + [step / 16 for step in range(1, 16, 2)]
+    for fraction in spans:
+        x = centre if fraction == 0.5 else left + (right - left) * fraction
+        x = max(left, min(right, x))
+        hits = _line_hits(x, region["label_y"], width,
+                          REGION_LABEL_SIZE * tm.LINE_HEIGHT, polylines)
+        if best_hits is None or hits < best_hits:
+            best, best_hits = x + width / 2.0, hits
+        if not hits:
+            break
+    return best, bool(best_hits)
+
+
+def region_elements(region: dict, style: dict | None = None,
+                    polylines: list | None = None) -> list[dict]:
     """一个区域 = 圆角矩形（交叉网格填充）+ 顶部居中的标题。
 
     ⚠️ **必须先进 `build_scene` 的 elements 数组。** Excalidraw 的绘制顺序就是
@@ -308,7 +364,9 @@ def region_elements(region: dict, style: dict | None = None) -> list[dict]:
                          f"（可用 {sorted(palette.LEVELS)}；未知值判失败，不 fallback）")
     stroke = palette.frame_stroke(level)      # 退到背景层的颜色，不再和连线撞脸
     fill = palette.LEVELS[level]["fill"]
-    resolved = palette.resolve_style(style)
+    # 区域的**局部覆盖**：顶层 style 打底，这个区域自己写的轴盖在上面。
+    # 用户要过「只让区域用虚线、节点保持实线」—— 全局 style 表达不了这件事。
+    resolved = palette.merge_style(palette.resolve_style(style), region.get("style"))
     el_id = _eid("region", region["id"])
     elements = [_base(el_id, "rectangle", region["x"], region["y"],
                       region["width"], region["height"], stroke, fill,
@@ -325,8 +383,9 @@ def region_elements(region: dict, style: dict | None = None) -> list[dict]:
         height = len(box.lines) * REGION_LABEL_SIZE * tm.LINE_HEIGHT
         text = "\n".join(box.lines)
         label_id = _eid("region-label", region["id"])
+        label_x, dirty = _region_label_x(region, width, polylines)
         elements.append({
-            **_base(label_id, "text", region["label_x"] - width / 2.0,
+            **_base(label_id, "text", label_x - width / 2.0,
                    region["label_y"], width, height,
                    palette.LEVELS[level]["stroke"], "transparent",
                    extra={"groupIds": [el_id]}),
@@ -340,6 +399,13 @@ def region_elements(region: dict, style: dict | None = None) -> list[dict]:
             "lineHeight": tm.LINE_HEIGHT,
             "baseline": round(REGION_LABEL_SIZE * BASELINE_RATIO, 2),
         })
+        if dirty:
+            # 标题宽过区域的时候，标题带里**根本不存在**干净位置（实测：420px 的标题
+            # 在 468px 的区域里，竖线又在正中）。这时给标题铺一个画布色底 ——
+            # 线到字跟前断开，字照样读得清。这和边标签的 needs_backdrop 是同一个办法，
+            # 复用而不是另发明一套。
+            elements[-1]["backgroundColor"] = palette.CANVAS["background"]
+            elements[-1]["roundness"] = {"type": 3}
     return elements
 
 
@@ -752,10 +818,16 @@ def build_scene(spec: dict, result, boxes: dict,
     by_id = {n["id"]: n for n in spec.get("nodes", [])}
     # 四组样式轴解析一次，透传给每个元素（未知值在 resolve_style 里就抛错了）
     style = palette.resolve_style(spec.get("style"))
+    # `detail` 以前是空壳（声明了没人读）。现在它就是信息量档位：见 layout 里
+    # shows_node_detail / shows_edge_label 的说明。
+    detail_level = spec.get("detail", L.DEFAULT_DETAIL)
 
     # 区域**第一个**进数组：它是背景，后进会盖住节点（见 region_elements）。
+    # 区域标题要在标题带里避开连线，所以这里就得把折线算出来 —— 区域虽然画在最前，
+    # 但折线本来就是 `result.edges` 里的现成数据（绝对坐标），不必等箭头那一步。
+    region_polylines = [list(edge["points"]) for edge in result.edges]
     for region in L.region_boxes(spec, result.placed, boxes):
-        elements += region_elements(region, style)
+        elements += region_elements(region, style, region_polylines)
 
     arrows_out: dict[str, list[str]] = {nid: [] for nid in by_id}
     arrows_in: dict[str, list[str]] = {nid: [] for nid in by_id}
@@ -780,11 +852,11 @@ def build_scene(spec: dict, result, boxes: dict,
             elements += node_elements(by_id[nid], placed, boxes[nid],
                                       arrows_out.get(nid, []), arrows_in.get(nid, []),
                                       icon_src=icon_src, icon_height=per_node,
-                                      style=style)
+                                      style=style, detail_level=detail_level)
         else:
             elements += node_elements(by_id[nid], placed, boxes[nid],
                                       arrows_out.get(nid, []), arrows_in.get(nid, []),
-                                      style=style)
+                                      style=style, detail_level=detail_level)
 
     # `result.edges` 里的 points **已经是绝对坐标**（`layout._points` 用的是 placed 的坐标），
     # 所以这里直接用，**不能再加一遍起点**。
@@ -802,7 +874,14 @@ def build_scene(spec: dict, result, boxes: dict,
                     for placed in result.real_nodes().values()]
     for i, (edge, _) in enumerate(arrow_specs):
         elements.append(arrow_element(edge, i, style))
+        if not L.shows_edge_label(edge, detail_level):
+            continue                      # executive：摘要里不堆边标签
         label = edge_label_element(edge, i, polylines, box_keepouts)
+        if label is None:
+            auto = edge_kind_label(edge, detail_level)
+            if auto:
+                label = edge_label_element({**edge, "label": auto}, i, polylines,
+                                           box_keepouts)
         if label:
             elements.append(label)
 
@@ -907,7 +986,9 @@ def load_icons(spec: dict, library_path: str | None = None,
         if icon_height:
             want = icon_height
         else:
-            text_box = tm.measure(node.get("label", ""), node.get("detail", ""))
+            text_box = tm.measure(node.get("label", ""),
+                                  node.get("detail", "") if L.shows_node_detail(
+                                      node, spec.get("detail", L.DEFAULT_DETAIL)) else "")
             want = icons.height_for(text_box.height)
         heights[node["id"]] = want
         width, height = icons.intrinsic_size(elements)

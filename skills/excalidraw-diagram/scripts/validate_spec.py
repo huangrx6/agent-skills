@@ -34,7 +34,7 @@ import sys
 # 让"顺手加一个"变得有摩擦。
 TOP_FIELDS = {"type", "title", "direction", "detail", "groups", "nodes", "edges",
               "visual", "mood", "style"}
-GROUP_FIELDS = {"id", "label", "level", "description"}
+GROUP_FIELDS = {"id", "label", "level", "style", "description"}
 NODE_FIELDS = {"id", "label", "kind", "shape", "emphasis", "icon", "group",
                "detail", "rank", "pin"}
 EDGE_FIELDS = {"id", "from", "to", "label", "kind"}
@@ -117,6 +117,26 @@ def _check_fields(obj: dict, allowed: set[str], where: str, issues: Issues) -> N
                          f"未知字段 {key!r}；允许：{sorted(allowed)}")
 
 
+def _check_style(style, where: str, issues: Issues) -> None:
+    """校验一份样式（顶层 `style` 与区域的 `groups[].style` 共用这一份实现）。
+
+    两处各写一遍的话，早晚会出现"顶层管得住、局部管不住" —— 而局部覆盖是直接落在
+    某一个区域上的，漏了它等于给了个后门。
+    """
+    if style is None:
+        return
+    if not isinstance(style, dict):
+        issues.error("BAD_STYLE", where, "style 必须是对象")
+        return
+    for key, value in style.items():
+        if key not in palette.STYLE_AXES:
+            issues.error("BAD_STYLE_AXIS", f"{where}.{key}",
+                         f"style 没有 {key!r} 这一项，可用 {sorted(palette.STYLE_AXES)}")
+        elif value not in palette.STYLE_AXES[key]:
+            issues.error("BAD_STYLE_VALUE", f"{where}.{key}",
+                         f"{value!r} 不在档位里，可用 {list(palette.STYLE_AXES[key])}")
+
+
 def validate(spec: dict) -> Issues:
     issues = Issues()
     if not isinstance(spec, dict):
@@ -149,20 +169,7 @@ def validate(spec: dict) -> Issues:
                      f"detail 只允许 {sorted(DETAIL_LEVELS)}")
 
     # style：四组样式轴。未知的轴、未知的取值都报错 —— 与颜色同一条规矩。
-    style = spec.get("style")
-    if style is not None:
-        if not isinstance(style, dict):
-            issues.error("BAD_STYLE", "$.style", "style 必须是对象")
-        else:
-            for key, value in style.items():
-                if key not in palette.STYLE_AXES:
-                    issues.error("BAD_STYLE_AXIS", f"$.style.{key}",
-                                 f"style 没有 {key!r} 这一项，可用 "
-                                 f"{sorted(palette.STYLE_AXES)}")
-                elif value not in palette.STYLE_AXES[key]:
-                    issues.error("BAD_STYLE_VALUE", f"$.style.{key}",
-                                 f"{value!r} 不在档位里，可用 "
-                                 f"{list(palette.STYLE_AXES[key])}")
+    _check_style(spec.get("style"), "$.style", issues)
 
     # groups
     group_ids: set[str] = set()
@@ -183,6 +190,7 @@ def validate(spec: dict) -> Issues:
             issues.error("DUPLICATE_GROUP_ID", where, f"group id 重复：{gid!r}")
         else:
             group_ids.add(gid)
+        _check_style(g.get("style"), f"{where}.style", issues)
         if "level" in g and g["level"] not in palette.VISUAL_LEVELS:
             issues.error("UNKNOWN_GROUP_LEVEL", f"{where}.level",
                          f"group level 只允许 {sorted(palette.VISUAL_LEVELS)}"

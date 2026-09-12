@@ -2535,6 +2535,34 @@ def region_boxes(spec: dict, placed: dict, boxes: dict) -> list[dict]:
     return out
 
 
+DEFAULT_DETAIL = "standard"
+
+
+def shows_node_detail(node: dict, level: str | None) -> bool:
+    """这一档要不要画这个节点的次要说明（`detail`）。
+
+    ⚠️ `detail` 以前是**空壳**：校验器认它，`layout` / `check_layout` / `emit`
+    一处都不读 —— 而 SKILL.md 的硬规则表里写着「信息量用 `detail` 控制」。
+    同一类静默失败（旧的 `groups` 也是，声明了没人读）。评审把它抓出来之后，
+    这里按那句话字面的意思实现：**它就是信息量档位**。
+
+        executive   只留重点（`primary` / `critical`）节点的说明 —— 摘要只留结论
+        standard    全部（默认，= 实现之前的行为，所以不影响任何既有规格）
+        diagnostic  全部
+
+    放在 layout 而不是 emit：**布局尺寸也依赖它**（少了那行字，盒子就该变小），
+    两边必须用同一个判据 —— 各写一份必然漂移。
+    """
+    if level == "executive":
+        return node.get("emphasis") in ("primary", "critical")
+    return True
+
+
+def shows_edge_label(edge: dict, level: str | None) -> bool:
+    """这一档要不要画**用户写的**边标签。`executive` 丢掉（摘要不堆细节）。"""
+    return level != "executive"
+
+
 def boxes_from_spec(spec: dict, icon_sizes: dict | None = None) -> dict[str, Any]:
     """由文字 + 形状反推每个节点的尺寸。**尺寸不由模型给。**
 
@@ -2553,6 +2581,7 @@ def boxes_from_spec(spec: dict, icon_sizes: dict | None = None) -> dict[str, Any
     “尺寸只有一个来源”那条前提从这一版起不再成立 —— 已按约定先改文档，
     再改 `TestSizeSourcePremise`（它先失败，那就是流程在起作用）。
     """
+    detail_level = spec.get("detail", DEFAULT_DETAIL)
     tm = load_sibling("text_metrics")
     sh = load_sibling("shapes")
     sizes = icon_sizes or {}
@@ -2563,7 +2592,8 @@ def boxes_from_spec(spec: dict, icon_sizes: dict | None = None) -> dict[str, Any
         # 字号层级（§14）：重点节点的**字号**往上一步。
         # 必须在这里传进去，不是落笔时改 fontSize —— 那样盒子的尺寸链就对不上了。
         step = _palette.emphasis_font_step(str(n.get("emphasis", "normal")))
-        text = tm.measure(n.get("label", ""), n.get("detail", ""),
+        node_detail = n.get("detail", "") if shows_node_detail(n, detail_level) else ""
+        text = tm.measure(n.get("label", ""), node_detail,
                           font_size=tm.FONT_NODE + step)
         shape = sh.resolve(n)
         width, height = sh.box_for(shape, text.width, text.height)

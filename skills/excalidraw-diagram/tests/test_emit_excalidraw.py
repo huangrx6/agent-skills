@@ -748,3 +748,107 @@ class TestStyleAxes(unittest.TestCase):
         codes = {i["code"] for i in issues}
         self.assertIn("BAD_STYLE_VALUE", codes)
         self.assertIn("BAD_STYLE_AXIS", codes)
+
+
+class TestDetailLevels(unittest.TestCase):
+    """`detail` 档位：executive 只留重点、standard 全留、diagnostic 额外补边语义。
+
+    ⚠️ 这个字段以前是**空壳**（校验器认它、别的脚本一处都不读），而 SKILL.md 的硬规则
+    表里写着「信息量用 detail 控制」。同一类静默失败，旧的 `groups` 也是。
+    """
+
+    def spec(self, level=None, detail="一行说明"):
+        spec = {
+            "type": "flow", "direction": "TB",
+            "nodes": [{"id": "a", "label": "A", "kind": "plain", "detail": detail},
+                      {"id": "b", "label": "B", "kind": "plain", "detail": detail,
+                       "emphasis": "primary"}],
+            "edges": [{"from": "a", "to": "b", "kind": "async", "label": "用户写的"}],
+        }
+        if level:
+            spec["detail"] = level
+        return spec
+
+    def texts(self, level=None, detail="一行说明"):
+        spec = self.spec(level, detail)
+        boxes = L.boxes_from_spec(spec)
+        result = L.layout(spec, boxes)
+        scene = E.build_scene(spec, result, boxes, None, None)
+        return [el.get("text", "") for el in scene["elements"] if el["type"] == "text"]
+
+    def test_default_keeps_everything(self):
+        """不写 `detail` = standard = 实现之前的行为（所以不影响任何既有规格）。"""
+        self.assertIn("一行说明", self.texts())
+        self.assertIn("用户写的", self.texts())
+
+    def test_executive_drops_secondary_text(self):
+        """executive：普通节点的次要说明不要，**重点节点留着** —— 摘要只留结论。"""
+        got = self.texts("executive")
+        self.assertEqual(1, sum(1 for t in got if t == "一行说明"),
+                         "普通节点的那行说明该被丢掉，重点节点的该留着")
+
+    def test_executive_drops_user_edge_labels(self):
+        self.assertNotIn("用户写的", self.texts("executive"))
+
+    def test_executive_shrinks_the_box(self):
+        """少了那行字，**盒子就该变小** —— 尺寸链必须跟着档位走，不能只有文字变。"""
+        plain = L.boxes_from_spec(self.spec("standard"))["a"]
+        short = L.boxes_from_spec(self.spec("executive"))["a"]
+        self.assertLess(short.height, plain.height)
+
+    def test_diagnostic_labels_edge_kinds(self):
+        """diagnostic：**用户没写**标签的边，自动补上 kind 的中文说明（异步 / 可选…）。"""
+        spec = self.spec("diagnostic")
+        spec["edges"][0].pop("label")          # 这条边用户没写标签
+        boxes = L.boxes_from_spec(spec)
+        result = L.layout(spec, boxes)
+        scene = E.build_scene(spec, result, boxes, None, None)
+        texts = [el.get("text", "") for el in scene["elements"] if el["type"] == "text"]
+        # 文案取自 palette.EDGE_KINDS 的 zh（"异步 / 事件"），所以查子串不查相等
+        self.assertTrue(any("异步" in t for t in texts), texts)
+
+    def test_diagnostic_does_not_override_user_labels(self):
+        """自动补的**从不**让位给人写的东西。"""
+        spec = self.spec("diagnostic")
+        boxes = L.boxes_from_spec(spec)
+        result = L.layout(spec, boxes)
+        scene = E.build_scene(spec, result, boxes, None, None)
+        texts = [el.get("text", "") for el in scene["elements"] if el["type"] == "text"]
+        self.assertIn("用户写的", texts)
+        self.assertFalse(any("异步" in t for t in texts),
+                         "用户已经写了标签，就不该再自动补一个")
+
+
+class TestEveryTopFieldIsRead(unittest.TestCase):
+    """spec 的每个顶层字段，必须至少被一个**非校验**脚本读一次。
+
+    这条是被两次真实事故逼出来的：`groups` 与 `detail` 都曾经是「校验器认它、
+    layout / check_layout / emit 一处都不读」的空壳 —— 声明了、校验通过了、图上
+    什么都不发生，而且一个字都不报。单元测试抓不到它（每个零件单独看都正常），
+    只有把「有没有人读」本身当成断言才抓得到。
+
+    读的方式不限于 `spec.get("x")`：也可能是 `spec["x"]`，或者由调用方取出来传进去。
+    所以这里只查**字段名这个字符串**在非校验脚本里出现过 —— 宁可松一点，
+    也不要为了精确而漏掉真正的空壳。
+    """
+
+    @staticmethod
+    def _script_text() -> str:
+        import glob
+        import os
+        here = os.path.dirname(os.path.abspath(__file__))
+        folder = os.path.join(os.path.dirname(here), "scripts")
+        chunks = []
+        for path in sorted(glob.glob(os.path.join(folder, "*.py"))):
+            if os.path.basename(path) == "validate_spec.py":
+                continue                      # 校验器读字段名不算「有人用它」
+            with open(path, encoding="utf-8") as handle:
+                chunks.append(handle.read())
+        return "\n".join(chunks)
+
+    def test_no_declared_field_is_a_no_op(self):
+        text = self._script_text()
+        self.assertTrue(text.strip(), "一个脚本都没读到，用例成了空话")
+        missing = sorted(f for f in V.TOP_FIELDS if f'"{f}"' not in text)
+        self.assertEqual([], missing,
+                         f"这些顶层字段只有校验器认识，没有任何脚本读它们（空壳）：{missing}")
