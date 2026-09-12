@@ -1,0 +1,36 @@
+#!/bin/sh
+# 提交前校验 skill 结构。
+#
+# 为什么阻塞:这些是硬要求 —— YAML 解析失败意味着 skill 根本加载不了,
+# name 与目录名不一致意味着触发会错。2026-09-12 一次会话里"正文 ≤ 150 行"
+# 被连续违反两次,都是脚本抓出来的,肉眼没发现,所以宁可挡住。
+#
+# 只在本次提交触及 skills/ 时运行。
+# 跳过方式:git commit --no-verify
+# 安装:git config core.hooksPath .githooks
+
+if ! git diff --cached --name-only | grep -q '^skills/'; then
+  exit 0
+fi
+
+ROOT=$(git rev-parse --show-toplevel)
+VALIDATOR="$ROOT/skills/skill-builder/scripts/validate_skill.py"
+
+if ! command -v python3 >/dev/null 2>&1 || [ ! -f "$VALIDATOR" ]; then
+  echo "⚠ pre-commit: 缺少 python3 或 $VALIDATOR,跳过 skill 校验"
+  exit 0
+fi
+
+OUT=$(python3 "$VALIDATOR" 2>&1)
+STATUS=$?
+
+if [ "$STATUS" -eq 0 ]; then
+  echo "✓ pre-commit: skill 校验通过"
+  exit 0
+fi
+
+echo "$OUT"
+echo ""
+echo "✗ pre-commit: skill 校验失败,提交已中止"
+echo "  修好后重试;确需跳过:git commit --no-verify"
+exit 1
