@@ -12,8 +12,21 @@ This skill turns completed work into durable Obsidian notes. It is intentionally
 This skill is bound to a specific machine and Obsidian vault:
 
 - vault path must be `/Users/huangrx6/Documents/obsidian`
-- depends on `obsidian-personal-knowledge-base` skill for vault structure conventions (`references/vault-map.md`, `references/writing-conventions.md`)
 - **cross-machine reuse is limited**: switching machines or vault paths requires re-aligning references
+
+### Mandatory startup checklist
+
+Before writing anything to the vault, you **must**:
+
+1. Load `obsidian-personal-knowledge-base/references/vault-map.md` — the vault's directory map and placement conventions.
+2. Load `obsidian-personal-knowledge-base/references/writing-conventions.md` — naming, frontmatter, link, and MOC conventions.
+3. Probe the target area with a single-level `ls` (see Location Decision) — `vault-map.md` is a snapshot, not authoritative; file system wins on conflict.
+
+These are hard requirements, not suggestions. If `obsidian-personal-knowledge-base` is not installed, tell the user to install it first and stop. Do not write into the vault based on assumptions about its structure.
+
+### Dependency on obsidian-personal-knowledge-base
+
+This skill reuses the vault conventions owned by `obsidian-personal-knowledge-base` rather than duplicating them. When that skill's references change, this skill inherits the change — do not fork the conventions here.
 
 ## Scope
 
@@ -73,12 +86,24 @@ Choose the narrowest stable home:
 - Reusable technical knowledge goes under `03 Resources/<topic>/`.
 - Unclear or incomplete capture goes under `00 Inbox/`, but only when there is not enough context to classify safely.
 
-For Huangrx6's current work, the common default for AsiaInfo delivery and release operations is:
+For this skill, resolve paths by **probing**, not from memory.
 
-- `02 Areas/客户X/00 MOC - 某领域运维.md`
-- `02 Areas/客户X/03 内部系统A/资源笔记 - 内部系统A部署与发布.md`
+1. Probe the candidate area before writing (`ls "$VAULT/01 Projects"`, `ls "$VAULT/02 Areas"`, `ls "$VAULT/03 Resources"`).
+2. Pick the narrowest existing directory that owns the topic.
+3. If the intended directory does not exist, **ask the user where to create it** — do not write into a non-existent path.
+4. Update the nearest MOC/index after creating a new durable note.
 
-Prefer updating those notes when the work is about 内部系统A deployment, release, server paths, package movement, Docker restart, FastAPI backend release, H5/admin frontend release, or related operational scripts.
+### Common scenario: AsiaInfo / 内部系统A operations (verify before use)
+
+Historically this lived under `02 Areas/客户X/`, with a release note at `02 Areas/客户X/03 内部系统A/资源笔记 - 内部系统A部署与发布.md`.
+
+> ⚠️ **As of 2026-09-11 that directory does not exist** — `02 Areas/` is empty. Do not assume the path is writable.
+
+If the work is about 内部系统A deployment, release, server paths, package movement, Docker restart, FastAPI backend release, H5/admin frontend release, or related operational scripts:
+
+1. Probe `02 Areas/` to see whether a matching area exists.
+2. If it exists, update the nearest matching note.
+3. If it does not exist, tell the user the historical path is gone and ask where the notes should live before creating anything.
 
 ## Weekly Release Note
 
@@ -90,10 +115,12 @@ Default naming:
 
 Examples:
 
-- `02 Areas/客户X/03 内部系统A/发版 - 内部系统A - 2026-W18.md`
 - `01 Projects/<项目名>/发版 - <项目名> - 2026-W18.md`
+- `02 Areas/<领域>/<子主题>/发版 - <系统或项目名> - 2026-W18.md`
 
 Use ISO week numbering unless the user provides a different release naming convention. If a note for the current week already exists, update it instead of creating another.
+
+Before using either example, probe the parent folder to confirm it exists; if it does not, ask the user where the release note should live.
 
 ## Weekly Release Note Template
 

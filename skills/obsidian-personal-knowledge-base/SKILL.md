@@ -15,20 +15,31 @@ description: >-
 本 skill 绑定 Huangrx6 的本机 Obsidian vault：
 
 - vault 路径必须是 `/Users/huangrx6/Documents/obsidian`
-- `references/vault-map.md` 描述的是这个 vault 的 PARA + MOC 结构；用户调整过目录结构后需要**同步更新** `references/vault-map.md`，否则起手流程会基于过期信息做判断
+- `references/vault-map.md` 是**某次探查的快照**，用于导航和归位参考，不用于直接信任；起手流程会先探查真实结构再与它对照。用户调整过目录结构后应**同步更新**该文件
 - **跨机复用性低**：换电脑或换 vault 路径都需要重新校准
 
 参考本 skill 依赖的 5 个 references：`vault-map.md` / `resource-notes.md` / `work-management.md` / `writing-conventions.md` / `research-and-synthesis.md`。
 
 ## 起手流程
 
-1. 读取 `references/vault-map.md`，确认当前目录结构和归位边界。
-2. 按目标目录和任务行为分类，不只按关键词判断。
-3. 只加载当前任务需要的引用文件。
-4. 编辑前打开最近的索引、MOC、模板或主笔记。
-5. 编辑后更新最近的索引/MOC，并检查明显的失效链接。
+1. **先探查目标区域**：单层 `ls` 或 `rg --files`，拿到真实结构。
+2. 读取 `references/vault-map.md`，用探查结果与文档对照。
+3. 按目标目录和任务行为分类，不只按关键词判断。
+4. 只加载当前任务需要的引用文件。
+5. 编辑前打开最近的索引、MOC、模板或主笔记。
+6. 编辑后更新最近的索引/MOC，并检查明显的失效链接。
 
-如果用户说某个区域被删除、重置或重建，以真实文件系统为准，不要凭旧链接或记忆恢复已删除结构，除非用户明确要求恢复。
+## 探查规则
+
+`references/vault-map.md` 是**快照，不是权威结构**。先探查、再对照，冲突时以文件系统为准。
+
+| 场景 | 处理 |
+| --- | --- |
+| 探查范围 | 目标区域单层（`ls "01 Projects"`、`rg --files "03 Resources/<topic>"`）；不做全库递归 |
+| 文档与真实不符 | 以真实文件系统为准；告知用户“vault-map.md 的 X 段已过期（文档说 A，实际是 B）”，并询问是否更新 |
+| 目标目录不存在 | 先问用户“要新建在哪”，不要写入不存在的路径 |
+| 用户说某区域被删除 / 重置 / 重建 | 以真实文件系统为准，不凭旧链接或记忆恢复已删除结构，除非用户明确要求恢复 |
+| 是否写回 vault-map.md | 结构稳定后再更新，沿用文档末尾“重置规则”；探查本身不触发写回 |
 
 ## 任务分流
 
