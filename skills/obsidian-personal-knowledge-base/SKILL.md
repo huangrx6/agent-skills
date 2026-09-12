@@ -28,7 +28,8 @@ description: >-
 3. 按目标目录和任务行为分类，不只按关键词判断。
 4. 只加载当前任务需要的引用文件。
 5. 编辑前打开最近的索引、MOC、模板或主笔记。
-6. 编辑后更新最近的索引/MOC，并检查明显的失效链接。
+6. 编辑或创建**最小但有用**的笔记；编辑已有笔记时保留原 frontmatter。
+7. 只在有助于检索时更新导航；动了文件名、目录或编号就跑一次「链接检查」。
 
 ## 探查规则
 
@@ -110,7 +111,7 @@ description: >-
 
 - 编辑已有笔记时保留 frontmatter，并按实际修改更新 `updated`。
 - 批量重命名或重编号后，同步更新 MOC、附近索引和 wikilink，检查旧标题、旧编号和临时文件残留。
-- 完成后至少检查：关键旧 import / 旧写法残留、Python 代码块语法、明显失效链接、表格列是否被代码里的 `|` 破坏、尾随空格。
+- 完成后至少检查：关键旧 import / 旧写法残留、Python 代码块语法、表格列是否被代码里的 `|` 破坏、尾随空格；结构性改动后跑「链接检查」。
 
 ## 目录判断
 
@@ -124,14 +125,15 @@ description: >-
 
 如果一个内容看起来可以放多处，只选一个最稳定的主家，再从其他地方链接过去。
 
-## 通用流程
+## 链接检查
 
-1. 用 `rg --files` 或 `find` 查看现状。
-2. 读取父级索引/MOC 和相关模板。
-3. 编辑或创建最小但有用的笔记。
-4. 编辑已有笔记时保留原前置属性。
-5. 只在有助于检索时更新导航。
-6. 重命名或移动后，检查附近索引/MOC 是否还有失效链接。
+要求“检查失效链接”时用 `scripts/check_links.py`，不要手写临时扫描：
+
+```sh
+python3 scripts/check_links.py --ignore-template
+```
+
+退出码 `0`/`1`/`2`；为什么必须用脚本、失效链接的五种处理方式见 `references/link-checking.md`。
 
 ## 引用文件
 
@@ -140,6 +142,8 @@ description: >-
 - `references/work-management.md`：Areas、Projects、周计划、周报、工作日志、交付记录。
 - `references/resource-notes.md`：仅适用于 Resources 的写作标准、学习笔记审阅、技术示例、配图规则。
 - `references/research-and-synthesis.md`：仅适用于 Resources 的研究流程和深度综合规则。
+- `references/link-checking.md`：失效链接检查的用法与五种处理方式。
+- `scripts/check_links.py`：全库失效 wikilink 与嵌入检查。
 
 ## 安装
 

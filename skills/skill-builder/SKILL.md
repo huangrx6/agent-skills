@@ -131,7 +131,7 @@ description: >-
 
 - [ ] 目录名 = frontmatter `name` 字段(强制一致,大小写敏感)
 - [ ] frontmatter 含 `name` + `description`
-- [ ] **用解析器实测** frontmatter 能解析通过(不是目测)。常见坑:单行 description 里出现 `: ` (冒号+空格)会被 YAML 当成映射分隔符,必须去掉冒号或改成 `>-` 折叠块
+- [ ] **用解析器实测** frontmatter 能解析通过(不是目测)。常见坑:单行 description 里出现冒号加空格会被 YAML 当成映射分隔符,必须去掉冒号或改成 `>-` 折叠块
 - [ ] description 第一段是"Use this skill when..."(或等价表达)
 - [ ] description 含 3-6 个具体动词 + 1-3 个对象,不是模糊词
 - [ ] description 含"Do NOT use this skill when..."边界
