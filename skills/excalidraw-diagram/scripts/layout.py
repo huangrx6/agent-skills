@@ -1080,10 +1080,16 @@ class NodeBox:
     text: Any          # text_metrics.TextBox
 
 
+
+
 def boxes_from_spec(spec: dict, icon_sizes: dict | None = None) -> dict[str, Any]:
     """由文字 + 形状反推每个节点的尺寸。**尺寸不由模型给。**
 
-    尺寸链：文字 → `text_metrics.measure` → `shapes.box_for` → （有图标时）为图标加宽。
+    尺寸链：文字 → `text_metrics.measure` → `shapes.box_for` →
+    **× 强调的尺寸倍数** → （枢纽时）交叉轴加长 → （有图标时）为图标加宽。
+    
+    顺序有讲究：倍数乘在**形状盒子**上（同形状等比放大，图形仍然成立），
+    而后两项是**固定像素**的追加量，不该跟着倍数走。
 
     `icon_sizes` 是 `{node_id: (宽, 高)}`，由调用方从**素材库**里量好传进来
     （图标是缩放到固定高度的，所以这里只需要尺寸，不需要库本身 —— 布局不该知道
@@ -1104,6 +1110,12 @@ def boxes_from_spec(spec: dict, icon_sizes: dict | None = None) -> dict[str, Any
         text = tm.measure(n.get("label", ""), n.get("detail", ""))
         shape = sh.resolve(n)
         width, height = sh.box_for(shape, text.width, text.height)
+        # 强调的**尺寸层级**：重点节点略大一点。颜色退出主次之后，这是"层次感"的
+        # 手段之一（见 §11 的优先级排序）。幅度刻意小（0.94 ~ 1.06）—— 要的是层次，
+        # 不是海报式跳跃。实测（#114）：这个幅度在整图尺度上几乎看不见，所以它
+        # **不承担焦点**，焦点仍由颜色和位置决定；倍数只让层次细腻一点。
+        scale = _palette.emphasis_scale(str(n.get("emphasis", "normal")))
+        width, height = width * scale, height * scale
         # 枢纽节点：扇出越大，交叉轴上越长 —— 落点才摊得开（P12）
         extra = hub_extra(fans.get(n["id"], 0))
         if cross_axis_is_width:
@@ -1137,6 +1149,11 @@ def load_sibling(name: str):
     mod_spec.loader.exec_module(module)
     return module
 
+
+
+# `emphasis_scale` 的值住在 palette 的 EMPHASIS 里。
+# 必须放在 load_sibling 定义**之后** —— 模块级代码自顶向下跑（这个坑踩过两次）。
+_palette = load_sibling("palette")
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="分层布局（干跑，看坐标与交叉数）")

@@ -51,6 +51,7 @@ def _load(name: str, path: str):
 
 
 C = _load("check_layout", CHECK)
+P = _load("palette", os.path.join(SCRIPTS, "palette.py"))
 L = C.L
 
 
@@ -379,13 +380,20 @@ class TestSizeSourcePremise(unittest.TestCase):
     """
 
     def test_every_box_follows_our_own_chain(self):
+        # 尺寸链现在多了一步：**× 强调的尺寸倍数**。它属于"多算了一步"（仍然是我们
+        # 自己算），所以按本类的约定 —— **把新步骤纳入断言**，而不是放宽成"大于等于"。
+        # 放宽会丢掉"盒子有没有按链条算出来"这件事的精度，而那才是这里要守的东西。
         spec = {"type": "architecture", "direction": "LR",
                 "nodes": [{"id": "a", "kind": "service", "label": "订单服务",
                            "detail": "3 副本"},
                           {"id": "b", "kind": "data", "label": "订单库"},
                           {"id": "c", "kind": "client", "label": "Web 前端"},
                           {"id": "d", "kind": "service", "label": "判断一下？",
-                           "shape": "diamond"}]}
+                           "shape": "diamond"},
+                          {"id": "e", "kind": "service", "label": "订单服务",
+                           "emphasis": "primary"},
+                          {"id": "f", "kind": "service", "label": "订单服务",
+                           "emphasis": "muted"}]}
         boxes = L.boxes_from_spec(spec)
         sh = L.load_sibling("shapes")
         for node in spec["nodes"]:
@@ -393,13 +401,32 @@ class TestSizeSourcePremise(unittest.TestCase):
                 box = boxes[node["id"]]
                 fresh = C.tm.measure(node["label"], node.get("detail", ""))
                 want_w, want_h = sh.box_for(box.shape, fresh.width, fresh.height)
+                scale = P.emphasis_scale(node.get("emphasis", "normal"))
+                want_w, want_h = want_w * scale, want_h * scale
                 self.assertAlmostEqual(
                     want_w, box.width, places=6,
-                    msg=f"{node['id']} 的包围盒不再等于「文字 × 形状」—— 尺寸链变了，"
-                        f"先回去看 validation.md 第六节（#1/#3 的前提）")
+                    msg=f"{node['id']} 的包围盒不再等于「文字 × 形状 × 强调倍数」"
+                        f"—— 尺寸链变了，先回去看 validation.md 第六节（#1/#3 的前提）")
                 self.assertAlmostEqual(want_h, box.height, places=6)
                 self.assertAlmostEqual(fresh.width, box.text.width, places=6,
                                        msg="盒子里的文字不再是现量出来的")
+
+    def test_emphasis_scale_actually_reaches_the_boxes(self):
+        # EMPHASIS.scale 必须**真的**改变盒子。
+        # 这条单独存在，是因为这个功能差点停在「声明了但没人消费」的状态：
+        # emphasis_scale() 有了、有用例守着顺序与幅度，而 boxes_from_spec
+        # 根本没调它 —— 尺寸层级写了等于没写。只断言函数返回值对是抓不住这种事的。
+        spec = {"type": "architecture", "direction": "LR", "nodes": [
+            {"id": "n", "kind": "service", "label": "订单服务"},
+            {"id": "p", "kind": "service", "label": "订单服务", "emphasis": "primary"},
+            {"id": "m", "kind": "service", "label": "订单服务", "emphasis": "muted"},
+        ]}
+        boxes = L.boxes_from_spec(spec)
+        self.assertGreater(boxes["p"].width, boxes["n"].width, "primary 应该更大")
+        self.assertLess(boxes["m"].width, boxes["n"].width, "muted 应该更小")
+        self.assertAlmostEqual(
+            P.emphasis_scale("primary"), boxes["p"].width / boxes["n"].width, places=6)
+        self.assertLess(boxes["p"].width / boxes["n"].width, 1.10, "幅度要小（§13）")
 
     def test_icon_adds_an_external_term_to_the_chain(self):
         """图标是**第一个外部尺寸来源**（宽高来自 .excalidrawlib 文件）。
