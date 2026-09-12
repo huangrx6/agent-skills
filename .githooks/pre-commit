@@ -68,5 +68,19 @@ for d in "$ROOT"/skills/*/tests; do
   fi
 done
 
-echo "✓ pre-commit: 结构、泄露与回归测试通过"
+# ── 4. 指针目标存在性 ──
+# 指针指向一个不存在的文件是客观错误。而“内容有没有真的搬过去”是语义判断 ——
+# 那个脚本分不出（实测过：用词条计数会把整句散文当成主语，全是噪音），
+# 留给 skill-builder 里的人工检查项。
+# 它真正的作用是**把指针语句列出来**，让逐词核对有明确的范围。
+POINTERS="$ROOT/skills/skill-builder/scripts/check_pointers.py"
+if [ -f "$POINTERS" ]; then
+  OUT=$(cd "$ROOT" && python3 "$POINTERS" --root "$ROOT" 2>&1)
+  STATUS=$?
+  if [ "$STATUS" -eq 1 ]; then
+    fail "$OUT" "有指针指向不存在的文件"
+  fi
+fi
+
+echo "✓ pre-commit: 结构、泄露、指针与回归测试通过"
 exit 0

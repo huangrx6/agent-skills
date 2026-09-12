@@ -130,8 +130,9 @@ description: >-
 **先跑脚本**（机械检查，不要靠肉眼——实测中“正文 ≤ 150 行”被连续违反两次都没看出来）：
 
 ```sh
-python3 scripts/validate_skill.py            # 扫本仓库全部 skill
-python3 scripts/validate_skill.py <skill 目录>
+python3 scripts/validate_skill.py [skill 目录]   # 结构检查（默认扫全部 skill）
+python3 scripts/check_leakage.py                 # 外发内容里的真实名称（需配 blocklist）
+python3 scripts/check_pointers.py                # 找出“这事定义在别处”的指针语句
 ```
 
 脚本覆盖：SKILL.md 存在 / 可读 / frontmatter 存在 / YAML 可解析 / `name` == 目录名 / description < 800 字符 / 含触发表达 / 含 Do NOT 边界 / 正文 ≤ 150 行 / 含表格或清单。退出码 `0` 通过、`1` 失败。
@@ -143,6 +144,7 @@ python3 scripts/validate_skill.py <skill 目录>
 - [ ] description 里的动词是用户真会说的话，不是“处理”“搞定”这类模糊词
 - [ ] Do NOT 边界是真边界，不是凑数
 - [ ] 没有“个人吐槽 / 临时想法 / 试验性”段落
+- [ ] **把某段改成“见别处”的指针时，逐词核对目标真的接住了内容** —— “指针写对了” ≠ “内容搬过去了”（实测：删掉 8 条风格规格改成指针，目标文件里一条都没落地）。先跑 `scripts/check_pointers.py` 列出所有指针，再逐条比对
 - [ ] 同步更新根 README 索引表 + Roadmap
 - [ ] 同步更新 `skills-lock.json`，新增一条 entry
 
