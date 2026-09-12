@@ -1336,19 +1336,57 @@ def assign_coordinates(order: dict[int, list[str]], boxes: dict[str, Box],
         if groups_of:
             for r, layer in live.items():
                 rank_groups[r] = {groups_of[n] for n in layer if n in groups_of}
-        segment = 0
-        used = 0
-        segment_first: dict[int, int] = {0: ranks[0]}
-        previous: int | None = None
+        # 切点只能落在**区域边界**上（相邻两层不共享 group）；没有区域时处处可切。
+        allowed = [j for j in range(1, len(ranks))
+                   if not (rank_groups.get(ranks[j], set())
+                           & rank_groups.get(ranks[j - 1], set()))]
+
+        def partition(limit: int) -> list[int] | None:
+            """在允许的位置切，让每段不超过 limit 层；做不到就返回 None。
+
+            贪心**尽量晚切**（每段塞满再切）—— 这样段数最少，也就是"用最少的栏数
+            把最长的那一栏压到 limit 以内"。
+            """
+            cuts: list[int] = []
+            start = 0
+            while len(ranks) - start > limit:
+                candidates = [c for c in allowed if start < c <= start + limit]
+                if not candidates:
+                    return None
+                cut = max(candidates)
+                cuts.append(cut)
+                start = cut
+                if len(cuts) >= count:
+                    return None          # 段数超了：这个 limit 不可行
+            return cuts
+
+        # 目标不是"每段尽量一样长"，而是**把最长的那一段压下来** ——
+        # 折段本来就是为了别让画布拉成一条长条，所以约束在**最长段**上。
+        # 旧的写法是"够长了就切"，被区域边界一挡就睡得很不均（实测 Spring 那张
+        # 折成 9 / 16 / 5：中间一栏是旁边的三倍高）。
+        best_cuts: list[int] | None = None
+        low_limit, high_limit = -(-len(ranks) // count), len(ranks)
+        while low_limit <= high_limit:
+            middle = (low_limit + high_limit) // 2
+            got = partition(middle)
+            if got is None:
+                low_limit = middle + 1
+            else:
+                best_cuts = got
+                high_limit = middle - 1
+        cuts = sorted(best_cuts or [])
+        segments = {}
+        current = 0
+        for index, r in enumerate(ranks):
+            if current < len(cuts) and index >= cuts[current]:
+                current += 1
+            segments[r] = current
+        segment_first: dict[int, int] = {}
         for r in ranks:
-            if used >= per_segment and previous is not None and not (
-                    rank_groups.get(r, set()) & rank_groups.get(previous, set())):
-                segment += 1
-                used = 0
-                segment_first[segment] = r
-            segments[r] = segment
-            used += 1
-            previous = r
+            segment_first.setdefault(segments[r], r)
+        # 平移：**每段都当作独立的一栏**摆在交叉轴上，主轴各自从 0 重新开始。
+        for r in ranks:
+            segment = segments[r]
             # 交叉轴：每段往右让开一个"段宽 + 段间空档"。第 0 段不让。
             cross_shift = segment * (cross_max + WRAP_SEGMENT_GAP)
             # 主轴：**每段都从 0 重新开始**。
@@ -1421,14 +1459,30 @@ def route_edges(origins: list[dict], segments: list[dict],
         # 第二条候选：**丢掉落在首尾跨度之外的虚节点行**，剩下的按行进方向排好 ——
         # 这样纵向移动是单调的（0 次来回）。实测 3 条来回边都是被“绕出去的行”拖的：
         # 目标行 547，而某个虚节点行在 572，于是必须先下去再回来。
-        low, high = sorted((pts[0][1], pts[-1][1]))
-        inside = [w for w in sorted(waypoints, key=lambda w: -w[1] if pts[0][1] > pts[-1][1]
-                                    else w[1]) if low - 1 <= w[1] <= high + 1]
+        # 实测这几条边的来回是**同一个病**：路由要经过的虚节点行/列落在首尾跨度之外，
+        # 路径就只能先出去再回来。虚节点的位置是分层布局给的（它给长边留的空位），跟这条
+        # 边要往哪走没关系。所以给两条把它拉回跨度内的候选：
+        #   ① 丢掉跨度外的那些站；② 保留站、但把**横轴坐标夹进跨度**。
+        #
+        # ⚠️ 横轴是 x 还是 y **由方向决定** —— 这里曾经写死用 y，于是 TB 图那边等于没做
+        # （TB 的横轴是 x）。是量 03-dependency 时发现「过滤前后结果一样」抓出来的。
+        cross = 1 if direction == "LR" else 0
+        low, high = sorted((pts[0][cross], pts[-1][cross]))
+        backwards = pts[0][cross] > pts[-1][cross]
+        ordered = sorted(waypoints, key=lambda w: w[cross], reverse=backwards)
+        inside = [w for w in ordered if low - 1 <= w[cross] <= high + 1]
+        clamped = []
+        for w in ordered:
+            pulled = list(w)
+            pulled[cross] = min(max(w[cross], low), high)
+            if not clamped or pulled != clamped[-1]:
+                clamped.append(pulled)
         variants = [_orthogonal_path(pts[0], pts[-1], waypoints, direction, gaps,
                                      start_rank, end_rank)]
-        if inside != waypoints:
-            variants.append(_orthogonal_path(pts[0], pts[-1], inside, direction, gaps,
-                                             start_rank, end_rank))
+        for alternative in (inside, clamped):
+            if alternative and alternative != waypoints:
+                variants.append(_orthogonal_path(pts[0], pts[-1], alternative, direction,
+                                                 gaps, start_rank, end_rank))
         pts = straighten(pts, placed, {chain[0], chain[-1]}, orthogonals=variants,
                          endpoints=(chain[0], chain[-1]))
         a, b = e["from"], e["to"]
@@ -2124,7 +2178,15 @@ def _orthogonal_path(a: list, b: list, waypoints: list, direction: str,
         pts.append([column, lane])             # 竖段：回到空档
         pts.append([b[0], lane])               # 横段：在空档里换到目标的列
         pts.append(list(b))                    # 竖段：从空档进目标
-    return _simplify_path(pts)
+    # **去掉连续重复点**：拐点正好落在空档上时会出现零长度的段（实测 order→db 就有
+    # `(1304,296) → (1304,296)`）。它不只是难看 —— 排序键的第一项"毛刺数"会把这种
+    # 段算进去，于是一条**来回 0** 的候选被一条来回 1 的压住，修好的路永远选不上。
+    # `wrap_route` 早就因为同一件事手工去过重复点，这里也得做。
+    deduped = [pts[0]]
+    for point in pts[1:]:
+        if point != deduped[-1]:
+            deduped.append(point)
+    return _simplify_path(deduped)
 
 
 def _lane_candidates(a: list[float], b: list[float], placed: dict,
