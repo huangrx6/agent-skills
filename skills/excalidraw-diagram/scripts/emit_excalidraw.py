@@ -150,7 +150,7 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
     kind = node.get("kind")
     emphasis = node.get("emphasis", palette.DEFAULT_EMPHASIS)
     stroke = palette.stroke_for(kind)
-    fill = palette.emphasis_fill(kind, emphasis)
+    fill = palette.fill_for(kind, emphasis)
     stroke_width = palette.emphasis_stroke_width(emphasis)
     elements = shape_elements(shape_id, box.shape, placed, stroke, fill,
                               stroke_width=stroke_width)
@@ -779,8 +779,8 @@ def icon_contrast_issues(spec: dict, lookup: dict) -> list:
         if not name or name not in lookup:
             continue
         try:
-            fill = palette.emphasis_fill(node.get("kind"),
-                                         node.get("emphasis", palette.DEFAULT_EMPHASIS))
+            fill = palette.fill_for(node.get("kind"),
+                                    node.get("emphasis", palette.DEFAULT_EMPHASIS))
         except KeyError:
             continue          # kind / emphasis 不合法的问题由 check_palette 报
         colours = icons.visible_colours(lookup[name])

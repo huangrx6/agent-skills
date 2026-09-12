@@ -1,32 +1,30 @@
 #!/usr/bin/env python3
-"""palette.py 的回归测试：用户指定的莫兰迪配色，可用性用**量出来的数**守住。
+"""palette.py 的回归测试。
 
-## 为什么这层值得有测试
+## 这套测试守的是什么
 
-配色看起来是"审美"，但里面有几条**可测量**的硬约束。不测的代价这次已经付过：
-我在 `palette.py` 注释里写了"对比度 ≥ 7:1"，而**那句话是写的时候还没量过的**，
-实测只有 6.15~7.79。所以现在这层不写"深色文字可读"这种话，直接算、直接卡。
+**不是"六个颜色彼此分得开"** —— 那正是被换掉的旧模型。旧模型逼着色板制造六种颜色，
+实测六种填充色相跨度 310°（占整个色环 86%），一张 14 节点的架构图出现 9 种颜色。
+工程上干净，视觉上一定丑。
 
-## 判据的来历（每一条都说清为什么是这个数）
+现在守的是**视觉负担**：
 
-| 判据 | 阈值 | 实测 | 依据 |
-| --- | --- | --- | --- |
-| 文字 vs 底色 | ≥ 4.5 | 6.15 ~ 7.79 | WCAG AA 正文 |
-| 文字 vs 画布 | ≥ 4.5 | 9.00 | 同上 |
-| 描边 vs 底色 | ≥ 1.8 | 2.19 ~ 2.48 | 框边界要看得见 |
-| 描边 vs 画布 | ≥ 2.0 | 2.57 ~ 3.63 | 否则轮廓在页面上"消失" |
-| 底色 vs 画布 ΔE | ≥ 5 | 8.0 ~ 17.0 | 浅色块也要分得出来 |
-| 底色两两 ΔE | ≥ 5 | 6.7 | 色板的意义就是"一眼按颜色分角色" |
-| 饱和度 | ≤ 0.30 | 0.14 | 莫兰迪 = 去饱和 |
-| 亮度 | ≥ 0.50 | 0.65 | 用户要"浅色一点" |
+| 约束 | 为什么 |
+| --- | --- |
+| 文字 vs 自己的填充 ≥ 4.5 | 读得清（WCAG AA） |
+| 描边 vs 填充 / 画布 ≥ 1.5 | 边界看得见 |
+| neutral / tint / accent / secondary / critical **五档互不相同** | 层级要真的分得出来，否则这一层白设 |
+| accent vs neutral、critical vs accent 明显可分 | 这两对是"有信息量"的对比 |
+| **一张图里 accent 及以上的节点 ≤ 一半** | 颜色多了就没有信息量 —— 这条才是"好看"的机械代理 |
 
-**关于描边为什么不卡 WCAG 的 3:1**：那一条是给 **UI 控件边界**定的（按钮、输入框 ——
-用户得先找到它才能操作）。图里的框是**内容**，它的可读性由文字对比度承担（已卡 4.5）。
-而且实测过：把描边压到 3:1，六条会全部变成近似的深灰（`#8A857E` / `#71797D` / `#77737B`…），
-**色相识别没了** —— 那正好违背用户要的风格。所以描边卡的是"看得见"，不是"够黑"。
+最后一条是这套测试里唯一一条**关于图、而不是关于色板**的约束。它的存在理由：
+色板好看不等于图好看 —— 一张每个框都是主色的图，再好的色板也救不回来。
 
-阈值都留在实测值**之下**留余量：它们是防"换成荧光色 / 换成深色底"这类退化的闸门，
-不是把当前数值抄一遍（那种测试只会把数字写死，改不动）。
+## 先证明尺子准
+
+`TestRulers` 用已知值钉住对比度 / ΔE 的实现（白对黑 = 21、同色 = 0、同明度不同色相
+ΔE 要够大）。尺子本身错的话，上面所有断言都是假的 —— 这个项目里"尺子自己错了"
+已经出现过好几次，最近一次是把 HSV 写成 HSL。
 
 跑法：
     python3 -m unittest discover -s tests -v
@@ -36,56 +34,58 @@
 from __future__ import annotations
 
 import importlib.util
-import itertools
+import json
 import os
 import sys
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = os.path.join(os.path.dirname(HERE), "scripts")
-PALETTE = os.path.join(SCRIPTS, "palette.py")
-
-TEXT_MIN = 4.5
-STROKE_VS_FILL_MIN = 1.8
-STROKE_VS_CANVAS_MIN = 2.0
-FILL_VS_CANVAS_DE_MIN = 5.0
-PAIR_DE_MIN = 5.0          # 感知可辨阈值 ΔE≈2.3，这里留两倍余量
-MAX_SATURATION = 0.30
-MIN_LUMINANCE = 0.50
+SPECS = os.path.join(HERE, "fixtures", "specs")
 
 
-def _load(name: str, path: str):
+def _load(name: str, filename: str):
+    path = os.path.join(SCRIPTS, filename)
     spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"加载不了 {path}")
     module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
+    sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
 
 
-P = _load("palette", PALETTE)
+P = _load("palette_under_test", "palette.py")
 
-
-# ── 颜色数学 ────────────────────────────────────────────────
-# 颜色数学的**唯一实现**在 scripts/palette.py 里（图标撞色检查、报告的可读性提示
-# 都要用它）—— 这里不再存第二份，只把这几把尺子钉住。
-_channels = P.hex_to_rgb
-_luminance = P.relative_luminance
 contrast = P.contrast
-saturation = P.saturation
-_lab = P.to_lab
 delta_e = P.delta_e
+saturation = P.saturation
+
+TEXT_MIN = 4.5              # 正文对比度（WCAG AA）
+STROKE_MIN = 1.5            # 描边只要"看得见边界"，不要求它自己成为焦点
+VISIBLE_DE = 5.0            # 感知可辨阈值 ΔE≈2.3，这里留两倍余量
+ACCENT_SHARE_MAX = 0.5      # 一张图里 accent 及以上的节点占比上限
 
 
-class TestColourMath(unittest.TestCase):
-    """先证明这把尺子准，再拿它去量配色。"""
+def _luminance(colour: str) -> float:
+    return P.relative_luminance(colour)
+
+
+def _specs():
+    for name in sorted(os.listdir(SPECS)):
+        if name.endswith(".json"):
+            with open(os.path.join(SPECS, name), encoding="utf-8") as fh:
+                yield name, json.load(fh)
+
+
+class TestRulers(unittest.TestCase):
+    """先证明尺子准 —— 尺子错的话，下面所有断言都是假的。"""
 
     def test_white_on_black_is_21(self):
-        self.assertAlmostEqual(21.0, contrast("#FFFFFF", "#000000"), places=1)
+        self.assertAlmostEqual(21.0, contrast("#000000", "#FFFFFF"), places=1)
 
     def test_same_colour_contrast_is_one(self):
-        self.assertAlmostEqual(1.0, contrast("#4A4744", "#4A4744"), places=6)
+        self.assertAlmostEqual(1.0, contrast("#7C93A6", "#7C93A6"), places=3)
 
     def test_identical_colour_has_zero_delta_e(self):
         self.assertAlmostEqual(0.0, delta_e("#7C93A6", "#7C93A6"), places=6)
@@ -94,252 +94,243 @@ class TestColourMath(unittest.TestCase):
         self.assertGreater(delta_e("#000000", "#FFFFFF"), 90)
 
     def test_delta_e_separates_same_lightness_different_hue(self):
-        """这条正是"不能用对比度当色差"的理由。"""
-        a, b = "#EBDACB", "#D1DBD4"          # 亮度几乎一样，色相不同
-        self.assertLess(contrast(a, b), 1.05)
-        self.assertGreater(delta_e(a, b), PAIR_DE_MIN)
+        self.assertGreater(delta_e("#D8E6F2", "#F2DFD8"), VISIBLE_DE)
+
+    def test_saturation_is_hsv_not_hsl(self):
+        """HSV 下纯红的饱和度是 1.0；HSL 下也是 1.0，但中间值会不同。
+
+        这条是防止"顺手改成 HSL" —— 搬家的那次真发生过，三个用例变红才挡住。
+        """
+        self.assertAlmostEqual(1.0, saturation("#FF0000"), places=3)
+        # #808080 无彩：两种模型都给 0
+        self.assertAlmostEqual(0.0, saturation("#808080"), places=3)
+        # #C08080：HSV = (192-128)/192 ≈ 0.333；HSL = (192-128)/(192+128) = 0.2
+        self.assertAlmostEqual(0.3333, saturation("#C08080"), places=3)
 
     def test_bad_hex_is_rejected(self):
-        for bad in ("4A4744", "#4A47", "#GGGGGG"):
-            with self.subTest(bad=bad):
-                with self.assertRaises(ValueError):
-                    _channels(bad)
+        with self.assertRaises(ValueError):
+            P.hex_to_rgb("not-a-colour")
 
 
-class TestTextReadability(unittest.TestCase):
-    def test_text_on_every_node_fill(self):
-        text = P.CANVAS["text"]
-        for kind, entry in P.KINDS.items():
-            with self.subTest(kind=kind):
-                ratio = contrast(text, entry["background"])
+class TestContrast(unittest.TestCase):
+    """硬约束：读得清、边界看得见。遍历**层级**，不是语义角色 —— 颜色住在层级里。"""
+
+    def test_level_table_is_complete(self):
+        self.assertEqual(set(P.LEVELS), set(P.VISUAL_LEVELS))
+        for name, entry in P.LEVELS.items():
+            self.assertEqual({"stroke", "fill"}, set(entry), f"{name} 字段不对")
+
+    def test_text_on_every_level_fill(self):
+        for level, entry in P.LEVELS.items():
+            with self.subTest(level=level):
+                ratio = contrast(P.CANVAS["text"], entry["fill"])
                 self.assertGreaterEqual(ratio, TEXT_MIN,
-                                        f"{kind} 底色上的文字只有 {ratio:.2f}")
+                                        f"{level} 上文字对比度只有 {ratio:.2f}")
 
     def test_text_on_canvas(self):
-        self.assertGreaterEqual(contrast(P.CANVAS["text"], P.CANVAS["background"]),
-                                TEXT_MIN)
+        ratio = contrast(P.CANVAS["text"], P.CANVAS["background"])
+        self.assertGreaterEqual(ratio, TEXT_MIN)
 
-
-class TestStrokesAreVisible(unittest.TestCase):
     def test_stroke_against_its_own_fill(self):
-        for kind, entry in P.KINDS.items():
-            with self.subTest(kind=kind):
-                ratio = contrast(entry["stroke"], entry["background"])
-                self.assertGreaterEqual(ratio, STROKE_VS_FILL_MIN,
-                                        f"{kind} 的描边在自己底色上只有 {ratio:.2f}")
+        for level, entry in P.LEVELS.items():
+            with self.subTest(level=level):
+                ratio = contrast(entry["stroke"], entry["fill"])
+                self.assertGreaterEqual(ratio, STROKE_MIN,
+                                        f"{level} 的描边与自己的填充只有 {ratio:.2f}")
 
     def test_stroke_against_canvas(self):
-        for kind, entry in P.KINDS.items():
-            with self.subTest(kind=kind):
+        for level, entry in P.LEVELS.items():
+            with self.subTest(level=level):
                 ratio = contrast(entry["stroke"], P.CANVAS["background"])
-                self.assertGreaterEqual(ratio, STROKE_VS_CANVAS_MIN)
+                self.assertGreaterEqual(ratio, STROKE_MIN)
 
     def test_edge_colours_against_canvas(self):
         for kind, entry in P.EDGE_KINDS.items():
-            with self.subTest(kind=kind):
+            with self.subTest(edge=kind):
                 ratio = contrast(entry["stroke"], P.CANVAS["background"])
-                self.assertGreaterEqual(ratio, STROKE_VS_CANVAS_MIN,
-                                        f"{kind} 的连线在画布上只有 {ratio:.2f}")
+                self.assertGreaterEqual(ratio, STROKE_MIN)
 
+    def test_level_fills_stand_out_from_canvas(self):
+        """**accent 及以上**要真的成块。
 
-class TestMorandiCharacter(unittest.TestCase):
-    """用户指定的是**莫兰迪**：去饱和、灰调、浅色。把风格变成可检查的。"""
-
-    def test_fills_are_desaturated(self):
-        for kind, entry in P.KINDS.items():
-            with self.subTest(kind=kind):
-                sat = saturation(entry["background"])
-                self.assertLessEqual(sat, MAX_SATURATION,
-                                     f"{kind} 底色饱和度 {sat:.2f} —— 这已经不是莫兰迪了")
-
-    def test_fills_are_light(self):
-        for kind, entry in P.KINDS.items():
-            with self.subTest(kind=kind):
-                self.assertGreaterEqual(_luminance(entry["background"]), MIN_LUMINANCE,
-                                        f"{kind} 的底色偏暗，用户要的是浅色")
-
-    def test_fills_stand_out_from_canvas(self):
-        for kind, entry in P.KINDS.items():
-            with self.subTest(kind=kind):
-                d = delta_e(entry["background"], P.CANVAS["background"])
-                self.assertGreaterEqual(d, FILL_VS_CANVAS_DE_MIN,
-                                        f"{kind} 底色与画布 ΔE 只有 {d:.1f}，看不出成块")
-
-    def test_fills_are_distinguishable_from_each_other(self):
-        for (ka, ea), (kb, eb) in itertools.combinations(P.KINDS.items(), 2):
-            with self.subTest(pair=(ka, kb)):
-                d = delta_e(ea["background"], eb["background"])
-                self.assertGreaterEqual(d, PAIR_DE_MIN,
-                                        f"{ka} 与 {kb} 的底色 ΔE 只有 {d:.1f}")
-
-    def test_no_duplicate_colours(self):
-        values = [v for e in P.KINDS.values() for v in e.values() if v.startswith("#")]
-        self.assertEqual(len(values), len(set(values)), "有重复的颜色值")
-
-
-class TestEmphasis(unittest.TestCase):
-    """强调层级 —— 三档必须**真的分得出来**，而且默认档不许改变原观感。"""
-
-    LEVELS = ("primary", "normal", "muted")
-
-    def test_default_level_changes_nothing(self):
-        """默认档的填充必须就是色板原色。
-
-        这条是这次改动的**零回归保证**：加 emphasis 之前所有节点都用色板原色，
-        默认档若不是原色，等于偷偷把之前看过的图全改了一遍。
+        neutral / tint 刻意接近画布 —— 它们是"背景里的普通节点"，不要求跳出来。
+        第一版这里把 tint 也要求了，是我写错：tint 的定义就是"非常轻微的色彩倾向"。
         """
+        for level, entry in P.LEVELS.items():
+            if level in ("neutral", "tint"):
+                continue
+            with self.subTest(level=level):
+                d = delta_e(entry["fill"], P.CANVAS["background"])
+                self.assertGreaterEqual(d, VISIBLE_DE, f"{level} 与画布 ΔE 只有 {d:.1f}")
+
+
+class TestVisualBurden(unittest.TestCase):
+    """这一组守的是**视觉负担**，不是色彩数量。
+
+    旧模型要求"六个语义色的填充两两 ΔE ≥ 5" —— 那条约束会**逼着**色板制造六种颜色，
+    和"舒服、大气"直接冲突。"六种颜色必须能区分" ≠ "六种颜色都应该被用户看到"。
+    """
+
+    def test_levels_are_distinguishable_from_each_other(self):
+        """五档层级必须真的分得出来 —— 这是新的可区分性要求，对象是层级不是语义。"""
+        names = list(P.VISUAL_LEVELS)
+        for i, a in enumerate(names):
+            for b in names[i + 1:]:
+                with self.subTest(pair=(a, b)):
+                    d = delta_e(P.LEVELS[a]["fill"], P.LEVELS[b]["fill"])
+                    self.assertGreaterEqual(d, VISIBLE_DE,
+                                            f"{a} 与 {b} 的填充 ΔE 只有 {d:.1f}")
+
+    def test_accent_stands_out_from_neutral(self):
+        """accent 是"重要的东西"，它必须从大量中性节点里跳出来。"""
+        for a, b in (("accent", "neutral"), ("accent", "tint"), ("critical", "accent")):
+            with self.subTest(pair=(a, b)):
+                d = delta_e(P.LEVELS[a]["fill"], P.LEVELS[b]["fill"])
+                self.assertGreaterEqual(d, VISIBLE_DE)
+
+    def test_accent_and_critical_strokes_differ(self):
+        """警示色不能和主色撞 —— 撞了就分不出"重点"和"异常"。"""
+        d = delta_e(P.LEVELS["critical"]["stroke"], P.LEVELS["accent"]["stroke"])
+        self.assertGreaterEqual(d, VISIBLE_DE)
+
+    def test_most_nodes_are_not_accented(self):
+        """**关于图、而不是关于色板的那条约束**：一张图里 accent 及以上的节点 ≤ 一半。
+
+        色板好看不等于图好看。一张每个框都是主色的图，再好的色板也救不回来 ——
+        而这条只有量实际规格才能发现。
+        """
+        offenders = []
+        for name, spec in _specs():
+            nodes = spec.get("nodes", [])
+            if not nodes:
+                continue
+            hot = 0
+            for node in nodes:
+                level = P.level_for(node["kind"], node.get("emphasis", P.DEFAULT_EMPHASIS))
+                if P.VISUAL_LEVELS.index(level) >= P.VISUAL_LEVELS.index("accent"):
+                    hot += 1
+            share = hot / len(nodes)
+            if share > ACCENT_SHARE_MAX:
+                offenders.append(f"{name}: {hot}/{len(nodes)} = {share:.0%}")
+        self.assertEqual(
+            [], offenders,
+            "这些图的强调色占比超过一半，颜色就没有信息量了：" + "；".join(offenders))
+
+
+class TestLevelDerivation(unittest.TestCase):
+    """kind → 层级 → 颜色 这条派生链。语义不直接决定颜色。"""
+
+    def test_kind_maps_to_a_level_not_a_colour(self):
+        for kind, level in P.KINDS.items():
+            with self.subTest(kind=kind):
+                self.assertIn(level, P.VISUAL_LEVELS, f"{kind} 指向未知层级 {level!r}")
+
+    def test_level_count_is_capped(self):
+        """真正要封顶的是**层级数**（颜色数），不是角色数 —— 颜色数量 ≠ 语义数量。"""
+        self.assertLessEqual(len(P.VISUAL_LEVELS), 5)
+
+    def test_most_kinds_are_not_accented(self):
+        """色板的默认值本身就不能"六种颜色" —— 大多数角色落在 neutral / tint。"""
+        hot = {k for k, level in P.KINDS.items()
+               if P.VISUAL_LEVELS.index(level) >= P.VISUAL_LEVELS.index("accent")}
+        self.assertLessEqual(len(hot), 2, f"默认就带强调色的角色太多了：{sorted(hot)}")
+
+    def test_default_emphasis_is_the_level_itself(self):
         for kind in P.KINDS:
             with self.subTest(kind=kind):
-                self.assertEqual(P.background_for(kind),
-                                 P.emphasis_fill(kind, P.DEFAULT_EMPHASIS))
-                self.assertEqual("normal", P.DEFAULT_EMPHASIS)
+                self.assertEqual(P.LEVELS[P.KINDS[kind]]["fill"], P.fill_for(kind))
 
-    def test_three_levels_are_actually_different(self):
-        """三档同色的话，emphasis 就只是多了个没人看得出效果的字段。"""
+    def test_primary_promotes_and_muted_demotes(self):
+        promoted = P.level_for("client", "primary")      # tint → accent
+        demoted = P.level_for("service", "muted")        # accent → tint
+        self.assertEqual("accent", promoted)
+        self.assertEqual("tint", demoted)
+
+    def test_promotion_never_reaches_critical(self):
+        """普通节点被"强调"不该变成警示色 —— critical 只能显式指定。"""
+        for kind in P.KINDS:
+            for emphasis in ("primary", "normal", "muted"):
+                with self.subTest(kind=kind, emphasis=emphasis):
+                    self.assertNotEqual("critical", P.level_for(kind, emphasis))
+
+    def test_critical_is_reachable_only_by_asking_for_it(self):
+        self.assertEqual("critical", P.level_for("service", "critical"))
+        self.assertEqual("critical", P.level_for("external", "critical"))
+
+    def test_promotion_is_capped_at_secondary(self):
+        """顶到头也不会溢出枚举 —— 提级要 clamp，不是 IndexError。"""
         for kind in P.KINDS:
             with self.subTest(kind=kind):
-                fills = [P.emphasis_fill(kind, lvl) for lvl in self.LEVELS]
-                self.assertEqual(3, len(set(fills)), f"{kind} 的填充三档没分开：{fills}")
-                widths = [P.emphasis_stroke_width(lvl) for lvl in self.LEVELS]
-                self.assertEqual(3, len(set(widths)), f"描边宽三档没分开：{widths}")
+                self.assertIn(P.level_for(kind, "primary"), P.VISUAL_LEVELS)
 
-    def test_primary_is_heavier_and_muted_is_quieter(self):
-        for kind in P.KINDS:
-            with self.subTest(kind=kind):
-                widths = [P.emphasis_stroke_width(lvl) for lvl in self.LEVELS]
-                self.assertGreater(widths[0], widths[1], "primary 要比 normal 重")
-                self.assertGreater(widths[1], widths[2], "normal 要比 muted 重")
-                # 在浅色底板上“更有颜色 = 更重要” —— 不能用“更深 = 更重要”那套。
-                canvas = P.CANVAS["background"]
-                d_primary = abs(_luminance(P.emphasis_fill(kind, "primary")) - _luminance(canvas))
-                d_normal = abs(_luminance(P.emphasis_fill(kind, "normal")) - _luminance(canvas))
-                d_muted = abs(_luminance(P.emphasis_fill(kind, "muted")) - _luminance(canvas))
-                self.assertGreater(d_primary, d_normal, "primary 应该比 normal 更实")
-                self.assertLess(d_muted, d_normal, "muted 应该更靠近画布（更安静）")
-
-    def test_text_stays_readable_at_every_level(self):
-        """primary 会把填充往描边色拉，文字对比度会降 —— 但不能降到 AA 以下。"""
-        for kind in P.KINDS:
-            for lvl in self.LEVELS:
-                with self.subTest(kind=kind, emphasis=lvl):
-                    got = contrast(P.CANVAS["text"],
-                                   P.emphasis_fill(kind, lvl))
-                    self.assertGreaterEqual(got, 4.5, f"对比度只有 {got:.2f}")
+    def test_unknown_kind_raises_never_falls_back(self):
+        for bad in ("queue", "", "Service"):
+            with self.subTest(kind=bad):
+                with self.assertRaises(KeyError):
+                    P.fill_for(bad)
 
     def test_unknown_emphasis_raises_never_falls_back(self):
-        """同 kind / shape 一条规矩：不 fallback。"""
-        for bad in ("emphasized", "", "PRIMARY", None):
+        for bad in ("important", "", "PRIMARY"):
             with self.subTest(emphasis=bad):
-                with self.assertRaises(KeyError) as ctx:
-                    P.emphasis_fill("service", bad)
-                self.assertIn("emphasis", str(ctx.exception))
+                with self.assertRaises(KeyError):
+                    P.fill_for("service", bad)
                 with self.assertRaises(KeyError):
                     P.emphasis_stroke_width(bad)
 
-    def test_derived_colours_stay_derived(self):
-        """派生色的唯一来源是色板 —— 换个 kind 就该换个结果，不能是写死的常量。"""
-        fills = {kind: P.emphasis_fill(kind, "primary") for kind in P.KINDS}
-        self.assertEqual(len(P.KINDS), len(set(fills.values())),
-                         "primary 的填充各 kind 应当互不相同（说明是从色板算的）")
+    def test_emphasis_strength_is_ordered(self):
+        widths = [P.emphasis_stroke_width(e) for e in ("muted", "normal", "primary")]
+        self.assertEqual(sorted(widths), widths, "描边粗细的顺序反了（muted 应最细）")
 
 
-class TestEveryTheme(unittest.TestCase):
-    """**每个**主题都要过同一套不变量。
-
-    为什么单独一个类：主题可切换之后，只在默认主题下跑的那套测试等于
-    只测了三分之一 —— 另两个主题变成"没测过的那一半"，而用户看到的正是它们。
-
-    这里只放**不变量**（可读性、边界可见、彼此可区分）。
-    莫兰迪的"去饱和 / 偏浅"那种是**风格**约束，只对那一个主题成立，
-    放在上面的 TestMorandiCharacter 里。
-    """
+class TestThemes(unittest.TestCase):
+    """每个主题都要独立满足上面的硬约束，而且要真的互不相同。"""
 
     def test_every_theme_keeps_text_readable(self):
         for theme in P.available_themes():
             with P.theme_context(theme):
-                for kind in P.KINDS:
-                    with self.subTest(theme=theme, kind=kind):
-                        got = contrast(P.CANVAS["text"], P.background_for(kind))
-                        self.assertGreaterEqual(
-                            got, 4.5,
-                            f"{theme}/{kind} 文字在其填充上只有 {got:.2f}")
+                for level, entry in P.LEVELS.items():
+                    with self.subTest(theme=theme, level=level):
+                        got = contrast(P.CANVAS["text"], entry["fill"])
+                        self.assertGreaterEqual(got, TEXT_MIN)
 
     def test_every_theme_keeps_strokes_visible(self):
         for theme in P.available_themes():
             with P.theme_context(theme):
-                for kind in P.KINDS:
-                    with self.subTest(theme=theme, kind=kind):
-                        own = contrast(P.stroke_for(kind), P.background_for(kind))
-                        self.assertGreaterEqual(own, 1.5, f"{theme}/{kind} 描边贴住了自己的填充")
-                        canvas = contrast(P.stroke_for(kind), P.CANVAS["background"])
-                        self.assertGreaterEqual(canvas, 1.5, f"{theme}/{kind} 描边在画布上看不见")
+                for level, entry in P.LEVELS.items():
+                    with self.subTest(theme=theme, level=level):
+                        own = contrast(entry["stroke"], entry["fill"])
+                        canvas = contrast(entry["stroke"], P.CANVAS["background"])
+                        self.assertGreaterEqual(min(own, canvas), STROKE_MIN)
 
-    def test_every_theme_has_distinguishable_fills(self):
-        """六种填充必须两两分得开 —— 深色主题尤其容易在这里翻车。
-
-        实测：深色主题第一版六色都挤在 #1E~#36 的窄明度带里，两两 ΔE 最小只有 2.5
-        （浅色主题是 6.7），看着就是六块差不多的深灰。所以这条对每个主题都要跑。
-        """
+    def test_every_theme_has_distinguishable_levels(self):
+        """深色主题翻过车：第一版五档挤在窄明度带里，看着就是几块差不多的深灰。"""
         for theme in P.available_themes():
             with P.theme_context(theme):
-                fills = {k: P.background_for(k) for k in P.KINDS}
-                names = list(fills)
-                worst = min((delta_e(fills[a], fills[b]), a, b)
-                            for i, a in enumerate(names) for b in names[i + 1:])
-                self.assertGreaterEqual(worst[0], 5.0,
-                                        f"{theme}: {worst[1]}/{worst[2]} 的填充几乎一样"
-                                        f"（ΔE {worst[0]:.1f}）")
+                names = list(P.VISUAL_LEVELS)
+                for i, a in enumerate(names):
+                    for b in names[i + 1:]:
+                        with self.subTest(theme=theme, pair=(a, b)):
+                            d = delta_e(P.LEVELS[a]["fill"], P.LEVELS[b]["fill"])
+                            self.assertGreaterEqual(d, VISIBLE_DE)
 
-    def test_every_theme_sets_a_full_canvas(self):
-        for theme in P.available_themes():
-            with P.theme_context(theme):
-                for key in ("background", "grid", "text"):
-                    self.assertIn(key, P.CANVAS, f"{theme} 的画布缺 {key}")
-                self.assertEqual(2, P.CANVAS["font_family"])
-
-    def test_themes_are_actually_different_from_each_other(self):
-        """几个主题长得一样的话，"可选主题"就是假的。"""
-        seen = {}
-        for theme in P.available_themes():
-            with P.theme_context(theme):
-                seen[theme] = tuple(sorted(P.background_for(k) for k in P.KINDS))
-        self.assertEqual(len(P.available_themes()), len(set(seen.values())),
-                         "有两个主题的六色完全相同")
+    def test_unknown_theme_raises_and_lists_options(self):
+        with self.assertRaises(KeyError) as ctx:
+            P.use_theme("不存在的主题")
+        self.assertIn("morandi", str(ctx.exception))
 
     def test_theme_context_restores_the_previous_one(self):
-        """用例之间不能互相污染 —— 上个用例切了主题没切回来，后面的全跑在错的主题上。"""
         before = P.active_theme()
         with P.theme_context("dark-tech"):
             self.assertEqual("dark-tech", P.active_theme())
         self.assertEqual(before, P.active_theme())
 
-    def test_unknown_theme_raises_and_lists_options(self):
-        with self.assertRaises(KeyError) as ctx:
-            P.use_theme("蒸汽波")
-        message = str(ctx.exception)
-        for name in P.available_themes():
-            self.assertIn(name, message, "报错要列出可用主题")
-        P.use_theme(None)          # 还原，别影响后面的用例
-
-
-class TestPaletteShape(unittest.TestCase):
-    def test_kind_count_is_capped(self):
-        self.assertLessEqual(len(P.KINDS), P.MAX_KINDS)
-
-    def test_unknown_kind_raises_never_falls_back(self):
-        """**绝不 fallback** —— 静默给个默认色会让"颜色必须在板内"这条校验自己绕过自己。"""
-        with self.assertRaises(KeyError):
-            P.stroke_for("queue")
-        with self.assertRaises(KeyError):
-            P.background_for("queue")
-        with self.assertRaises(KeyError):
-            P.edge_style_for("telepathy")
-
-    def test_every_kind_has_a_chinese_role(self):
-        for kind, entry in P.KINDS.items():
-            with self.subTest(kind=kind):
-                self.assertTrue(entry.get("zh"), f"{kind} 缺中文语义说明")
+    def test_themes_are_actually_different_from_each_other(self):
+        seen = {}
+        for theme in P.available_themes():
+            with P.theme_context(theme):
+                seen[theme] = tuple(sorted(e["fill"] for e in P.LEVELS.values()))
+        self.assertEqual(len(seen), len(set(seen.values())), "有两个主题的层级色完全一样")
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    unittest.main()

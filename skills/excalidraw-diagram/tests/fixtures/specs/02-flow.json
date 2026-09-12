@@ -1,29 +1,141 @@
-{"type":"flow","direction":"TB","title":"CI/CD 发布流程",
- "nodes":[
-  {"id":"push","kind":"client","label":"提交代码"},
-  {"id":"ci","kind":"service","label":"CI 触发"},
-  {"id":"lint","kind":"service","label":"静态检查"},
-  {"id":"build","kind":"service","label":"构建镜像","detail":"多阶段"},
-  {"id":"unit","kind":"service","label":"单元测试"},
-  {"id":"cache","kind":"async","label":"构建缓存"},
-  {"id":"scan","kind":"security","label":"安全扫描"},
-  {"id":"stage","kind":"external","label":"预发环境"},
-  {"id":"e2e","kind":"service","label":"端到端测试"},
-  {"id":"gate","kind":"security","label":"人工审批"},
-  {"id":"prod","kind":"external","label":"生产发布"},
-  {"id":"rollback","kind":"async","label":"自动回滚"},
-  {"id":"notify","kind":"external","label":"通知团队"}],
- "edges":[
-  {"from":"push","to":"ci","kind":"sync"},
-  {"from":"ci","to":"lint","kind":"sync"},
-  {"from":"lint","to":"build","kind":"sync"},
-  {"from":"build","to":"cache","kind":"data"},
-  {"from":"build","to":"unit","kind":"sync"},
-  {"from":"unit","to":"scan","kind":"sync"},
-  {"from":"scan","to":"stage","kind":"sync"},
-  {"from":"stage","to":"e2e","kind":"sync"},
-  {"from":"e2e","to":"gate","kind":"sync"},
-  {"from":"gate","to":"prod","kind":"sync"},
-  {"from":"prod","to":"notify","kind":"async"},
-  {"from":"e2e","to":"rollback","kind":"optional","label":"失败"},
-  {"from":"rollback","to":"notify","kind":"async"}]}
+{
+  "type": "flow",
+  "direction": "TB",
+  "title": "CI/CD 发布流程",
+  "nodes": [
+    {
+      "id": "push",
+      "kind": "client",
+      "label": "提交代码"
+    },
+    {
+      "id": "ci",
+      "kind": "plain",
+      "label": "CI 触发"
+    },
+    {
+      "id": "lint",
+      "kind": "plain",
+      "label": "静态检查"
+    },
+    {
+      "id": "build",
+      "kind": "service",
+      "label": "构建镜像",
+      "detail": "多阶段"
+    },
+    {
+      "id": "unit",
+      "kind": "plain",
+      "label": "单元测试"
+    },
+    {
+      "id": "cache",
+      "kind": "async",
+      "label": "构建缓存"
+    },
+    {
+      "id": "scan",
+      "kind": "security",
+      "label": "安全扫描"
+    },
+    {
+      "id": "stage",
+      "kind": "external",
+      "label": "预发环境"
+    },
+    {
+      "id": "e2e",
+      "kind": "plain",
+      "label": "端到端测试"
+    },
+    {
+      "id": "gate",
+      "kind": "security",
+      "label": "人工审批"
+    },
+    {
+      "id": "prod",
+      "kind": "external",
+      "label": "生产发布"
+    },
+    {
+      "id": "rollback",
+      "kind": "async",
+      "label": "自动回滚"
+    },
+    {
+      "id": "notify",
+      "kind": "external",
+      "label": "通知团队"
+    }
+  ],
+  "edges": [
+    {
+      "from": "push",
+      "to": "ci",
+      "kind": "sync"
+    },
+    {
+      "from": "ci",
+      "to": "lint",
+      "kind": "sync"
+    },
+    {
+      "from": "lint",
+      "to": "build",
+      "kind": "sync"
+    },
+    {
+      "from": "build",
+      "to": "cache",
+      "kind": "data"
+    },
+    {
+      "from": "build",
+      "to": "unit",
+      "kind": "sync"
+    },
+    {
+      "from": "unit",
+      "to": "scan",
+      "kind": "sync"
+    },
+    {
+      "from": "scan",
+      "to": "stage",
+      "kind": "sync"
+    },
+    {
+      "from": "stage",
+      "to": "e2e",
+      "kind": "sync"
+    },
+    {
+      "from": "e2e",
+      "to": "gate",
+      "kind": "sync"
+    },
+    {
+      "from": "gate",
+      "to": "prod",
+      "kind": "sync"
+    },
+    {
+      "from": "prod",
+      "to": "notify",
+      "kind": "async"
+    },
+    {
+      "from": "e2e",
+      "to": "rollback",
+      "kind": "optional",
+      "label": "失败"
+    },
+    {
+      "from": "rollback",
+      "to": "notify",
+      "kind": "async"
+    }
+  ]
+}

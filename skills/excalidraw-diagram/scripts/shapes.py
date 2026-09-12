@@ -61,6 +61,7 @@ DEFAULT_SHAPE_FOR_KIND: dict[str, str] = {
     "async": "capsule",       # 消息 / 队列 —— 管道感
     "security": "round",      # 鉴权 / 网关 —— 仍是服务，只是语义角色不同
     "external": "note",       # 外部系统 —— 虚线框表示"不受控"
+    "plain": "round",       # 普通节点（步骤 / 状态 / 模块）—— 不喧宾夺主
 }
 
 # 圆柱顶盖的高度上限：太厚的盖子在小节点上会挤掉文字

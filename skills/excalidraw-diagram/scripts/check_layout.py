@@ -243,12 +243,13 @@ def _palette_colors() -> set[str]:
     不是手写第二张表 —— 手写就会漂移，而漂移了这张校验就变成假的。
     """
     colors: set[str] = set()
-    for entry in list(palette.KINDS.values()) + list(palette.EDGE_KINDS.values()):
+    for entry in list(palette.LEVELS.values()) + list(palette.EDGE_KINDS.values()):
         colors.update(v for k, v in entry.items() if k in ("stroke", "background"))
     colors.update(v for k, v in palette.CANVAS.items() if k in ("background", "grid", "text"))
     for kind in palette.KINDS:
         for emphasis in palette.EMPHASIS:
-            colors.add(palette.emphasis_fill(kind, emphasis))
+            colors.add(palette.fill_for(kind, emphasis))
+            colors.add(palette.stroke_for(kind, emphasis))
     return colors
 
 
@@ -278,8 +279,8 @@ def check_palette(spec: dict) -> list[Issue]:
                              f"允许值 {sorted(palette.EMPHASIS)}",
                              advice="有强调档位不在允许集合里：改用上面列出的允许值。"))
             continue
-        stroke = palette.stroke_for(kind)
-        background = palette.emphasis_fill(kind, emphasis)
+        stroke = palette.stroke_for(kind, emphasis)
+        background = palette.fill_for(kind, emphasis)
         for got, what in ((stroke, "描边"), (background, "填充")):
             if got not in allowed:
                 out.append(Issue("palette", True, node["id"],

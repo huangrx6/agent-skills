@@ -45,7 +45,8 @@ import contextlib
 # 当前主题的颜色。由 `_rebind()` 在导入时与切换主题时填充 ——
 # 声明放这里（而不是文件末尾），是为了让静态检查看得到这两个名字：
 # 声明放在使用之后，运行时没问题，但分析会说"未绑定"。
-KINDS: dict[str, dict[str, str]] = {}
+LEVELS: dict[str, dict[str, str]] = {}   # 层级名 → {stroke, fill}
+KINDS: dict[str, str] = {}               # 语义角色 → **层级名**（不是颜色）
 EDGE_KINDS: dict[str, dict[str, str]] = {}
 CANVAS: dict = {}
 
@@ -68,48 +69,130 @@ CANVAS: dict = {}
 #
 # **只列真正实现的。** 文档里另外几个是候选，没做出来的不往这里写 ——
 # 写进去就会变成"指向一个空文件"的那种指针。
+#
+# **语义不直接决定颜色。** 中间隔一层"视觉层级"：
+#
+#   kind ──(语义)──→ 默认层级 ──┐
+#                               ├──→ THEMES[主题][层级] ──→ 描边 + 填充
+#   emphasis ──(强调)──────────┘
+#
+# 为什么必须有这一层：六种语义各绑一套颜色，工程上干净，**视觉上一定丑** ——
+# 实测旧色板的六种填充色相跨度 310°（占整个色环 86%），眼睛读到的是"六个颜色"
+# 而不是"一个结构"；一张 14 节点的架构图会出现 6 种节点色 + 3 种边色。
+#
+# 目标是**视觉上只有少数几个颜色，语义上仍然能区分** —— 这两件事不一样。
+# 层级只有 5 档，其中 neutral / tint / accent 承担绝大多数节点，
+# secondary 少量，critical 只在真的异常时用。
+VISUAL_LEVELS = ("neutral", "tint", "accent", "secondary", "critical")
+_LEVEL_ORDER = {name: i for i, name in enumerate(VISUAL_LEVELS)}
+DEFAULT_LEVEL = "tint"
+
 THEMES: dict[str, dict] = {
-    "morandi": {"zh": "莫兰迪（默认，用户指定）"},
+    "morandi": {
+        "zh": "莫兰迪（默认，用户指定）",
+        "canvas": {"background": "#FDFCFA", "grid": "#F1EDE8", "text": "#4A4744"},
+        "levels": {
+            "neutral":   {"stroke": "#A9A49C", "fill": "#FFFFFF"},
+            "tint":      {"stroke": "#A9A49C", "fill": "#F4F1EC"},
+            "accent":    {"stroke": "#7C93A6", "fill": "#CBD8E0"},
+            "secondary": {"stroke": "#8B7FA0", "fill": "#DDD6E4"},
+            "critical":  {"stroke": "#B0888A", "fill": "#F2DEDA"},
+        },
+        "kinds": {
+            "client":   "tint",
+            "service":  "accent",
+            "data":     "tint",
+            "async":    "secondary",
+            "security": "neutral",
+            "external": "neutral",
+            # 通用角色：状态机里的状态、思维导图的叶子、任何"就是个节点"的东西。
+            # 它存在是因为分类学覆盖不到所有图型 —— 状态机里的节点不是"服务"，
+            # 硬套一个角色会让整张图变成强调色（实测过：04-state 75% 是 accent）。
+            # 通用角色：流水线步骤 / 状态机状态 / 普通模块 / 思维导图叶子 ——
+            # 任何“就是个节点、不是那个特殊角色”的东西。没有它的时候这些节点
+            # 只能硬套 service，整张图就变成强调色（实测 04-state 75%、05-network 75%）。
+            # 注意：**加角色不会加颜色** —— 角色映射到已有层级，颜色数由层级封顶。
+            "plain":    "tint",
+        },
+        "edges": {
+            "sync":     {"zh": "同步调用", "stroke": "#A9A49C", "style": "solid"},
+            "data":     {"zh": "数据读写", "stroke": "#A9A49C", "style": "solid"},
+            "async":    {"zh": "异步 / 事件", "stroke": "#A9A49C", "style": "dashed"},
+            "optional": {"zh": "可选 / 条件分支", "stroke": "#A9A49C", "style": "dashed"},
+        },
+    },
     "bright-clean": {
         "zh": "明亮清爽",
         "canvas": {"background": "#FFFFFF", "grid": "#EEF2F6", "text": "#2E3440"},
-        "kinds": {
-            "client":   {"zh": "客户端 / 角色", "stroke": "#6E8CA8", "background": "#D8E6F2"},
-            "service":  {"zh": "核心服务",     "stroke": "#4F8A8B", "background": "#C9E4E2"},
-            "data":     {"zh": "数据 / 存储",   "stroke": "#6B6FA8", "background": "#D5D6EE"},
-            "async":    {"zh": "异步 / 消息",   "stroke": "#B08040", "background": "#F0DFC0"},
-            "security": {"zh": "安全 / 鉴权",   "stroke": "#B06070", "background": "#F2D2D8"},
-            "external": {"zh": "外部系统",     "stroke": "#5F8A5F", "background": "#D0E4CF"},
+        "levels": {
+            "neutral":   {"stroke": "#8A94A0", "fill": "#FFFFFF"},
+            "tint":      {"stroke": "#8A94A0", "fill": "#EDF2F5"},
+            "accent":    {"stroke": "#3F7C8C", "fill": "#C9E4E2"},
+            "secondary": {"stroke": "#6B6FA8", "fill": "#DFE1F2"},
+            "critical":  {"stroke": "#B06070", "fill": "#F5DDE1"},
         },
+        # 语义角色 → **默认层级**。注意大多数角色落在 neutral / tint：
+        # 一张图里"有颜色的"节点应该是少数，颜色才有信息量。
+        "kinds": {
+            "client":   "tint",
+            "service":  "accent",
+            "data":     "tint",
+            "async":    "secondary",
+            "security": "neutral",
+            "external": "neutral",
+            # 通用角色：状态机里的状态、思维导图的叶子、任何"就是个节点"的东西。
+            # 它存在是因为分类学覆盖不到所有图型 —— 状态机里的节点不是"服务"，
+            # 硬套一个角色会让整张图变成强调色（实测过：04-state 75% 是 accent）。
+            # 通用角色：流水线步骤 / 状态机状态 / 普通模块 / 思维导图叶子 ——
+            # 任何“就是个节点、不是那个特殊角色”的东西。没有它的时候这些节点
+            # 只能硬套 service，整张图就变成强调色（实测 04-state 75%、05-network 75%）。
+            # 注意：**加角色不会加颜色** —— 角色映射到已有层级，颜色数由层级封顶。
+            "plain":    "tint",
+        },
+        # 默认连线**统一中性**，只有真的需要区分才上色 ——
+        # 否则会出现"蓝框─蓝线、绿框─绿线"，那是技术 PPT 风。
         "edges": {
-            "sync":     {"zh": "同步调用", "stroke": "#6E7A86", "style": "solid"},
-            "data":     {"zh": "数据流",   "stroke": "#6B6FA8", "style": "solid"},
-            "async":    {"zh": "异步消息", "stroke": "#B08040", "style": "dashed"},
-            "optional": {"zh": "可选 / 间接", "stroke": "#5F8A5F", "style": "dashed"},
+            "sync":     {"zh": "同步调用", "stroke": "#8A94A0", "style": "solid"},
+            "data":     {"zh": "数据流",   "stroke": "#8A94A0", "style": "solid"},
+            "async":    {"zh": "异步消息", "stroke": "#8A94A0", "style": "dashed"},
+            "optional": {"zh": "可选 / 间接", "stroke": "#8A94A0", "style": "dashed"},
         },
     },
     "dark-tech": {
         "zh": "深色科技",
         "canvas": {"background": "#12161C", "grid": "#1D232B", "text": "#E6E9EE"},
+        "levels": {
+            "neutral":   {"stroke": "#5A6472", "fill": "#181D24"},
+            "tint":      {"stroke": "#5A6472", "fill": "#2A3540"},
+            "accent":    {"stroke": "#6FA8D0", "fill": "#13293A"},
+            "secondary": {"stroke": "#9B8FD0", "fill": "#2A2340"},
+            "critical":  {"stroke": "#D08F8F", "fill": "#3A1D26"},
+        },
         "kinds": {
-            # 深色底上"彼此可区分"比浅色底更难：只靠色相不够，明度也要拉开。
-            # 第一版六色都在 #1E~#36 的窄明度带里，两两 ΔE 最小只有 2.5（浅色主题是 6.7）——
-            # 也就是说看着是六块差不多的深灰。这版把明度和色相一起拉开，ΔE 最小 7.8。
-            "client":   {"zh": "客户端 / 角色", "stroke": "#8FA8C0", "background": "#2C3644"},
-            "service":  {"zh": "核心服务",     "stroke": "#6FA8D0", "background": "#13293A"},
-            "data":     {"zh": "数据 / 存储",   "stroke": "#9B8FD0", "background": "#2F2545"},
-            "async":    {"zh": "异步 / 消息",   "stroke": "#D0A56F", "background": "#432E12"},
-            "security": {"zh": "安全 / 鉴权",   "stroke": "#D08F8F", "background": "#431F2A"},
-            "external": {"zh": "外部系统",     "stroke": "#7FB08F", "background": "#12301C"},
+            "client":   "tint",
+            "service":  "accent",
+            "data":     "tint",
+            "async":    "secondary",
+            "security": "neutral",
+            "external": "neutral",
+            # 通用角色：状态机里的状态、思维导图的叶子、任何"就是个节点"的东西。
+            # 它存在是因为分类学覆盖不到所有图型 —— 状态机里的节点不是"服务"，
+            # 硬套一个角色会让整张图变成强调色（实测过：04-state 75% 是 accent）。
+            # 通用角色：流水线步骤 / 状态机状态 / 普通模块 / 思维导图叶子 ——
+            # 任何“就是个节点、不是那个特殊角色”的东西。没有它的时候这些节点
+            # 只能硬套 service，整张图就变成强调色（实测 04-state 75%、05-network 75%）。
+            # 注意：**加角色不会加颜色** —— 角色映射到已有层级，颜色数由层级封顶。
+            "plain":    "tint",
         },
         "edges": {
-            "sync":     {"zh": "同步调用", "stroke": "#A8B0BC", "style": "solid"},
-            "data":     {"zh": "数据流",   "stroke": "#9B8FD0", "style": "solid"},
-            "async":    {"zh": "异步消息", "stroke": "#D0A56F", "style": "dashed"},
-            "optional": {"zh": "可选 / 间接", "stroke": "#7FB08F", "style": "dashed"},
+            "sync":     {"zh": "同步调用", "stroke": "#7A828E", "style": "solid"},
+            "data":     {"zh": "数据流",   "stroke": "#7A828E", "style": "solid"},
+            "async":    {"zh": "异步消息", "stroke": "#7A828E", "style": "dashed"},
+            "optional": {"zh": "可选 / 间接", "stroke": "#7A828E", "style": "dashed"},
         },
     },
 }
+
 DEFAULT_THEME = "morandi"
 
 # 当前生效的主题。为什么用模块级状态而不是把主题一路传参：
@@ -193,58 +276,8 @@ def theme_context(name: str):
     finally:
         use_theme(before)
 
-_MORANDI_KINDS: dict[str, dict[str, str]] = {
-    "client": {
-        "zh": "用户 / 客户端 / 浏览器",
-        "stroke": "#A89E92",
-        "background": "#F2EBDF",
-    },
-    "service": {
-        "zh": "服务 / API / 进程",
-        "stroke": "#7C93A6",
-        "background": "#CBD8E0",
-    },
-    "data": {
-        "zh": "数据库 / 持久化存储",
-        "stroke": "#8B7FA0",
-        "background": "#D8D0DE",
-    },
-    "async": {
-        "zh": "消息队列 / 缓存 / 事件通道",
-        "stroke": "#B08A6C",
-        "background": "#EBDACB",
-    },
-    "security": {
-        "zh": "鉴权 / 网关 / 密钥",
-        "stroke": "#AC8383",
-        "background": "#E8D2D2",
-    },
-    "external": {
-        "zh": "外部系统 / 第三方 / 不受控边界",
-        "stroke": "#809081",
-        "background": "#D1DBD4",
-    },
-}
-
-# 边（箭头）的样式：语义 → 线型。和前作一样保留"虚实表达同步/异步"的区分，
-# 但**不给颜色自由度** —— 边一律用中性色，颜色只用于节点语义。
-_MORANDI_EDGES: dict[str, dict[str, str]] = {
-    "sync": {"zh": "同步调用", "style": "solid", "stroke": "#8A8681"},
-    "data": {"zh": "数据读写", "style": "solid", "stroke": "#8B7FA0"},
-    "async": {"zh": "异步 / 事件", "style": "dashed", "stroke": "#AC896F"},
-    "optional": {"zh": "可选 / 条件分支", "style": "dashed", "stroke": "#849383"},
-}
-
-MAX_KINDS = 6
-
-# 画布与视觉风格（原本写在 PKB 的 resource-notes.md，已收拢到这里）。
-_MORANDI_CANVAS = {
-    "background": "#FDFCFA",   # 暖白，不是纯白 —— 莫兰迪底色偏暖
-    "grid": "#F1EDE8",
-    # 节点里的文字色。暖调深灰，不用纯黑 —— 纯黑与莫兰迪的柔和底色打架。
-    # 与 6 种底色的对比度**已实测**：6.15 ~ 7.78（全部达 WCAG AA；client 达 AAA）。
-    # 数字由 tests/test_palette.py 守住，不是写在注释里的口号。
-    "text": "#4A4744",
+# 画布与画风：与主题无关的部分（三个主题共用）。画风偏好和字体都不该随配色变。
+CANVAS_STYLE = {
     "stroke_style": "hand-drawn",
     "font_family": 2,  # native Excalidraw scene 里 CJK-safe 的那一档
 }
@@ -259,24 +292,6 @@ EXCLUDED_STYLES = (
     "装饰性插画",
     "为了显得丰富而添加的重复图",
 )
-
-
-# 强调层级 —— 封闭枚举。视觉重点靠“描边粗细 + 填充浓度”表达，**不靠尺寸**。
-#
-# 为什么尺寸不参与：尺寸会进尺寸链（文字 → 盒子 → 坐标）。改它就得重新验证
-# 12px 最小间隙那一套阈值，而“哪几处必须一眼看到”这件事本身不需要动几何。
-#
-# 三档的填充都由 `emphasis_fill()` 从色板**派生**，没有第二份表：
-#   primary 向自己的描边色靠一点 → 颜色更实（“更有颜色 = 更重要”，
-#           适合浅色底板，不能用“更深 = 更重要”那套）
-#   normal  就是色板原色（所以默认档与加入 emphasis 之前的观感**完全一致**）
-#   muted   向画布色靠拢一半以上 → 退到背景里
-EMPHASIS: dict[str, dict] = {
-    "primary": {"zh": "重点", "stroke_width": 2.5, "to_stroke": 0.14},
-    "normal": {"zh": "常规", "stroke_width": 1.5, "to_stroke": 0.00},
-    "muted": {"zh": "次要", "stroke_width": 1.0, "to_canvas": 0.55},
-}
-DEFAULT_EMPHASIS = "normal"
 
 
 # ── 颜色数学：**唯一实现**在 palette 里 ────────────────────────
@@ -358,6 +373,55 @@ def _mix(a: str, b: str, ratio: float) -> str:
     return f"#{blend(ra, rb):02X}{blend(ga, gb):02X}{blend(ba, bb):02X}"
 
 
+# ── 强调：**在层级上上下挪一档**，而不是另给一套颜色 ──────────────
+#
+# 两个能力分开：
+#   `kind`     决定**默认层级**（这是语义，"这是个什么角色"）
+#   `emphasis` 决定**在这基础上提/降多少**（这是强调，"这一处要不要突出"）
+#
+# 视觉重点靠"描边粗细 + 层级升降"表达，**不靠尺寸** —— 尺寸会进尺寸链
+# （文字 → 盒子 → 坐标），改它就得重新验证 12px 最小间隙那一套阈值。
+EMPHASIS: dict[str, dict] = {
+    "muted":    {"zh": "次要", "stroke_width": 1.0, "promote": -1},
+    "normal":   {"zh": "常规", "stroke_width": 1.5, "promote": 0},
+    "primary":  {"zh": "重点", "stroke_width": 2.5, "promote": 1},
+    # 警示是**唯一**能进 critical 的入口，而且只给"真的异常/危险"用。
+    # 不要把某个语义角色永久绑成红色（"security = 红"就是那种绑定）。
+    "critical": {"zh": "警示", "stroke_width": 2.5, "promote": 0, "level": "critical"},
+}
+DEFAULT_EMPHASIS = "normal"
+
+
+def level_for(kind: str, emphasis: str = DEFAULT_EMPHASIS) -> str:
+    """这个角色在这档强调下，落在哪个视觉层级。**颜色的唯一入口。**
+
+    未知 kind / emphasis 都抛错，不 fallback（fallback 会让"颜色必须落在板内"
+    这条校验自己绕过自己）。
+
+    提级**封顶在 secondary**：普通节点被"强调"不该变成警示色 ——
+    critical 只能由 `emphasis: critical` 显式指定。
+    """
+    if emphasis not in EMPHASIS:
+        raise KeyError(f"未知 emphasis: {emphasis!r}；允许的取值：{sorted(EMPHASIS)}")
+    if kind not in KINDS:
+        raise KeyError(f"未知 kind: {kind!r}；允许的取值：{sorted(KINDS)}")
+    if "level" in EMPHASIS[emphasis]:
+        return EMPHASIS[emphasis]["level"]
+    index = _LEVEL_ORDER[KINDS[kind]] + EMPHASIS[emphasis]["promote"]
+    ceiling = _LEVEL_ORDER["secondary"]
+    return VISUAL_LEVELS[max(0, min(index, ceiling))]
+
+
+def stroke_for(kind: str, emphasis: str = DEFAULT_EMPHASIS) -> str:
+    """取节点边框色。未知值直接抛错 —— 不 fallback。"""
+    return LEVELS[level_for(kind, emphasis)]["stroke"]
+
+
+def fill_for(kind: str, emphasis: str = DEFAULT_EMPHASIS) -> str:
+    """取节点填充色。**唯一来源是主题的层级表**，没有第二张表。"""
+    return LEVELS[level_for(kind, emphasis)]["fill"]
+
+
 def emphasis_stroke_width(emphasis: str) -> float:
     """未知 emphasis 直接抛错 —— 与 kind / shape 同一条规矩。"""
     try:
@@ -365,45 +429,6 @@ def emphasis_stroke_width(emphasis: str) -> float:
     except KeyError:
         raise KeyError(
             f"未知 emphasis: {emphasis!r}；允许的取值：{sorted(EMPHASIS)}"
-        ) from None
-
-
-def emphasis_fill(kind: str, emphasis: str) -> str:
-    """这个语义角色在这档强调下的填充色。**唯一来源是色板本身。**
-
-    未知 kind / emphasis 都抛错，不 fallback（fallback 会让“颜色必须落在板内”
-    这条校验自己绕过自己）。
-    """
-    if emphasis not in EMPHASIS:
-        raise KeyError(
-            f"未知 emphasis: {emphasis!r}；允许的取值：{sorted(EMPHASIS)}"
-        )
-    base = background_for(kind)
-    rule = EMPHASIS[emphasis]
-    if "to_stroke" in rule:
-        return _mix(base, stroke_for(kind), rule["to_stroke"])
-    if "to_canvas" in rule:
-        return _mix(base, CANVAS["background"], rule["to_canvas"])
-    return base
-
-
-def stroke_for(kind: str) -> str:
-    """取节点边框色。未知 kind 直接抛错 —— 不 fallback。"""
-    try:
-        return KINDS[kind]["stroke"]
-    except KeyError:
-        raise KeyError(
-            f"未知 kind: {kind!r}；允许的取值：{sorted(KINDS)}"
-        ) from None
-
-
-def background_for(kind: str) -> str:
-    """取节点填充色。未知 kind 直接抛错 —— 不 fallback。"""
-    try:
-        return KINDS[kind]["background"]
-    except KeyError:
-        raise KeyError(
-            f"未知 kind: {kind!r}；允许的取值：{sorted(KINDS)}"
         ) from None
 
 
@@ -416,34 +441,33 @@ def edge_style_for(kind: str) -> str:
         ) from None
 
 
-if __name__ == "__main__":
-    # 人类可读的清单：python3 palette.py
-    print(f"节点语义（{len(KINDS)} 类，上限 {MAX_KINDS}）")
-    for k, v in KINDS.items():
-        print(f"  {k:<9} {v['zh']:<24} 边框 {v['stroke']}  填充 {v['background']}")
-    print(f"\n边语义（{len(EDGE_KINDS)} 类）")
-    for k, v in EDGE_KINDS.items():
-        print(f"  {k:<9} {v['zh']:<12} {v['style']:<7} {v['stroke']}")
-
-
 def _rebind() -> None:
-    """把当前主题的颜色装进 KINDS / EDGE_KINDS / CANVAS。
+    """把当前主题装进 LEVELS / KINDS（角色→层级）/ EDGE_KINDS / CANVAS。
 
-    morandi 的定义就写在本文件里（历史原因），别的主题从 THEMES 取 ——
-    这里做的是"两份取一份"。
+    morandi 现在和其他主题**同一套结构**，这里不再有特例分支
+    （以前它的定义散在三个独立常量里，是封闭枚举里唯一的例外）。
     """
-    global KINDS, EDGE_KINDS, CANVAS
-    if _active == "morandi":
-        KINDS = dict(_MORANDI_KINDS)
-        EDGE_KINDS = dict(_MORANDI_EDGES)
-        CANVAS = dict(_MORANDI_CANVAS)
-        return
+    global LEVELS, KINDS, EDGE_KINDS, CANVAS
     spec = THEMES[_active]
-    KINDS = {k: dict(v) for k, v in spec["kinds"].items()}
+    LEVELS = {k: dict(v) for k, v in spec["levels"].items()}
+    KINDS = dict(spec["kinds"])
     EDGE_KINDS = {k: dict(v) for k, v in spec["edges"].items()}
-    CANVAS = {**spec["canvas"],
-              "stroke_style": _MORANDI_CANVAS["stroke_style"],
-              "font_family": _MORANDI_CANVAS["font_family"]}
+    CANVAS = {**spec["canvas"], **CANVAS_STYLE}
 
 
 _rebind()
+
+
+if __name__ == "__main__":
+    # 人类可读的清单：python3 palette.py
+    print(f"视觉层级（{len(VISUAL_LEVELS)} 档）")
+    for name in VISUAL_LEVELS:
+        v = LEVELS[name]
+        print(f"  {name:<10} 描边 {v['stroke']}  填充 {v['fill']}")
+    print(f"\n语义角色（{len(KINDS)} 类）—— 它们映射到上面的层级（角色数不设限，颜色只有 5 档）")
+    for k, level in KINDS.items():
+        v = LEVELS[level]
+        print(f"  {k:<9} → {level:<9} 描边 {v['stroke']}  填充 {v['fill']}")
+    print(f"\n边型（{len(EDGE_KINDS)} 类）—— 默认全部中性，只有线型表达语义")
+    for k, v in EDGE_KINDS.items():
+        print(f"  {k:<9} {v['zh']:<12} {v['style']:<7} {v['stroke']}")
