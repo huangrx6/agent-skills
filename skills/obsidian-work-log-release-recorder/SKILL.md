@@ -22,23 +22,11 @@ Before writing anything to the vault, you **must**:
 2. Load `obsidian-personal-knowledge-base/references/writing-conventions.md` — naming, frontmatter, link, and MOC conventions.
 3. Probe the target area with a single-level `ls` (see Location Decision) — `vault-map.md` is a snapshot, not authoritative; file system wins on conflict.
 
-These are hard requirements, not suggestions. If `obsidian-personal-knowledge-base` is not installed, tell the user to install it first and stop. Do not write into the vault based on assumptions about its structure.
-
-### Dependency on obsidian-personal-knowledge-base
-
-This skill reuses the vault conventions owned by `obsidian-personal-knowledge-base` rather than duplicating them. When that skill's references change, this skill inherits the change — do not fork the conventions here.
+These are hard requirements, not suggestions. If `obsidian-personal-knowledge-base` is not installed, tell the user to install it first and stop. Do not write into the vault based on assumptions about its structure. Do not fork the vault conventions into this skill — when PKB's references change, this skill inherits the change.
 
 ## Scope
 
-Use this skill with the Obsidian vault at:
-
-`/Users/huangrx6/Documents/obsidian`
-
-Use the existing `obsidian-personal-knowledge-base` skill conventions when writing in that vault:
-
-- read `references/vault-map.md` before choosing a location if the destination is not obvious
-- read `references/writing-conventions.md` before creating or heavily editing notes
-- reuse the nearest existing project, area, resource note, MOC, or template rather than inventing a parallel structure
+Reuse the nearest existing project, area, resource note, MOC, or template rather than inventing a parallel structure. When no existing note owns the topic, follow the placement rules in `obsidian-personal-knowledge-base/references/vault-map.md`.
 
 ## Trigger Signals
 
@@ -66,14 +54,7 @@ Good candidates:
 - execution order assumptions, dependencies, preconditions, and risks
 - durable design decisions that affect future work
 
-Do not record:
-
-- raw conversation
-- every file touched when only a summary matters
-- failed experiments unless they prevent future mistakes
-- trivial formatting, typo fixes, or local-only noise
-- secrets, tokens, passwords, private keys, cookies, or full credentials
-- speculative plans that were not accepted or implemented
+Do not record: raw conversation; every file touched when only a summary matters; failed experiments unless they prevent future mistakes; trivial formatting or local-only noise; secrets, tokens, passwords, or full credentials; speculative plans that were not accepted.
 
 If a detail looks sensitive but operationally important, record the variable or config name and location, not the secret value.
 
@@ -93,17 +74,11 @@ For this skill, resolve paths by **probing**, not from memory.
 3. If the intended directory does not exist, **ask the user where to create it** — do not write into a non-existent path.
 4. Update the nearest MOC/index after creating a new durable note.
 
-### Common scenario: AsiaInfo / 内部系统A operations (verify before use)
+### Common scenario: AsiaInfo / 内部系统A operations
 
-Historically this lived under `02 Areas/客户X/`, with a release note at `02 Areas/客户X/03 内部系统A/资源笔记 - 内部系统A部署与发布.md`.
+Release and operations work for 内部系统A (deployment, server paths, package movement, Docker restart, FastAPI backend release, H5/admin frontend release) historically lived at `02 Areas/客户X/03 内部系统A/`.
 
-> ⚠️ **As of 2026-09-11 that directory does not exist** — `02 Areas/` is empty. Do not assume the path is writable.
-
-If the work is about 内部系统A deployment, release, server paths, package movement, Docker restart, FastAPI backend release, H5/admin frontend release, or related operational scripts:
-
-1. Probe `02 Areas/` to see whether a matching area exists.
-2. If it exists, update the nearest matching note.
-3. If it does not exist, tell the user the historical path is gone and ask where the notes should live before creating anything.
+> ⚠️ **As of 2026-09-11 that directory does not exist — `02 Areas/` is empty.** Probe first; if no matching area exists, tell the user the historical path is gone and ask where the notes should live before creating anything.
 
 ## Weekly Release Note
 
@@ -113,91 +88,13 @@ Default naming:
 
 `发版 - <系统或项目名> - YYYY-Www.md`
 
-Examples:
+Examples: `01 Projects/<项目名>/发版 - <项目名> - 2026-W18.md` or `02 Areas/<领域>/<子主题>/发版 - <系统或项目名> - 2026-W18.md`.
 
-- `01 Projects/<项目名>/发版 - <项目名> - 2026-W18.md`
-- `02 Areas/<领域>/<子主题>/发版 - <系统或项目名> - 2026-W18.md`
-
-Use ISO week numbering unless the user provides a different release naming convention. If a note for the current week already exists, update it instead of creating another.
-
-Before using either example, probe the parent folder to confirm it exists; if it does not, ask the user where the release note should live.
+Use ISO week numbering unless the user provides a different release naming convention. If a note for the current week already exists, update it instead of creating another. Probe the parent folder before writing; if it does not exist, ask the user where the release note should live.
 
 ## Weekly Release Note Template
 
-Use this structure unless a nearby existing note has a stronger local convention:
-
-````markdown
----
-type: review
-status: active
-area:
-project:
-created: YYYY-MM-DD
-tags:
-  - 发版
----
-
-# 发版 - <系统或项目名> - YYYY-Www
-
-敬畏每一行代码，敬畏每一次变更。通过结构化、可验证、可回溯的方式，降低发布风险，保障系统稳定。
-
-## 01 基本信息
-
-| 项目 | 内容 |
-| --- | --- |
-| 发布名称 |  |
-| 发布类型 | 常规发布 |
-| 发布时间 | 待确认 |
-| 发布申请人 | 待确认 |
-| 核心协同成员 | 运维 - 待确认；开发 - 待确认；测试 - 待确认 |
-
-## 02 版本内容
-
-| 需求类型 | 需求详情 |
-| --- | --- |
-| 新增 |  |
-| 优化 |  |
-| 修改 |  |
-
-## 03 变更影响
-
-| 分类 | 是否涉及 |
-| --- | --- |
-| 数据库变更 |  |
-| 服务端配置变更 |  |
-| 服务端代码变更 |  |
-| H5 前端代码变更 |  |
-| PC 前端代码变更 |  |
-| 运营侧前端代码变更 |  |
-
-## 04 发布依赖清单
-
-| 分类 | 内容 |
-| --- | --- |
-| SQL 脚本 |  |
-| YML 配置 |  |
-| Nginx 配置 |  |
-
-## 05 发布服务清单
-
-| 服务分类 | 服务名称 | 服务描述 |
-| --- | --- | --- |
-| 前端 |  |  |
-| 后端 |  |  |
-
-## 06 发布执行步骤
-
-注意：
-
-- 上传相关打包文件到内网主机。
-- 部署前先行备份原来的服务包。
-- SQL 执行前备份相关表或数据库。
-- 配置文件修改前备份相关配置文件。
-
-执行步骤：
-
-1. 
-````
+Read `references/release-note-template.md` and use its structure unless a nearby existing note has a stronger local convention.
 
 Keep release notes short. Put full scripts or config snippets under `04 发布依赖清单`, but avoid turning the note into a detailed runbook unless the user asks for operational depth.
 
@@ -212,19 +109,21 @@ Keep release notes short. Put full scripts or config snippets under `04 发布�
    - Create the weekly release note only when release-relevant details exist.
    - Update the nearest MOC when a new durable note is created.
 
-3. Write the smallest durable update.
-   - Add compact bullets for work logs.
-   - Add command blocks only when future execution needs exact commands.
-   - Explain non-obvious command flags, config fields, paths, and ordering assumptions.
+3. Write the smallest durable update that stays operational.
+   - Compact bullets for work logs; command blocks only when future execution needs exact commands.
+   - Explain non-obvious flags, config fields, paths, and ordering assumptions.
+   - Record what to run, where, what it affects, and how to verify it.
+   - Include skipped validation explicitly, plus backup and rollback steps for release notes when known.
 
-4. Preserve operational usefulness.
-   - Record what to run, where to run it, what it affects, and how to verify it.
-   - Include skipped validation explicitly when relevant.
-   - Include backup and rollback steps for release notes whenever they are known.
-
-5. Verify link and structure integrity.
+4. Verify link and structure integrity.
    - Ensure new notes are linked from the nearest MOC or parent note.
    - Avoid duplicating the same release instructions in multiple places; cross-link instead.
+
+5. Report back briefly — keep the handoff short; the value is in the notes.
+   - Which notes were created or updated.
+   - What landed points were recorded.
+   - Whether a weekly release note was created or updated.
+   - Any assumptions, skipped validation, or missing release details.
 
 ## Writing Style
 
@@ -236,21 +135,8 @@ Write like an operations memory, not a diary:
 - no inflated summaries; prefer exact commands, paths, and constraints
 - no secrets
 
-## Output To User
-
-After updating the vault, report:
-
-- which Obsidian notes were created or updated
-- what landed points were recorded
-- whether a weekly release note was created or updated
-- any assumptions, skipped validation, or missing release details
-
-Keep the handoff short. The value is in the notes.
-
 ## Installation
 
-Install via the repo-root `npx skills add huangrx6/agent-skills` (see repo-root [README.md](../../README.md)). After installing:
+Install via the repo-root `npx skills add huangrx6/agent-skills` (see repo-root [README.md](../../README.md)).
 
-1. Confirm your vault path matches `/Users/huangrx6/Documents/obsidian`
-2. Install `obsidian-personal-knowledge-base` first if not already installed — this skill depends on its `references/vault-map.md` and `references/writing-conventions.md`
-3. Agent will read both skills' references when triggered to write release notes
+**Install `obsidian-personal-knowledge-base` first** — this skill depends on its `references/vault-map.md` and `references/writing-conventions.md`, and refuses to write when they are unavailable.
