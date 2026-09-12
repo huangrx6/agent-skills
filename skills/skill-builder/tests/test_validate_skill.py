@@ -117,13 +117,42 @@ class ValidateSkillTest(unittest.TestCase):
             "分两行声明的真矛盾没被抓到 —— 这正是 WLRR 当初的形态",
         )
 
+    # 已知的否定写法 —— 全是实测过会误报的。一个合理的“不绑定”写法被当成矛盾，
+    # 会直接挡住提交，所以这些必须覆盖。不穷尽语言学变体，但这几种是关于
+    # “绑定本机”的常见说法，中英文都有。
+    NEGATED_FORMS = (
+        "路径从配置解析,**不绑定本机**",
+        "该 skill 并不绑定本机",
+        "该 skill 无需绑定本机",
+        "该 skill 没有绑定本机",
+        "该 skill 并不需要绑定本机",
+        "This skill is not bound to a specific machine.",
+        "This skill isn't bound to a specific machine.",
+        "This skill is no longer bound to a specific machine.",
+        "This skill cannot be bound to a specific machine.",
+        "This skill is never bound to a specific machine.",
+    )
+
     def test_negated_declaration_is_not_flagged(self):
+        for form in self.NEGATED_FORMS:
+            with self.subTest(form=form):
+                body = (f"# t\n\n- {form}\n"
+                        "- path reads from ~/.config/obsidian-vault-path\n\n"
+                        "| a | b |\n| --- | --- |\n")
+                self.assertFalse(
+                    self.fails(_skill(self.tmp, "negation", body=body)),
+                    f"否定写法被当成绑定声明了: {form}",
+                )
+
+    def test_negation_in_previous_sentence_does_not_suppress(self):
+        # 前看窗口不能太长，否则上一句的否定会连这一句的真声明一起豁免
         body = ("# t\n\n"
-                "- 路径从配置解析,**不绑定本机**\n"
-                "- machine path is never hardcoded\n")
-        self.assertFalse(
-            self.fails(_skill(self.tmp, "negation", body=body)),
-            "「不绑定本机」被当成绑定声明了 —— 意思正好相反",
+                "- This skill is not a chat toy. It is bound to a specific machine.\n"
+                "- path reads from ~/.config/obsidian-vault-path\n\n"
+                "| a | b |\n| --- | --- |\n")
+        self.assertTrue(
+            self.fails(_skill(self.tmp, "neg-cross", body=body)),
+            "上一句里的否定把这一句的真声明也豁免掉了 —— 前看窗口太长",
         )
 
     def test_describing_the_antipattern_is_not_flagged(self):

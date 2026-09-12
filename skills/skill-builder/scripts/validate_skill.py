@@ -66,12 +66,23 @@ PORTABLE_PATTERNS = (
 QUOTED_SPAN_RE = re.compile(r'''"[^"\n]*"|“[^”\n]*”|`[^`\n]*`''')
 # 否定式不算声明。“不绑定本机”说的是“不绑定”，意思正好相反。
 #
-# 已知局限（2026-09-12 记）：只看匹配**前两个字符**里有没有否定词，所以
-# “该 skill 并不绑定本机”这种否定词不在紧跟位置的句式，理论上会被误判成矛盾。
-# 没改是因为按本仓库定的停止判据，元工具只需边界值/变异测试覆盖已知形态，
-# 不要求穷尽语言学变体。如果将来真在这类句式上误报，根源就在这里 ——
-# 到时候只需把前看窗口放宽或改成句内任意位置的否定词。
-NEGATION_CHARS = "不无非未"
+# 否定词表包含中英文，英文那几种是这类声明最常见的写法：
+#     This skill is not bound to a specific machine.
+#     This skill isn't / is no longer / cannot be bound to ...
+# 最初只查了中文四个字且只看前面 2 个字符，实测这几种全都会误报（一个合理的
+# “不绑定”写法被当成矛盾，会直接挡住提交）。
+#
+# n['’]t 前面**不能**加 \b：isn't 的结构是 i-s-n-'-t，“n” 前面是 “s”（单词字符），
+# \b 永远不成立，写 \bn't\b 会静默失效。直接匹配撇号后的 n't 即可。
+# 两种撇号（ASCII ' 与 ’）都认。
+#
+# 已知局限（2026-09-12 记）：仍是个启发式，不穷尽语言学变体。没继续做是因为按
+# 本仓库的停止判据，元工具只需覆盖已知形态。如果将来在别的句式上误报，根源就是
+# 这里的词表与 NEGATION_WINDOW —— 加词或放宽窗口即可。
+NEGATION_RE = re.compile(r"(?:不|无|非|未|没|勿|别)|n['’]t\b|\b(?:not|no longer|never|cannot)\b", re.I)
+# 往前看多少字符找否定词。要能覆盖中文的“并不需要绑定”（隔 2 字）和英文的
+# “is no longer bound”（隔 2 个词），又不能太长 —— 否则上一句的否定会误伤这一句。
+NEGATION_WINDOW = 14
 FM_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
 
 
@@ -97,7 +108,8 @@ def find_contradiction(desc: str, body: str) -> tuple[set[int], set[int]]:
             portable.add(i)
         for pat in BOUND_PATTERNS:
             for m in re.finditer(pat, clean, re.I):
-                if any(ch in NEGATION_CHARS for ch in clean[max(0, m.start() - 2):m.start()]):
+                # 往前看一小段找否定词：“不绑定本机” / “is not bound to ...”
+                if NEGATION_RE.search(clean[max(0, m.start() - NEGATION_WINDOW):m.start()]):
                     continue
                 bound.add(i)
     return bound, portable
