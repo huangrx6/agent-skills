@@ -90,10 +90,21 @@ git clone https://github.com/<owner>/agent-skills.git
 ## 维护约定
 
 - **目录名 = frontmatter `name` 字段**,保持一致
-- 改完 skill 跑 `python3 skills/skill-builder/scripts/validate_skill.py` —— 机械检查 10 项(YAML 可解析、name 匹配目录名、description < 800 字符、含 Do NOT 边界、正文 ≤ 150 行等),退出码 `0` 通过 / `1` 失败
+- 改完 skill 跑 `python3 skills/skill-builder/scripts/validate_skill.py` —— 机械检查结构硬错误(YAML 可解析、name 匹配目录名、description < 800 字符、含 Do NOT 边界、正文 ≤ 150 行、无绑定声明矛盾等),退出码 `0` 通过 / `1` 失败。**完整清单以脚本输出为准,不在这里拄一份**——拄了就会和脚本漂移
 - 正文余量不足 10 行时脚本会另提示一行(`!` 前缀,不影响退出码):**下次要往正文加规则前,先做 references 瘦身**。瘦身由下一次真实需求触发,不靠“等哪天有空”——一直没空就一直不做。
-- **Obsidian 类**绑定具体 vault 路径(跨机复用性低)
+- **Obsidian 类**的 vault 路径从配置解析(见上方 Skills 索引),换机器或 vault 搬家只改一处,不要在文档或脚本里写死。某个 skill 真的不可移植时才显式声明——而**把它改造成可移植之后,必须在同一次里删掉那条声明**,否则就成了自相矛盾(`validate_skill.py` 会把这种情况判为失败)
 - 本仓库的 `.skill-lock.json` 已被 `.gitignore` 排除——那是 pi 工具的本地 lock,每台机器自己生成
+
+### 什么时候可以不修(停止判据)
+
+改进会递归:修完一个问题会露出下一层(写回规则 → eval 标尺 → 检查器自己没测试),而“给测试写的测试谁来验证”理论上没有尽头。所以设一条线:
+
+| 层 | 要求 | 不再要求 |
+| --- | --- | --- |
+| **核心行为**(skill 的规则本身) | 必须有 eval 覆盖 | — |
+| **元工具**(校验脚本) | 边界值测试 | 不再验证“测试本身对不对” |
+
+遇到新遗留先归到这二层:落第一层的就得做;落第二层的,边界值测完就停——不用每轮重新权衡。
 
 ### 自动校验(git hook)
 

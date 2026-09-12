@@ -127,7 +127,7 @@ description: >-
 
 ## Minimum Viable SKILL.md Checklist
 
-**先跑脚本**（前 10 项是机械检查，不要靠肉眼——实测中“正文 ≤ 150 行”被连续违反两次都没看出来）：
+**先跑脚本**（机械检查，不要靠肉眼——实测中“正文 ≤ 150 行”被连续违反两次都没看出来）：
 
 ```sh
 python3 scripts/validate_skill.py            # 扫本仓库全部 skill

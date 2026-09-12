@@ -26,11 +26,75 @@ import sys
 MAX_DESC = 800
 MAX_BODY_LINES = 150
 # 余量低于此值时提示（不判失败）。
-# 2026-09-12 三个 skill 同时逼近上限（146/143/145），意味着下一次“真实需要的新规则”
+# 2026-09-12 三个 skill 同时逼近上限（146/143/147），意味着下一次“真实需要的新规则”
 # 没有空间直接加进去 —— 那时会被迫先做 references 瘦身。与其等到那一刻才发现，
 # 不如每次校验都把它显出来。只说事实（余量多少、该先做什么），不替人决定要不要加。
 HEADROOM_MIN = 10
+
+# 「绑定本机」声明 与 「从配置读」表述 同时出现 = 自相矛盾，直接判失败。
+#
+# 2026-09-12 实测（WLRR）：同一段里上面写着
+#     This skill is bound to a specific machine and Obsidian vault
+# 下面写着
+#     vault path resolves from $OBSIDIAN_VAULT_PATH — never hardcode it
+# 成因：把硬编码路径改成配置解析之后，没删掉原来的绑定声明。agent 读到会据此
+# 拒绝在别的机器上工作。
+#
+# 为什么必须做成检查：skill-builder 里早就有一句“声明要撤”的提醒，而同一类错误
+# 又发生了一次 —— 提醒别人自己记得做，就是那个偷懒路径。
+#
+# 只匹配**引号外**的表述：skill-builder 会合法地引用 "bound to specific machine"
+# 作为“要显式声明什么”的例子，那不该被当成矛盾。
+BOUND_PATTERNS = (
+    r"bound to (?:a )?specific machine",
+    r"machine[- ]bound",
+    r"cross-machine reuse is limited",
+    r"绑定(?:到)?(?:本机|特定机器)",
+    r"跨机复用(?:性)?(?:低|受限)",
+)
+PORTABLE_PATTERNS = (
+    r"never hardcod",
+    r"not hardcod",
+    r"从配置(?:读取|解析|取)",
+    r"解析(?:顺序|自|出)(?:见|见下方|按)",
+    r"resolves? from \$",
+    r"reads? from",
+    r"~/\\.config/",
+    r"OBSIDIAN_VAULT_PATH",
+)
+# 引号里的内容当例子看，不参与“矛盾”判定
+QUOTED_SPAN_RE = re.compile(r'''"[^"\n]*"|“[^”\n]*”|`[^`\n]*`''')
+# 否定式不算声明。“不绑定本机”说的是“不绑定”，意思正好相反。
+NEGATION_CHARS = "不无非未"
 FM_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
+
+
+def find_contradiction(desc: str, body: str) -> tuple[set[int], set[int]]:
+    """找出「绑定本机」与「从配置读」同时断言的行号。返回 (bound 行号, portable 行号)。
+
+    两个约束都是为了不误报，都是实测出来的：
+
+    1. **否定式不算**。“路径从配置解析，**不绑定本机**”里的“绑定本机”是在说
+       不绑定，意思正好相反。只看匹配前两个字符里有没有否定词。
+    2. **必须在不同行**。真正出问题的形态是“上面写一边、下面写另一边”
+       （WLRR：上半段 bound、下半段 resolves from）。同一行里两侧同时出现的，
+       几乎都是在**描述这个失败模式本身** —— skill-builder 那句就是
+       “上面说绑定本机，下面说路径从配置解析”，它不是在犯这个错。
+
+    判定规则：存在一行有 bound 但没有 portable，且全文有 portable。
+    """
+    bound: set[int] = set()
+    portable: set[int] = set()
+    for i, line in enumerate((desc + "\n" + body).split("\n")):
+        clean = QUOTED_SPAN_RE.sub(" ", line)
+        if any(re.search(p, clean, re.I) for p in PORTABLE_PATTERNS):
+            portable.add(i)
+        for pat in BOUND_PATTERNS:
+            for m in re.finditer(pat, clean, re.I):
+                if any(ch in NEGATION_CHARS for ch in clean[max(0, m.start() - 2):m.start()]):
+                    continue
+                bound.add(i)
+    return bound, portable
 # description 里应出现的触发表达（中英皆可）
 TRIGGER_HINTS = ("Use this skill", "Use when", "用于", "触发")
 
@@ -112,6 +176,16 @@ def check_skill(path: str) -> dict:
             f"正文余量只剩 {headroom} 行：下次要往正文加规则前，先做 references 瘦身"
         )
     add("正文含表格或清单", "|" in body or "\n- " in body)
+
+    # 绑定声明 vs 可移植表述：引号里的当例子看，只看引号外的
+    bound, portable = find_contradiction(desc, body)
+    conflicting = bound - portable
+    if conflicting and portable:
+        add("无「绑定本机 + 从配置读」矛盾", False,
+            f"第 {sorted(conflicting)} 行声明绑定本机，全文又有“从配置读”的表述；"
+            f"已改成从配置读路径的话，同一次里删掉绑定声明")
+    else:
+        add("无「绑定本机 + 从配置读」矛盾", True)
 
     for sub in ("references", "evals"):
         d = os.path.join(path, sub)
