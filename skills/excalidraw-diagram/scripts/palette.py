@@ -50,18 +50,6 @@ KINDS: dict[str, str] = {}               # 语义角色 → **层级名**（不�
 EDGE_KINDS: dict[str, dict[str, str]] = {}
 CANVAS: dict = {}
 
-# ⚠️ **本文件有一个历史特例：`morandi`。**
-# 它是默认主题，但定义**不在** `THEMES` 里 —— `THEMES["morandi"]` 只有一个名字，
-# 真正的颜色在下面的 `_MORANDI_KINDS` / `_MORANDI_EDGES` / `_MORANDI_CANVAS` 三个常量里，
-# `_rebind()` 对它单独开了一个分支。
-#
-# **动 KINDS / EDGE_KINDS 结构的人必须同时改这三个常量。**
-# 否则新加的 kind 在里面没有对应项 → 未知 kind 会抛错，不是静默降级（这点还好），
-# 但错误信息会指向主题而不是"你漏改了一个常量"。
-#
-# 这是封闭枚举里唯一的例外分支，是未来最容易漏改的地方。
-# 待办：把 morandi 迁进 `THEMES` 的标准结构，去掉 `_rebind()` 的分支。
-
 # ── 主题 = 一套**视觉语言**，不是一套色值套餐 ────────────────────
 #
 # 一个主题**只手写两个色相**：一个主色（accent）+ 一个状态色（critical）。
@@ -189,15 +177,15 @@ _active = DEFAULT_THEME
 # 图类型 → 建议主题（#76）。**只引用已实现的主题** —— 指向一个不存在的主题名
 # 就是"指向空文件的指针"，写规格的人会照着一个永远报错的值去写。
 #
-# 这是**建议**，不是默认：默认永远是 `morandi`（用户明确指定过）。
+# 这是**建议**，不是默认：默认永远是 `soft-light`（用户明确指定过）。
 # 想用建议就必须显式写 `"theme": "auto"` —— 自动覆盖用户的选择是错的。
 # 只列**例外**：没列到的图类型都用 `DEFAULT_THEME`。
 # 以前这里把 8 个图类型全抄了一遍，于是同一个漂移又发生一次 ——
 # `component` / `sequence` 早就不在合法类型里了，这里还留着。
 THEME_SUGGESTION: dict[str, str] = {
     # 其余图类型（architecture / dependency / state / network）不列 —— 走 DEFAULT_THEME
-    "flow": "bright-clean",          # 流程要明快、有节奏
-    "mindmap": "bright-clean",       # 结构图要清爽
+    "flow": "clean-light",           # 流程要明快、有节奏
+    "mindmap": "clean-light",        # 结构图要清爽
 }
 AUTO_THEME = "auto"
 
@@ -426,8 +414,8 @@ def edge_style_for(kind: str) -> str:
 def _rebind() -> None:
     """把当前主题装进 LEVELS / KINDS（角色→层级）/ EDGE_KINDS / CANVAS。
 
-    morandi 现在和其他主题**同一套结构**，这里不再有特例分支
-    （以前它的定义散在三个独立常量里，是封闭枚举里唯一的例外）。
+    三个主题**同一套结构**，这里没有特例分支。（`soft-light` 曾经是个例外 ——
+    定义散在三个独立常量里 —— 已在重构颜色模型时合并掉了。）
     """
     global LEVELS, KINDS, EDGE_KINDS, CANVAS, ROLES
     spec = THEMES[_active]

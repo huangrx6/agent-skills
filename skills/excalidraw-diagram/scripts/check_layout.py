@@ -239,7 +239,7 @@ def check_text_fit(spec: dict, result: ResultT,
 def _palette_colors() -> set[str]:
     """“在板内”的完整取值集合。
 
-    强调层级的派生色**也从色板算出来**（`palette.emphasis_fill`），
+    强调层级的派生色**也从色板算出来**（`palette.fill_for` / `stroke_for`），
     不是手写第二张表 —— 手写就会漂移，而漂移了这张校验就变成假的。
     """
     colors: set[str] = set()
