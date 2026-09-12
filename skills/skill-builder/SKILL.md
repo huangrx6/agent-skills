@@ -76,21 +76,14 @@ P0 是新 skill 的最佳档。P1 / P2 一开始就要警惕——很可能该�
 
 description 是 Agent 唯一的触发器,占整张 SKILL.md 工作量的 60%。
 
-### Anti-patterns(导致触发失败)
+### 六条规则（每条都带反例）
 
-- ❌ **太宽**:"AI 助手"、"提高效率"、"通用工具"(Agent 不知道何时触发)
-- ❌ **太窄**:列举具体文件路径、具体人名、具体机器(换环境就不触发)
-- ❌ **关键词堆砌**:"X、Y、Z、A、B、C"(没权重信号,Agent 全打散)
-- ❌ **模糊动词**:"处理"、"搞定"、"做"(没说做什么动作)
-- ❌ **没有 Do NOT use this skill when 边界**(几乎一定误触发)
-
-### Good patterns
-
-- ✅ 第一句说"Use this skill when..."触发场景
-- ✅ 列出 3-6 个具体动词 + 1-3 个对象(`整理`、`归位`、`创建`、`审阅` + `笔记`)
-- ✅ 第二句说"Do NOT use this skill when..."边界,边界尽量具体
-- ✅ 如果 skill 跨机 / 跨环境不可用,**显式声明**("bound to specific machine" / "依赖特定 vault 路径")—— 但这条声明会过期:把它改成从配置读路径之后,**必须在同一次里删掉声明**。留着会变成自相矛盾(实测 WLRR 就是如此:上面说绑定本机,下面说路径从配置解析),agent 会据此拒绝在别的机器上工作。
-- ✅ description 总长度控制在 800 字符以内(太长会触发阈值被截断)
+- 第一句 `Use this skill when...` 说清触发场景。**别写“AI 助手”“提高效率”“通用工具”** —— 太宽，Agent 不知道何时触发。
+- 列 3-6 个具体动词 + 1-3 个对象（`整理`、`归位`、`创建`、`审阅` + `笔记`）。**别列举具体文件路径、人名、机器** —— 太窄，换环境就不触发。
+- 第二句 `Do NOT use this skill when...`，边界尽量具体。**没有 Do NOT 边界几乎一定误触发**；也别堆关键词（`X、Y、Z`），那没有权重信号。
+- 动词要具体。**别用“处理”“搞定”“做”** —— 没说做什么动作。
+- 总长度 ≤ 800 字符，太长会触发阈值被截断。
+- 真的跨机不可用时才显式声明；而**把它改造成从配置读路径之后，必须在同一次里删掉那条声明** —— 留着会自相矛盾（实测 WLRR：上面说绑定本机，下面说路径从配置解析），agent 会据此拒绍在别的机器上工作。
 
 ### 描述模板
 
@@ -104,26 +97,11 @@ description: >-
 
 ## Scope Discipline — 写什么 / 不写什么
 
-### 写进 SKILL.md 的
-
-- 起手流程(用户在第一句问"怎么办"时就能跑)
-- 1-3 个核心决策表
-- Anti-pattern(明确的"不要做")
-- 一两个例子(如果有)
-
-### 不写进 SKILL.md 的(放到 `references/` 或 `examples/`)
-
-- 长文背景知识
-- 完整的决策树图(mermaid 用 `references/decision-tree.md`)
-- 工具 / 库的安装说明
-- 重复的引用
-- 跨 skill 共用的写作约定(那是根 README 或单独的 style-guide)
-
-### 永远不要写进 skill
-
-- 个人吐槽、临时想法、试验性段落
-- 没经过验证的"最佳实践"
-- "读者复制代码"、"这里要提醒读者"、"给作者自己看"这种后台话术
+| 归属 | 内容 |
+| --- | --- |
+| 写进 SKILL.md | 起手流程(用户在第一句问“怎么办”时就能跑)、 1-3 个核心决策表、 anti-pattern(明确的“不要做”)、 一两个例子(如果有) |
+| 移到 `references/` 或 `examples/` | 长文背景知识、 完整决策树图(mermaid 放 `references/decision-tree.md`)、 工具 / 库的安装说明、 重复的引用、 跨 skill 共用写作约定(那是根 README 或单独的 style-guide) |
+| **永不写进 skill** | 个人吐槽、临时想法、试验性段落、 没经过验证的“最佳实践”、 “读者复制代码”“这里要提醒读者”“给作者自己看”这类后台话术 |
 
 ## Minimum Viable SKILL.md Checklist
 
@@ -133,6 +111,7 @@ description: >-
 python3 scripts/validate_skill.py [skill 目录]   # 结构检查（默认扫全部 skill）
 python3 scripts/check_leakage.py                 # 外发内容里的真实名称（需配 blocklist）
 python3 scripts/check_pointers.py                # 找出“这事定义在别处”的指针语句
+python3 scripts/preflight.py                     # 报告前跑：全部检查 + 事实快照
 ```
 
 脚本覆盖：SKILL.md 存在 / 可读 / frontmatter 存在 / YAML 可解析 / `name` == 目录名 / description < 800 字符 / 含触发表达 / 含 Do NOT 边界 / 正文 ≤ 150 行 / 含表格或清单。退出码 `0` 通过、`1` 失败。
@@ -147,6 +126,24 @@ python3 scripts/check_pointers.py                # 找出“这事定义在别�
 - [ ] **把某段改成“见别处”的指针时，逐词核对目标真的接住了内容** —— “指针写对了” ≠ “内容搬过去了”（实测：删掉 8 条风格规格改成指针，目标文件里一条都没落地）。先跑 `scripts/check_pointers.py` 列出所有指针，再逐条比对
 - [ ] 同步更新根 README 索引表 + Roadmap
 - [ ] 同步更新 `skills-lock.json`，新增一条 entry
+
+## 报告纪律（写任何“已完成 X”之前）
+
+**工具报“成功”不等于文件真的变了。** 实测过两次：
+
+- 编辑工具回“成功替换 1 块”，文件其实没动 —— 而我把“已加入 checklist”写进了报告。
+  事后核查：`git log -S"check_leakage.py" -- skills/skill-builder/SKILL.md` 无输出。
+- 报告里写“SKILL.md（142 行）”，实际 74 行 —— 那个数来自印象，不是测量。
+
+两次的共同点：**数字与存在性来自记忆，而不是测量**。而“下次记得验证”解决不了 ——
+“记得”正是本仓库反复证明不可靠的东西。所以它是一条前置步骤：
+
+**写报告前先跑 `python3 scripts/preflight.py`**（全部检查 + 事实快照 + 孤儿脚本检测）。
+报告里的每个数字、每个存在性声明，都从它的输出里抄。
+
+顺带：那个脚本会查一类容易被漏的错 —— **孤儿脚本**。`scripts/` 里有文件、检查在跑，
+但从 SKILL.md 和 references 里一个字都找不到它。脚本存在、但没有任何地方叫你去跑它，
+等于没接线。（实测：它第一次跑就报出了刚写的 `validate_spec.py` 没被起手流程提到。）
 
 ## Anatomy & Out-of-Scope
 

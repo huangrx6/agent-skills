@@ -1,0 +1,228 @@
+#!/usr/bin/env python3
+"""报告前的强制一步：跑全部检查 + 打印所有可核对的事实。
+
+## 为什么有这个脚本
+
+2026-09-12 两处报告错误，共同点是**数字与存在性来自记忆，而不是测量**：
+
+1. 报告里写"已加入 skill-builder 的检查表（check_leakage）" —— **文件其实没变**。
+   编辑工具回了"成功替换 1 块"，我没验证就写进了报告。
+   事后核查：`git log -S"check_leakage.py" -- skills/skill-builder/SKILL.md` 无输出。
+
+2. 报告里写"SKILL.md（142 行）" —— 实际 74 行。那个数是凭印象写的。
+
+"下次记得验证"解决不了这件事 —— "记得"正是本仓库反复证明不可靠的东西。
+所以把它变成一条**可执行的前置步骤**：
+
+    写任何声称"完成了 X"的报告之前，先跑这个脚本。
+    报告里的每个数字、每个存在性声明，都从它的输出里抄。
+
+它做三件事：
+  1. 跑全部检查（结构 / 泄露 / 指针目标）
+  2. 打印可核对的事实快照（行数、余量、文件数、hook 步骤、测试数）
+  3. 额外查一类错：**孤儿脚本** —— `scripts/` 里有文件，但本 skill 的任何文档都没提到它。
+     这正是错误 1 的形态：脚本存在、检查在跑，但从 skill-builder 的 checklist 里找不到它。
+
+用法：
+    python3 preflight.py            # 检查 + 快照
+    python3 preflight.py --json
+    python3 preflight.py --snapshot-only
+
+退出码：0 = 全部检查通过且无孤儿脚本，1 = 有失败，2 = 找不到仓库根。
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+
+FM_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
+DESC_RE = re.compile(r"^description:\s*(.+)$", re.M)
+RAN_RE = re.compile(r"Ran (\d+) test")
+MAX_BODY_LINES = 150
+
+
+def _safe_listdir(path: str) -> list[str]:
+    """列目录。不存在、没权限、路径其实是文件 —— 一律返回空列表。"""
+    try:
+        return sorted(os.listdir(path))
+    except OSError:
+        return []
+
+
+def _safe_read(path: str) -> str:
+    """读文本文件。读不到返回空串。"""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return fh.read()
+    except OSError:
+        return ""
+
+
+def find_root(start: str) -> str | None:
+    """从 start 往上找含 skills/ 的仓库根。"""
+    cur = os.path.abspath(start)
+    while True:
+        if os.path.isdir(os.path.join(cur, "skills")):
+            return cur
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            return None
+        cur = parent
+
+
+def _run(cmd: list[str], cwd: str) -> tuple[int, str]:
+    try:
+        proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+        return proc.returncode, (proc.stdout + proc.stderr).strip()
+    except OSError as exc:
+        return 2, str(exc)
+
+
+def _skill_doc_text(path: str) -> str:
+    """把 skill 下所有 .md 的内容拼起来，用来判断脚本有没有被文档提到。"""
+    chunks: list[str] = []
+    for dirpath, dirs, files in os.walk(path):
+        dirs[:] = [d for d in dirs if d not in {"__pycache__", "tests"} and not d.startswith(".")]
+        for name in files:
+            if name.endswith(".md"):
+                chunks.append(_safe_read(os.path.join(dirpath, name)))
+    return "\n".join(chunks)
+
+
+def _count_tests(skill_path: str, root: str) -> int:
+    """跑一个 skill 的测试目录，取用例数。跑不动就算 0。"""
+    tests_dir = os.path.join(skill_path, "tests")
+    if not os.path.isdir(tests_dir):
+        return 0
+    code, out = _run([sys.executable, "-m", "unittest", "discover", "-s", tests_dir], root)
+    m = RAN_RE.search(out)
+    if not m:
+        return 0
+    try:
+        return int(m.group(1))
+    except ValueError:
+        return 0
+
+
+def skill_facts(root: str) -> list[dict]:
+    base = os.path.join(root, "skills")
+    facts: list[dict] = []
+    for name in _safe_listdir(base):
+        path = os.path.join(base, name)
+        skill_md = os.path.join(path, "SKILL.md")
+        if not os.path.isfile(skill_md):
+            continue
+
+        raw = _safe_read(skill_md)
+        fm = FM_RE.match(raw)
+        body = raw[fm.end():] if fm else raw
+        desc = DESC_RE.search(fm.group(1)) if fm else None
+        doc_text = _skill_doc_text(path)
+
+        def count_sub(sub: str) -> int:
+            return len([f for f in _safe_listdir(os.path.join(path, sub))
+                        if not f.startswith(".") and f != "__pycache__"])
+
+        scripts = [f for f in _safe_listdir(os.path.join(path, "scripts")) if f.endswith(".py")]
+        # 孤儿脚本：scripts/ 里有，但本 skill 的任何 .md 都没提到文件名
+        orphans = [s for s in scripts if s not in doc_text]
+
+        lines = body.count("\n")
+        facts.append({
+            "skill": name,
+            "body_lines": lines,
+            "headroom": MAX_BODY_LINES - lines,
+            "over_limit": lines > MAX_BODY_LINES,
+            "description_chars": len(desc.group(1)) if desc else 0,
+            "references": count_sub("references"),
+            "scripts": scripts,
+            "orphan_scripts": orphans,
+            "tests": _count_tests(path, root),
+        })
+    return facts
+
+
+def hook_steps(root: str) -> list[str]:
+    text = _safe_read(os.path.join(root, ".githooks", "pre-commit"))
+    return re.findall(r"^# ── (\d+\.\s+.+?) ──", text, re.M)
+
+
+def checks(root: str) -> list[dict]:
+    sb = os.path.join(root, "skills", "skill-builder", "scripts")
+    return [
+        {"name": "结构校验", "cmd": [sys.executable, os.path.join(sb, "validate_skill.py")]},
+        {"name": "泄露扫描", "cmd": [sys.executable, os.path.join(sb, "check_leakage.py")]},
+        {"name": "指针目标", "cmd": [sys.executable, os.path.join(sb, "check_pointers.py"),
+                                     "--root", root, "skills"]},
+    ]
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description="报告前的强制一步：检查 + 事实快照")
+    ap.add_argument("--json", action="store_true", help="输出 JSON")
+    ap.add_argument("--snapshot-only", action="store_true", help="只打印快照，不跑检查")
+    args = ap.parse_args(argv)
+
+    root = find_root(os.getcwd())
+    if root is None:
+        print("找不到含 skills/ 的仓库根", file=sys.stderr)
+        return 2
+
+    results: list[dict] = []
+    if not args.snapshot_only:
+        for c in checks(root):
+            code, out = _run(c["cmd"], root)
+            results.append({"name": c["name"], "exit": code, "output": out})
+
+    facts = skill_facts(root)
+    steps = hook_steps(root)
+    total_tests = sum(f["tests"] for f in facts)
+    orphans = [(f["skill"], s) for f in facts for s in f["orphan_scripts"]]
+
+    if args.json:
+        print(json.dumps({"root": root, "checks": results, "skills": facts,
+                          "hook_steps": steps, "total_tests": total_tests,
+                          "orphan_scripts": orphans}, ensure_ascii=False, indent=2))
+        failed = any(r["exit"] != 0 for r in results) or bool(orphans)
+        return 1 if failed else 0
+
+    if results:
+        print("检查")
+        for r in results:
+            tail = r["output"].split("\n")[-1] if r["output"] else ""
+            print(f"  {'✓' if r['exit'] == 0 else '✗'} {r['name']}  {tail}")
+        print()
+
+    print("事实快照（报告里的数字从这里抄，不要凭印象写）")
+    print(f"  {'skill':<34}{'正文':>10}{'余量':>6}{'desc':>6}{'refs':>6}{'tests':>7}")
+    for f in facts:
+        limit = "  ← 超限!" if f["over_limit"] else ""
+        print(f"  {f['skill']:<34}{f['body_lines']:>6}/150{f['headroom']:>6}"
+              f"{f['description_chars']:>6}{f['references']:>6}{f['tests']:>7}{limit}")
+    print(f"\n  测试合计 {total_tests}")
+    if steps:
+        names = " / ".join(s.split(". ", 1)[-1] for s in steps)
+        print(f"  hook 步骤 {len(steps)}: {names}")
+    else:
+        print("  hook 步骤 0（没找到 .githooks/pre-commit）")
+
+    if orphans:
+        print("\n  ✗ 孤儿脚本（scripts/ 里有，但本 skill 的文档一个字都没提）")
+        for skill, s in orphans:
+            print(f"      {skill}/scripts/{s}")
+        print("      这类脚本等于没接线 —— 谁都不知道该跑它。"
+              "把用法写进 SKILL.md 或 references/。")
+    else:
+        print("\n  ✓ 无孤儿脚本")
+
+    failed = any(r["exit"] != 0 for r in results) or bool(orphans)
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
