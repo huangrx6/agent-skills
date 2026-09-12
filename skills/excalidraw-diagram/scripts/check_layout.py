@@ -226,10 +226,18 @@ def check_text_fit(spec: dict, result: ResultT,
 
 # ── #4 kind / 颜色越界 ──────────────────────────────────────
 def _palette_colors() -> set[str]:
+    """“在板内”的完整取值集合。
+
+    强调层级的派生色**也从色板算出来**（`palette.emphasis_fill`），
+    不是手写第二张表 —— 手写就会漂移，而漂移了这张校验就变成假的。
+    """
     colors: set[str] = set()
     for entry in list(palette.KINDS.values()) + list(palette.EDGE_KINDS.values()):
         colors.update(v for k, v in entry.items() if k in ("stroke", "background"))
     colors.update(v for k, v in palette.CANVAS.items() if k in ("background", "grid", "text"))
+    for kind in palette.KINDS:
+        for emphasis in palette.EMPHASIS:
+            colors.add(palette.emphasis_fill(kind, emphasis))
     return colors
 
 
@@ -244,13 +252,23 @@ def check_palette(spec: dict) -> list[Issue]:
     out: list[Issue] = []
     for node in spec.get("nodes", []):
         kind = node.get("kind")
-        try:
-            stroke, background = palette.stroke_for(kind), palette.background_for(kind)
-        except KeyError:
+        emphasis = node.get("emphasis", palette.DEFAULT_EMPHASIS)
+        # 两种病因分开判、分开报。混成一句会让修的人照着一个错的提示越修越偏
+        # （实测踩过：kind 写错时报出的是“未知 shape: None”）。
+        # 两条都是**硬判**，不 fallback —— fallback 会让“颜色必须在板内”这条校验绕过自己。
+        if kind not in palette.KINDS:
             out.append(Issue("palette", True, node["id"],
                              f"未知 kind：{kind!r}；允许值 {sorted(palette.KINDS)}",
                              advice="有 kind 不在允许集合里：改用上面列出的允许值。"))
             continue
+        if emphasis not in palette.EMPHASIS:
+            out.append(Issue("palette", True, node["id"],
+                             f"未知 emphasis：{emphasis!r}；"
+                             f"允许值 {sorted(palette.EMPHASIS)}",
+                             advice="有强调档位不在允许集合里：改用上面列出的允许值。"))
+            continue
+        stroke = palette.stroke_for(kind)
+        background = palette.emphasis_fill(kind, emphasis)
         for got, what in ((stroke, "描边"), (background, "填充")):
             if got not in allowed:
                 out.append(Issue("palette", True, node["id"],

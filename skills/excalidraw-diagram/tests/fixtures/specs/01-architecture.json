@@ -1,31 +1,159 @@
-{"type":"architecture","direction":"LR","title":"电商下单链路",
- "nodes":[
-  {"id":"web","kind":"client","label":"Web 前端"},
-  {"id":"app","kind":"client","label":"移动 App"},
-  {"id":"gw","kind":"security","label":"API 网关","detail":"限流 / 鉴权"},
-  {"id":"auth","kind":"security","label":"认证中心"},
-  {"id":"order","kind":"service","label":"订单服务","detail":"3 副本"},
-  {"id":"pay","kind":"service","label":"支付服务"},
-  {"id":"stock","kind":"service","label":"库存服务"},
-  {"id":"user","kind":"service","label":"用户服务"},
-  {"id":"mq","kind":"async","label":"订单事件队列"},
-  {"id":"cache","kind":"async","label":"Redis 缓存"},
-  {"id":"db","kind":"data","label":"订单库","detail":"MySQL 主从"},
-  {"id":"search","kind":"data","label":"搜索索引"},
-  {"id":"sms","kind":"external","label":"短信平台"},
-  {"id":"risk","kind":"external","label":"风控系统"}],
- "edges":[
-  {"from":"web","to":"gw","kind":"sync","label":"HTTPS"},
-  {"from":"app","to":"gw","kind":"sync"},
-  {"from":"gw","to":"auth","kind":"sync"},
-  {"from":"gw","to":"order","kind":"sync"},
-  {"from":"order","to":"user","kind":"sync"},
-  {"from":"order","to":"stock","kind":"sync"},
-  {"from":"order","to":"pay","kind":"sync"},
-  {"from":"order","to":"db","kind":"data"},
-  {"from":"order","to":"cache","kind":"data"},
-  {"from":"order","to":"mq","kind":"async","label":"发布事件"},
-  {"from":"mq","to":"search","kind":"async"},
-  {"from":"mq","to":"sms","kind":"async"},
-  {"from":"pay","to":"risk","kind":"sync"},
-  {"from":"stock","to":"db","kind":"data"}]}
+{
+  "type": "architecture",
+  "direction": "LR",
+  "title": "电商下单链路",
+  "nodes": [
+    {
+      "id": "web",
+      "kind": "client",
+      "label": "Web 前端"
+    },
+    {
+      "id": "app",
+      "kind": "client",
+      "label": "移动 App"
+    },
+    {
+      "id": "gw",
+      "kind": "security",
+      "label": "API 网关",
+      "detail": "限流 / 鉴权"
+    },
+    {
+      "id": "auth",
+      "kind": "security",
+      "label": "认证中心"
+    },
+    {
+      "id": "order",
+      "kind": "service",
+      "label": "订单服务",
+      "detail": "3 副本",
+      "emphasis": "primary"
+    },
+    {
+      "id": "pay",
+      "kind": "service",
+      "label": "支付服务",
+      "emphasis": "primary"
+    },
+    {
+      "id": "stock",
+      "kind": "service",
+      "label": "库存服务"
+    },
+    {
+      "id": "user",
+      "kind": "service",
+      "label": "用户服务"
+    },
+    {
+      "id": "mq",
+      "kind": "async",
+      "label": "订单事件队列"
+    },
+    {
+      "id": "cache",
+      "kind": "async",
+      "label": "Redis 缓存"
+    },
+    {
+      "id": "db",
+      "kind": "data",
+      "label": "订单库",
+      "detail": "MySQL 主从"
+    },
+    {
+      "id": "search",
+      "kind": "data",
+      "label": "搜索索引",
+      "emphasis": "muted"
+    },
+    {
+      "id": "sms",
+      "kind": "external",
+      "label": "短信平台",
+      "emphasis": "muted"
+    },
+    {
+      "id": "risk",
+      "kind": "external",
+      "label": "风控系统",
+      "emphasis": "muted"
+    }
+  ],
+  "edges": [
+    {
+      "from": "web",
+      "to": "gw",
+      "kind": "sync",
+      "label": "HTTPS"
+    },
+    {
+      "from": "app",
+      "to": "gw",
+      "kind": "sync"
+    },
+    {
+      "from": "gw",
+      "to": "auth",
+      "kind": "sync"
+    },
+    {
+      "from": "gw",
+      "to": "order",
+      "kind": "sync"
+    },
+    {
+      "from": "order",
+      "to": "user",
+      "kind": "sync"
+    },
+    {
+      "from": "order",
+      "to": "stock",
+      "kind": "sync"
+    },
+    {
+      "from": "order",
+      "to": "pay",
+      "kind": "sync"
+    },
+    {
+      "from": "order",
+      "to": "db",
+      "kind": "data"
+    },
+    {
+      "from": "order",
+      "to": "cache",
+      "kind": "data"
+    },
+    {
+      "from": "order",
+      "to": "mq",
+      "kind": "async",
+      "label": "发布事件"
+    },
+    {
+      "from": "mq",
+      "to": "search",
+      "kind": "async"
+    },
+    {
+      "from": "mq",
+      "to": "sms",
+      "kind": "async"
+    },
+    {
+      "from": "pay",
+      "to": "risk",
+      "kind": "sync"
+    },
+    {
+      "from": "stock",
+      "to": "db",
+      "kind": "data"
+    }
+  ]
+}

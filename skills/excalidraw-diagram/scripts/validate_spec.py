@@ -34,7 +34,8 @@ import sys
 # 让"顺手加一个"变得有摩擦。
 TOP_FIELDS = {"type", "title", "direction", "detail", "groups", "nodes", "edges"}
 GROUP_FIELDS = {"id", "label", "description"}
-NODE_FIELDS = {"id", "label", "kind", "shape", "group", "detail", "rank", "pin"}
+NODE_FIELDS = {"id", "label", "kind", "shape", "emphasis", "group", "detail",
+               "rank", "pin"}
 EDGE_FIELDS = {"id", "from", "to", "label", "kind"}
 
 DIAGRAM_TYPES = {"architecture", "flow", "state", "dependency", "mindmap", "network"}
@@ -77,6 +78,7 @@ _palette = _load_sibling("palette")
 KINDS = _palette.KINDS
 EDGE_KINDS = _palette.EDGE_KINDS
 SHAPES = _load_sibling("shapes").SHAPES
+EMPHASIS = _load_sibling("palette").EMPHASIS
 
 
 class Issues:
@@ -191,6 +193,12 @@ def validate(spec: dict) -> Issues:
             # “形状必须与语义有关”变成空话 —— 写错的人不知道，看图的人也看不出。
             issues.error("UNKNOWN_SHAPE", f"{where}.shape",
                          f"未知 shape {shape!r}；允许的取值：{sorted(SHAPES)}")
+
+        emphasis = n.get("emphasis")
+        if emphasis is not None and emphasis not in EMPHASIS:
+            # 同 kind / shape 一条原则：不 fallback。
+            issues.error("UNKNOWN_EMPHASIS", f"{where}.emphasis",
+                         f"未知 emphasis {emphasis!r}；允许的取值：{sorted(EMPHASIS)}")
 
         grp = n.get("group")
         if grp is not None and grp not in group_ids:

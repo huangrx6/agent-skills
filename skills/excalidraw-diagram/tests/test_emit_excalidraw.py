@@ -286,6 +286,81 @@ class TestRefusesBadSpecs(unittest.TestCase):
         self.assertIn("star", str(ctx.exception))
 
 
+class TestDiagramTitle(unittest.TestCase):
+    """图标题。以前 `title` 字段被**完全忽略**（6/6 张 fixture 都写了，一张都没画出来）。"""
+
+    @staticmethod
+    def _titles(scene):
+        return [e for e in scene["elements"]
+                if e["type"] == "text" and e.get("containerId") is None
+                and e["fontSize"] == E.tm.FONT_TITLE]
+
+    def test_no_title_field_means_no_element(self):
+        spec = spec_of(["a", "b"], [("a", "b")])
+        scene, _, _, _ = E.emit(spec)
+        self.assertEqual([], self._titles(scene))
+
+    def test_title_exists_and_uses_the_title_font(self):
+        spec = spec_of(["a", "b"], [("a", "b")])
+        spec["title"] = "下单链路"
+        scene, _, _, _ = E.emit(spec)
+        titles = self._titles(scene)
+        self.assertEqual(1, len(titles))
+        self.assertEqual("下单链路", titles[0]["text"])
+        self.assertEqual(E.tm.FONT_TITLE, titles[0]["fontSize"])
+        self.assertEqual("center", titles[0]["textAlign"])
+
+    def test_title_is_centred_on_the_content(self):
+        spec = spec_of(["a", "b", "c"], [("a", "b"), ("b", "c")])
+        spec["title"] = "居中检查"
+        scene, _, _, _ = E.emit(spec)
+        title = self._titles(scene)[0]
+        others = [e for e in scene["elements"] if e is not title]
+        left, top, right, bottom = E.scene_bounds(others)
+        self.assertAlmostEqual((left + right) / 2.0,
+                               title["x"] + title["width"] / 2.0, places=1,
+                               msg="标题的中心要落在内容水平中心上")
+
+    def test_title_sits_above_everything(self):
+        spec = spec_of(["a", "b"], [("a", "b")])
+        spec["title"] = "在上方"
+        scene, _, _, _ = E.emit(spec)
+        title = self._titles(scene)[0]
+        content_top = min(e["y"] for e in scene["elements"] if e is not title)
+        self.assertLessEqual(title["y"] + title["height"], content_top,
+                             "标题压到内容上了")
+
+    def test_title_width_is_the_real_line_width_not_the_size_class(self):
+        """两字标题不能被撑成档位宽度。
+
+        `text_metrics.measure` 返回的 `break_units` 是**容器的断行档位**（给形状用的）。
+        标题不该用容器逻辑：按档位算，一个两字标题会占 10 个字宽（240px），白占画布。
+        """
+        spec = spec_of(["a", "b"], [("a", "b")])
+        spec["title"] = "两头"
+        scene, _, _, _ = E.emit(spec)
+        title = self._titles(scene)[0]
+        two_chars = 2 * E.tm.FONT_TITLE
+        self.assertLess(title["width"], two_chars * 1.35,
+                        f"两字标题占了 {title['width']:.0f}px —— 是不是用档位宽算了")
+        self.assertGreaterEqual(title["width"], two_chars * 0.9)
+
+    def test_long_title_wraps_into_one_element(self):
+        """超长标题要断行，但**仍然只是一个元素**。
+
+        断行档位是给容器用的（最大一档 24 个单位），标题沿用它 ——
+        所以 22 个字的标题本来就不会断。这里用真正超长的来试。
+        """
+        spec = spec_of(["a", "b"], [("a", "b")])
+        spec["title"] = "这是一个特别特别长的图标题它长到了必须断行的程度因为超过了最大断行档位"
+        scene, _, _, _ = E.emit(spec)
+        titles = self._titles(scene)
+        self.assertEqual(1, len(titles), "断行也不该变成多个元素")
+        self.assertIn("\n", titles[0]["text"])
+        self.assertLess(titles[0]["width"], 28 * E.tm.FONT_TITLE,
+                        "断了行就不该还占着没断时的宽度")
+
+
 class TestEdgeLabels(unittest.TestCase):
     @staticmethod
     def _hits(label: dict, arrows: list[dict]) -> list:

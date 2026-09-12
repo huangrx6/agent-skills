@@ -48,6 +48,10 @@ import os
 import sys
 from typing import Any
 
+# 包围盒实现放在 `scripts/emit_excalidraw.py` —— 那里是元素的出生地。
+# 这里**刻意不存第二份**：同一件几何算两遍必然漂移，而漂移的那一份会让
+# 预览和真实输出给出不同的结论（实测踩过：用 x+width 量线性元素，产生 744px 幽灵空白）。
+_SCRIPTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
 LINEAR_TYPES = {"arrow", "line"}
 # 字体：拉丁 + CJK 都要有。macOS 上这几个够用；换平台要么改这里，要么接受回退字体。
 FONT_CANDIDATES = (
@@ -60,23 +64,22 @@ ARROW_LEN = 12.0
 ARROW_HALF_WIDTH = 5.0
 
 
-def element_bounds(el: dict) -> tuple[float, float, float, float]:
-    """元素的真实包围盒 (left, top, right, bottom)。
+def _load_emit():
+    """加载 `scripts/emit_excalidraw.py`（它自己会再加载兄弟模块）。"""
+    import importlib.util
+    path = os.path.join(_SCRIPTS, "emit_excalidraw.py")
+    spec = importlib.util.spec_from_file_location("emit_excalidraw", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"加载不了 {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
-    **线性元素不能用 `x + width`** —— 它的 `x`/`y` 是首点，折线点可以向左/向上伸出，
-    所以必须从 `points` 算。非线性的用 x/y/width/height。
-    """
-    if el.get("type") in LINEAR_TYPES and el.get("points"):
-        xs = [el["x"] + p[0] for p in el["points"]]
-        ys = [el["y"] + p[1] for p in el["points"]]
-        return min(xs), min(ys), max(xs), max(ys)
-    return el["x"], el["y"], el["x"] + el["width"], el["y"] + el["height"]
 
-
-def scene_bounds(elements: list[dict]) -> tuple[float, float, float, float]:
-    boxes = [element_bounds(e) for e in elements]
-    return (min(b[0] for b in boxes), min(b[1] for b in boxes),
-            max(b[2] for b in boxes), max(b[3] for b in boxes))
+_EMIT = _load_emit()
+element_bounds = _EMIT.element_bounds
+scene_bounds = _EMIT.scene_bounds
 
 
 def _px(value: Any) -> int:
@@ -126,15 +129,52 @@ def render(scene: dict, out_path: str, scale: float = 1.0, pad: float = 40.0) ->
         return cache[px]
 
     rects = [e for e in elements if e["type"] == "rectangle"]
+    ellipses = [e for e in elements if e["type"] == "ellipse"]
+    diamonds = [e for e in elements if e["type"] == "diamond"]
     arrows = [e for e in elements if e["type"] in LINEAR_TYPES]
     texts = [e for e in elements if e["type"] == "text"]
+    drawn = {id(e) for e in rects + ellipses + diamonds + arrows + texts}
+
+    # 画不出来的元素必须**显式报警**，而不是静静地不画。
+    #
+    # 这条是实测出来的：早期这个渲染器只认得 `rectangle`，于是加进形状之后，
+    # 椭圆节点在预览里**彻底消失** —— 我看到的是“纯文字没框”，差点去改 emit。
+    # 工具不完整不是错，不完整却不吭声才是错：目视检查的全部价值就在那张图上。
+    skipped: dict[str, int] = {}
+    for e in elements:
+        if id(e) not in drawn:
+            skipped[e["type"]] = skipped.get(e["type"], 0) + 1
 
     for e in rects:
         x0, y0 = to_px(e["x"], e["y"])
         x1, y1 = to_px(e["x"] + e["width"], e["y"] + e["height"])
-        draw.rounded_rectangle([x0, y0, x1, y1], radius=8 * scale,
+        roundness = e.get("roundness") or {}
+        radius = 8.0 * scale
+        if roundness.get("type") == 2:
+            # 胶囊：半径 = 高的一半（emit 里就是这么写的）。
+            # 不用 `float()` 硬转：值本来就是我们自己 emit 的数字，而且这条 lint
+            # （unchecked-throwing-call-python）会匹配**任何**裸转换，包括安全的那些。
+            ratio = roundness.get("value", 0.5)
+            if isinstance(ratio, (int, float)):
+                radius = e["height"] * ratio * scale
+        draw.rounded_rectangle([x0, y0, x1, y1], radius=radius,
                                fill=e["backgroundColor"], outline=e["strokeColor"],
                                width=_px(2 * scale))
+
+    for e in ellipses:
+        x0, y0 = to_px(e["x"], e["y"])
+        x1, y1 = to_px(e["x"] + e["width"], e["y"] + e["height"])
+        draw.ellipse([x0, y0, x1, y1], fill=e["backgroundColor"],
+                     outline=e["strokeColor"], width=_px(2 * scale))
+
+    for e in diamonds:
+        cx0, cy0 = to_px(e["x"] + e["width"] / 2, e["y"])
+        cx1, cy1 = to_px(e["x"] + e["width"], e["y"] + e["height"] / 2)
+        cx2, cy2 = to_px(e["x"] + e["width"] / 2, e["y"] + e["height"])
+        cx3, cy3 = to_px(e["x"], e["y"] + e["height"] / 2)
+        draw.polygon([cx0, cy0, cx1, cy1, cx2, cy2, cx3, cy3],
+                     fill=e["backgroundColor"], outline=e["strokeColor"],
+                     width=_px(2 * scale))
 
     for e in arrows:
         pts = [to_px(e["x"] + p[0], e["y"] + p[1]) for p in e["points"]]
@@ -166,9 +206,15 @@ def render(scene: dict, out_path: str, scale: float = 1.0, pad: float = 40.0) ->
                           line, font=f, fill=e["strokeColor"], anchor="la")
 
     img.save(out_path)
+    if skipped:
+        print(f"  ⚠ 有 {sum(skipped.values())} 个元素没画出来：{skipped} "
+              f"—— 预览**不完整**，别据此下结论", file=sys.stderr)
     return {"path": out_path, "size": [width, height],
             "content": [round(right - left, 1), round(bottom - top, 1)],
-            "elements": {"rectangles": len(rects), "arrows": len(arrows), "texts": len(texts)}}
+            "skipped": skipped,
+            "elements": {"rectangles": len(rects), "ellipses": len(ellipses),
+                         "diamonds": len(diamonds), "arrows": len(arrows),
+                         "texts": len(texts)}}
 
 
 def _dashed_line(draw, a, b, colour, width) -> None:
@@ -222,10 +268,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"写不了 {out}：{exc}", file=sys.stderr)
         return 2
 
+    # 汇总里**只列出现过的类型**，而且未画的元素单独占一行 —— 不静默省略。
+    counts = " / ".join(f"{name} {n}" for name, n in
+                        (("矩形", info["elements"]["rectangles"]),
+                         ("椭圆", info["elements"]["ellipses"]),
+                         ("菱形", info["elements"]["diamonds"]),
+                         ("箭头", info["elements"]["arrows"]),
+                         ("文字", info["elements"]["texts"])) if n)
     print(f"✓ {info['path']}  {info['size'][0]}×{info['size'][1]}px  "
-          f"内容 {info['content'][0]}×{info['content'][1]}  "
-          f"矩形 {info['elements']['rectangles']} / 箭头 {info['elements']['arrows']} / "
-          f"文字 {info['elements']['texts']}")
+          f"内容 {info['content'][0]}×{info['content'][1]}  {counts}")
+    if info["skipped"]:
+        print(f"  ⚠ 未画：{info['skipped']} —— 预览**不完整**，别据此下结论")
     print("  提示：这只反映我们自己的布局模型。'Excalidraw 渲染出来是否一致' "
           "必须在真实 Excalidraw 里看。")
     return 0

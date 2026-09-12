@@ -94,7 +94,8 @@ def _eid(kind: str, raw: str, index: int = 0) -> str:
 
 def _base(el_id: str, el_type: str, x: float, y: float, w: float, h: float,
           stroke: str, background: str, *, stroke_style: str = "solid",
-          roundness: dict | None = None, extra: dict | None = None) -> dict:
+          roundness: dict | None = None, stroke_width: float = STROKE_WIDTH,
+          extra: dict | None = None) -> dict:
     """所有元素共有的字段。字段集照 Excalidraw 的 `_ExcalidrawElementBase` 来。"""
     el = {
         "id": el_id,
@@ -107,7 +108,7 @@ def _base(el_id: str, el_type: str, x: float, y: float, w: float, h: float,
         "strokeColor": stroke,
         "backgroundColor": background,
         "fillStyle": "solid",
-        "strokeWidth": STROKE_WIDTH,
+        "strokeWidth": stroke_width,
         "strokeStyle": stroke_style,
         "roughness": ROUGHNESS,
         "opacity": 100,
@@ -131,7 +132,7 @@ def _base(el_id: str, el_type: str, x: float, y: float, w: float, h: float,
 
 # ── 节点：矩形 + 容器绑定的文字 ─────────────────────────────
 def node_elements(node: dict, placed, box, arrows_out: list[str],
-                  arrows_in: list[str]) -> list[dict]:
+                    arrows_in: list[str]) -> list[dict]:
     nid = node["id"]
     shape_id = _eid("node", nid)
     title_id = _eid("title", nid)
@@ -144,9 +145,13 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
         bound.append({"type": "text", "id": detail_id})
     bound += [{"type": "arrow", "id": a} for a in arrows_out + arrows_in]
 
-    stroke = palette.stroke_for(node.get("kind"))
-    fill = palette.background_for(node.get("kind"))
-    elements = shape_elements(shape_id, box.shape, placed, stroke, fill)
+    kind = node.get("kind")
+    emphasis = node.get("emphasis", palette.DEFAULT_EMPHASIS)
+    stroke = palette.stroke_for(kind)
+    fill = palette.emphasis_fill(kind, emphasis)
+    stroke_width = palette.emphasis_stroke_width(emphasis)
+    elements = shape_elements(shape_id, box.shape, placed, stroke, fill,
+                              stroke_width=stroke_width)
     # 文字与箭头都绑到**主体**那个元素上；圆柱的顶盖只是一个装饰性叠加
     elements[0]["boundElements"] = bound
 
@@ -176,7 +181,8 @@ def text_band(shape_name: str, placed) -> tuple[float, float]:
 
 
 def shape_elements(element_id: str, shape_name: str, placed,
-                   stroke: str, fill: str) -> list[dict]:
+                   stroke: str, fill: str,
+                   stroke_width: float = STROKE_WIDTH) -> list[dict]:
     """按形状建元素。除圆柱外都是一个元素。
 
     **圆柱刻意让柱体跨满整个包围盒**，而不是“柱体在下半、盖子在右上”：
@@ -190,9 +196,9 @@ def shape_elements(element_id: str, shape_name: str, placed,
         cap = shapes.cylinder_cap(placed.width)
         body = _base(element_id, "rectangle", placed.x, placed.y, placed.width,
                      placed.height, stroke, fill, stroke_style=style,
-                     roundness={"type": 3})
+                     roundness={"type": 3}, stroke_width=stroke_width)
         lid = _base(f"{element_id}-lid", "ellipse", placed.x, placed.y,
-                    placed.width, cap, stroke, fill)
+                    placed.width, cap, stroke, fill, stroke_width=stroke_width)
         # 顶盖与柱体成组：在 Excalidraw 里拖动时它们一起动（否则一拖就散开），
         # 同时这也是一个明确标记 —— “groupIds 非空的是装饰，不是节点”，
         # 校验/量图那边靠它区分顶盖与真节点。
@@ -204,7 +210,8 @@ def shape_elements(element_id: str, shape_name: str, placed,
         roundness = {"type": 2, "value": 0.5}
     return [_base(element_id, entry["excalidraw"], placed.x, placed.y,
                   placed.width, placed.height, stroke, fill,
-                  stroke_style=style, roundness=roundness)]
+                  stroke_style=style, roundness=roundness,
+                  stroke_width=stroke_width)]
 
 
 def _text_block(el_id: str, container_id: str, lines: tuple[str, ...],
@@ -452,6 +459,91 @@ def edge_label_element(edge: dict, index: int, obstacles: list | None = None) ->
 
 
 # ── 场景 ────────────────────────────────────────────────────
+LINEAR_TYPES = {"arrow", "line"}
+
+
+def element_bounds(el: dict) -> tuple[float, float, float, float]:
+    """元素的真实包围盒 (left, top, right, bottom)。
+
+    **线性元素不能用 `x + width`** —— 它的 `x`/`y` 是首点，折线点可以向左/向上
+    伸出，所以必须从 `points` 算。
+
+    这条是实测出来的：早期用 `x + width` 量图，得到 744px 的**幽灵空白** ——
+    一个箭头让整张图的包围盒无端变宽，于是“图看着不对称”之类的结论全是错的。
+    本函数就是那一份实现（`dev-tools/preview.py` 从这里 import，不存第二份）。
+    """
+    if el.get("type") in LINEAR_TYPES and el.get("points"):
+        xs = [el["x"] + p[0] for p in el["points"]]
+        ys = [el["y"] + p[1] for p in el["points"]]
+        return min(xs), min(ys), max(xs), max(ys)
+    return el["x"], el["y"], el["x"] + el["width"], el["y"] + el["height"]
+
+
+def scene_bounds(elements: list[dict]) -> tuple[float, float, float, float]:
+    boxes = [element_bounds(e) for e in elements]
+    return (min(b[0] for b in boxes), min(b[1] for b in boxes),
+            max(b[2] for b in boxes), max(b[3] for b in boxes))
+
+
+# 标题底边到内容顶边的距离。数值来源：与最小元素间隙（12px）同量级再放大一档，
+# 让标题与图之间看得出“这不是图的一部分”。**未经真实数据校准**，属于待验证。
+TITLE_GAP = 28.0
+
+
+def title_element(title: str | None) -> dict | None:
+    """图标题。以前 `title` 字段被**完全忽略**（6/6 张图的标题都没画出来）。
+
+    与节点文字不同，标题是**不绑定容器**的自由文字（`containerId = None`）——
+    它不属于任何形状，所以 Excalidraw 不会自己重算它的位置，x/y 要算准。
+    宽度用**实际行宽**而不是断行档位：档位是给容器用的，标题按档位宽算会
+    把一个两字标题撑成 240px，白占画布。
+    """
+    if not title:
+        return None
+    box = tm.measure(title, "", font_size=tm.FONT_TITLE)
+    lines = box.lines
+    width = max(tm.weighted_units(line) for line in lines) * tm.FONT_TITLE
+    height = len(lines) * tm.FONT_TITLE * tm.LINE_HEIGHT
+    text = "\n".join(lines)
+    return {
+        "id": _eid("diagram-title", title),
+        "type": "text",
+        "x": 0.0,          # 居中放在 build_scene 里算（那里才知道内容多宽）
+        "y": 0.0,
+        "width": round(width, 2),
+        "height": round(height, 2),
+        "angle": 0,
+        "strokeColor": palette.CANVAS["text"],
+        "backgroundColor": "transparent",
+        "fillStyle": "solid",
+        "strokeWidth": 1,
+        "strokeStyle": "solid",
+        "roughness": ROUGHNESS,
+        "opacity": 100,
+        "groupIds": [],
+        "frameId": None,
+        "roundness": None,
+        "seed": _stable_int("diagram-title", title),
+        "version": ELEMENT_VERSION,
+        "versionNonce": _stable_int("diagram-title-nonce", title),
+        "isDeleted": False,
+        "boundElements": None,
+        "updated": 1,
+        "link": None,
+        "locked": False,
+        "index": None,
+        "text": text,
+        "fontSize": tm.FONT_TITLE,
+        "fontFamily": palette.CANVAS["font_family"],
+        "textAlign": "center",
+        "verticalAlign": "top",
+        "containerId": None,
+        "originalText": text,
+        "lineHeight": tm.LINE_HEIGHT,
+        "baseline": round(tm.FONT_TITLE * BASELINE_RATIO, 2),
+    }
+
+
 def build_scene(spec: dict, result, boxes: dict) -> dict:
     elements: list[dict] = []
     by_id = {n["id"]: n for n in spec.get("nodes", [])}
@@ -480,6 +572,16 @@ def build_scene(spec: dict, result, boxes: dict) -> dict:
         label = edge_label_element(edge, i, polylines)
         if label:
             elements.append(label)
+
+    # 图标题最后加：它要按已排好的内容来居中，而它自己**不参与**布局。
+    # 放的位置是“内容顶边往上 TITLE_GAP”，所以不需要把别的元素往下挪 ——
+    # 标题可能落到 y 为负的地方，对 Excalidraw 没有影响（载入时会自动居中视图）。
+    title = title_element(spec.get("title"))
+    if title is not None and elements:
+        left, top, right, _bottom = scene_bounds(elements)
+        title["x"] = round(left + (right - left) / 2.0 - title["width"] / 2.0, 2)
+        title["y"] = round(top - TITLE_GAP - title["height"], 2)
+        elements.append(title)
 
     return {
         "type": SCENE_TYPE,

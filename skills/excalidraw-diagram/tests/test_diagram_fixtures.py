@@ -82,6 +82,12 @@ MAX_FANOUT_HARD = 8          # 超过这个数就不只是"不够好看"，是�
 READABLE_ASPECT = (0.45, 4.5)
 # 已知超出可读区间的那两张：**按其当前值放宽 ±15%** 作为允许带。
 # 语义是“不许变差”，而不是“永远这么差”。修好之后把它们删掉，可读区间就接管了。
+#
+# ⚠ 加图标题后，04-state 的数字从 13.2 降到 9.7、05-network 从 5.1 降到 4.2 ——
+# **这不是布局变好了**。标题给场景加了高度，比值的分母变大而已，内容本身一点没动。
+# 所以下面的门槛实际上被**悄悄放松**了。换成“内容比例”（去掉标题）才算真实改善；
+# 之所以没换：导出的图里确实有标题，人眼看到的比例就是这里量的这个。
+# 要判断布局到底有没有改善，得看**节点尺寸与坐标**，不是这个比值。
 KNOWN_ASPECT = {"02-flow": 0.30, "04-state": 13.1, "05-network": 5.0}
 
 
@@ -320,14 +326,31 @@ class TestKnownProblemsDoNotWorsen(unittest.TestCase):
 class TestMissingCapabilitiesAreRecorded(unittest.TestCase):
     """把"还没实现的能力"也钉住 —— 否则它们会静默消失在"图看起来还行"里。"""
 
-    def test_title_is_currently_dropped(self):
-        """P4：`title` 字段被忽略。这条在实现标题渲染后应该**失败**，那时改断言即可。"""
-        with open(spec_paths()[0], encoding="utf-8") as fh:
-            spec = json.load(fh)
-        self.assertTrue(spec.get("title"), "fixture 里得有 title 才能测这件事")
-        scene, _, _, _ = E.emit(spec)
-        self.assertFalse(measure(scene)["has_title"],
-                         "标题已经实现了 —— 删掉这条用例，并在 visual-design.md 里划掉 P4")
+    def test_every_diagram_now_has_a_title(self):
+        """P4 已修：`title` 真的画出来了。
+
+        这条以前是“缺失能力标记”（断言标题**不**存在）。按约定它失败了，
+        失败消息就是“去把 visual-design.md 里 P4 划掉” —— 现在划掉了，断言跟着反过来了。
+
+        顺带钉住两条不进校验的约束：标题必须在**所有内容之上**（否则压住东西），
+        而且必须是图字号而不是节点字号。
+        """
+        for path in spec_paths():
+            with self.subTest(fixture=os.path.basename(path)):
+                with open(path, encoding="utf-8") as fh:
+                    spec = json.load(fh)
+                self.assertTrue(spec.get("title"), "fixture 里得有 title 才能测这件事")
+                scene, _, _, _ = E.emit(spec)
+                self.assertTrue(measure(scene)["has_title"],
+                                "标题又丢了 —— emit 里 title_element 那条路断了？")
+                titles = [e for e in scene["elements"]
+                          if e["type"] == "text" and e.get("containerId") is None
+                          and e["fontSize"] == E.tm.FONT_TITLE]
+                self.assertEqual(1, len(titles), "标题必须正好一个")
+                title = titles[0]
+                content_top = min(e["y"] for e in scene["elements"] if e is not title)
+                gap = content_top - (title["y"] + title["height"])
+                self.assertGreater(gap, 0, f"标题压到内容上了（间隙 {gap:.0f}）")
 
     def test_shapes_follow_semantics(self):
         """P5 已修：形状与语义有关，不再是清一色圆角矩形。

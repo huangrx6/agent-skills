@@ -108,6 +108,68 @@ EXCLUDED_STYLES = (
 )
 
 
+# 强调层级 —— 封闭枚举。视觉重点靠“描边粗细 + 填充浓度”表达，**不靠尺寸**。
+#
+# 为什么尺寸不参与：尺寸会进尺寸链（文字 → 盒子 → 坐标）。改它就得重新验证
+# 12px 最小间隙那一套阈值，而“哪几处必须一眼看到”这件事本身不需要动几何。
+#
+# 三档的填充都由 `emphasis_fill()` 从色板**派生**，没有第二份表：
+#   primary 向自己的描边色靠一点 → 颜色更实（“更有颜色 = 更重要”，
+#           适合浅色底板，不能用“更深 = 更重要”那套）
+#   normal  就是色板原色（所以默认档与加入 emphasis 之前的观感**完全一致**）
+#   muted   向画布色靠拢一半以上 → 退到背景里
+EMPHASIS: dict[str, dict] = {
+    "primary": {"zh": "重点", "stroke_width": 2.5, "to_stroke": 0.14},
+    "normal": {"zh": "常规", "stroke_width": 1.5, "to_stroke": 0.00},
+    "muted": {"zh": "次要", "stroke_width": 1.0, "to_canvas": 0.55},
+}
+DEFAULT_EMPHASIS = "normal"
+
+
+def _parse_hex(value: str) -> tuple[int, int, int]:
+    raw = value.lstrip("#")
+    if len(raw) != 6:
+        raise ValueError(f"只接受 #RRGGBB，收到 {value!r}")
+    return (int(raw[0:2], 16), int(raw[2:4], 16), int(raw[4:6], 16))
+
+
+def _mix(a: str, b: str, ratio: float) -> str:
+    """把 `a` 按 `ratio` 往 `b` 混。ratio=0 就是 a 本身。"""
+    ra, ga, ba = _parse_hex(a)
+    rb, gb, bb = _parse_hex(b)
+    blend = lambda x, y: round(x + (y - x) * ratio)  # noqa: E731
+    return f"#{blend(ra, rb):02X}{blend(ga, gb):02X}{blend(ba, bb):02X}"
+
+
+def emphasis_stroke_width(emphasis: str) -> float:
+    """未知 emphasis 直接抛错 —— 与 kind / shape 同一条规矩。"""
+    try:
+        return EMPHASIS[emphasis]["stroke_width"]
+    except KeyError:
+        raise KeyError(
+            f"未知 emphasis: {emphasis!r}；允许的取值：{sorted(EMPHASIS)}"
+        ) from None
+
+
+def emphasis_fill(kind: str, emphasis: str) -> str:
+    """这个语义角色在这档强调下的填充色。**唯一来源是色板本身。**
+
+    未知 kind / emphasis 都抛错，不 fallback（fallback 会让“颜色必须落在板内”
+    这条校验自己绕过自己）。
+    """
+    if emphasis not in EMPHASIS:
+        raise KeyError(
+            f"未知 emphasis: {emphasis!r}；允许的取值：{sorted(EMPHASIS)}"
+        )
+    base = background_for(kind)
+    rule = EMPHASIS[emphasis]
+    if "to_stroke" in rule:
+        return _mix(base, stroke_for(kind), rule["to_stroke"])
+    if "to_canvas" in rule:
+        return _mix(base, CANVAS["background"], rule["to_canvas"])
+    return base
+
+
 def stroke_for(kind: str) -> str:
     """取节点边框色。未知 kind 直接抛错 —— 不 fallback。"""
     try:

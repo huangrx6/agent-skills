@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+from types import SimpleNamespace
 import sys
 import unittest
 
@@ -43,6 +44,7 @@ def _load(name: str, path: str):
 
 
 P = _load("preview", PREVIEW)
+EMIT = _load("emit_excalidraw", os.path.join(SKILL, "scripts", "emit_excalidraw.py"))
 
 
 def rect(x, y, w, h):
@@ -105,5 +107,50 @@ class TestNoRuntimeDependency(unittest.TestCase):
         self.assertNotIn(os.sep + "scripts" + os.sep, PREVIEW)
 
 
+
+
+class TestRendererCoversEveryShape(unittest.TestCase):
+    """渲染器必须能画出**每一种**形状，而且画不出来时要**明说**。
+
+    这条防线的来历：早期这个渲染器只认得 `rectangle`，加进节点形状之后，
+    椭圆节点在预览里彻底消失 —— 我看到的是"纯文字没框"，差点去改 emit。
+    工具不完整不是错，不完整却不吭声才是错：目视检查的全部价值就在那张图上。
+    """
+
+    @staticmethod
+    def _placed(x, y, w, h):
+        # `shape_elements` 只需要这四个属性（真实调用里传的是 layout.Placed）
+        return SimpleNamespace(x=x, y=y, width=w, height=h)
+
+    def _render(self, elements, name):
+        # `render` 收的是**场景**（含 appState 那些），不是裸的元素列表
+        out = os.path.join(HERE, name)
+        try:
+            return P.render({"elements": elements}, out, 0.5)
+        finally:
+            if os.path.exists(out):
+                os.remove(out)
+
+    def test_nothing_is_skipped_for_all_shapes(self):
+        elements = []
+        for i, shape in enumerate(EMIT.shapes.SHAPES):
+            elements += EMIT.shape_elements(f"n{i}", shape,
+                                            self._placed(i * 400, 0, 200, 80),
+                                            "#888888", "#EEEEEE")
+        info = self._render(elements, "_tmp_all_shapes.png")
+        self.assertEqual({}, info["skipped"],
+                         f"这些元素预览画不出来：{info['skipped']} —— "
+                         f"要么补渲染，要么至少别让目视检查建立在残图上")
+        self.assertGreaterEqual(info["elements"]["ellipses"], 1)
+        self.assertGreaterEqual(info["elements"]["diamonds"], 1)
+
+    def test_unknown_element_type_is_reported_not_dropped(self):
+        elements = [{"id": "x", "type": "freedraw", "x": 0, "y": 0,
+                     "width": 10, "height": 10}]
+        info = self._render(elements, "_tmp_unknown.png")
+        self.assertEqual({"freedraw": 1}, info["skipped"],
+                         "不认识的元素类型必须被报出来，不能静静丢掉")
+
+
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    unittest.main()

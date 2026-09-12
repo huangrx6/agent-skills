@@ -212,6 +212,72 @@ class TestMorandiCharacter(unittest.TestCase):
         self.assertEqual(len(values), len(set(values)), "有重复的颜色值")
 
 
+class TestEmphasis(unittest.TestCase):
+    """强调层级 —— 三档必须**真的分得出来**，而且默认档不许改变原观感。"""
+
+    LEVELS = ("primary", "normal", "muted")
+
+    def test_default_level_changes_nothing(self):
+        """默认档的填充必须就是色板原色。
+
+        这条是这次改动的**零回归保证**：加 emphasis 之前所有节点都用色板原色，
+        默认档若不是原色，等于偷偷把之前看过的图全改了一遍。
+        """
+        for kind in P.KINDS:
+            with self.subTest(kind=kind):
+                self.assertEqual(P.background_for(kind),
+                                 P.emphasis_fill(kind, P.DEFAULT_EMPHASIS))
+                self.assertEqual("normal", P.DEFAULT_EMPHASIS)
+
+    def test_three_levels_are_actually_different(self):
+        """三档同色的话，emphasis 就只是多了个没人看得出效果的字段。"""
+        for kind in P.KINDS:
+            with self.subTest(kind=kind):
+                fills = [P.emphasis_fill(kind, lvl) for lvl in self.LEVELS]
+                self.assertEqual(3, len(set(fills)), f"{kind} 的填充三档没分开：{fills}")
+                widths = [P.emphasis_stroke_width(lvl) for lvl in self.LEVELS]
+                self.assertEqual(3, len(set(widths)), f"描边宽三档没分开：{widths}")
+
+    def test_primary_is_heavier_and_muted_is_quieter(self):
+        for kind in P.KINDS:
+            with self.subTest(kind=kind):
+                widths = [P.emphasis_stroke_width(lvl) for lvl in self.LEVELS]
+                self.assertGreater(widths[0], widths[1], "primary 要比 normal 重")
+                self.assertGreater(widths[1], widths[2], "normal 要比 muted 重")
+                # 在浅色底板上“更有颜色 = 更重要” —— 不能用“更深 = 更重要”那套。
+                canvas = P.CANVAS["background"]
+                d_primary = abs(_luminance(P.emphasis_fill(kind, "primary")) - _luminance(canvas))
+                d_normal = abs(_luminance(P.emphasis_fill(kind, "normal")) - _luminance(canvas))
+                d_muted = abs(_luminance(P.emphasis_fill(kind, "muted")) - _luminance(canvas))
+                self.assertGreater(d_primary, d_normal, "primary 应该比 normal 更实")
+                self.assertLess(d_muted, d_normal, "muted 应该更靠近画布（更安静）")
+
+    def test_text_stays_readable_at_every_level(self):
+        """primary 会把填充往描边色拉，文字对比度会降 —— 但不能降到 AA 以下。"""
+        for kind in P.KINDS:
+            for lvl in self.LEVELS:
+                with self.subTest(kind=kind, emphasis=lvl):
+                    got = contrast(P.CANVAS["text"],
+                                   P.emphasis_fill(kind, lvl))
+                    self.assertGreaterEqual(got, 4.5, f"对比度只有 {got:.2f}")
+
+    def test_unknown_emphasis_raises_never_falls_back(self):
+        """同 kind / shape 一条规矩：不 fallback。"""
+        for bad in ("emphasized", "", "PRIMARY", None):
+            with self.subTest(emphasis=bad):
+                with self.assertRaises(KeyError) as ctx:
+                    P.emphasis_fill("service", bad)
+                self.assertIn("emphasis", str(ctx.exception))
+                with self.assertRaises(KeyError):
+                    P.emphasis_stroke_width(bad)
+
+    def test_derived_colours_stay_derived(self):
+        """派生色的唯一来源是色板 —— 换个 kind 就该换个结果，不能是写死的常量。"""
+        fills = {kind: P.emphasis_fill(kind, "primary") for kind in P.KINDS}
+        self.assertEqual(len(P.KINDS), len(set(fills.values())),
+                         "primary 的填充各 kind 应当互不相同（说明是从色板算的）")
+
+
 class TestPaletteShape(unittest.TestCase):
     def test_kind_count_is_capped(self):
         self.assertLessEqual(len(P.KINDS), P.MAX_KINDS)
