@@ -69,6 +69,9 @@ PlacedT = Any       # layout.Placed
 ResultT = Any       # layout.LayoutResult
 
 # ── 阈值。全部写死在脚本里，不进规格（规格里没有旋钮，见 diagram-spec.md）──
+# 【待验证】这几个阈值是“依据前作数值与常识设的起点”，不是实测出来的 ——
+# 它们等的是 validation.md 里那张校准表（用够 5 张图做一次复盘）。
+# 信任状态总表见 references/diagram-spec.md（“数值的信任状态”一节）。
 GAP_MIN = 12.0            # #1 相邻元素最小间隙（前作容忍 4px **重叠**，本版检查间隙）
 EDGE_MIN = 24.0           # #2 连线最短可见长度
 CROSSING_RATIO = 0.5      # #5 交叉数软阈值 = 边数 × 0.5

@@ -93,6 +93,23 @@ python3 scripts/palette.py                            # 打印色板与 kind 取
 
 `check_layout.py` 退出码：0 = 无阻塞项，1 = 有阻塞项，2 = 读不到规格。
 
+## `dev-tools/preview.py` —— 不是运行时的一部分
+
+把 `.excalidraw` 画成 PNG，给我自己**目视复核**用。它**需要 PIL**，而上面那条链跑图
+**不需要**——用户用这个 skill 出图仍然是零依赖。放在 `dev-tools/` 而不是 `scripts/`，
+就是为了让“核心链路零依赖”这句话不被含糊掉。
+
+**它能判断**：结构一眼能不能看懂、排版顺不顺眼、颜色比例、节点疏密、连线走向、
+标签有没有压在节点上。
+
+**它不能判断**：它画的是我们**自己的布局模型**（与 `layout.py` 同源），
+所以它**在构造上**看不见“渲染器与我们的模型不一致”这类问题 —— 尤其是容器绑定文字
+在 Excalidraw 里的实际断行。那类问题只有真实 Excalidraw 才算数，见 `references/validation.md`。
+
+```sh
+python3 dev-tools/preview.py x.excalidraw out.png
+```
+
 ## 输出格式：`.excalidraw`（plain JSON）
 
 **不是 `.excalidraw.md`。** 后者的场景是 **lz-string** 压缩的（实测插件 `main.js` 里 24 处

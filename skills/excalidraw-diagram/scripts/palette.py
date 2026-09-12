@@ -19,6 +19,9 @@ from __future__ import annotations
 
 # kind → 语义角色 + 颜色。加第 7 项之前先问"能不能归并进已有类"：
 # 超过 6 类语义就无法靠颜色区分了。
+#
+# 【已选型未实测】这些色取自 Excalidraw 内置浅色系 —— "深色文字在其上可读"是看过的，
+# 不是量过的（对比度没算过）。信任状态总表见 references/diagram-spec.md。
 KINDS: dict[str, dict[str, str]] = {
     "client": {
         "zh": "用户 / 客户端 / 浏览器",

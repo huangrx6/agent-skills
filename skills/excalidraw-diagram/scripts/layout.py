@@ -61,8 +61,10 @@ DIRECTION_FOR_TYPE = {
 }
 
 # ── 布局参数：只在脚本内部，不进规格 ────────────────────────
-# 初值取自前作 layout.mjs 的 Dagre 默认值（nodeSeparation 70 / rankSeparation 120）。
+# 【待验证】初值取自前作 layout.mjs 的 Dagre 默认值（nodeSeparation 70 / rankSeparation 120）。
 # 原则：别人失败经验里的**具体数值**值得复用；他们的**架构决策**不值得复用。
+# 但注意——“前作用过、没被推翻”≠“已经验证过”。这两个数我们没量过，所以标待验证。
+# 信任状态总表见 references/diagram-spec.md（“数值的信任状态”一节）。
 DEFAULT_PARAMS: dict[str, float] = {
     "nodeSeparation": 70.0,
     "rankSeparation": 120.0,
