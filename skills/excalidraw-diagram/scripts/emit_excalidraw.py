@@ -282,7 +282,9 @@ def shape_elements(element_id: str, shape_name: str, placed,
                   roughness=roughness)]
 
 
-REGION_STROKE_WIDTH = 0.75       # 比节点细：区域是背景层（见 palette.frame_stroke）
+# 比节点细（节点 1.5 / 强调 2.5）：区域是背景层。但不低于 1.0 ——
+# 0.75 时手绘的那点抖动几乎看不出来，整块区域会显得比周围"更机械"。
+REGION_STROKE_WIDTH = 1.0
 REGION_LABEL_SIZE = 20.0
 
 

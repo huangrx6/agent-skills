@@ -123,6 +123,77 @@ def _font(path: str, px: float):
     return ImageFont.truetype(path, _px(px))
 
 
+# ── 手绘与虚线：预览必须看得出这两样，否则会误导判断 ──
+#
+# 这两样以前**完全不画**（只有折线画了虚线）。后果实测了两次：我给用户看的预览图
+# 永远是笔直实线，于是他连着问"哪来的手绘感""为什么全是实线"。
+# 工具不完整不是错，不完整却让人据此下结论才是错（和 render() 里 skipped 那段同一条）。
+#
+# 手绘的实现照 Excalidraw 的做法：**同一条边轻微错位描两遍**（不是把形状画歪）。
+SKETCH_AMOUNT = {0: 0.0, 1: 1.7, 2: 3.4}
+
+
+def _sketch_passes(roughness: Any) -> list[tuple[float, float]]:
+    """要描几遍、每遍错开多少像素。0 档（正常直线）只有一遍且不偏移。"""
+    try:
+        amount = SKETCH_AMOUNT.get(int(roughness or 0), 0.0)
+    except (TypeError, ValueError):
+        amount = 0.0
+    if amount <= 0:
+        return [(0.0, 0.0)]
+    return [(-amount, -amount * 0.5), (amount * 0.6, amount)]
+
+
+def _rect_perimeter(x0, y0, x1, y1, r, steps: int = 4) -> list:
+    """圆角矩形的周长采样（顺时针）。虚线要按点列画，PIL 的 outline 不支持虚线。"""
+    r = max(0.0, min(r, (x1 - x0) / 2, (y1 - y0) / 2))
+    pts: list = []
+
+    def edge(a, b):
+        for k in range(1, steps + 1):
+            t = k / steps
+            pts.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
+
+    def arc(cx, cy, start):
+        for k in range(1, 4):
+            ang = start + (k / 3) * (math.pi / 2)
+            pts.append((cx + r * math.cos(ang), cy + r * math.sin(ang)))
+
+    if r <= 0.5:
+        pts = [(x0, y0)]
+        edge((x0, y0), (x1, y0))
+        edge((x1, y0), (x1, y1))
+        edge((x1, y1), (x0, y1))
+        edge((x0, y1), (x0, y0))
+        return pts
+    pts.append((x0 + r, y0))
+    edge((x0 + r, y0), (x1 - r, y0))
+    arc(x1 - r, y0 + r, -math.pi / 2)
+    edge((x1, y0 + r), (x1, y1 - r))
+    arc(x1 - r, y1 - r, 0.0)
+    edge((x1 - r, y1), (x0 + r, y1))
+    arc(x0 + r, y1 - r, math.pi / 2)
+    edge((x0, y1 - r), (x0, y0 + r))
+    arc(x0 + r, y0 + r, math.pi)
+    return pts
+
+
+def _stroke_path(draw, points, colour, width, style, roughness, passes) -> None:
+    """按点列描线：支持虚线 / 点线 + 手绘重描。"""
+    for dx, dy in passes:
+        moved = [(x + dx, y + dy) for x, y in points]
+        if style == "dashed":
+            for a, b in zip(moved, moved[1:]):
+                _dashed_line(draw, a, b, colour, width)
+        elif style == "dotted":
+            for a, b in zip(moved, moved[1:]):
+                draw.line([a, b], fill=colour, width=width)
+                r = max(1.0, width * 0.6)
+                draw.ellipse([a[0] - r, a[1] - r, a[0] + r, a[1] + r], fill=colour)
+        else:
+            draw.line(moved, fill=colour, width=width, joint="curve")
+
+
 def render(scene: dict, out_path: str, scale: float = 1.0, pad: float = 40.0) -> dict:
     from PIL import Image, ImageDraw
 
@@ -178,16 +249,23 @@ def render(scene: dict, out_path: str, scale: float = 1.0, pad: float = 40.0) ->
             if isinstance(ratio, (int, float)):
                 radius = e["height"] * ratio * scale
         draw.rounded_rectangle([x0, y0, x1, y1], radius=radius,
-                               fill=_colour(e.get("backgroundColor")),
-                               outline=_colour(e.get("strokeColor"), "#666666"),
-                               width=_px(2 * scale))
+                               fill=_colour(e.get("backgroundColor")))
+        _stroke_path(draw, _rect_perimeter(x0, y0, x1, y1, radius * scale),
+                     _colour(e.get("strokeColor"), "#666666"), _px(2 * scale),
+                     e.get("strokeStyle"), e.get("roughness"),
+                     _sketch_passes(e.get("roughness")))
 
     for e in ellipses:
         x0, y0 = to_px(e["x"], e["y"])
         x1, y1 = to_px(e["x"] + e["width"], e["y"] + e["height"])
-        draw.ellipse([x0, y0, x1, y1], fill=_colour(e.get("backgroundColor")),
-                     outline=_colour(e.get("strokeColor"), "#666666"),
-                     width=_px(2 * scale))
+        draw.ellipse([x0, y0, x1, y1], fill=_colour(e.get("backgroundColor")))
+        cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        rx, ry = (x1 - x0) / 2, (y1 - y0) / 2
+        ring = [(cx + rx * math.cos(t / 32 * math.tau),
+                 cy + ry * math.sin(t / 32 * math.tau)) for t in range(33)]
+        _stroke_path(draw, ring, _colour(e.get("strokeColor"), "#666666"),
+                     _px(2 * scale), e.get("strokeStyle"), e.get("roughness"),
+                     _sketch_passes(e.get("roughness")))
 
     for e in diamonds:
         cx0, cy0 = to_px(e["x"] + e["width"] / 2, e["y"])
@@ -195,21 +273,19 @@ def render(scene: dict, out_path: str, scale: float = 1.0, pad: float = 40.0) ->
         cx2, cy2 = to_px(e["x"] + e["width"] / 2, e["y"] + e["height"])
         cx3, cy3 = to_px(e["x"], e["y"] + e["height"] / 2)
         draw.polygon([cx0, cy0, cx1, cy1, cx2, cy2, cx3, cy3],
-                     fill=_colour(e.get("backgroundColor")),
-                     outline=_colour(e.get("strokeColor"), "#666666"),
-                     width=_px(2 * scale))
+                     fill=_colour(e.get("backgroundColor")))
+        _stroke_path(draw, [(cx0, cy0), (cx1, cy1), (cx2, cy2), (cx3, cy3), (cx0, cy0)],
+                     _colour(e.get("strokeColor"), "#666666"), _px(2 * scale),
+                     e.get("strokeStyle"), e.get("roughness"),
+                     _sketch_passes(e.get("roughness")))
 
     for e in arrows:
         pts = [to_px(e["x"] + p[0], e["y"] + p[1]) for p in e["points"]]
         if len(pts) < 2:
             continue
-        lw = _px(2 * scale)
-        if e.get("strokeStyle") == "dashed":
-            for a, b in zip(pts, pts[1:]):
-                _dashed_line(draw, a, b, _colour(e.get("strokeColor"), "#666666"), lw)
-        else:
-            draw.line(pts, fill=_colour(e.get("strokeColor"), "#666666"),
-                      width=lw, joint="curve")
+        _stroke_path(draw, pts, _colour(e.get("strokeColor"), "#666666"),
+                     _px(2 * scale), e.get("strokeStyle"), e.get("roughness"),
+                     _sketch_passes(e.get("roughness")))
         if e.get("endArrowhead"):
             _arrow_head(draw, pts[-2], pts[-1],
                         _colour(e.get("strokeColor"), "#666666"), scale)
