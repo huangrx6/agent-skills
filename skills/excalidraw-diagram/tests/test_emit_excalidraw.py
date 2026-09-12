@@ -54,6 +54,7 @@ def _load(name: str, path: str):
 E = _load("emit_excalidraw", EMIT)
 L = E.L
 palette = E.palette
+V = E._load_sibling("validate_spec")
 
 
 def spec_of(ids, edges, **kw) -> dict:
@@ -678,3 +679,72 @@ class TestLabelNeverSitsOnANode(unittest.TestCase):
                                                 lines, [node_rect])
         self.assertTrue(needs_backdrop, "完全没有干净位置时应当要底色")
 
+
+
+class TestStyleAxes(unittest.TestCase):
+    """四组样式轴：默认不是实心、未知值判失败、落笔真的跟着变。"""
+
+    def spec(self, style=None):
+        spec = {
+            "type": "flow", "direction": "TB",
+            "nodes": [{"id": "a", "label": "A", "kind": "plain"},
+                      {"id": "b", "label": "B", "kind": "plain"}],
+            "edges": [{"from": "a", "to": "b"}],
+        }
+        if style is not None:
+            spec["style"] = style
+        return spec
+
+    def elements(self, style=None):
+        spec = self.spec(style)
+        boxes = L.boxes_from_spec(spec)
+        result = L.layout(spec, boxes)
+        return E.build_scene(spec, result, boxes, None, None)["elements"]
+
+    def node(self, style=None):
+        return next(e for e in self.elements(style) if e["id"].startswith("node-"))
+
+    def test_default_is_not_solid(self):
+        """默认**不是实心** —— 用户明确要求"尽量不要用实心的颜色"。"""
+        self.assertEqual("hachure", self.node()["fillStyle"])
+
+    def test_fill_axis_reaches_the_element(self):
+        for value in palette.FILL_STYLES:
+            with self.subTest(value=value):
+                self.assertEqual(value, self.node({"fill": value})["fillStyle"])
+
+    def test_stroke_axis_reaches_the_shape_only(self):
+        """`stroke` 改节点的框，**不改连线** —— 连线的虚实是语义。"""
+        self.assertEqual("dotted", self.node({"stroke": "dotted"})["strokeStyle"])
+        arrow = next(e for e in self.elements({"stroke": "dotted"}) if e["type"] == "arrow")
+        self.assertEqual("solid", arrow["strokeStyle"], "边是同步的，本来就该是实线")
+        dashed = next(e for e in self.elements({"stroke": "dotted"}) if e["type"] == "arrow")
+        self.assertNotEqual("dotted", dashed["strokeStyle"])
+
+    def test_corners_axis_reaches_the_element(self):
+        self.assertIsNone(self.node({"corners": "sharp"})["roundness"])
+        self.assertIsNotNone(self.node({"corners": "round"})["roundness"])
+
+    def test_line_axis_reaches_nodes_and_arrows(self):
+        for value, expected in palette.ROUGHNESS_OF.items():
+            with self.subTest(value=value):
+                elements = self.elements({"line": value})
+                self.assertEqual(expected, self.node({"line": value})["roughness"])
+                arrow = next(e for e in elements if e["type"] == "arrow")
+                self.assertEqual(expected, arrow["roughness"])
+
+    def test_unknown_axis_is_rejected(self):
+        with self.assertRaises(ValueError) as caught:
+            palette.resolve_style({"colour": "red"})
+        self.assertIn("colour", str(caught.exception))
+
+    def test_unknown_value_is_rejected(self):
+        with self.assertRaises(ValueError) as caught:
+            palette.resolve_style({"fill": "sparkles"})
+        self.assertIn("sparkles", str(caught.exception))
+
+    def test_validate_reports_bad_axes(self):
+        issues = V.validate(self.spec({"fill": "sparkles", "colour": "red"})).items
+        codes = {i["code"] for i in issues}
+        self.assertIn("BAD_STYLE_VALUE", codes)
+        self.assertIn("BAD_STYLE_AXIS", codes)

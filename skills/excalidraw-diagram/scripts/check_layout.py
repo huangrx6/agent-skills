@@ -403,6 +403,23 @@ def check_regions(spec: dict, result: ResultT, boxes: dict[str, BoxT]) -> list[I
                 f"两个区域部分重叠 {overlap_x:.0f}×{overlap_y:.0f}px",
                 advice="区域要么分开、要么一个完全包住另一个。把其中一组的节点挪到一起，"
                        "或者把这几个节点重新归组 —— 不要靠缩框，缩完就盖住成员了。"))
+
+    # 框里**夹着非成员节点** —— 这比重叠更严重：图上看那个节点"属于这一区"，
+    # 是**语义错误**，不是排版问题。部分压线也算（边框从它身上切过去）。
+    real = result.real_nodes()
+    for region in regions:
+        members = set(region.get("members", ()))
+        for nid, node in real.items():
+            if nid in members:
+                continue
+            if (node.x < region["x"] + region["width"] and node.x + node.width > region["x"]
+                    and node.y < region["y"] + region["height"]
+                    and node.y + node.height > region["y"]):
+                out.append(Issue(
+                    "region", True, f"{region['id']} ⊃ {nid}",
+                    f"区域 {region['id']!r} 的框里夹着非成员节点 {nid!r}",
+                    advice="它在图上看起来属于这一区。要么把它也写进这个 group，"
+                           "要么把这一区拆成两块 —— 框不能靠缩，缩了就会盖住自己的成员。"))
     return out
 
 

@@ -33,7 +33,7 @@ import sys
 # 封闭字段集。加字段要同时改这里和 references/diagram-spec.md —— 这正是设计意图：
 # 让"顺手加一个"变得有摩擦。
 TOP_FIELDS = {"type", "title", "direction", "detail", "groups", "nodes", "edges",
-              "visual", "mood"}
+              "visual", "mood", "style"}
 GROUP_FIELDS = {"id", "label", "level", "description"}
 NODE_FIELDS = {"id", "label", "kind", "shape", "emphasis", "icon", "group",
                "detail", "rank", "pin"}
@@ -147,6 +147,22 @@ def validate(spec: dict) -> Issues:
     if "detail" in spec and spec["detail"] not in DETAIL_LEVELS:
         issues.error("BAD_DETAIL", "$.detail",
                      f"detail 只允许 {sorted(DETAIL_LEVELS)}")
+
+    # style：四组样式轴。未知的轴、未知的取值都报错 —— 与颜色同一条规矩。
+    style = spec.get("style")
+    if style is not None:
+        if not isinstance(style, dict):
+            issues.error("BAD_STYLE", "$.style", "style 必须是对象")
+        else:
+            for key, value in style.items():
+                if key not in palette.STYLE_AXES:
+                    issues.error("BAD_STYLE_AXIS", f"$.style.{key}",
+                                 f"style 没有 {key!r} 这一项，可用 "
+                                 f"{sorted(palette.STYLE_AXES)}")
+                elif value not in palette.STYLE_AXES[key]:
+                    issues.error("BAD_STYLE_VALUE", f"$.style.{key}",
+                                 f"{value!r} 不在档位里，可用 "
+                                 f"{list(palette.STYLE_AXES[key])}")
 
     # groups
     group_ids: set[str] = set()

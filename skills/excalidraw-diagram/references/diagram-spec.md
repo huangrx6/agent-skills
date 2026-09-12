@@ -12,6 +12,12 @@
   "detail": "standard",             // executive | standard | diagnostic
   "visual": "auto",                  // 可选，见下方"视觉方向"；不写 = auto
   "groups": [],                     // 可选：区域（一整个色块 + 顶部标题，见下）
+  "style": {                        // 可选：四组样式轴，见下方"样式轴"；不写就是默认
+    "fill": "hachure",              // hachure 斜条纹 | cross-hatch 网格 | solid 实心
+    "stroke": "shape",              // shape 听形状的 | solid | dashed | dotted（只管框）
+    "corners": "shape",             // shape 听形状的 | sharp 直角 | round 圆角
+    "line": "sketch"                // straight | sketch | rough（粗糙度 0/1/2）
+  },
   "nodes": [
     {
       "id": "auth",                 // 必填，稳定 ID（来自领域名，不是序号）
@@ -72,6 +78,32 @@
 
 ⚠️ 区域**不改变布局**：节点位置由 rank / 边决定，区域是照着结果画的。
 所以"把节点挪到一起"要改的是分组归属或 rank，不是区域。
+
+### 样式轴：四组 `style.*`
+
+颜色之外，"怎么画"还有四组档位 —— 它们就是 Excalidraw 原生的四组设置：
+
+| 轴 | 取值 | 作用范围 | 默认 |
+| --- | --- | --- | --- |
+| `fill` | `hachure` 斜条纹 / `cross-hatch` 网格 / `solid` 实心 | 节点 + 区域 | **`hachure`** |
+| `stroke` | `shape` 听形状的 / `solid` / `dashed` / `dotted` | **节点 + 区域**（不管连线） | `shape` |
+| `corners` | `shape` 听形状的 / `sharp` 直角 / `round` 圆角 | 节点 + 区域 | `shape` |
+| `line` | `straight` / `sketch` / `rough`（roughness 0 / 1 / 2） | 节点 + 区域 + 连线 | `sketch` |
+
+四条需要注意的：
+
+1. **默认不是实心**。用户的要求是"尽量不要用实心的颜色"—— 斜条纹把浅色画成一组细线，
+   整体更轻更透，一屏十几个框不会糊成一片色块。要实心就显式写 `"fill": "solid"`。
+2. **`stroke` 只管节点和区域，不管连线**。连线的虚实是**语义**（虚线 = 异步 / 可选，
+   见 §7）—— 让样式轴去改它会把语义一起改掉。
+3. **`shape` 这个档位是"显式覆盖"的对手**。不写 = 保留形状自己的定义
+   （`note` 天生虚线框、`rect` 天生直角、`capsule` 靠圆角定义自己）；
+   写了就是明确要覆盖，包括把 capsule 变成普通直角矩形。
+4. **未知的轴、未知的取值都判失败**（`BAD_STYLE_AXIS` / `BAD_STYLE_VALUE`），不 fallback。
+   和颜色同一条规矩：程序补的默认值当然合法，那校验就自己绕过自己了。
+
+`line` 的 `(roughness)` 数字是 Excalidraw 的 sloppiness：0 = architect（正常直线）、
+1 = artist（轻微手绘）、2 = cartoonist（更明显的手绘）。
 
 ### 没有区域的时候怎么表达层
 

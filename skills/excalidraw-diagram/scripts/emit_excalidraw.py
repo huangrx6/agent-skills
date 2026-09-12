@@ -99,6 +99,7 @@ def _eid(kind: str, raw: str, index: int = 0) -> str:
 def _base(el_id: str, el_type: str, x: float, y: float, w: float, h: float,
           stroke: str, background: str, *, stroke_style: str = "solid",
           roundness: dict | None = None, stroke_width: float = STROKE_WIDTH,
+          fill_style: str = "hachure", roughness: int = ROUGHNESS,
           extra: dict | None = None) -> dict:
     """所有元素共有的字段。字段集照 Excalidraw 的 `_ExcalidrawElementBase` 来。"""
     el = {
@@ -111,10 +112,10 @@ def _base(el_id: str, el_type: str, x: float, y: float, w: float, h: float,
         "angle": 0,
         "strokeColor": stroke,
         "backgroundColor": background,
-        "fillStyle": "solid",
+        "fillStyle": fill_style,
         "strokeWidth": stroke_width,
         "strokeStyle": stroke_style,
-        "roughness": ROUGHNESS,
+        "roughness": roughness,
         "opacity": 100,
         "groupIds": [],
         "frameId": None,
@@ -137,7 +138,8 @@ def _base(el_id: str, el_type: str, x: float, y: float, w: float, h: float,
 # ── 节点：矩形 + 容器绑定的文字 ─────────────────────────────
 def node_elements(node: dict, placed, box, arrows_out: list[str],
                     arrows_in: list[str], icon_src: list | None = None,
-                    icon_height: float | None = None) -> list[dict]:
+                    icon_height: float | None = None,
+                    style: dict | None = None) -> list[dict]:
     nid = node["id"]
     shape_id = _eid("node", nid)
     title_id = _eid("title", nid)
@@ -158,7 +160,7 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
     fill = palette.fill_for(kind, emphasis)
     stroke_width = palette.emphasis_stroke_width(emphasis)
     elements = shape_elements(shape_id, box.shape, placed, stroke, fill,
-                              stroke_width=stroke_width)
+                              stroke_width=stroke_width, style=style)
     # 文字与箭头都绑到**主体**那个元素上；圆柱的顶盖只是一个装饰性叠加
     elements[0]["boundElements"] = bound
 
@@ -231,7 +233,8 @@ def text_band(shape_name: str, placed) -> tuple[float, float]:
 
 def shape_elements(element_id: str, shape_name: str, placed,
                    stroke: str, fill: str,
-                   stroke_width: float = STROKE_WIDTH) -> list[dict]:
+                   stroke_width: float = STROKE_WIDTH,
+                   style: dict | None = None) -> list[dict]:
     """按形状建元素。除圆柱外都是一个元素。
 
     **圆柱刻意让柱体跨满整个包围盒**，而不是“柱体在下半、盖子在右上”：
@@ -240,35 +243,44 @@ def shape_elements(element_id: str, shape_name: str, placed,
     顶盖椭圆只是叠在上面的装饰（元素顺序 = 叠放顺序，它在后面所以在上）。
     """
     entry = shapes.SHAPES[shape_name]
-    style = shapes.stroke_style_for(shape_name)
+    # 这里必须换名字：`style` 现在是样式轴那份字典，而旧代码把它当"描边风格串"用
+    # （`shapes.stroke_style_for` 的返回值）。同名会被后一次赋值悄悄覆盖。
+    resolved = palette.resolve_style(style)
+    stroke_style = palette.stroke_style_of(resolved, shapes.stroke_style_for(shape_name))
+    fill_style, roughness = resolved["fill"], palette.roughness_of(resolved)
     if shape_name == "cylinder":
         cap = shapes.cylinder_cap(placed.width)
         body = _base(element_id, "rectangle", placed.x, placed.y, placed.width,
-                     placed.height, stroke, fill, stroke_style=style,
-                     roundness={"type": 3}, stroke_width=stroke_width)
+                     placed.height, stroke, fill, stroke_style=stroke_style,
+                     roundness=palette.roundness_of(resolved, entry.get("roundness")),
+                     stroke_width=stroke_width, fill_style=fill_style,
+                     roughness=roughness)
         lid = _base(f"{element_id}-lid", "ellipse", placed.x, placed.y,
-                    placed.width, cap, stroke, fill, stroke_width=stroke_width)
+                    placed.width, cap, stroke, fill, stroke_width=stroke_width,
+                    fill_style=fill_style, roughness=roughness)
         # 顶盖与柱体成组：在 Excalidraw 里拖动时它们一起动（否则一拖就散开），
         # 同时这也是一个明确标记 —— “groupIds 非空的是装饰，不是节点”，
         # 校验/量图那边靠它区分顶盖与真节点。
         lid["groupIds"] = [element_id]
         return [body, lid]
     roundness = entry.get("roundness")
-    if shape_name == "capsule":
+    if shape_name == "capsule" and resolved["corners"] == "shape":
         # Excalidraw 没有原生胶囊。type 2 是“按比例取半径”，0.5 就是高的一半 → 真正的胶囊。
+        # 只在默认档（听形状自己的）时用它 —— 显式写 sharp 就是要一个普通直角矩形。
         roundness = {"type": 2, "value": 0.5}
     return [_base(element_id, entry["excalidraw"], placed.x, placed.y,
                   placed.width, placed.height, stroke, fill,
-                  stroke_style=style, roundness=roundness,
-                  stroke_width=stroke_width)]
+                  stroke_style=stroke_style,
+                  roundness=palette.roundness_of(resolved, roundness),
+                  stroke_width=stroke_width, fill_style=fill_style,
+                  roughness=roughness)]
 
 
 REGION_STROKE_WIDTH = 1.0
-REGION_FILL_STYLE = "cross-hatch"   # 参考图里那种交叉网格（Excalidraw 原生档位）
 REGION_LABEL_SIZE = 20.0
 
 
-def region_elements(region: dict) -> list[dict]:
+def region_elements(region: dict, style: dict | None = None) -> list[dict]:
     """一个区域 = 圆角矩形（交叉网格填充）+ 顶部居中的标题。
 
     ⚠️ **必须先进 `build_scene` 的 elements 数组。** Excalidraw 的绘制顺序就是
@@ -288,13 +300,16 @@ def region_elements(region: dict) -> list[dict]:
                          f"（可用 {sorted(palette.LEVELS)}；未知值判失败，不 fallback）")
     stroke = palette.LEVELS[level]["stroke"]
     fill = palette.LEVELS[level]["fill"]
+    resolved = palette.resolve_style(style)
     el_id = _eid("region", region["id"])
     elements = [_base(el_id, "rectangle", region["x"], region["y"],
                       region["width"], region["height"], stroke, fill,
                       stroke_width=REGION_STROKE_WIDTH,
-                      roundness={"type": 3},
-                      extra={"fillStyle": REGION_FILL_STYLE,
-                             "groupIds": [el_id]})]
+                      roundness=palette.roundness_of(resolved, {"type": 3}),
+                      stroke_style=palette.stroke_style_of(resolved, "solid"),
+                      fill_style=resolved["fill"],
+                      roughness=palette.roughness_of(resolved),
+                      extra={"groupIds": [el_id]})]
     label = region.get("label")
     if label:
         box = tm.measure(label, "", font_size=REGION_LABEL_SIZE)
@@ -346,14 +361,15 @@ def _text_block(el_id: str, container_id: str, lines: tuple[str, ...],
 
 
 # ── 边：箭头 ────────────────────────────────────────────────
-def arrow_element(edge: dict, index: int) -> dict:
+def arrow_element(edge: dict, index: int,
+                  style: dict | None = None) -> dict:
     pts = edge["points"]
     x0, y0 = pts[0]
     rel = [[round(px - x0, 2), round(py - y0, 2)] for px, py in pts]
     xs = [p[0] for p in rel]
     ys = [p[1] for p in rel]
     kind = edge.get("kind") or "sync"
-    style = palette.EDGE_KINDS.get(kind, palette.EDGE_KINDS["sync"])
+    edge_style = palette.EDGE_KINDS.get(kind, palette.EDGE_KINDS["sync"])
 
     el_id = _eid("edge", f"{edge['from']}-{edge['to']}", index)
     # 拐角**不圆**。用户的原话是「就是那种 90 度拐弯的线不行吗」，而 Excalidraw 的
@@ -361,8 +377,9 @@ def arrow_element(edge: dict, index: int) -> dict:
     # 实测图里那几处「钩子」有一半是它造成的。手绘感由 `roughness` 提供，不靠倒角。
     # （`roundness: None` 就是界面上的 Sharp；两点直线没有拐角，不受影响。）
     el = _base(el_id, "arrow", x0, y0, max(xs) - min(xs), max(ys) - min(ys),
-               style["stroke"], "transparent", stroke_style=style["style"],
-               roundness=None)
+               edge_style["stroke"], "transparent", stroke_style=edge_style["style"],
+               roundness=None, roughness=palette.roughness_of(
+                   palette.resolve_style(style)))
     el.update({
         "points": rel,
         "startArrowhead": None,
@@ -724,10 +741,12 @@ def build_scene(spec: dict, result, boxes: dict,
                 icon_lookup=None, icon_height=None) -> dict:
     elements: list[dict] = []
     by_id = {n["id"]: n for n in spec.get("nodes", [])}
+    # 四组样式轴解析一次，透传给每个元素（未知值在 resolve_style 里就抛错了）
+    style = palette.resolve_style(spec.get("style"))
 
     # 区域**第一个**进数组：它是背景，后进会盖住节点（见 region_elements）。
     for region in L.region_boxes(spec, result.placed, boxes):
-        elements += region_elements(region)
+        elements += region_elements(region, style)
 
     arrows_out: dict[str, list[str]] = {nid: [] for nid in by_id}
     arrows_in: dict[str, list[str]] = {nid: [] for nid in by_id}
@@ -751,10 +770,12 @@ def build_scene(spec: dict, result, boxes: dict,
                         else icon_height)
             elements += node_elements(by_id[nid], placed, boxes[nid],
                                       arrows_out.get(nid, []), arrows_in.get(nid, []),
-                                      icon_src=icon_src, icon_height=per_node)
+                                      icon_src=icon_src, icon_height=per_node,
+                                      style=style)
         else:
             elements += node_elements(by_id[nid], placed, boxes[nid],
-                                      arrows_out.get(nid, []), arrows_in.get(nid, []))
+                                      arrows_out.get(nid, []), arrows_in.get(nid, []),
+                                      style=style)
 
     # `result.edges` 里的 points **已经是绝对坐标**（`layout._points` 用的是 placed 的坐标），
     # 所以这里直接用，**不能再加一遍起点**。
@@ -771,7 +792,7 @@ def build_scene(spec: dict, result, boxes: dict,
                      placed.y + placed.height)
                     for placed in result.real_nodes().values()]
     for i, (edge, _) in enumerate(arrow_specs):
-        elements.append(arrow_element(edge, i))
+        elements.append(arrow_element(edge, i, style))
         label = edge_label_element(edge, i, polylines, box_keepouts)
         if label:
             elements.append(label)

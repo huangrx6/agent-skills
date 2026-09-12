@@ -75,6 +75,84 @@ EDGE_MIX = 0.42        # 普通连线：画布与墨色之间
 EDGE_MUTED_MIX = 0.24  # 弱连线：更靠近画布
 
 # ══════════════════════════════════════════════════════════════════
+# 样式轴 —— Excalidraw 原生的四组档位
+# ══════════════════════════════════════════════════════════════════
+#
+# 颜色之外，图上还有四组"怎么画"的档位。用户点名要能选的就是这四组：
+#
+#   填充   斜条纹 / 网格 / 实心        （Excalidraw 的 fillStyle）
+#   描边   实线 / 虚线 / 小圆点         （strokeStyle）
+#   边角   直角 / 圆角                 （roundness）
+#   线条   正常直线 / 轻微手绘 / 更明显的手绘（roughness 0 / 1 / 2）
+#
+# ⚠️ `stroke` **只管节点的框和区域**，不管连线。连线的虚实是**语义**（§7：
+# 虚线 = 异步 / 可选）—— 让 `style.stroke` 去改它会把语义一起改掉。
+#
+# ⚠️ 默认**不是实心**。用户的要求是"尽量不要用实心的颜色"：斜条纹的填充是把
+# 浅色画成一组细线，整体更轻更透，一屏十几个框也不会糊成一片色块。
+# 实心要显式要（`"fill": "solid"`）。
+FILL_STYLES = ("hachure", "cross-hatch", "solid")
+# `shape` = **听形状自己的**（`shapes.SHAPES` 的 roundness / stroke_style）。
+# 做成一个默认档位而不是"默认 None"，是为了让"显式覆盖"和"不改"两件事都说得清楚：
+#   note 形状天生虚线框、rect 天生直角 —— 不写就等于保留它们；
+#   写了 `stroke: solid` / `corners: round` 就是**明确要覆盖**，包括 capsule 那种
+#   靠圆角定义自己的形状（覆盖成直角它就变成一个普通矩形，那是你要的就要）。
+STROKE_STYLES = ("shape", "solid", "dashed", "dotted")
+CORNER_STYLES = ("shape", "sharp", "round")
+LINE_STYLES = ("straight", "sketch", "rough")
+ROUGHNESS_OF = {"straight": 0, "sketch": 1, "rough": 2}
+
+STYLE_AXES: dict[str, tuple[str, ...]] = {
+    "fill": FILL_STYLES,
+    "stroke": STROKE_STYLES,
+    "corners": CORNER_STYLES,
+    "line": LINE_STYLES,
+}
+STYLE_DEFAULT = {"fill": "hachure", "stroke": "shape", "corners": "shape",
+                 "line": "sketch"}
+
+
+def resolve_style(raw: dict | None) -> dict:
+    """把 spec 里的 `style` 补全成一份完整样式。
+
+    **未知的轴、未知的取值都判失败，绝不 fallback** —— 和颜色那两条规矩同源：
+    fallback 会让"样式必须落在档位内"这条校验自己绕过自己（程序补的默认值当然
+    合法，校验通过，但画出来的不是你要的）。
+    """
+    style = dict(STYLE_DEFAULT)
+    for key, value in (raw or {}).items():
+        if key not in STYLE_AXES:
+            raise ValueError(f"style 里没有 {key!r} 这一项，可用 {sorted(STYLE_AXES)}")
+        if value not in STYLE_AXES[key]:
+            raise ValueError(f"style.{key} = {value!r} 不在档位里，可用 "
+                             f"{list(STYLE_AXES[key])}")
+        style[key] = value
+    return style
+
+
+def roundness_of(style: dict, shape_default: dict | None) -> dict | None:
+    """圆角给 Excalidraw 的 roundness 对象，直角给 None（不是 type 0）。
+
+    `corners: shape`（默认）原样交回形状自己的值 —— 这样"不改"和"显式改成直角"
+    是同一条路径上的两个取值，不存在"没生效"这种中间状态。
+    """
+    corners = style.get("corners", STYLE_DEFAULT["corners"])
+    if corners == "shape":
+        return shape_default
+    return {"type": 3} if corners == "round" else None
+
+
+def stroke_style_of(style: dict, shape_default: str) -> str:
+    """节点的框线虚实。`stroke: shape` 时保留形状自己的（note 天生虚线）。"""
+    value = style.get("stroke", STYLE_DEFAULT["stroke"])
+    return shape_default if value == "shape" else value
+
+
+def roughness_of(style: dict) -> int:
+    return ROUGHNESS_OF[style.get("line", STYLE_DEFAULT["line"])]
+
+
+# ══════════════════════════════════════════════════════════════════
 # Visual Directions —— 5 个视觉母体，每个 1~2 个 Seed
 # ══════════════════════════════════════════════════════════════════
 #

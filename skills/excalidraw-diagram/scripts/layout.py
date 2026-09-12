@@ -2489,6 +2489,8 @@ def region_boxes(spec: dict, placed: dict, boxes: dict) -> list[dict]:
             "id": group["id"],
             "label": group.get("label") or "",
             "level": group.get("level", "tint"),
+            # 成员列表一起带出去：校验器要判"框里有没有夹着非成员"
+            "members": list(ids),
             "x": round(x, 2), "y": round(y, 2),
             "width": round(width, 2), "height": round(height, 2),
             # 标题在标题带里**水平居中**（参考图就是这个样子）
