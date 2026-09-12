@@ -90,9 +90,23 @@ git clone https://github.com/<owner>/agent-skills.git
 ## 维护约定
 
 - **目录名 = frontmatter `name` 字段**,保持一致
-- 修改某个 skill 后:跑它自带的 `validate_*.py` + `unittest`
+- 改完 skill 跑 `python3 skills/skill-builder/scripts/validate_skill.py` —— 机械检查 10 项(YAML 可解析、name 匹配目录名、description < 800 字符、含 Do NOT 边界、正文 ≤ 150 行等),退出码 `0` 通过 / `1` 失败
 - **Obsidian 类**绑定具体 vault 路径(跨机复用性低)
 - 本仓库的 `.skill-lock.json` 已被 `.gitignore` 排除——那是 pi 工具的本地 lock,每台机器自己生成
+
+### 自动校验(git hook)
+
+`.githooks/pre-commit` 在提交触及 `skills/` 时自动跑 `validate_skill.py`,失败就挡住提交。
+
+hook 不会随 clone 自动生效,新机器上执行一次:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+跳过单次检查用 `git commit --no-verify`。
+
+> 为什么用 hook 而不是靠自觉:2026-09-12 一次会话里“正文 ≤ 150 行”被连续违反两次(WLRR 256 行、PKB 174 行),两次都是脚本抓出来的,肉眼没发现。
 
 ## 参考
 

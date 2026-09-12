@@ -137,6 +137,7 @@ Templater 脚本：
 - 删除/移动笔记用 `git rm` / `git mv`，这样可回滚；不要直接 `rm`。
 - 大规模结构调整（删目录、改编号）建议单独提交，commit message 写清原因，方便日后 `git revert`。
 - 工作区状态文件（`workspace*.json`、`*冲突文件*.json`）被忽略，这是有意的。
+- **提交时会自动跑链接检查**（`.githooks/pre-commit`）：只在提交涉及 `.md` 时运行，发现失效引用会提示，但**不阻塞提交**——失效链接在 vault 里经常是有意为之（先写笔记、目标还没写）。换机器后需执行一次 `git config core.hooksPath .githooks` 才会生效。
 
 ## 探查命令示例
 

@@ -9,7 +9,7 @@
 # 跳过方式:git commit --no-verify
 # 安装:git config core.hooksPath .githooks
 
-if ! git diff --cached --name-only | grep -q '^skills/'; then
+if ! git diff --cached --name-only -z | tr '\0' '\n' | grep -q '^skills/'; then
   exit 0
 fi
 
