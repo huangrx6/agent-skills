@@ -575,7 +575,7 @@ def title_element(title: str | None) -> dict | None:
 
 
 def build_scene(spec: dict, result, boxes: dict,
-                icon_lookup=None, icon_height: float | None = None) -> dict:
+                icon_lookup=None, icon_height=None) -> dict:
     elements: list[dict] = []
     by_id = {n["id"]: n for n in spec.get("nodes", [])}
 
@@ -596,11 +596,12 @@ def build_scene(spec: dict, result, boxes: dict,
         if icon_lookup is not None and by_id[nid].get("icon"):
             icon_src = icon_lookup(by_id[nid]["icon"])
         if icon_src:
-            # 图标里的元素挂同一个 groupId；`boundElements` 只绑定**主体**那个元素，
-            # 否则 Excalidraw 里拖动时会连图标一起拖走（图标是装饰，不该跟着动）。
+            # 图标高度按节点各算各的（`icon_height` 是整数时是"全部用这个"，否则是表）。
+            per_node = (icon_height.get(nid) if isinstance(icon_height, dict)
+                        else icon_height)
             elements += node_elements(by_id[nid], placed, boxes[nid],
                                       arrows_out.get(nid, []), arrows_in.get(nid, []),
-                                      icon_src=icon_src, icon_height=icon_height)
+                                      icon_src=icon_src, icon_height=per_node)
         else:
             elements += node_elements(by_id[nid], placed, boxes[nid],
                                       arrows_out.get(nid, []), arrows_in.get(nid, []))
@@ -655,7 +656,7 @@ class SpecError(ValueError):
 
 
 def load_icons(spec: dict, library_path: str | None = None,
-               icon_height: float | None = None):
+               icon_height: float | None = None, full: bool = False):
     """把规格里用到的图标从素材库取出来。**一个都不要就完全不碰文件。**
 
     返回 `(lookup, sizes)`：
@@ -667,7 +668,7 @@ def load_icons(spec: dict, library_path: str | None = None,
     """
     wanted = {n["icon"] for n in spec.get("nodes", []) if n.get("icon")}
     if not wanted:
-        return None, {}
+        return None, {}, {}
 
     path, source = icons.library_path(library_path)
     if not path:
@@ -677,19 +678,30 @@ def load_icons(spec: dict, library_path: str | None = None,
     library = icons.load(path)
 
     lookup = {}
-    sizes = {}
     for name in sorted(wanted):
         elements = icons.resolve(library, name)      # 找不到会抛错并列出可用名字
-        lookup[name] = elements
+        # 默认只留图形：节点自己已经有标签，素材自带的文字是冗余的，
+        # 而且缩到节点尺寸后只有几个像素（见 icons.glyph_only）。
+        lookup[name] = list(elements) if full else icons.glyph_only(elements)
+
+    # 每个节点算自己的图标高度 —— 用户要的"适配每一个元素"。
+    sizes = {}
+    heights = {}
     for node in spec.get("nodes", []):
         name = node.get("icon")
         if not name:
             continue
         elements = lookup[name]
-        scale = icons.fit_scale(elements, icon_height or icons.ICON_HEIGHT)
+        if icon_height:
+            want = icon_height
+        else:
+            text_box = tm.measure(node.get("label", ""), node.get("detail", ""))
+            want = icons.height_for(text_box.height)
+        heights[node["id"]] = want
         width, height = icons.intrinsic_size(elements)
+        scale = icons.fit_scale(elements, want)
         sizes[node["id"]] = (width * scale, height * scale)
-    return lookup, sizes
+    return lookup, sizes, heights
 
 
 def icon_readability_issues(spec: dict, lookup: dict,
@@ -721,7 +733,8 @@ def icon_readability_issues(spec: dict, lookup: dict,
 
 
 def emit(spec: dict, *, params=None, library: str | None = None,
-         icon_height: float | None = None) -> tuple[dict, Any, Any, list]:
+         icon_height: float | None = None, icon_full: bool = False
+         ) -> tuple[dict, Any, Any, list]:
     """跑完整条流水线并返回场景。**校验有阻塞项就不出图。**
 
     顺序刻意是 validate → layout → check → emit：出图是最后一步，
@@ -735,7 +748,8 @@ def emit(spec: dict, *, params=None, library: str | None = None,
         raise SpecError(f"规格不通过，没有出图：\n{detail}")
 
     # 图标必须在算盒子**之前**解析出来 —— 它会影响节点尺寸（第一个外部尺寸来源）
-    lookup, icon_sizes = load_icons(spec, library, icon_height)
+    lookup, icon_sizes, icon_heights = load_icons(spec, library, icon_height,
+                                                  icon_full)
     boxes = L.boxes_from_spec(spec, icon_sizes)
     result, outcome, attempts = _check_layout().layout_with_retry(spec, boxes, params)
     extra = icon_readability_issues(spec, lookup or {}, icon_height)
@@ -744,7 +758,8 @@ def emit(spec: dict, *, params=None, library: str | None = None,
     if outcome.blocking:
         return {}, result, outcome, attempts
     icon_lookup = (lambda name: lookup.get(name)) if lookup else None
-    return (build_scene(spec, result, boxes, icon_lookup, icon_height),
+    return (build_scene(spec, result, boxes, icon_lookup,
+                        icon_heights or icon_height),
             result, outcome, attempts)
 
 
@@ -759,7 +774,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--stdout", action="store_true", help="打到标准输出，不写文件")
     ap.add_argument("--library", help="*.excalidrawlib（规格里用到 icon 时才需要）")
     ap.add_argument("--icon-height", type=float,
-                    help="图标缩放到多高（默认 %(default)s；素材自带文字看不清时会提示）")
+                    help="强制图标高度（默认按每个节点自身高度算，见 references/icons.md）")
+    ap.add_argument("--icon-full", action="store_true",
+                    help="保留素材自带的文字（默认只取图形：节点自己已经有标签了）")
     args = ap.parse_args(argv)
 
     try:
@@ -771,7 +788,8 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         scene, result, outcome, attempts = emit(spec, library=args.library,
-                                                icon_height=args.icon_height)
+                                                icon_height=args.icon_height,
+                                                icon_full=args.icon_full)
     except SpecError as exc:
         print(str(exc), file=sys.stderr)
         return 1

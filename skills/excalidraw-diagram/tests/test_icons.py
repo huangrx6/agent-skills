@@ -29,6 +29,11 @@ def _load(name, filename):
 
 I = _load("icons", "icons.py")
 V2 = os.path.join(LIBS, "mini-v2.excalidrawlib")
+# 图标相关用例共用的规格。放模块级而不是类属性 —— 可变的类属性是共享可变状态。
+ICON_SPEC = {"type": "flow", "direction": "TB",
+             "nodes": [{"id": "a", "kind": "service", "label": "订单服务",
+                        "icon": "Bound Box"}],
+             "edges": []}
 V1 = os.path.join(LIBS, "mini-v1.excalidrawlib")
 
 
@@ -241,23 +246,42 @@ class TestIconWiring(unittest.TestCase):
     def test_scene_contains_the_icon_and_it_is_grouped(self):
         """按**图标自己的** groupId 筛，不能按"有没有 groupId"筛 ——
         圆柱的顶盖也带 groupId（它同样是装饰，见 emit 的说明）。"""
-        scene, _, _, _ = self.E.emit(self.SPEC, library=V2)
+        scene, _, _, _ = self.E.emit(ICON_SPEC, library=V2)
         group = next(e["groupIds"][0] for e in scene["elements"]
                      if e["id"].startswith("icon-a"))
         icons = [e for e in scene["elements"] if e.get("groupIds") == [group]]
-        self.assertEqual(2, len(icons), "Bound Box 是两个元素（框 + 文字）")
-        self.assertIn("rectangle", [e["type"] for e in icons])
+        # 默认只取图形：素材自带的文字被丢掉了（节点自己已经有标签）
+        self.assertEqual(1, len(icons), "默认应当只剩图形那一个元素")
+        self.assertEqual("rectangle", icons[0]["type"])
+
+    def test_full_mode_keeps_the_items_own_text(self):
+        """`icon_full=True` 时保留素材自带的文字 —— 两条路都要真的不一样。"""
+        scene, _, _, _ = self.E.emit(ICON_SPEC, library=V2, icon_full=True)
+        group = next(e["groupIds"][0] for e in scene["elements"]
+                     if e["id"].startswith("icon-a"))
+        icons = [e for e in scene["elements"] if e.get("groupIds") == [group]]
+        self.assertEqual(2, len(icons))
         self.assertIn("text", [e["type"] for e in icons])
 
     def test_icon_does_not_get_counted_as_a_node(self):
-        """本项目靠“有没有 groupIds”区分节点与装饰（圆柱顶盖也走这条路）。"""
-        scene, _, _, _ = self.E.emit(self.SPEC, library=V2)
+        """本项目靠“有没有 groupIds”区分节点与装饰（圆柱顶盖也走这条路）。
+
+        这条**刻意用两个节点**：一个有图标、一个是圆柱（顶盖也带 groupId），
+        正好覆盖两种“带 groupId 但不是节点”的情况。
+        """
+        two = {"type": "flow", "direction": "TB",
+               "nodes": [{"id": "a", "kind": "service", "label": "订单服务",
+                          "icon": "Bound Box"},
+                         {"id": "b", "kind": "data", "label": "订单库"}],
+               "edges": [{"from": "a", "to": "b"}]}
+        scene, _, _, _ = self.E.emit(two, library=V2)
         nodes = [e for e in scene["elements"]
                  if e["type"] in ("rectangle", "ellipse", "diamond") and not e["groupIds"]]
-        self.assertEqual(2, len(nodes), "两个节点就是两个，图标不能算进去")
+        self.assertEqual(2, len(nodes), "两个节点就是两个；图标与圆柱顶盖都不能算进去")
+        self.assertEqual({"node-a", "node-b"}, {e["id"] for e in nodes})
 
     def test_text_does_not_overlap_the_icon(self):
-        scene, _, _, _ = self.E.emit(self.SPEC, library=V2)
+        scene, _, _, _ = self.E.emit(ICON_SPEC, library=V2)
         node = next(e for e in scene["elements"] if e["id"].startswith("node-a"))
         icon = next(e for e in scene["elements"] if e["groupIds"])
         title = next(e for e in scene["elements"]
@@ -277,7 +301,7 @@ class TestIconWiring(unittest.TestCase):
 
     def test_icon_without_a_library_fails_loudly(self):
         with self.assertRaises(self.E.icons.LibraryError) as ctx:
-            self.E.emit(self.SPEC, library=None)
+            self.E.emit(ICON_SPEC, library=None)
         self.assertIn("素材库", str(ctx.exception))
 
     def test_unknown_icon_name_fails_loudly(self):
@@ -342,25 +366,69 @@ class TestIconReadability(unittest.TestCase):
         plain = [e for e in I.resolve(lib, "Linked Nodes")]
         self.assertIsNone(I.readability(plain))
 
-    def test_illegible_icon_is_reported_as_a_soft_issue(self):
-        spec = {"type": "flow", "direction": "TB",
-                "nodes": [{"id": "a", "kind": "service", "label": "订单服务",
-                           "icon": "Bound Box"}],
-                "edges": []}
-        _, _, outcome, _ = self.E.emit(spec, library=V2)        # 默认高度 22 → 文字 5.9px
+    def test_glyph_mode_never_reports_illegible_text(self):
+        """默认只取图形 → 素材自带的文字根本不进来，**这个提示从构造上不会出现**。
+
+        这比"报个警告让人去改"强：不是检测到了问题再提醒，是这个问题不存在。
+        """
+        _, _, outcome, _ = self.E.emit(ICON_SPEC, library=V2)
+        self.assertEqual([], [i for i in outcome.issues if i.check == "icon"])
+
+    def test_full_mode_reports_illegible_text(self):
+        """保留自带文字时才会撞上可读性 —— 这时报出来是**选型提示**，不阻塞。"""
+        _, _, outcome, _ = self.E.emit(ICON_SPEC, library=V2, icon_full=True)
         got = [i for i in outcome.issues if i.check == "icon"]
         self.assertEqual(1, len(got), f"应当报 1 条，实得 {len(got)}")
         self.assertFalse(got[0].blocking, "这是选型提示，不该阻塞出图")
         self.assertIn("看不清", got[0].detail)
         self.assertIn("换一个", got[0].advice or "", "建议要是内容级的")
 
-    def test_bigger_icon_clears_the_warning(self):
+    def test_bigger_icon_clears_the_warning_in_full_mode(self):
         """把图标调大到自带文字可读，提示就该消失 —— 否则这条检查会变成噪音。"""
-        spec = {"type": "flow", "direction": "TB",
-                "nodes": [{"id": "a", "kind": "service", "label": "订单服务",
-                           "icon": "Bound Box"}],
-                "edges": []}
-        _, _, outcome, _ = self.E.emit(spec, library=V2, icon_height=60.0)
+        _, _, outcome, _ = self.E.emit(ICON_SPEC, library=V2, icon_full=True,
+                                       icon_height=60.0)
         self.assertEqual([], [i for i in outcome.issues if i.check == "icon"])
+
+
+class TestGlyphOnly(unittest.TestCase):
+    """默认只取图形 —— 这一条是"图标又小又糊"的根因修复。"""
+
+    def test_text_elements_are_dropped(self):
+        lib = I.load(V2)
+        full = I.resolve(lib, "Bound Box")
+        glyph = I.glyph_only(full)
+        self.assertEqual(1, len(glyph))
+        self.assertNotIn("text", [e["type"] for e in glyph])
+
+    def test_items_without_text_are_returned_unchanged(self):
+        lib = I.load(V2)
+        plain = I.resolve(lib, "Linked Nodes")
+        self.assertEqual(plain, I.glyph_only(plain))
+
+    def test_a_text_only_item_is_not_emptied(self):
+        """整项只有文字时不能返回空数组 —— 空数组会让节点上什么都不显示，而且不报错。"""
+        only_text = [{"id": "t", "type": "text", "x": 0, "y": 0, "width": 10,
+                      "height": 10, "fontSize": 16}]
+        self.assertEqual(only_text, I.glyph_only(only_text))
+
+    def test_the_same_height_now_gives_a_bigger_glyph(self):
+        """丢掉标签之后，图形在同样的高度里占得更满 —— 这就是"看起来更大"从哪来。"""
+        lib = I.load(V2)
+        full = I.resolve(lib, "Bound Box")          # 框 0..60，文字在 20..40
+        glyph = I.glyph_only(full)
+        self.assertEqual((100.0, 60.0), I.intrinsic_size(full))
+        w, h = I.intrinsic_size(glyph)
+        self.assertEqual((100.0, 60.0), (w, h),
+                         "这一项的标签在框内，所以外框不变 —— 变大的是"
+                         "**不再有噪点**，以及可以用更大的目标高度")
+
+    def test_height_adapts_to_the_node(self):
+        """按节点自己的高度算 —— 用户要的"适配每一个元素"。"""
+        small = I.height_for(28.0)                  # 单行小节点
+        big = I.height_for(64.0)                    # 两行带 detail 的节点
+        self.assertLess(small, big, "大节点的图标该更大")
+        self.assertGreaterEqual(small, I.ICON_MIN, "不能小到看不清")
+        self.assertLessEqual(big, I.ICON_MAX, "不能大到失衡")
+        self.assertEqual(I.ICON_MAX, I.height_for(500.0), "要夹住上限")
 
 
