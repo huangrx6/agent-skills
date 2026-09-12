@@ -399,9 +399,14 @@ class TestSizeSourcePremise(unittest.TestCase):
         for node in spec["nodes"]:
             with self.subTest(node=node["id"]):
                 box = boxes[node["id"]]
-                fresh = C.tm.measure(node["label"], node.get("detail", ""))
+                # 量的时候要用**这一步的强调档所对应的字号** —— 字号也是尺寸链的一环
+                # （§14），按默认字号量出来的尺寸当然对不上。
+                emphasis = node.get("emphasis", "normal")
+                fresh = C.tm.measure(node["label"], node.get("detail", ""),
+                                     font_size=C.tm.FONT_NODE
+                                     + P.emphasis_font_step(emphasis))
                 want_w, want_h = sh.box_for(box.shape, fresh.width, fresh.height)
-                scale = P.emphasis_scale(node.get("emphasis", "normal"))
+                scale = P.emphasis_scale(emphasis)
                 want_w, want_h = want_w * scale, want_h * scale
                 self.assertAlmostEqual(
                     want_w, box.width, places=6,
@@ -424,9 +429,41 @@ class TestSizeSourcePremise(unittest.TestCase):
         boxes = L.boxes_from_spec(spec)
         self.assertGreater(boxes["p"].width, boxes["n"].width, "primary 应该更大")
         self.assertLess(boxes["m"].width, boxes["n"].width, "muted 应该更小")
-        self.assertAlmostEqual(
-            P.emphasis_scale("primary"), boxes["p"].width / boxes["n"].width, places=6)
-        self.assertLess(boxes["p"].width / boxes["n"].width, 1.10, "幅度要小（§13）")
+        # 不能再拿 scale 去比：primary 的放大**由字号承担**（scale 是 1.00），
+        # 两条一起上会叠到 1.13，超出 §13 说的 1.05~1.10。
+        self.assertLess(boxes["p"].width / boxes["n"].width, 1.10, msg="幅度要小（§13）")
+        self.assertGreater(boxes["p"].width / boxes["n"].width, 1.00, msg="但要看得出来")
+
+    def test_emphasis_font_step_reaches_the_text(self):
+        # §14：重点节点的**字号**要跟上。字号和盒子是两条手段 ——
+        # 只改盒子是「同样的字、留白多一点」，改字号才是「字本身变大」。
+        # 关键：字号必须从 **measure** 走进去（盒子顺着尺寸链跟着变大），
+        # 而不是落笔时改 fontSize —— 那样盒子与实际文字就对不上了。
+        spec = {"type": "architecture", "direction": "LR", "nodes": [
+            {"id": "n", "kind": "service", "label": "订单服务"},
+            {"id": "p", "kind": "service", "label": "订单服务", "emphasis": "primary"},
+        ]}
+        boxes = L.boxes_from_spec(spec)
+        self.assertEqual(C.tm.FONT_NODE, boxes["n"].text.font_size)
+        self.assertGreater(boxes["p"].text.font_size, boxes["n"].text.font_size,
+                           msg="重点节点的字号没有跟上")
+        self.assertEqual(C.tm.FONT_NODE + P.emphasis_font_step("primary"),
+                         boxes["p"].text.font_size)
+
+    def test_effective_growth_stays_small(self):
+        # §13：要层次，不是海报式跳跃。卡的是**总放大**（盒子倍数 × 字号倍数），
+        # 因为这两条会相乘。
+        for emphasis in P.EMPHASIS:
+            with self.subTest(emphasis=emphasis):
+                spec = {"type": "architecture", "direction": "LR", "nodes": [
+                    {"id": "n", "kind": "service", "label": "订单服务"},
+                    {"id": "e", "kind": "service", "label": "订单服务",
+                     "emphasis": emphasis},
+                ]}
+                boxes = L.boxes_from_spec(spec)
+                ratio = boxes["e"].width / boxes["n"].width
+                self.assertLessEqual(ratio, 1.10, msg=f"{emphasis} 放大到 {ratio:.3f}")
+                self.assertGreaterEqual(ratio, 0.90)
 
     def test_icon_adds_an_external_term_to_the_chain(self):
         """图标是**第一个外部尺寸来源**（宽高来自 .excalidrawlib 文件）。

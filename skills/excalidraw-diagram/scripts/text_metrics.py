@@ -240,6 +240,9 @@ class TextBox:
     detail_lines: tuple[str, ...]  # 次要说明实际断行结果
     width: float
     height: float
+    # 这份文字实际用的字号。**由 measure 决定，调用方只读不猜** ——
+    # emit 写元素时若自己再算一遍（比如写死 FONT_NODE），重点节点的字就还是小的。
+    font_size: float = FONT_NODE
     forced_breaks: tuple[str, ...] = field(default_factory=tuple)
 
     @property
@@ -268,6 +271,7 @@ def measure(label: str, detail: str = "", *, font_size: float = FONT_NODE) -> Te
     return TextBox(
         size_class=class_name,
         break_units=break_units,
+        font_size=font_size,
         lines=tuple(lines),
         detail_lines=tuple(detail_lines),
         width=width,

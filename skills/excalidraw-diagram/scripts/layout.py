@@ -1107,7 +1107,11 @@ def boxes_from_spec(spec: dict, icon_sizes: dict | None = None) -> dict[str, Any
     cross_axis_is_width = main_axis(spec) == "TB"
     out: dict[str, NodeBox] = {}
     for n in spec.get("nodes", []):
-        text = tm.measure(n.get("label", ""), n.get("detail", ""))
+        # 字号层级（§14）：重点节点的**字号**往上一步。
+        # 必须在这里传进去，不是落笔时改 fontSize —— 那样盒子的尺寸链就对不上了。
+        step = _palette.emphasis_font_step(str(n.get("emphasis", "normal")))
+        text = tm.measure(n.get("label", ""), n.get("detail", ""),
+                          font_size=tm.FONT_NODE + step)
         shape = sh.resolve(n)
         width, height = sh.box_for(shape, text.width, text.height)
         # 强调的**尺寸层级**：重点节点略大一点。颜色退出主次之后，这是"层次感"的

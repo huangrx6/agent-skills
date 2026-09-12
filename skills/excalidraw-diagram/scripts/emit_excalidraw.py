@@ -162,10 +162,10 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
     # 文字在**形状里能放字的那块区域**居中（不是在整个包围盒里居中）——
     # 圆柱要下沉一个盖高，否则标题会压在椭圆盖上。
     inner_y, inner_h = text_band(box.shape, placed)
-    title_h = len(text.lines) * tm.FONT_NODE * tm.LINE_HEIGHT
+    title_h = len(text.lines) * text.font_size * tm.LINE_HEIGHT
     detail_h = len(text.detail_lines) * tm.FONT_DETAIL * tm.LINE_HEIGHT
     top = inner_y + (inner_h - (title_h + detail_h)) / 2.0
-    content_w = text.break_units * tm.FONT_NODE
+    content_w = text.break_units * text.font_size
 
     # 图标（可选）与文字的摆放，要按**真实 Excalidraw 的规矩**来算。
     #
@@ -192,7 +192,7 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
     # 所以“可见文字的左边界”是下面这个，而不是盒子的左边界。
     visible_w = max([tm.weighted_units(line) for line in text.lines]
                     + [tm.weighted_units(line) for line in text.detail_lines]
-                    or [0.0]) * tm.FONT_NODE
+                    or [0.0]) * text.font_size
     center = placed.x + placed.width / 2.0
     tx = center - content_w / 2.0          # 与真实渲染一致（官方会把它放这里）
 
@@ -206,7 +206,7 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
                                 key=_eid("icon", nid), target_height=height)
 
     elements.append(_text_block(title_id, shape_id, text.lines, tx, top,
-                                content_w, tm.FONT_NODE))
+                                content_w, text.font_size))
     if has_detail:
         elements.append(_text_block(detail_id, shape_id, text.detail_lines, tx,
                                     top + title_h, content_w, tm.FONT_DETAIL))

@@ -265,12 +265,34 @@ EDGE_STYLES: dict[str, tuple[str, str]] = {
 # 幅度刻意小：0.92 / 1.00 / 1.06 / 1.03。我们要的是"有层次"，不是海报式跳跃。
 # 实测（#114）1.08 的放大在整图尺度上几乎看不见 —— 所以尺寸是**辅助**，
 # 第一眼看到哪里仍然由颜色和位置决定。
+#
+# `font_step` 是**字号档位的步数**（§14）。它和 `scale` 是两条不同的手段：
+#   `scale`     乘在形状盒子上 → 同样的字，留白多一点
+#   `font_step` 加在字号上     → **字本身变大**，盒子顺着尺寸链跟着变大
+#
+# 重点档用的是**字号**而不是盒子倍数 —— 一是"重点节点的字要跟上"（§14），
+# 二是两条一起上会叠成 1.0625 × 1.06 ≈ 1.13，超出 §13 说的 1.05~1.10。
+# 所以 `primary` 的 scale 是 1.00，放大全交给字号。
 EMPHASIS: dict[str, dict] = {
-    "muted":    {"zh": "次要", "level": "neutral",  "scale": 0.94, "stroke_width": 1.0},
-    "normal":   {"zh": "常规", "level": None,       "scale": 1.00, "stroke_width": 1.5},
-    "primary":  {"zh": "重点", "level": "accent",   "scale": 1.06, "stroke_width": 2.5},
-    "critical": {"zh": "警示", "level": "critical", "scale": 1.03, "stroke_width": 2.5},
+    "muted":    {"zh": "次要", "level": "neutral",  "scale": 0.94, "font_step": 0,
+                 "stroke_width": 1.0},
+    "normal":   {"zh": "常规", "level": None,       "scale": 1.00, "font_step": 0,
+                 "stroke_width": 1.5},
+    "primary":  {"zh": "重点", "level": "accent",   "scale": 1.00, "font_step": 1,
+                 "stroke_width": 2.5},
+    "critical": {"zh": "警示", "level": "critical", "scale": 1.03, "font_step": 0,
+                 "stroke_width": 2.5},
 }
+
+
+def emphasis_font_step(emphasis: str) -> int:
+    """这档强调的字号步数（0 = 用节点默认字号）。未知值抛错，不 fallback。"""
+    try:
+        return int(EMPHASIS[emphasis]["font_step"])
+    except KeyError:
+        raise KeyError(
+            f"未知 emphasis: {emphasis!r}；允许的取值：{sorted(EMPHASIS)}"
+        ) from None
 DEFAULT_EMPHASIS = "normal"
 
 # ══════════════════════════════════════════════════════════════════

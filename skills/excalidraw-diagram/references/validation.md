@@ -254,6 +254,9 @@ find . -name __pycache__ -type d -exec rm -rf {} +
 >      → shapes.box_for（形状包围盒）
 >      → layout.assign_coordinates（坐标）
 > ```
+>
+> 现在还多了一步同样的"自己算"：**× 强调的尺寸倍数与字号步数**（§11/§14），
+> 见 `layout.boxes_from_spec`。它仍然是我们自己算的，所以单一来源没被破坏。
 
 ### 第二次触发：图标（`icons.py`）—— 这次**真的**进来了一个外部来源
 

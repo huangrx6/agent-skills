@@ -218,11 +218,15 @@ def check_text_fit(spec: dict, result: ResultT,
         nid = node["id"]
         if nid not in boxes:
             continue
-        fresh = tm.measure(node.get("label", ""), node.get("detail", ""))
         # 盒子现在是 NodeBox：形状包围盒 + 里面的文字。断言比的是**文字那一半** ——
         # 形状多出来的余量是从文字算出来的，拿包围盒去比文字尺寸会必然不等。
         # 比文字本身反而更强：形状算错了会从 layout.boxes_from_spec 那条路被发现。
         used = getattr(boxes[nid], "text", boxes[nid])
+        # **用盒子自己的字号重新量。** 强调档会让字号大一步（§14），按默认字号量
+        # 出来的尺寸当然对不上 —— 那会把它误报成「文字溢出」，而其实落笔是对的。
+        # 这里仍然卡"恰好相等"，没有放宽：字号不一致照样会被抓住。
+        fresh = tm.measure(node.get("label", ""), node.get("detail", ""),
+                           font_size=getattr(used, "font_size", tm.FONT_NODE))
         if abs(fresh.width - used.width) > TOLERANCE or abs(fresh.height - used.height) > TOLERANCE:
             out.append(Issue("text", True, nid,
                              f"落笔尺寸 {used.width:.0f}×{used.height:.0f}，"
