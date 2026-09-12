@@ -1266,8 +1266,9 @@ class Coords:
 
 
 def assign_coordinates(order: dict[int, list[str]], boxes: dict[str, Box],
-                       direction: str, node_sep: float, rank_sep: float
-                       ) -> Coords:
+                       direction: str, node_sep: float, rank_sep: float,
+                       groups_of: dict[str, str] | None = None) -> Coords:
+    """`groups_of` 是**节点 → 区域**的映射（可选），只用来决定折点位置 —— 见下面那段。"""
     live = {r: [n for n in layer if n in boxes] for r, layer in order.items()}
     live = {r: layer for r, layer in live.items() if layer}
     if not live:
@@ -1323,15 +1324,33 @@ def assign_coordinates(order: dict[int, list[str]], boxes: dict[str, Box],
     if count > 1:
         ranks = sorted(live)
         per_segment = -(-len(ranks) // count)          # 向上取整
-        for index, r in enumerate(ranks):
-            segment = index // per_segment
+        # ⚠️ **折点不许切进一个区域**。区域是"一块连续的东西"，被折成两栏就不是一块了 ——
+        # 而且区域的包围盒会横跨两栏，把两栏之间的节点全包进去（实测：一张 29 层、
+        # 8 个区域的图，按等差折点会把 3 个区域劈开，报出 20 条"框里夹着非成员"）。
+        # 判据：相邻两层若共享同一个 group，就必须留在同一段。
+        rank_groups: dict[int, set[str]] = {}
+        if groups_of:
+            for r, layer in live.items():
+                rank_groups[r] = {groups_of[n] for n in layer if n in groups_of}
+        segment = 0
+        used = 0
+        segment_first: dict[int, int] = {0: ranks[0]}
+        previous: int | None = None
+        for r in ranks:
+            if used >= per_segment and previous is not None and not (
+                    rank_groups.get(r, set()) & rank_groups.get(previous, set())):
+                segment += 1
+                used = 0
+                segment_first[segment] = r
             segments[r] = segment
+            used += 1
+            previous = r
             # 交叉轴：每段往右让开一个"段宽 + 段间空档"。第 0 段不让。
             cross_shift = segment * (cross_max + WRAP_SEGMENT_GAP)
             # 主轴：**每段都从 0 重新开始**。
             # 少了这一步就不是"折"，而是"斜着错开的楼梯" —— 高度一点没降，只多了宽度，
             # 长宽比数字会变好看但图反而更大。第一版就漏了这一步。
-            main_shift = main_start[ranks[segment * per_segment]] if segment else 0.0
+            main_shift = main_start[segment_first[segment]] if segment else 0.0
             if not cross_shift and not main_shift:
                 continue
             for n in live[r]:
@@ -2339,8 +2358,12 @@ def layout(spec: dict, boxes: dict[str, Box],
     for n in dummy_ids:
         all_boxes.setdefault(n, Box(0.0, 0.0))
 
+    # 节点 → 区域（只喂给折段：折点要避开区域边界，见 assign_coordinates）
+    groups_of = {node["id"]: node["group"] for node in spec.get("nodes", [])
+                 if isinstance(node, dict) and node.get("group")}
     coords = assign_coordinates(order, all_boxes, direction,
-                                p["nodeSeparation"], p["rankSeparation"])
+                                p["nodeSeparation"], p["rankSeparation"],
+                                groups_of=groups_of)
     placed = coords.placed
     # 主轴拉直是一把双刃剑：它让主流程直着走，但也可能把某条边推到别的节点上。
     # **两种都算，挑更干净的** —— 判据是「连线穿节点的处数」，同分时留着拉直版

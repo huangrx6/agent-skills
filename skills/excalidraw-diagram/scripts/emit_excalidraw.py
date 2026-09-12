@@ -99,7 +99,11 @@ def _eid(kind: str, raw: str, index: int = 0) -> str:
 def _base(el_id: str, el_type: str, x: float, y: float, w: float, h: float,
           stroke: str, background: str, *, stroke_style: str = "solid",
           roundness: dict | None = None, stroke_width: float = STROKE_WIDTH,
-          fill_style: str = "hachure", roughness: int = ROUGHNESS,
+          # 默认 solid 而不是 hachure：**文字与箭头也走这里**，它们没有填充，
+          # 继承一个"斜条纹"只会让产物里多一堆无意义的字段（Excalidraw 自己的
+          # 文字元素就是 solid）。真正的填充档位由 shape_elements / region_elements
+          # 显式传进来 —— 那两处才是"用户能选的填充"。
+          fill_style: str = "solid", roughness: int = ROUGHNESS,
           extra: dict | None = None) -> dict:
     """所有元素共有的字段。字段集照 Excalidraw 的 `_ExcalidrawElementBase` 来。"""
     el = {
@@ -255,9 +259,11 @@ def shape_elements(element_id: str, shape_name: str, placed,
                      roundness=palette.roundness_of(resolved, entry.get("roundness")),
                      stroke_width=stroke_width, fill_style=fill_style,
                      roughness=roughness)
+        # 顶盖必须跟柱体同一套线型 —— 少了 stroke_style，柱体是虚线、盖子却是实线
         lid = _base(f"{element_id}-lid", "ellipse", placed.x, placed.y,
                     placed.width, cap, stroke, fill, stroke_width=stroke_width,
-                    fill_style=fill_style, roughness=roughness)
+                    stroke_style=stroke_style, fill_style=fill_style,
+                    roughness=roughness)
         # 顶盖与柱体成组：在 Excalidraw 里拖动时它们一起动（否则一拖就散开），
         # 同时这也是一个明确标记 —— “groupIds 非空的是装饰，不是节点”，
         # 校验/量图那边靠它区分顶盖与真节点。

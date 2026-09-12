@@ -32,7 +32,7 @@ description: >-
 2. **判断图类型**，查下面的策略表（类型决定布局算法，不是学美规则）。
 3. **写规格**：一份 `*.diagram.json`，只有结构（节点／边／分组），见 `references/diagram-spec.md`。
 4. **校验规格**：`python3 scripts/validate_spec.py x.diagram.json` —— 字段集是封闭的，未知字段会判失败（包括坐标）。
-5. **出图**：`python3 scripts/emit_excalidraw.py x.diagram.json` —— 它串起整条流水线（校验 → `layout.py` 分层布局 → `check_layout.py` 五项校验、失败时脚本自己调参重跑 → 写出 `.excalidraw`）。**有阻塞项时不写文件。**
+5. **出图**：`python3 scripts/emit_excalidraw.py x.diagram.json` —— 它串起整条流水线（校验 → `layout.py` 分层布局 → `check_layout.py` 七项校验、失败时脚本自己调参重跑 → 写出 `.excalidraw`）。**有阻塞项时不写文件。**
 6. **看报告**：只有脚本自动重试耗尽时才有报告，此时按报告建议改**内容**，不要改参数。报告里不会出现参数名。
 7. **保留规格文件**，和 `.excalidraw` 放一起；以后的修改改规格再重新生成。
 
@@ -76,7 +76,7 @@ layout(参数) → 校验 ──通过──→ 输出
 **报告只在你无法自动收敛时出现**，而且只建议**内容层面**的修改（拆节点／缩短标签／降 `detail`／
 调整 rank 分层）。报告会列出**已经试过哪些参数** —— 看到"建议调大某某间距"这种话是设计事故，请上报。
 
-五项校验（重叠／连线过短／文字溢出／越界颜色／边交叉数）的阈值与级别见 `references/validation.md`，实现在 `scripts/check_layout.py`；切分与排序在 `scripts/layout.py`。
+七项校验（元素间隙／连线过短／文字溢出／越界颜色／边交叉数／连线穿节点／区域重叠）的阈值与级别见 `references/validation.md`，实现在 `scripts/check_layout.py`；切分与排序在 `scripts/layout.py`。
 
 两个容易看错的点：
 
