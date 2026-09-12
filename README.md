@@ -44,11 +44,11 @@ python3 tools/install_skills.py --check    # 软链指向对不对 / 副本内�
 默认装到 `~/.agents/skills/`（`--install-dir` 可换）。常见的加载目录：
 
 ```text
-Claude Code 项目级: ./.claude/skills/<name>
-Claude Code 全局级: ~/.claude/skills/<name>
-pi 全局级:          ~/.agents/skills/<name>
-OpenCode 全局级:    ~/.opencode/skills/<name>
-Codex 全局级:       ~/.codex/skills/<name>
+Claude Code  项目级  →  ./.claude/skills/<name>
+Claude Code  全局级  →  ~/.claude/skills/<name>
+pi           全局级  →  ~/.agents/skills/<name>
+OpenCode     全局级  →  ~/.opencode/skills/<name>
+Codex        全局级  →  ~/.codex/skills/<name>
 ```
 
 **「pi 认不认软链」不是猜的**，两处证据：
