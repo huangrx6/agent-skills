@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """text_metrics.py 的回归测试。
 
-为什么需要：这个模块守的是前作 `draw-excalidraw` 真正的病灶 —— 它**有正确的宽度模型**
-（1.00 / 0.56，与本模块一致），却依然文字溢出，因为**断行宽度与容器宽度没有耦合**：
-`wrapText(maxUnits = 22)` 里的 22 是写死的，与容器尺寸档位无关。
+为什么需要：这个模块守的是前作 `draw-excalidraw` 真正的病灶 —— 它**有正确的模型结构**
+（宽度 = 每行 units × 字号，CJK 与拉丁分开计），却依然文字溢出，因为
+**断行宽度与容器宽度没有耦合**：`wrapText(maxUnits = 22)` 里的 22 是写死的，
+与容器尺寸档位无关。
+
+（它的拉丁常数 0.56 后来被实测推翻：对 MQ / CPU / DB 这类大写缩写偏窄 15~30%，
+已换成按字符查 Helvetica 实测表。见 `test_latin_advance_table_is_the_measured_one`。）
 
 所以本模块最要紧的一条是**耦合不变量**：
 
@@ -67,23 +71,44 @@ class TextMetricsTest(unittest.TestCase):
     def setUpClass(cls):
         cls.m = _load()
 
-    # ── 防线 1:宽度权重（数值取自前作,没被推翻） ──
+    # ── 防线 1:宽度权重（拉丁那半已按实测换掉） ──
     def test_wide_and_narrow_weights(self):
         self.assertEqual(self.m.weighted_units("中"), 1.00)
-        self.assertEqual(self.m.char_weight("A"), 0.56)
-        self.assertAlmostEqual(self.m.weighted_units("AB"), 1.12)
+        self.assertEqual(self.m.char_weight("A"), 0.70)
+        self.assertAlmostEqual(self.m.weighted_units("AB"), 1.40)
         # 全角标点、假名、谚文都按全角算
         for ch in ("，", "。", "ア", "한"):
             with self.subTest(ch=ch):
                 self.assertEqual(self.m.char_weight(ch), 1.00)
 
+    def test_latin_advance_table_is_the_measured_one(self):
+        """锁住**实测数据本身**。
+
+        表里的值是拿 PIL + Helvetica 逐个字符量出来、再向上取整到 0.05 的。
+        没有 PIL 就没法在测试里重新量 —— 所以这里锁住数值：
+        改这张表必须是刻意的，不能顺手调。
+        """
+        for ch, want in (("i", 0.25), ("l", 0.25), ("I", 0.30), (" ", 0.30),
+                         ("a", 0.60), ("1", 0.60), ("A", 0.70), ("M", 0.85),
+                         ("W", 0.95), ("@", 1.05)):
+            with self.subTest(ch=ch):
+                self.assertEqual(want, self.m.char_weight(ch))
+
+    def test_unknown_characters_are_assumed_widest(self):
+        """表里没有的字符按最宽估 —— 两边代价不对称：估宽只是多留白，估窄会毁掉布局。"""
+        for ch in ("é", "Я", "🙂"):
+            with self.subTest(ch=ch):
+                self.assertEqual(1.00, self.m.char_weight(ch))
+
     def test_same_char_count_differs_between_cjk_and_latin(self):
-        # 这一条就是"字符数简单映射"为什么不行：同样 10 个字符，宽度差近一倍
+        """这一条就是“字符数简单映射”为什么不行：同样 8 个字符，宽度差近一倍。"""
         zh_text, en_text = "中文字符宽度测试", "abcdefgh"
         self.assertEqual(len(zh_text), len(en_text), "样本长度要相等才有可比性")
         zh = self.m.weighted_units(zh_text)
         en = self.m.weighted_units(en_text)
-        self.assertAlmostEqual(zh / en, 1.00 / 0.56, places=2)
+        self.assertEqual(8.0, zh, "全角字符恰好 1.0 em")
+        self.assertGreater(zh / en, 1.5, "中文应当明显更宽")
+        self.assertLess(zh / en, 2.5)
 
     # ── 防线 2:档位边界 ──
     def test_size_class_boundaries(self):
@@ -130,7 +155,13 @@ class TextMetricsTest(unittest.TestCase):
             self.assertLessEqual(self.m.weighted_units(l), 5.0 + 1e-6)
 
     def test_latin_breaks_at_spaces_only(self):
-        lines, forced = self.m.wrap("alpha beta gamma", 5.6)
+        """拉丁词只在空格处断，词内不断。
+
+        max_units 取得比 "alpha beta" 窄、比 "alpha" 宽 —— **不靠浮点凑巧**。
+        这条以前用的是 5.6，而 "alpha beta" 在旧权重下恰好是 5.6000000000000005，
+        是靠浮点误差才断开的；换个权重就变成 "alpha beta" / "gamma"。
+        """
+        lines, forced = self.m.wrap("alpha beta gamma", 4.0)
         self.assertEqual(lines, ["alpha", "beta", "gamma"])
         self.assertEqual(forced, [], "拉丁词不该被强行切开")
 

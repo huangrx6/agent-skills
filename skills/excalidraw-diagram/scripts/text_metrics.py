@@ -3,13 +3,14 @@
 
 ## 这个模块存在的理由（前作真正的病灶）
 
-前作 `draw-excalidraw` 的宽度模型是**对的**：
+前作 `draw-excalidraw` 的**结构**是对的：
 
-    CJK / 全角 → 1.00 ；其余 → 0.56
-    width = max(每行 units) × fontSize
+    width = max(每行 units) × fontSize     （CJK 与拉丁分开计）
 
-它依然出现文字溢出，原因不是精度，是**耦合**：`wrapText(maxUnits = 22)` 里的 22 是
+它依然出现文字溢出，**主因不是精度，是耦合**：`wrapText(maxUnits = 22)` 里的 22 是
 写死的，与容器尺寸档位完全无关 —— 22 单位 × 16px = 352px，而容器可能只有 140px 宽。
+
+（“不是精度问题”这句后来被自己的实测**部分推翻**了 —— 见下方“数值来源”。）
 
 **所以本模块把耦合方向反过来：先定断行宽度，容器宽度由它反推。**
 
@@ -23,12 +24,21 @@
 
 > 通用原则：**让错误在结构上不可能发生，比让错误发生了再去检测更可靠。**
 
-## 数值来源
+## 数值来源：这一处后来被自己的实测推翻了
 
-1.00 / 0.56 直接取自前作的 `util.mjs`。它没被推翻，所以复用。
+CJK 的 **1.00 保持不变** —— 用真实字体量过，全角字符的前进宽度精确等于 1.0 em（偏差 0.0%）。
 
-原则：别人失败经验里的**具体数值**值得复用；他们的**架构决策**不值得复用。
-数是真实验证出来的，架构是假设出来的。
+拉丁的 **0.56 不对**，已换成按字符查 `_ADVANCE` 表（Helvetica 实测前进宽度，向上取整）。
+0.56 是个“平均字符宽度”式的单值启发式，实测对**最需要准的标签**偏得最厉害：
+
+    MQ -30.5%   CPU/DNS -20.4%   DB -19.4%   SQL -16.0%   HTTPS -14.6%
+
+而这些恰恰是架构图里最常见的缩写。**偏窄的代价是容器比真实文字小** ——
+Excalidraw 会自己换行、把容器撑高，整个布局随之偏移。
+
+原则仍然成立，但要说得更细：别人失败经验里的**具体数值**值得复用，
+**但要拿实测复核，而不是因为“前作是好的”就照抄** ——
+“它没被推翻”当时只是没人去量，不等于它经得起量。
 """
 
 from __future__ import annotations
@@ -39,7 +49,39 @@ from dataclasses import dataclass, field
 # 0x2E80 起：CJK 部首、假名（0x3040-）、谚文（0xAC00-）、全角形式（0xFF01-）都在其后
 WIDE_FROM_CODEPOINT = 0x2E80
 WIDE_WEIGHT = 1.00
-NARROW_WEIGHT = 0.56
+
+
+def _advance_table(rows: tuple[tuple[str, float], ...]) -> dict[str, float]:
+    out: dict[str, float] = {}
+    for chars, width in rows:
+        for ch in chars:
+            out[ch] = width
+    return out
+
+
+# 可打印 ASCII 的真实前进宽度（em）：Helvetica 实测后**向上取整到 0.05**。
+#
+# 为什么不用“拉丁一律 0.56”这种单值启发式：实测下来它对**最需要准的标签**偏得最厉害 ——
+#     MQ -30.5%   CPU/DNS -20.4%   DB -19.4%   SQL -16.0%   HTTPS -14.6%
+# 而这些恰恰是架构图里最常见的缩写。偏窄的代价是容器比真实文字小，
+# Excalidraw 只能自己换行、把容器撑高，整个布局随之偏移。
+_ADVANCE = _advance_table((
+    ("'", 0.20),
+    ("ijl", 0.25),
+    ("ftI!,./:;[\\]| ", 0.30),
+    ("r()-`{}", 0.35),
+    ('"*', 0.40),
+    ("cksvxyzJ^", 0.50),
+    ("0123456789abdeghnopquL#$+<=>?_~", 0.60),
+    ("FTZ", 0.65),
+    ("ABEKPSVXY&", 0.70),
+    ("wCDHNRU", 0.75),
+    ("GOQ", 0.80),
+    ("mM", 0.85),
+    ("%", 0.90),
+    ("W", 0.95),
+    ("@", 1.05),
+))
 
 # ── 字号：固定 3 档，不给区间 ───────────────────────────────
 # 前作给的是区间（28-32 / 18-20 / 16-18 / 12-14）—— 区间就是"让模型自己判断"，
@@ -69,7 +111,16 @@ def is_wide(ch: str) -> bool:
 
 
 def char_weight(ch: str) -> float:
-    return WIDE_WEIGHT if is_wide(ch) else NARROW_WEIGHT
+    """单个字符占多少 em。
+
+    - 全角（CJK、全角标点）：恰好 1.00。实测全角字体的前进宽度就是 1.0 em，偏差 0.0%。
+    - 可打印 ASCII：查 `_ADVANCE`（Helvetica 实测，向上取整）。
+    - 其它（带重音字母、西里尔、emoji……）：按 1.00 估。表里没有的字符一律按最宽的算，
+      理由同上：估宽只是多留白，估窄会把布局推偏。
+    """
+    if is_wide(ch):
+        return WIDE_WEIGHT
+    return _ADVANCE.get(ch, WIDE_WEIGHT)
 
 
 def weighted_units(text: str) -> float:

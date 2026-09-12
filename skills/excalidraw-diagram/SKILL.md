@@ -104,7 +104,7 @@ python3 scripts/palette.py                            # 打印色板与 kind 取
 
 ## ⚠ 一处必须知道的限制：Excalidraw 会自己重新排版文字
 
-`text_metrics` 算出的尺寸是我们对“文字占多大”的**推算**（CJK 1.00 em / Latin 0.56 em）。
+`text_metrics` 算出的尺寸是我们对“文字占多大”的**推算**（按 Helvetica 实测的字符宽度表算，一律向上取整）。
 而容器绑定的文字（`containerId`）在 Excalidraw 里是**由它自己按真实字体重新断行**的 ——
 **渲染器是第二个尺寸来源，而且不在我们控制之内。**
 

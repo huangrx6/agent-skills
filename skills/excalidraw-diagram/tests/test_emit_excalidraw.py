@@ -274,6 +274,40 @@ class TestRefusesBlockedSpecs(unittest.TestCase):
 
 
 class TestEdgeLabels(unittest.TestCase):
+    def test_polyline_midpoint_is_by_arc_length(self):
+        """中点是“走一半弧长”处的点，不是“中间那个拐点”。"""
+        # 两个点的折线：中点应是两点平均，而不是第二个点（那正是曾经的 bug）
+        self.assertEqual([5.0, 0.0], E.polyline_midpoint([[0, 0], [10, 0]]))
+        # 不均等的两段：走一半长度，落在长的那段内部
+        self.assertEqual([10.0, 45.0], E.polyline_midpoint([[0, 0], [10, 0], [10, 100]]))
+        # 退化情况：长度为 0 时不除零
+        self.assertEqual([3.0, 3.0], E.polyline_midpoint([[3, 3], [3, 3]]))
+
+    def test_label_never_lands_on_top_of_a_node(self):
+        """**用眼睛看到过的真实缺陷**：`HTTPS` 标签压在 `API 网关` 的左边缘。
+
+        当时五项校验、绑定完整性、字段完整性全部绿 —— 只有看图才发现。
+        根因是取“中间那个拐点”当中点：对 2 个点的折线，`pts[1]` 就是终点。
+        这条用例把修复钉住，并且对**任意**边都要求标签不落在任何节点上。
+        """
+        spec = {"type": "architecture", "direction": "LR",
+                "nodes": [{"id": "a", "kind": "client", "label": "Web 前端"},
+                          {"id": "b", "kind": "security", "label": "API 网关"},
+                          {"id": "c", "kind": "service", "label": "订单服务"}],
+                "edges": [{"from": "a", "to": "b", "label": "HTTPS"},
+                          {"from": "b", "to": "c", "label": "gRPC"}]}
+        scene = build(spec)
+        boxes = [e for e in scene["elements"] if e["type"] == "rectangle"]
+        labels = [e for e in scene["elements"]
+                  if e["type"] == "text" and not e.get("containerId")]
+        self.assertEqual(2, len(labels))
+        for lb in labels:
+            for box in boxes:
+                dx = min(lb["x"] + lb["width"], box["x"] + box["width"]) - max(lb["x"], box["x"])
+                dy = min(lb["y"] + lb["height"], box["y"] + box["height"]) - max(lb["y"], box["y"])
+                self.assertFalse(dx > 0 and dy > 0,
+                                 f"标签 {lb['id']} 压在 {box['id']} 上")
+
     def test_label_becomes_a_standalone_text(self):
         spec = {"type": "architecture", "direction": "LR",
                 "nodes": [{"id": "a", "kind": "client", "label": "A"},

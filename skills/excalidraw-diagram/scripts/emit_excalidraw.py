@@ -12,7 +12,7 @@ Obsidian 的 Excalidraw 插件把 `.excalidraw.md` 里的场景压成 **lz-strin
 
 ## ⚠ 一处必须说清楚的限制：Excalidraw 会重新排版文字
 
-`text_metrics` 的尺寸是我们对"文字占多大"的**推算**（CJK 1.00 em / Latin 0.56 em）。
+`text_metrics` 的尺寸是我们对"文字占多大"的**推算**（按 Helvetica 实测的字符宽度表算，一律向上取整）。
 但容器绑定的文字（`containerId`）在 Excalidraw 里是**由它自己按真实字体重新断行**的。
 
 也就是说：**渲染器是第二个尺寸来源，而且不在我们控制之内。**
@@ -36,6 +36,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import math
 import os
 import re
 import sys
@@ -209,6 +210,31 @@ def arrow_element(edge: dict, index: int) -> dict:
     return el
 
 
+def polyline_midpoint(pts: list) -> list:
+    """沿折线走**一半弧长**处的点 —— 也就是视觉上的中点。
+
+    不能用“取中间那个拐点”：对只有 2 个点的折线，`pts[1]` **就是终点**，
+    标签会直接贴在目标节点边缘上。实测就是这样被发现的 ——
+    `HTTPS` 标签压在 `API 网关` 的左边缘，而所有机械校验全绿。
+    多拐点的边也不该把标签放在拐点上（拐点通常离两端都很远）。
+    """
+    if len(pts) < 2:
+        return list(pts[0]) if pts else [0.0, 0.0]
+    segs = [(pts[i], pts[i + 1], math.dist(pts[i], pts[i + 1]))
+            for i in range(len(pts) - 1)]
+    total = sum(s[2] for s in segs)
+    if total <= 0:
+        return list(pts[0])
+    half = total / 2.0
+    walked = 0.0
+    for a, b, seg_len in segs:
+        if walked + seg_len >= half:
+            t = (half - walked) / seg_len if seg_len else 0.0
+            return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
+        walked += seg_len
+    return list(pts[-1])
+
+
 def edge_label_element(edge: dict, index: int) -> dict | None:
     """边标签：一个独立的文字元素放在折线中点。
 
@@ -218,8 +244,7 @@ def edge_label_element(edge: dict, index: int) -> dict | None:
     label = edge.get("label")
     if not label:
         return None
-    pts = edge["points"]
-    mid = pts[len(pts) // 2] if len(pts) % 2 == 0 else pts[(len(pts) - 1) // 2]
+    mid = polyline_midpoint(edge["points"])
     el_id = _eid("elabel", f"{edge['from']}-{edge['to']}", index)
     el = _base(el_id, "text", mid[0] + 6, mid[1] - tm.FONT_DETAIL, 0, 0,
                palette.CANVAS["text"], "transparent", extra={"roundness": None})
