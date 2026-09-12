@@ -17,6 +17,8 @@
 
 from __future__ import annotations
 
+import contextlib
+
 # kind → 语义角色 + 颜色。加第 7 项之前先问"能不能归并进已有类"：
 # 超过 6 类语义就无法靠颜色区分了。
 #
@@ -40,7 +42,102 @@ from __future__ import annotations
 #   描边 vs 底色 ≥ 1.8（框边界看得见；实测 ~2.4）
 #   底色 vs 画布 ΔE ≥ 5（浅色块也要从背景里分得出来）
 # 全部由 tests/test_palette.py 守住。
-KINDS: dict[str, dict[str, str]] = {
+# 当前主题的颜色。由 `_rebind()` 在导入时与切换主题时填充 ——
+# 声明放这里（而不是文件末尾），是为了让静态检查看得到这两个名字：
+# 声明放在使用之后，运行时没问题，但分析会说"未绑定"。
+KINDS: dict[str, dict[str, str]] = {}
+EDGE_KINDS: dict[str, dict[str, str]] = {}
+CANVAS: dict = {}
+
+# ── 主题：`颜色 = THEMES[主题名][语义角色]` ─────────────────────
+#
+# 落地机制就是两层封闭枚举：主题名封闭、语义角色封闭 —— 既不给模型自由发挥的空间，
+# 也不逼所有图一个样。
+#
+# **只列真正实现的。** 文档里另外几个是候选，没做出来的不往这里写 ——
+# 写进去就会变成"指向一个空文件"的那种指针。
+THEMES: dict[str, dict] = {
+    "morandi": {"zh": "莫兰迪（默认，用户指定）"},
+    "bright-clean": {
+        "zh": "明亮清爽",
+        "canvas": {"background": "#FFFFFF", "grid": "#EEF2F6", "text": "#2E3440"},
+        "kinds": {
+            "client":   {"zh": "客户端 / 角色", "stroke": "#6E8CA8", "background": "#D8E6F2"},
+            "service":  {"zh": "核心服务",     "stroke": "#4F8A8B", "background": "#C9E4E2"},
+            "data":     {"zh": "数据 / 存储",   "stroke": "#6B6FA8", "background": "#D5D6EE"},
+            "async":    {"zh": "异步 / 消息",   "stroke": "#B08040", "background": "#F0DFC0"},
+            "security": {"zh": "安全 / 鉴权",   "stroke": "#B06070", "background": "#F2D2D8"},
+            "external": {"zh": "外部系统",     "stroke": "#5F8A5F", "background": "#D0E4CF"},
+        },
+        "edges": {
+            "sync":     {"zh": "同步调用", "stroke": "#6E7A86", "style": "solid"},
+            "data":     {"zh": "数据流",   "stroke": "#6B6FA8", "style": "solid"},
+            "async":    {"zh": "异步消息", "stroke": "#B08040", "style": "dashed"},
+            "optional": {"zh": "可选 / 间接", "stroke": "#5F8A5F", "style": "dashed"},
+        },
+    },
+    "dark-tech": {
+        "zh": "深色科技",
+        "canvas": {"background": "#12161C", "grid": "#1D232B", "text": "#E6E9EE"},
+        "kinds": {
+            # 深色底上"彼此可区分"比浅色底更难：只靠色相不够，明度也要拉开。
+            # 第一版六色都在 #1E~#36 的窄明度带里，两两 ΔE 最小只有 2.5（浅色主题是 6.7）——
+            # 也就是说看着是六块差不多的深灰。这版把明度和色相一起拉开，ΔE 最小 7.8。
+            "client":   {"zh": "客户端 / 角色", "stroke": "#8FA8C0", "background": "#2C3644"},
+            "service":  {"zh": "核心服务",     "stroke": "#6FA8D0", "background": "#13293A"},
+            "data":     {"zh": "数据 / 存储",   "stroke": "#9B8FD0", "background": "#2F2545"},
+            "async":    {"zh": "异步 / 消息",   "stroke": "#D0A56F", "background": "#432E12"},
+            "security": {"zh": "安全 / 鉴权",   "stroke": "#D08F8F", "background": "#431F2A"},
+            "external": {"zh": "外部系统",     "stroke": "#7FB08F", "background": "#12301C"},
+        },
+        "edges": {
+            "sync":     {"zh": "同步调用", "stroke": "#A8B0BC", "style": "solid"},
+            "data":     {"zh": "数据流",   "stroke": "#9B8FD0", "style": "solid"},
+            "async":    {"zh": "异步消息", "stroke": "#D0A56F", "style": "dashed"},
+            "optional": {"zh": "可选 / 间接", "stroke": "#7FB08F", "style": "dashed"},
+        },
+    },
+}
+DEFAULT_THEME = "morandi"
+
+# 当前生效的主题。为什么用模块级状态而不是把主题一路传参：
+# `stroke_for` / `background_for` / `CANVAS` 被几十处调用，全改成带主题参数会把
+# "颜色"这件事的调用面铺得很大，而主题在**一次出图里只有一个**。
+# 所以入口处 `use_theme()` 定一次，其余照旧读。
+# **测试里必须用 `theme_context()`** —— 否则用例之间会互相污染。
+_active = DEFAULT_THEME
+
+
+def available_themes() -> list[str]:
+    return sorted(THEMES)
+
+
+def active_theme() -> str:
+    return _active
+
+
+def use_theme(name: str | None) -> str:
+    """切换主题。未知主题名**判失败不 fallback** —— 同 kind / shape 一条规矩。"""
+    global _active
+    name = name if name else DEFAULT_THEME
+    if name not in THEMES:
+        raise KeyError(f"未知主题 {name!r}；可用的：{available_themes()}")
+    _active = name
+    _rebind()
+    return name
+
+
+@contextlib.contextmanager
+def theme_context(name: str):
+    """测试用：进出一个主题，出来时恢复原状。"""
+    before = active_theme()
+    use_theme(name)
+    try:
+        yield name
+    finally:
+        use_theme(before)
+
+_MORANDI_KINDS: dict[str, dict[str, str]] = {
     "client": {
         "zh": "用户 / 客户端 / 浏览器",
         "stroke": "#A89E92",
@@ -75,7 +172,7 @@ KINDS: dict[str, dict[str, str]] = {
 
 # 边（箭头）的样式：语义 → 线型。和前作一样保留"虚实表达同步/异步"的区分，
 # 但**不给颜色自由度** —— 边一律用中性色，颜色只用于节点语义。
-EDGE_KINDS: dict[str, dict[str, str]] = {
+_MORANDI_EDGES: dict[str, dict[str, str]] = {
     "sync": {"zh": "同步调用", "style": "solid", "stroke": "#8A8681"},
     "data": {"zh": "数据读写", "style": "solid", "stroke": "#8B7FA0"},
     "async": {"zh": "异步 / 事件", "style": "dashed", "stroke": "#AC896F"},
@@ -85,7 +182,7 @@ EDGE_KINDS: dict[str, dict[str, str]] = {
 MAX_KINDS = 6
 
 # 画布与视觉风格（原本写在 PKB 的 resource-notes.md，已收拢到这里）。
-CANVAS = {
+_MORANDI_CANVAS = {
     "background": "#FDFCFA",   # 暖白，不是纯白 —— 莫兰迪底色偏暖
     "grid": "#F1EDE8",
     # 节点里的文字色。暖调深灰，不用纯黑 —— 纯黑与莫兰迪的柔和底色打架。
@@ -207,3 +304,26 @@ if __name__ == "__main__":
     print(f"\n边语义（{len(EDGE_KINDS)} 类）")
     for k, v in EDGE_KINDS.items():
         print(f"  {k:<9} {v['zh']:<12} {v['style']:<7} {v['stroke']}")
+
+
+def _rebind() -> None:
+    """把当前主题的颜色装进 KINDS / EDGE_KINDS / CANVAS。
+
+    morandi 的定义就写在本文件里（历史原因），别的主题从 THEMES 取 ——
+    这里做的是"两份取一份"。
+    """
+    global KINDS, EDGE_KINDS, CANVAS
+    if _active == "morandi":
+        KINDS = dict(_MORANDI_KINDS)
+        EDGE_KINDS = dict(_MORANDI_EDGES)
+        CANVAS = dict(_MORANDI_CANVAS)
+        return
+    spec = THEMES[_active]
+    KINDS = {k: dict(v) for k, v in spec["kinds"].items()}
+    EDGE_KINDS = {k: dict(v) for k, v in spec["edges"].items()}
+    CANVAS = {**spec["canvas"],
+              "stroke_style": _MORANDI_CANVAS["stroke_style"],
+              "font_family": _MORANDI_CANVAS["font_family"]}
+
+
+_rebind()

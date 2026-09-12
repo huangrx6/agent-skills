@@ -747,6 +747,9 @@ def emit(spec: dict, *, params=None, library: str | None = None,
                            for e in report.errors)
         raise SpecError(f"规格不通过，没有出图：\n{detail}")
 
+    # 主题在**一切之前**定：颜色要被尺寸/校验/标签各处读到，切晚了会前后不一致。
+    palette.use_theme(spec.get("theme"))
+
     # 图标必须在算盒子**之前**解析出来 —— 它会影响节点尺寸（第一个外部尺寸来源）
     lookup, icon_sizes, icon_heights = load_icons(spec, library, icon_height,
                                                   icon_full)

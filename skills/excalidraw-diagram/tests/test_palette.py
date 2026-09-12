@@ -278,6 +278,85 @@ class TestEmphasis(unittest.TestCase):
                          "primary 的填充各 kind 应当互不相同（说明是从色板算的）")
 
 
+class TestEveryTheme(unittest.TestCase):
+    """**每个**主题都要过同一套不变量。
+
+    为什么单独一个类：主题可切换之后，只在默认主题下跑的那套测试等于
+    只测了三分之一 —— 另两个主题变成"没测过的那一半"，而用户看到的正是它们。
+
+    这里只放**不变量**（可读性、边界可见、彼此可区分）。
+    莫兰迪的"去饱和 / 偏浅"那种是**风格**约束，只对那一个主题成立，
+    放在上面的 TestMorandiCharacter 里。
+    """
+
+    def test_every_theme_keeps_text_readable(self):
+        for theme in P.available_themes():
+            with P.theme_context(theme):
+                for kind in P.KINDS:
+                    with self.subTest(theme=theme, kind=kind):
+                        got = contrast(P.CANVAS["text"], P.background_for(kind))
+                        self.assertGreaterEqual(
+                            got, 4.5,
+                            f"{theme}/{kind} 文字在其填充上只有 {got:.2f}")
+
+    def test_every_theme_keeps_strokes_visible(self):
+        for theme in P.available_themes():
+            with P.theme_context(theme):
+                for kind in P.KINDS:
+                    with self.subTest(theme=theme, kind=kind):
+                        own = contrast(P.stroke_for(kind), P.background_for(kind))
+                        self.assertGreaterEqual(own, 1.5, f"{theme}/{kind} 描边贴住了自己的填充")
+                        canvas = contrast(P.stroke_for(kind), P.CANVAS["background"])
+                        self.assertGreaterEqual(canvas, 1.5, f"{theme}/{kind} 描边在画布上看不见")
+
+    def test_every_theme_has_distinguishable_fills(self):
+        """六种填充必须两两分得开 —— 深色主题尤其容易在这里翻车。
+
+        实测：深色主题第一版六色都挤在 #1E~#36 的窄明度带里，两两 ΔE 最小只有 2.5
+        （浅色主题是 6.7），看着就是六块差不多的深灰。所以这条对每个主题都要跑。
+        """
+        for theme in P.available_themes():
+            with P.theme_context(theme):
+                fills = {k: P.background_for(k) for k in P.KINDS}
+                names = list(fills)
+                worst = min((delta_e(fills[a], fills[b]), a, b)
+                            for i, a in enumerate(names) for b in names[i + 1:])
+                self.assertGreaterEqual(worst[0], 5.0,
+                                        f"{theme}: {worst[1]}/{worst[2]} 的填充几乎一样"
+                                        f"（ΔE {worst[0]:.1f}）")
+
+    def test_every_theme_sets_a_full_canvas(self):
+        for theme in P.available_themes():
+            with P.theme_context(theme):
+                for key in ("background", "grid", "text"):
+                    self.assertIn(key, P.CANVAS, f"{theme} 的画布缺 {key}")
+                self.assertEqual(2, P.CANVAS["font_family"])
+
+    def test_themes_are_actually_different_from_each_other(self):
+        """几个主题长得一样的话，"可选主题"就是假的。"""
+        seen = {}
+        for theme in P.available_themes():
+            with P.theme_context(theme):
+                seen[theme] = tuple(sorted(P.background_for(k) for k in P.KINDS))
+        self.assertEqual(len(P.available_themes()), len(set(seen.values())),
+                         "有两个主题的六色完全相同")
+
+    def test_theme_context_restores_the_previous_one(self):
+        """用例之间不能互相污染 —— 上个用例切了主题没切回来，后面的全跑在错的主题上。"""
+        before = P.active_theme()
+        with P.theme_context("dark-tech"):
+            self.assertEqual("dark-tech", P.active_theme())
+        self.assertEqual(before, P.active_theme())
+
+    def test_unknown_theme_raises_and_lists_options(self):
+        with self.assertRaises(KeyError) as ctx:
+            P.use_theme("蒸汽波")
+        message = str(ctx.exception)
+        for name in P.available_themes():
+            self.assertIn(name, message, "报错要列出可用主题")
+        P.use_theme(None)          # 还原，别影响后面的用例
+
+
 class TestPaletteShape(unittest.TestCase):
     def test_kind_count_is_capped(self):
         self.assertLessEqual(len(P.KINDS), P.MAX_KINDS)

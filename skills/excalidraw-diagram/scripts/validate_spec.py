@@ -32,7 +32,7 @@ import sys
 
 # 封闭字段集。加字段要同时改这里和 references/diagram-spec.md —— 这正是设计意图：
 # 让"顺手加一个"变得有摩擦。
-TOP_FIELDS = {"type", "title", "direction", "detail", "groups", "nodes", "edges"}
+TOP_FIELDS = {"type", "title", "direction", "detail", "groups", "nodes", "edges", "theme"}
 GROUP_FIELDS = {"id", "label", "description"}
 NODE_FIELDS = {"id", "label", "kind", "shape", "emphasis", "icon", "group",
                "detail", "rank", "pin"}
@@ -78,7 +78,8 @@ _palette = _load_sibling("palette")
 KINDS = _palette.KINDS
 EDGE_KINDS = _palette.EDGE_KINDS
 SHAPES = _load_sibling("shapes").SHAPES
-EMPHASIS = _load_sibling("palette").EMPHASIS
+palette = _load_sibling("palette")
+EMPHASIS = palette.EMPHASIS
 
 
 class Issues:
@@ -131,6 +132,12 @@ def validate(spec: dict) -> Issues:
     if "direction" in spec and spec["direction"] not in DIRECTIONS:
         issues.error("BAD_DIRECTION", "$.direction",
                      f"direction 只允许 {sorted(DIRECTIONS)}")
+    theme = spec.get("theme")
+    if theme is not None and theme not in palette.THEMES:
+        # 同 kind / shape 一条原则：不 fallback。静默换主题会让"风格"这件事
+        # 变成"我明明写了 A 出来的是 B"，而且看图的人不知道为什么。
+        issues.error("UNKNOWN_THEME", "$.theme",
+                     f"未知主题 {theme!r}；可用的：{palette.available_themes()}")
     if "detail" in spec and spec["detail"] not in DETAIL_LEVELS:
         issues.error("BAD_DETAIL", "$.detail",
                      f"detail 只允许 {sorted(DETAIL_LEVELS)}")
