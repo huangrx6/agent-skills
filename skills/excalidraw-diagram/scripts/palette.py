@@ -49,6 +49,18 @@ KINDS: dict[str, dict[str, str]] = {}
 EDGE_KINDS: dict[str, dict[str, str]] = {}
 CANVAS: dict = {}
 
+# ⚠️ **本文件有一个历史特例：`morandi`。**
+# 它是默认主题，但定义**不在** `THEMES` 里 —— `THEMES["morandi"]` 只有一个名字，
+# 真正的颜色在下面的 `_MORANDI_KINDS` / `_MORANDI_EDGES` / `_MORANDI_CANVAS` 三个常量里，
+# `_rebind()` 对它单独开了一个分支。
+#
+# **动 KINDS / EDGE_KINDS 结构的人必须同时改这三个常量。**
+# 否则新加的 kind 在里面没有对应项 → 未知 kind 会抛错，不是静默降级（这点还好），
+# 但错误信息会指向主题而不是"你漏改了一个常量"。
+#
+# 这是封闭枚举里唯一的例外分支，是未来最容易漏改的地方。
+# 待办：把 morandi 迁进 `THEMES` 的标准结构，去掉 `_rebind()` 的分支。
+
 # ── 主题：`颜色 = THEMES[主题名][语义角色]` ─────────────────────
 #
 # 落地机制就是两层封闭枚举：主题名封闭、语义角色封闭 —— 既不给模型自由发挥的空间，
