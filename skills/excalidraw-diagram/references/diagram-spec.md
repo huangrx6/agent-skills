@@ -267,7 +267,7 @@
 | CJK 1.00 em | `text_metrics.py` | **已实测**：偏差 0.0%（Excalidraw 渲染量出 10 字 = 160px @16px） |
 | 拉丁每字符前进宽度 | `text_metrics.py` | **已实测**：Helvetica 逐个字符量出后向上取整（`tests/test_text_metrics.py` 锁住数值） |
 | 断行档位 S/M/L = 10/16/24 单位 | `text_metrics.py` | **待验证**：依据前作档位与常识设的起点 |
-| `nodeSeparation` 70 / `rankSeparation` 120 | `layout.py` | **待验证**：来自前作 Dagre 默认值 |
+| `nodeSeparation` 120 / `rankSeparation` 120 | `layout.py` | **待验证**：来自前作 Dagre 默认值 |
 | 阈值 12px / 24px / 边数÷2 | `check_layout.py` | **待验证**：依据前作数值与常识设的起点 |
 | 2 个色相 + 5 档层级 + 3 档 emphasis 派生 | `palette.py` | **已实测**：对比度 / ΔE / 色相跨度 / 颜色密度全部由 `tests/test_palette.py` 锁住（数值是量出来的） |
 | 图标高 22 / 与文字间隙 10 / 无尺寸时占位 30 | `icons.py` `layout.py` | **待验证**：新定的数，没有真实数据校准过 |

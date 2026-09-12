@@ -69,12 +69,21 @@ DIRECTION_FOR_TYPE = {
 }
 
 # ── 布局参数：只在脚本内部，不进规格 ────────────────────────
-# 【待验证】初值取自前作 layout.mjs 的 Dagre 默认值（nodeSeparation 70 / rankSeparation 120）。
+# 【已实测】rankSeparation 120 沿用前作 Dagre 默认值，实测这些指标对它不敏感；
+# **nodeSeparation 从 70 提到 120** —— 70 是继承来的、没验过的值，量出来是这样：
+#   同一份五层架构规格（19 节点 / 25 边，含正交路由）：
+#     nodeSep 70  → 斜段占 3.9%、2 个标签被挤到压在节点框上、画布高 687
+#     nodeSep 90~105 → 仍有 1 个标签压节点，斜段 9~10%（挤到连正交都排不下）
+#     nodeSep 115 → 标签清干净，斜段 9.3%
+#     nodeSep 120 → **标签 0、斜段 0%**，画布高 912   ← 拐点
+#     nodeSep 145 → 同样干净，只是白占地方（高 1024）
+# 所以取 120 —— 和 rankSeparation 同值，两个方向的呼吸空间一样大。
+# 这一条的来历：先按参数扫描量，再取“再小就开始坏”的那个值，不凭手感定。
 # 原则：别人失败经验里的**具体数值**值得复用；他们的**架构决策**不值得复用。
 # 但注意——“前作用过、没被推翻”≠“已经验证过”。这两个数我们没量过，所以标待验证。
 # 信任状态总表见 references/diagram-spec.md（“数值的信任状态”一节）。
 DEFAULT_PARAMS: dict[str, float] = {
-    "nodeSeparation": 70.0,
+    "nodeSeparation": 120.0,
     "rankSeparation": 120.0,
     "barycenterRounds": 4.0,
 }
@@ -1378,7 +1387,10 @@ def route_edges(origins: list[dict], segments: list[dict],
         pts = avoid_nodes(pts, placed, {chain[0], chain[-1]})
         # 最后一道：能直就直。上一步只保证「不穿节点」，不保证「不绕远」——
         # 虚节点车道会把跨层边牵着在每一层横移一次（实测偏离直线 324px）。
-        pts = straighten(pts, placed, {chain[0], chain[-1]})
+        waypoints = [[placed[n].x + placed[n].width / 2,
+                      placed[n].y + placed[n].height / 2] for n in chain[1:-1]]
+        pts = straighten(pts, placed, {chain[0], chain[-1]},
+                         orthogonal=_orthogonal_path(pts[0], pts[-1], waypoints))
         a, b = e["from"], e["to"]
         was_reversed = (b, a) in reversed_set
         if was_reversed:
@@ -1661,6 +1673,11 @@ def _simplify_path(pts: list, min_segment: float = EDGE_MIN) -> list:
     while len(kept) >= 2 and math.dist(kept[-1], tail) < min_segment:
         kept.pop()                          # 末段太短：把最后一个内点也去掉
     kept.append(tail)
+    # **简化不许引入斜段**：正交路径的拐点被合并掉之后会变回一条斜线，
+    # 而它仍然带着正交的档位标签 —— 实测这就是斜段占 20% 的来源
+    # （两点路径的“偏离”恒为 0，度量也看不出来）。宁可不简化。
+    if _is_slanted(kept) and not _is_slanted(pts):
+        return [list(p) for p in pts]
     return kept
 
 
@@ -1673,32 +1690,64 @@ def _max_deviation(pts: list) -> float:
                 for q in pts[1:-1]), default=0.0)
 
 
-def _path_rank(pts: list, tier: int) -> tuple[int, int, int, float, float]:
-    """候选路径的排序键：**先看它是哪一类形状**，再看折点数、偏离、绕路比。
+def _is_slanted(pts: list) -> bool:
+    """这条路径里有没有**斜段**（既不水平也不竖直）。"""
+    for first, second in zip(pts, pts[1:]):
+        if abs(second[0] - first[0]) > 0.5 and abs(second[1] - first[1]) > 0.5:
+            return True
+    return False
 
-    为什么不是单纯的几何评分：试过「折点最少优先」，它把一条边的中点推到 424px
-    开外（一个巨大的 V），折点确实最少，看着却比原来还乱。人能接受的形状是分档的：
 
-      0 直线          —— 无疑最好
-      1 小幅让开      —— 单点推开，且**偏得不远**（≤ SMALL_DODGE），几乎看不出弯
-      2 贴车道        —— 让开、贴着障碍直走、再回来：中段是长直线，两个拐在两端
-      3 其余          —— 沿虚节点车道的碎折线，以及推不动的那些
+def _path_rank(pts: list, tier: int) -> tuple:
+    """候选路径的排序键。
 
-    档位由**生成候选的人**标（每条候选自己带着 tier），不靠事后猜几何 ——
-    「这是贴车道的形状」这件事在建它的时候就知道，重新反推一遍只会多一个漂移点。
-    同档之内再比折点数、偏离、绕路比。
+    顺序：**毛刺段 → 斜段 → 形状档位 → 折点数 → 偏离 → 绕路比**。
+
+    - 毛刺段（短于可见下限）是**缺陷**：`check_layout` 会因此判红整张图。
+    - 斜段是**用户明确不要的东西**（原话：“就是那种 90 度拐弯的线不行吗”）。
+      它必须排在这里，而不是靠档位 —— 因为「简化」会把正交折线的拐点合并掉，
+      让它变回一条两点斜线，而它仍然带着正交的档位标签。实测踩过：斜段因此
+      占了全部连线长度的 20%，而两点路径的“偏离”恒为 0，用度量根本看不出来。
+    - 这两项都是「结构上不该出现」，所以排在审美档位前面；档位只在同类型之间分高下。
     """
     a, b = pts[0], pts[-1]
     span = math.hypot(b[0] - a[0], b[1] - a[1]) or 1e-9
     length = sum(math.dist(pts[i], pts[i + 1]) for i in range(len(pts) - 1))
-    if len(pts) <= 2:
-        return (0, 0, 0, 0.0, 1.0)
-    # 「有短于可见下限的段」排在最前 —— 那是**缺陷**（check_layout 会因此判红整张图），
-    # 不是审美偏好：一条 3px 的毛刺比多一个折点难看多了。
     stub = 0 if all(math.dist(first, second) >= EDGE_MIN
                     for first, second in zip(pts, pts[1:])) else 1
-    return (stub, tier, len(pts) - 2, round(_max_deviation(pts), 2),
-            round(length / span, 3))
+    slanted = 1 if _is_slanted(pts) else 0
+    corners = max(0, len(pts) - 2)
+    deviation = max((abs((q[0] - a[0]) * (b[1] - a[1]) - (q[1] - a[1]) * (b[0] - a[0])) / span
+                     for q in pts[1:-1]), default=0.0)
+    return (stub, slanted, tier, corners, round(deviation, 2), round(length / span, 3))
+
+
+def _orthogonal_path(a: list, b: list, waypoints: list) -> list[list[float]]:
+    """走出只含**横段与竖段**的路径。
+
+    两条规矩，都是从实测的“钩子”里总结出来的：
+
+    1. **竖段走在列间空档里**（源列右边界与目标列左边界之间），不走目标的列 ——
+       走目标那一列的话，竖段会贴着目标上下穿，压到**同层的兄弟节点**；图上表现为
+       线从上面下来、绕过兄弟、再拐进目标，也就是那几处被圈出来的钩子。
+    2. **横段走在虚节点给的行上** —— 虚节点是分层布局为长边预留的空位，
+       它所在的行在它穿过的列里是空的。所以一条多层的边就沿着这些行横向推进。
+
+    背景：斜段曾占全部连线长度的 **49.5%**。用户的原话是「就是那种 90 度拐弯的线
+    不行吗」—— 要的是正交 + 90 度角，不是“把斜线拉直”。
+    """
+    gap = (a[0] + b[0]) / 2.0                 # 列间空档（LR）；TB 时按 y 取
+    pts: list[list[float]] = [list(a)]
+    pts.append([gap, a[1]])                   # 横段：出源列，进空档
+    row = a[1]
+    for x, y in waypoints:
+        pts.append([x, row])                  # 横段：沿着上一站的行推进
+        pts.append([x, y])                    # 竖段：在它所在的空档里换行
+        row = y
+    pts.append([gap, row])                    # 横段：回到空档
+    pts.append([gap, b[1]])                   # 竖段：在空档里换到目标的行
+    pts.append(list(b))                       # 横段：从空档直接进目标
+    return _simplify_path(pts)
 
 
 def _lane_candidates(a: list[float], b: list[float], placed: dict,
@@ -1742,7 +1791,8 @@ def _lane_candidates(a: list[float], b: list[float], placed: dict,
     return out
 
 
-def straighten(pts: list, placed: dict, exclude: set[str]) -> list[list[float]]:
+def straighten(pts: list, placed: dict, exclude: set[str],
+               orthogonal: list | None = None) -> list[list[float]]:
     """把一条边**能直就直、要弯就最小弯**。
 
     为什么必须有这一遍：跨层的边在分层算法里是被**虚节点**牵着走的 —— 虚节点的 x
@@ -1763,11 +1813,20 @@ def straighten(pts: list, placed: dict, exclude: set[str]) -> list[list[float]]:
         return [[round(x, 2), round(y, 2)] for x, y in pts]
     straight = [list(pts[0]), list(pts[-1])]
     pushed = avoid_nodes(straight, placed, exclude)
-    candidates = [(0, straight),
-                  (1 if _max_deviation(pushed) <= SMALL_DODGE else 3, pushed)]
-    candidates += [(2, lane) for lane in _lane_candidates(straight[0], straight[1],
+    candidates: list[tuple[int, list]] = []
+    # 档 0：**轴向**直线（同一行的两点）—— 既直又正交，最好
+    if abs(straight[0][1] - straight[1][1]) < 0.5 or abs(straight[0][0] - straight[1][0]) < 0.5:
+        candidates.append((0, straight))
+    # 档 1：正交路径（只走横竖段，拐点落在虚节点预留的行/列上）
+    if orthogonal:
+        candidates.append((1, orthogonal))
+    # 档 2：小动作推开 / 贴着障碍走车道（两者都是轴对齐的）
+    candidates.append((2 if _max_deviation(pushed) <= SMALL_DODGE else 4, pushed))
+    candidates += [(3, lane) for lane in _lane_candidates(straight[0], straight[1],
                                                           placed, exclude)]
-    candidates.append((3, pts))
+    # 档 4：斜的直线弦，档 5：原来的虚节点车道 —— 只在正交都不可行时才用
+    candidates.append((4, straight))
+    candidates.append((5, pts))
     viable = []
     for tier, path in candidates:
         if nodes_hit_by_polyline(path, placed, exclude):

@@ -297,9 +297,13 @@ def arrow_element(edge: dict, index: int) -> dict:
     style = palette.EDGE_KINDS.get(kind, palette.EDGE_KINDS["sync"])
 
     el_id = _eid("edge", f"{edge['from']}-{edge['to']}", index)
+    # 拐角**不圆**。用户的原话是「就是那种 90 度拐弯的线不行吗」，而 Excalidraw 的
+    # `roundness` type 2 会把每个拐角都倒成弧 —— 多段折线的短拐角被糊得几乎看不出角度，
+    # 实测图里那几处「钩子」有一半是它造成的。手绘感由 `roughness` 提供，不靠倒角。
+    # （`roundness: None` 就是界面上的 Sharp；两点直线没有拐角，不受影响。）
     el = _base(el_id, "arrow", x0, y0, max(xs) - min(xs), max(ys) - min(ys),
                style["stroke"], "transparent", stroke_style=style["style"],
-               roundness={"type": 2})
+               roundness=None)
     el.update({
         "points": rel,
         "startArrowhead": None,
@@ -397,14 +401,27 @@ def _segment_enters_rect(a: tuple[float, float], b: tuple[float, float],
     return False
 
 
-def _hits_lines(x: float, y: float, width: float, height: float,
-                obstacles: list) -> bool:
+def _line_hits(x: float, y: float, width: float, height: float,
+               obstacles: list) -> int:
+    """标签矩形压到了多少段线（或多少条边）。0 = 干净。
+
+    数出来的个数有第二个用途：**一个干净的位置都找不到时，退到"最不脏"的那个**。
+    以前是“全都不干净就回到第一个候选”，于是密集图上会出现标签压在节点上 ——
+    实测过（正交路由之后线更多了，“注册与装配”直接压在 kernel 的框上）。
+    几何只有这一份实现，`_hits_lines` 是它的布尔包装。
+    """
     right, bottom = x + width, y + height
+    hits = 0
     for polyline in obstacles:
         for a, b in zip(polyline, polyline[1:]):
             if _segment_enters_rect(a, b, x, y, right, bottom):
-                return True
-    return False
+                hits += 1
+    return hits
+
+
+def _hits_lines(x: float, y: float, width: float, height: float,
+                obstacles: list) -> bool:
+    return _line_hits(x, y, width, height, obstacles) > 0
 
 
 def _candidate_directions(back: tuple[float, float],
@@ -461,18 +478,28 @@ def label_position(pts: list, width: float, height: float,
     # 而死守中点会把“附近明明有位置”变成“只能压线”。
     # 顺序是“离中点由近到远”，所以能用中点时一定用中点。
     first: tuple[float, float] | None = None
-    for frac in (0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74):
+    best: tuple[float, float] | None = None
+    best_hits = -1
+    # 取样点与退让量都给足：正交路由之后线段变多，密集图上常常整片中招 ——
+    # 实测（五层架构那张）标签被逼到“最不脏”的位置，正好压在节点框上。
+    # 多试一些点的代价很小（一次搜索也就几百次矩形相交判断），比压上去划算。
+    for frac in (0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82, 0.1, 0.9):
         mid, back, fwd = _midpoint_frame(pts, frac)
         directions = _candidate_directions(back, fwd)
-        for extra in (0.0, 6.0, 12.0, 20.0, 30.0, 45.0, 65.0):
+        for extra in (0.0, 6.0, 12.0, 20.0, 30.0, 45.0, 65.0, 90.0, 120.0, 160.0):
             for dx, dy in directions:
                 reach = radius + gap + extra
                 x = mid[0] + dx * reach - width / 2
                 y = mid[1] + dy * reach - height / 2
                 if first is None:
                     first = (x, y)
-                if not _hits_lines(x, y, width, height, obstacles):
+                hits = _line_hits(x, y, width, height, obstacles)
+                if hits == 0:
                     return round(x, 2), round(y, 2)
+                if best is None or hits < best_hits:
+                    best, best_hits = (x, y), hits    # 兜底：最不脏的那个
+    if best is not None:
+        return round(best[0], 2), round(best[1], 2)
     if first is None:                       # 理论上不可达（候选方向非空），但不靠 assert
         mid = _midpoint_frame(pts)[0]
         first = (mid[0] - width / 2, mid[1] - radius - gap - height / 2)
