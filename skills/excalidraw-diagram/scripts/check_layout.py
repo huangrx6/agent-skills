@@ -390,6 +390,19 @@ def _step(params: dict[str, float], outcome: Outcome) -> dict[str, float]:
     return out
 
 
+def _extremeness(result: Any) -> float:
+    """图的长宽比有多极端：1.0 = 正方，越大越细长。"""
+    placed = list(result.placed.values())
+    if not placed:
+        return 1.0
+    width = max(p.x + p.width for p in placed) - min(p.x for p in placed)
+    height = max(p.y + p.height for p in placed) - min(p.y for p in placed)
+    if width <= 0 or height <= 0:
+        return 1.0
+    ratio = width / height
+    return max(ratio, 1.0 / ratio)
+
+
 def layout_with_retry(spec: dict, boxes: dict[str, BoxT],
                       params: dict[str, float] | None = None
                       ) -> tuple[Any, Outcome, list[Attempt]]:
@@ -414,9 +427,14 @@ def layout_with_retry(spec: dict, boxes: dict[str, BoxT],
         stepped = _step(current, outcome)
         if stepped == current:
             break                       # 已到上限；再跑只会得到同一个结果
-        current = stepped
-        result = L.layout(spec, boxes, current)
-        outcome = check(spec, result, boxes)
+        candidate = L.layout(spec, boxes, stepped)
+        candidate_outcome = check(spec, candidate, boxes)
+        # 护栏：调参器只盯它自己那几项检查，对**长宽比完全无感**。实测它会为了修
+        # 折段带出来的 2 处穿节点，把层间距从 120 一路顶到 270 —— 图又变回细长条，
+        # 折段刚省下来的高度全被吃回去。所以明确规定：**让图变得更极端的一步不采纳**。
+        if _extremeness(candidate) > _extremeness(result):
+            break
+        current, result, outcome = stepped, candidate, candidate_outcome
 
     return result, outcome, attempts
 

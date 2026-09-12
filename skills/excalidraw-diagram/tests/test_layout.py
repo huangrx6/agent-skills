@@ -414,3 +414,65 @@ class TestAvoidNodes(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+class TestWrapLongChains(unittest.TestCase):
+    """折段（P7）：主轴太长的链式图折成几段并排。
+
+    这些用例存在的理由：折段的**每一个条件**都是被现实打回来之后才加上的，
+    而原来那两个坐标用例是"因为测试图太小不再折了"才通过的 —— 等于没有覆盖。
+    """
+
+    def _spec(self, count: int, direction: str, width: int = 1) -> dict:
+        nodes = [{"id": f"n{i}", "kind": "service", "label": f"步骤{i}"} for i in range(count)]
+        edges = [{"from": f"n{i}", "to": f"n{i+1}"} for i in range(count - 1)]
+        for i in range(count - 1):
+            for w in range(1, width):
+                nodes.append({"id": f"n{i}x{w}", "kind": "external", "label": f"旁支{i}{w}"})
+                edges.append({"from": f"n{i}", "to": f"n{i}x{w}"})
+        return {"type": "flow", "direction": direction, "nodes": nodes, "edges": edges}
+
+    def _main_extent(self, spec: dict) -> float:
+        result = L.layout(spec, L.boxes_from_spec(spec))
+        placed = result.placed
+        if result.direction == "TB":
+            return max(p.y + p.height for p in placed.values()) - min(p.y for p in placed.values())
+        return max(p.x + p.width for p in placed.values()) - min(p.x for p in placed.values())
+
+    def test_long_vertical_chain_gets_folded(self):
+        """真的长 + 链式 + 竖着 → 折，而且**主轴必须变短**。
+
+        只断言"比例变好"是不够的：第一版只加了宽度、没有重置主轴，比例数字同样变好看，
+        但图反而更大（斜着错开的楼梯）。所以这里断言的是绝对长度。
+        """
+        spec = self._spec(14, "TB")
+        # 判据层：这样的图该折
+        self.assertGreater(L.segments_needed(2400.0, 200.0, 1, "TB"), 1)
+        # 结果层：折完主轴**真的短了**。注意不能只断言比例 —— 第一版只加宽不缩高，
+        # 比例数字一样好看，但图反而更大（斜着错开的楼梯）。
+        self.assertLess(self._main_extent(spec), 1600,
+                        "折完之后主轴应该短到一屏以内，而不是只是变宽")
+
+    def test_short_chain_is_left_alone(self):
+        """三个节点排一行也是 13:1，但那是一张小图 —— 不折。"""
+        self.assertEqual(L.segments_needed(600.0, 44.0, 1, "TB"), 1)
+
+    def test_dense_diagram_is_left_alone(self):
+        """密集图本来就不是长条，折它只会把段间连线拉长（实测穿节点 1 → 4）。"""
+        self.assertEqual(L.segments_needed(3000.0, 400.0, 6, "TB"), 1)
+
+    def test_long_horizontal_chain_is_left_alone(self):
+        """横向的长流程不折（阈值更高）—— 见 WRAP_MIN_MAIN 上的说明。"""
+        self.assertEqual(L.segments_needed(2090.0, 172.0, 2, "LR"), 1)
+        # 但真长到两屏以上还是要折
+        self.assertGreater(L.segments_needed(5000.0, 172.0, 2, "LR"), 1)
+
+    def test_cross_segment_edge_does_not_cross_nodes(self):
+        """跨段那条连线要走空档，不能斜穿两栏（实测斜穿撞掉 2 个节点）。"""
+        spec = self._spec(14, "TB")
+        result = L.layout(spec, L.boxes_from_spec(spec))
+        self.assertTrue(any(len(e["points"]) > 2 for e in result.edges),
+                        "折段之后应该有一条绕行的跨段连线")
+        for e in result.edges:
+            hits = L.nodes_hit_by_polyline(e["points"], result.placed,
+                                           {e["from"], e["to"]})
+            self.assertEqual(hits, [], f"{e['from']} → {e['to']} 穿过了 {hits}")

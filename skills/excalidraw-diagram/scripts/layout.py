@@ -102,6 +102,62 @@ DETOUR_MAX_OFFSET = 280.0
 # 最多几轮。一轮解决一处，多轮是给“推完之后又撞上别的”留的余地。
 DETOUR_ROUNDS = 6
 
+# ── 折段：主轴太长时把它折成几段并排（P7）─────────────────────
+#
+# 为什么需要：`02-flow` 是一条 13 节点的链，主轴必然很长、交叉轴必然很空 ——
+# 实测 114×380（0.30:1），缩到一屏就是一条竖线。**这不是间距能解决的**：
+# 间距调小只会更窄、调大只会更长，因为层数不变。唯一能改的是层的排布方式。
+#
+# 判据用与可读区间同一组数（0.45~4.5），不另立一套。
+WRAP_MIN_ASPECT = 0.45
+WRAP_MAX_ASPECT = 4.5
+# 段与段之间的空档。与 rankSeparation 同量级（120）但它们是两件事：
+# 段内是"层与层的距离"，段间是"两块图之间的空白"，后者要更明显才看得出是折过来的。
+WRAP_SEGMENT_GAP = 150.0
+# 主轴超过这么长才考虑折。**比例分不出"三个节点排一行"和"十三个节点排一行"** ——
+# 两者都是 13:1，但前者是一张小图（一屏放得下），后者才是真长条。
+# 少了这条，几张测试用的小图都会被折，几何也跟着变得莫名其妙。
+#
+# 两个方向的阈值不同，这是**判断**不是推导 —— 因为实测证明没有任何纯几何判据
+# 能分开这两种情况：`04-state` 的自然主轴（2090）比 `02-flow`（1734）还长，
+# 长短和比例都说"更该折"，但折完 `04-state` 反而更难读。
+# 真正的差别在阅读方式：
+#   TB 的细长条 = 一条竖线，**任何屏幕都放不下**（屏幕是横的）→ 早折
+#   LR 的长条 = 本来就是这个方向该有的样子，横着读是自然的 → 长到两屏以上才折
+WRAP_MIN_MAIN = {"TB": 1600.0, "LR": 2400.0}
+
+
+# 每层最多几个节点还算"链式"。链式图折段是有意义的：主轴长是因为**层数多**，
+# 交叉轴空是因为**每层没几个节点**。密集图不一样 —— 它宽高比本来就在区间内，
+# 折它只会把段间的连线拉长、横穿过去（实测：05-network 穿节点 1 → 4）。
+WRAP_MAX_LAYER_SIZE = 2
+
+
+def segments_needed(main_total: float, cross_total: float,
+                    max_layer: int = 1, direction: str = "TB") -> int:
+    """要把主轴折成几段。返回 1 表示**不折**。
+
+    两个条件都要满足才折：
+
+    三个条件都要满足才折：
+
+    1. **真的长**（`WRAP_MIN_MAIN`，按方向取值）—— 比例不够，得看绝对长度。
+    2. **比例出区间**（`WRAP_MIN/MAX_ASPECT`，和可读区间同一组数）。
+    3. **是链式图**（`WRAP_MAX_LAYER_SIZE`）—— 折段的收益是消掉长条，代价是
+       段间连线要绕路；密集图本来就不是长条，付这个代价是净亏。
+    """
+    if cross_total <= 0 or main_total <= 0:
+        return 1
+    if max_layer > WRAP_MAX_LAYER_SIZE:
+        return 1
+    if main_total < WRAP_MIN_MAIN.get(direction, 2400.0):
+        return 1
+    aspect = (cross_total / main_total) if direction == "TB" else (main_total / cross_total)
+    if WRAP_MIN_ASPECT <= aspect <= WRAP_MAX_ASPECT:
+        return 1
+    return max(1, round((main_total / cross_total) ** 0.5))
+
+
 # ── 枢纽节点：扇出大的节点在**交叉轴**上长一点（P12）──────────
 #
 # 为什么：边的落点是沿节点边缘均分的，节点太小就摊不开。实测 order 有 7 条边、
@@ -516,13 +572,26 @@ def apply_cross_axis_pins(order: dict[int, list[str]], ranks: dict[str, int],
 
 
 # ── 阶段三：坐标分配 ────────────────────────────────────────
+@dataclass(frozen=True)
+class Coords:
+    """坐标 + **折段的划分**。
+
+    段信息必须跟着坐标一起出来：跨段的那条连线要走两栏之间的空档绕过去，
+    它得知道"段在哪、空档在哪"。在别处再算一遍就是两份实现，两份必然漂移。
+    """
+
+    placed: dict[str, Placed]
+    segments: dict[int, int]          # 层号 → 段号（不折时全是 0）
+    bands: tuple[float, ...]          # 段间空档的中心（交叉轴坐标）
+
+
 def assign_coordinates(order: dict[int, list[str]], boxes: dict[str, Box],
                        direction: str, node_sep: float, rank_sep: float
-                       ) -> dict[str, Placed]:
+                       ) -> Coords:
     live = {r: [n for n in layer if n in boxes] for r, layer in order.items()}
     live = {r: layer for r, layer in live.items() if layer}
     if not live:
-        return {}
+        return Coords(placed={}, segments={}, bands=())
 
     def main_size(n: str) -> float:
         b = boxes[n]
@@ -563,7 +632,52 @@ def assign_coordinates(order: dict[int, list[str]], boxes: dict[str, Box],
             placed[n] = Placed(id=n, x=round(x, 2), y=round(y, 2), width=b.width,
                                height=b.height, rank=r)
             offset += cross_size(n) + gap_for(n, node_sep)
-    return placed
+
+    # ── 折段（P7）────────────────────────────────────────────
+    # 主轴太长时把层切成几段并排 —— "链式图缩到一屏是一条线"的唯一解法。
+    # 放在坐标算完之后：只是一次平移，不碰分层与层内排序的任何逻辑。
+    main_total = cursor - rank_sep if len(live) > 1 else cursor
+    count = segments_needed(main_total, cross_max,
+                            max(len(layer) for layer in live.values()), direction)
+    segments: dict[int, int] = {}
+    if count > 1:
+        ranks = sorted(live)
+        per_segment = -(-len(ranks) // count)          # 向上取整
+        for index, r in enumerate(ranks):
+            segment = index // per_segment
+            segments[r] = segment
+            # 交叉轴：每段往右让开一个"段宽 + 段间空档"。第 0 段不让。
+            cross_shift = segment * (cross_max + WRAP_SEGMENT_GAP)
+            # 主轴：**每段都从 0 重新开始**。
+            # 少了这一步就不是"折"，而是"斜着错开的楼梯" —— 高度一点没降，只多了宽度，
+            # 长宽比数字会变好看但图反而更大。第一版就漏了这一步。
+            main_shift = main_start[ranks[segment * per_segment]] if segment else 0.0
+            if not cross_shift and not main_shift:
+                continue
+            for n in live[r]:
+                p = placed[n]
+                if direction == "TB":
+                    placed[n] = Placed(id=p.id, x=round(p.x + cross_shift, 2),
+                                       y=round(p.y - main_shift, 2), width=p.width,
+                                       height=p.height, rank=p.rank)
+                else:
+                    placed[n] = Placed(id=p.id, x=round(p.x - main_shift, 2),
+                                       y=round(p.y + cross_shift, 2), width=p.width,
+                                       height=p.height, rank=p.rank)
+    if not segments:
+        segments = {r: 0 for r in live}
+    # 空档位置**从摆好的坐标实测**，不按 `cross_max + gap/2` 解析推算 ——
+    # 两者会差：第一版按理论值算，跨段那条连线横走的那一段正好落在别的节点上。
+    extent: dict[int, list[float]] = {}
+    for nid, p in placed.items():
+        lo, hi = ((p.x, p.x + p.width) if direction == "TB" else (p.y, p.y + p.height))
+        slot = extent.setdefault(segments[p.rank], [lo, hi])
+        slot[0], slot[1] = min(slot[0], lo), max(slot[1], hi)
+    bands = []
+    for k in range(1, max(segments.values()) + 1):
+        if (k - 1) in extent and k in extent:
+            bands.append(round((extent[k - 1][1] + extent[k][0]) / 2.0, 2))
+    return Coords(placed=placed, segments=segments, bands=tuple(bands))
 
 
 # ── 边路径 ──────────────────────────────────────────────────
@@ -835,6 +949,42 @@ def avoid_nodes(pts: list, placed: dict, exclude: set[str]) -> list[list[float]]
 
 
 # ── 主入口 ──────────────────────────────────────────────────
+def wrap_route(a: Placed, b: Placed, band: float, lane: float,
+               direction: str) -> list[list[float]]:
+    """跨段连线的走法：出源节点 → **先沿主轴绕到本层外缘之外** → 沿交叉轴进空档 →
+    沿主轴走到目标那一层 → 进目标。
+
+    三个坑，全是实测踩出来的：
+
+    1. **不能直连**。直连是从一栏的末尾斜拉到另一栏的开头，横穿两栏 ——
+       实测 `02-flow` 的 `scan → stage` 撞掉 2 个节点（`cache`、`gate`）。
+    2. **也不能顺着"出源节点后直接走交叉轴"**。TB 下这招碰巧能用（层是横排，
+       从源节点下方走出去天然是空的），**LR 下必撞** —— 层是竖列，源节点正下方
+       往往就站着同列的下一个节点。实测 `04-state` 的 `paid → refunding`
+       就这么撞上了 `cancelled`。
+    3. 所以第一步必须是**沿主轴**绕到本层外缘之外那条通道（`lane`），再拐。
+
+    `lane` 由调用方按源节点所在层的实际外缘算出（主轴方向）。
+    """
+    if direction == "TB":
+        start = [a.x + a.width / 2.0, a.y + a.height]        # 底边中点
+        end = [b.x + b.width / 2.0, b.y]                     # 顶边中点
+        pts = [start, [start[0], lane], [band, lane],
+               [band, end[1]], end]
+    else:
+        start = [a.x + a.width, a.y + a.height / 2.0]        # 右边中点
+        end = [b.x, b.y + b.height / 2.0]                    # 左边中点
+        pts = [start, [lane, start[1]], [lane, band],
+               [end[0], band], end]
+    # 各段宽度相同时，中间两个拐点会落在同一个位置 —— 那一段长度是 0，
+    # 会被"最短连线"校验判成 0px。去掉重复点（保留首尾）。
+    out = [pts[0]]
+    for point in pts[1:]:
+        if point != out[-1]:
+            out.append(point)
+    return out
+
+
 def layout(spec: dict, boxes: dict[str, Box],
            params: dict[str, float] | None = None) -> LayoutResult:
     p = dict(DEFAULT_PARAMS)
@@ -869,9 +1019,33 @@ def layout(spec: dict, boxes: dict[str, Box],
     for n in dummy_ids:
         all_boxes.setdefault(n, Box(0.0, 0.0))
 
-    placed = assign_coordinates(order, all_boxes, direction,
+    coords = assign_coordinates(order, all_boxes, direction,
                                 p["nodeSeparation"], p["rankSeparation"])
+    placed = coords.placed
     routed = route_edges(origins, segments, placed, direction, set(reversed_edges))
+    # 折段之后，两端落在不同段的连线改走空档 —— 直连会横穿两栏。
+    if coords.bands:
+        for e in routed:
+            sa = coords.segments.get(placed[e["from"]].rank) if e["from"] in placed else None
+            sb = coords.segments.get(placed[e["to"]].rank) if e["to"] in placed else None
+            if sa is None or sb is None or sa == sb:
+                continue
+            pa = placed[e["from"]]
+            pb = placed[e["to"]]
+            # 通道放在**源节点那一层的外缘之外**（主轴方向），不是源节点自己的中线 ——
+            # 同层里源节点旁边/下面可能还站着别的节点。留 30px 余量。
+            peers = [q for q in placed.values() if q.rank == pa.rank]
+            # 目标在哪一侧就往哪一侧绕，别绕反了。
+            if direction == "TB":
+                far = max(q.y + q.height for q in peers) + 30.0
+                near = min(q.y for q in peers) - 30.0
+                lane = far if pb.y >= pa.y else near
+            else:
+                far = max(q.x + q.width for q in peers) + 30.0
+                near = min(q.x for q in peers) - 30.0
+                lane = far if pb.x >= pa.x else near
+            e["points"] = wrap_route(pa, placed[e["to"]], coords.bands[min(sa, sb)],
+                                     lane, direction)
 
     return LayoutResult(direction=direction, params=p, ranks=ranks, order=order,
                         placed=placed, edges=routed, crossings=crossings,
