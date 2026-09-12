@@ -484,8 +484,8 @@ class TestEdgeLabels(unittest.TestCase):
         """
         pts = [[0.0, 0.0], [100.0, 0.0]]
         width, height = 40.0, 15.0
-        _, y_tight = E.label_position(pts, width, height, gap=2.0)
-        _, y_loose = E.label_position(pts, width, height, gap=40.0)
+        _, y_tight, _ = E.label_position(pts, width, height, gap=2.0)
+        _, y_loose, _ = E.label_position(pts, width, height, gap=40.0)
         self.assertLess(y_loose, y_tight, "把间隙调大，标签必须退得更远")
         self.assertGreaterEqual(0.0 - (y_tight + height), 1.9)
         self.assertLess(y_tight + height, 0.0, "标签必须整块在线的上方")
@@ -497,9 +497,10 @@ class TestEdgeLabels(unittest.TestCase):
         """
         own = [[0.0, 0.0], [200.0, 0.0]]
         other = [[0.0, -20.0], [200.0, -20.0]]
-        x, y = E.label_position(own, 40.0, 15.0, [own, other])
+        x, y, needs_backdrop = E.label_position(own, 40.0, 15.0, [own, other])
         self.assertFalse(E._hits_lines(x, y, 40.0, 15.0, [own, other]),
                          "标签仍然撞在线段上")
+        self.assertFalse(needs_backdrop, "有干净位置时不该要底色")
 
     def test_polyline_midpoint_is_by_arc_length(self):
         """中点是“走一半弧长”处的点，不是“中间那个拐点”。"""
@@ -647,3 +648,33 @@ class TestOpeningView(unittest.TestCase):
         self.assertLessEqual((right - left) * state["zoom"], E.OPEN_VIEW[0])
         self.assertLessEqual((bottom - top) * state["zoom"],
                              E.OPEN_VIEW[1] - E.OPEN_MARGIN[1])
+
+
+class TestLabelNeverSitsOnANode(unittest.TestCase):
+    """标签压到**框**上比压到线上更糟 —— 分不清这行字属于谁。
+
+    实测来由：五层架构那张里「上传 / 建 job」正好压在 apps/api 的框里、
+    「注册与装配」压在 kernel/contracts 上。原因是节点矩形和线**同权**，
+    兜底选“最不脏”时压框不压线的位置胜出。
+    """
+
+    def test_fallback_prefers_a_line_over_a_node(self):
+        own = [[0.0, 0.0], [200.0, 0.0]]
+        # 正上方放一个节点矩形（闭合折线），更远处放一条线
+        node = (60.0, -40.0, 140.0, -10.0)          # keepouts 是矩形 (x0, y0, x1, y1)
+        width, height = 40.0, 15.0
+        x, y, needs_backdrop = E.label_position(own, width, height, [own], [node])
+        self.assertEqual(0, E._box_hits(x, y, width, height, [node]),
+                         "宁可压线也不能压框 —— 兜底没避开节点")
+        self.assertFalse(needs_backdrop, "避开了节点又没压线，不需要底色")
+
+    def test_no_clean_spot_anywhere_asks_for_a_backdrop(self):
+        # 把标签整个包在一个节点矩形里，四周再缠上线：真的没有干净位置
+        node_rect = (-200.0, -200.0, 200.0, 200.0)
+        lines = [[[-200.0, -200.0], [200.0, -200.0], [200.0, 200.0], [-200.0, 200.0],
+                  [-200.0, -200.0]],
+                 [[-300.0, 0.0], [300.0, 0.0]], [[0.0, -300.0], [0.0, 300.0]]]
+        _, _, needs_backdrop = E.label_position([[0.0, 0.0], [10.0, 0.0]], 40.0, 15.0,
+                                                lines, [node_rect])
+        self.assertTrue(needs_backdrop, "完全没有干净位置时应当要底色")
+

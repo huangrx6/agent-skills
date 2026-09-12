@@ -53,6 +53,9 @@ VERTICAL_ALIGN = "middle"
 # 边标签与连线之间至少要留的空隙。太小会被线穿过（实测过：只上移一个字号时，
 # 标签高 15px 而上移 12px，线正好从文字中间过）。
 LABEL_GAP = 6.0
+NODE_WEIGHT = 10.0      # 标签打分时“压到节点”相对于“压到线”的权。
+                        # 线从字上穿过还看得清，字压在框上就分不清这行字属于谁了 ——
+                        # 所以兜底选“最不脏”的时候，先避开框。
 # Excalidraw 文本元素的 baseline（从文本块顶部到首行基线的距离）。
 # 容器绑定的文字在加载时由 Excalidraw 重算，这里给一个合理初值即可。
 BASELINE_RATIO = 0.875
@@ -424,6 +427,21 @@ def _hits_lines(x: float, y: float, width: float, height: float,
     return _line_hits(x, y, width, height, obstacles) > 0
 
 
+def _box_hits(x: float, y: float, width: float, height: float, boxes: list) -> int:
+    """标签矩形和这些矩形**重叠**了几处。
+
+    这里必须用**面积重叠**，不能用轮廓：标签整个落在框**里面**时，框的轮廓和它
+    根本不相交 —— 实测就是这么漏掉的（标签压在框里，打分却算它干净，底色也就
+    永远不触发）。线段用轮廓判据是对的（线是线），矩形要用矩形判据。
+    """
+    right, bottom = x + width, y + height
+    hits = 0
+    for left, top, box_right, box_bottom in boxes:
+        if x < box_right and right > left and y < box_bottom and bottom > top:
+            hits += 1
+    return hits
+
+
 def _candidate_directions(back: tuple[float, float],
                           fwd: tuple[float, float]) -> list[tuple[float, float]]:
     """标签可以往哪几个方向退。先试最合理的，再试备选。
@@ -457,7 +475,8 @@ def _candidate_directions(back: tuple[float, float],
 
 def label_position(pts: list, width: float, height: float,
                    obstacles: list | None = None,
-                   gap: float = LABEL_GAP) -> tuple[float, float]:
+                   keepouts: list | None = None,
+                   gap: float = LABEL_GAP) -> tuple[float, float, bool]:
     """找一个**不与任何连线相交**的标签位置 —— 由脚本自己搜，不靠一个魔法偏移量。
 
     为什么不能只算一个偏移量：
@@ -465,23 +484,30 @@ def label_position(pts: list, width: float, height: float,
     1. 旧写法 `(mid.x + 6, mid.y - fontSize)` 只上移了一个字号（12px）而标签高 15px，
        线正好从文字中间穿过 —— 用户看到的“还是有遮挡”就是这个。
     2. 改成“沿法线退开”之后，**拐点**上仍然会盖：中点落在 V 形折线的顶点时，
-       标签以顶点为中心，它有一半会压回入射那一段（实测：`长边` 标签的左半边被
-       自己的入边穿过）。
+       标签以顶点为中心，它有一半会压回入射那一段。
     3. 而且标签还可能撞上**别的边**，那是单纯算自家法线永远避不开的。
 
-    所以改成：按候选方向 × 递增退让量试位置，取第一个干净的。全都不干净时回到第一个
-    候选（法线朝上）—— 那种情况说明图太密，应该由报告建议拆节点，而不是在这里硬拗。
+    返回 `(x, y, 需要底色吗)`。
+
+    `keepouts` 是**节点矩形**（`(x, y, w, h)` 四元组，按面积重叠判，不是轮廓）。
+    压到节点比压到线严重得多 —— 线从字上过去
+    还看得清，字压在框上就分不清这行字属于谁了。所以打分时节点按 `NODE_WEIGHT` 计权，
+    「最不脏」的兜底会优先避开框（实测：五层架构那张里「上传 / 建 job」正好压在
+    apps/api 框里 —— 就是因为节点和线同权，兜底选了一个压框但没压线的位置）。
+
+    全都不干净时返回 `True`：调用方会给文字铺一个**底色**，让“被穿过看不清”
+    在结构上不可能发生，而不是继续挪到一个一样脏的地方。
     """
     obstacles = obstacles or [list(pts)]
+    keepouts = keepouts or []
     radius = math.hypot(width, height) / 2
     # 先试中点，不行再沿边滑 —— 标签本来就可以不在中点，
     # 而死守中点会把“附近明明有位置”变成“只能压线”。
     # 顺序是“离中点由近到远”，所以能用中点时一定用中点。
     first: tuple[float, float] | None = None
     best: tuple[float, float] | None = None
-    best_hits = -1
-    # 取样点与退让量都给足：正交路由之后线段变多，密集图上常常整片中招 ——
-    # 实测（五层架构那张）标签被逼到“最不脏”的位置，正好压在节点框上。
+    best_score = -1
+    # 取样点与退让量都给足：正交路由之后线段变多，密集图上常常整片中招。
     # 多试一些点的代价很小（一次搜索也就几百次矩形相交判断），比压上去划算。
     for frac in (0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82, 0.1, 0.9):
         mid, back, fwd = _midpoint_frame(pts, frac)
@@ -493,36 +519,46 @@ def label_position(pts: list, width: float, height: float,
                 y = mid[1] + dy * reach - height / 2
                 if first is None:
                     first = (x, y)
-                hits = _line_hits(x, y, width, height, obstacles)
-                if hits == 0:
-                    return round(x, 2), round(y, 2)
-                if best is None or hits < best_hits:
-                    best, best_hits = (x, y), hits    # 兜底：最不脏的那个
+                score = (_line_hits(x, y, width, height, obstacles)
+                         + NODE_WEIGHT * _box_hits(x, y, width, height, keepouts))
+                if score == 0:
+                    return round(x, 2), round(y, 2), False
+                if best is None or score < best_score:
+                    best, best_score = (x, y), score    # 兜底：最不脏的那个
     if best is not None:
-        return round(best[0], 2), round(best[1], 2)
+        return round(best[0], 2), round(best[1], 2), True
     if first is None:                       # 理论上不可达（候选方向非空），但不靠 assert
         mid = _midpoint_frame(pts)[0]
         first = (mid[0] - width / 2, mid[1] - radius - gap - height / 2)
-    return round(first[0], 2), round(first[1], 2)
+    return round(first[0], 2), round(first[1], 2), True
 
 
-def edge_label_element(edge: dict, index: int, obstacles: list | None = None) -> dict | None:
+def edge_label_element(edge: dict, index: int, obstacles: list | None = None,
+                       keepouts: list | None = None) -> dict | None:
     """边标签：一个独立的文字元素，位置由 `label_position` 搜出来。
 
     刻意**不**绑到箭头上 —— 箭头标签在 Excalidraw 里有自己的定位规则，
     绑上去容易在编辑时漂移；独立元素至少位置是可预测的。
 
-    `obstacles` 传**所有**边的折线，不只是自己那条 —— 标签撞上别的边同样是遮挡。
+    `obstacles` 传**所有**边的折线（不只是自己那条），`keepouts` 传**节点矩形** ——
+    前者撞上就不好读，后者撞上就更糟：分不清这行字属于谁。
     """
     label = edge.get("label")
     if not label:
         return None
     width = round(tm.weighted_units(label) * tm.FONT_DETAIL, 2)
     height = round(tm.FONT_DETAIL * tm.LINE_HEIGHT, 2)
-    x, y = label_position(edge["points"], width, height, obstacles)
+    x, y, needs_backdrop = label_position(edge["points"], width, height,
+                                          obstacles, keepouts)
     el_id = _eid("elabel", f"{edge['from']}-{edge['to']}", index)
     el = _base(el_id, "text", x, y, width, height,
                palette.CANVAS["text"], "transparent", extra={"roundness": None})
+    if needs_backdrop:
+        # 一个干净位置都找不到时，给文字铺一个**底色**（Excalidraw 的文字元素本来
+        # 就有 backgroundColor，铺在字后面就是一枚小牌子）。这样“标签被线穿过看不清”
+        # 在结构上不可能发生 —— 比继续挪、挪到一个一样脏的地方强。
+        el["backgroundColor"] = palette.CANVAS["background"]
+        el["roundness"] = {"type": 3}
     el.update({
         "text": label,
         "fontSize": tm.FONT_DETAIL,
@@ -668,19 +704,15 @@ def build_scene(spec: dict, result, boxes: dict,
     # 落到图上却压在真线上（实测某条边被压 19 个采样点）。
     # 这就是 P3“标签压线”反复修不掉的根因。
     polylines = [list(edge["points"]) for edge in result.edges]
-    # 节点框也算障碍。以前只躲线 —— 于是标签躲开了所有线，却正好贴在节点边框上
-    # （实测某张图里「38」就压在 application 的左边框上）。矩形按闭合折线传，
-    # `label_position` 一个字都不用改：几何判据还是同一个函数，只是多喂了几条线。
-    # 只算**真节点**：虚节点是布局内部的东西，不画出来，不该把标签赶走。
-    for placed in result.real_nodes().values():
-        polylines.append([[placed.x, placed.y],
-                          [placed.x + placed.width, placed.y],
-                          [placed.x + placed.width, placed.y + placed.height],
-                          [placed.x, placed.y + placed.height],
-                          [placed.x, placed.y]])
+    # 节点框单独传给标签搜索（`keepouts`），**不混进 `polylines`**：压到框比压到线
+    # 严重得多，打分时要分别计权（NODE_WEIGHT）。只算**真节点** —— 虚节点是布局
+    # 内部的东西，不画出来，不该把标签赶走。
+    box_keepouts = [(placed.x, placed.y, placed.x + placed.width,
+                     placed.y + placed.height)
+                    for placed in result.real_nodes().values()]
     for i, (edge, _) in enumerate(arrow_specs):
         elements.append(arrow_element(edge, i))
-        label = edge_label_element(edge, i, polylines)
+        label = edge_label_element(edge, i, polylines, box_keepouts)
         if label:
             elements.append(label)
 

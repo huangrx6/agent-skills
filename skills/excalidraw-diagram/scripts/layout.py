@@ -1382,6 +1382,7 @@ def route_edges(origins: list[dict], segments: list[dict],
     # 贴点要按最终位置算，先分锚点再挪节点等于白算。
     if align:
         _align_spine(placed, origins, direction)
+    gaps = _rank_gaps(placed, direction)
     starts, ends = _anchor_slots(resolved, placed, direction)
 
     for idx, chain in resolved:
@@ -1395,7 +1396,9 @@ def route_edges(origins: list[dict], segments: list[dict],
                       placed[n].y + placed[n].height / 2] for n in chain[1:-1]]
         pts = straighten(pts, placed, {chain[0], chain[-1]},
                          orthogonal=_orthogonal_path(pts[0], pts[-1], waypoints,
-                                                     direction))
+                                                     direction, gaps,
+                                                     placed[chain[0]].rank,
+                                                     placed[chain[-1]].rank))
         a, b = e["from"], e["to"]
         was_reversed = (b, a) in reversed_set
         if was_reversed:
@@ -1712,6 +1715,24 @@ def _is_slanted(pts: list) -> bool:
     return False
 
 
+def _reversals(pts: list) -> int:
+    """路径在两条轴上各“改了几次方向”。
+
+    一条干净的路线（直线 / Z / 贴着车道绕）在两个轴上都**单调** —— 0 次。
+    出去又回来的路（在图上就是绕着节点画了一个矩形框）会有 1~2 次。
+    实测踩过：新路由在往回走的边上走出大矩形回路，看着像“容器边界” ——
+    结构误读，比斜线糟糕得多；而当时的度量只数了 y 方向的往返，没抓到它。
+    """
+    total = 0
+    for axis in (0, 1):
+        values = [p[axis] for p in pts]
+        signs = [1 if b > a + 1e-6 else (-1 if b < a - 1e-6 else 0)
+                 for a, b in zip(values, values[1:])]
+        signs = [s for s in signs if s]
+        total += sum(1 for a, b in zip(signs, signs[1:]) if a != b)
+    return total
+
+
 def _path_rank(pts: list, tier: int) -> tuple:
     """候选路径的排序键。
 
@@ -1730,10 +1751,14 @@ def _path_rank(pts: list, tier: int) -> tuple:
     stub = 0 if all(math.dist(first, second) >= EDGE_MIN
                     for first, second in zip(pts, pts[1:])) else 1
     slanted = 1 if _is_slanted(pts) else 0
+    # 主轴来回（走出去再走回来）也排在最前 —— 它同样属于「结构上不该出现」，
+    # 而且比多几个拐点难看得多：看上去像给一组节点画了个框。
+    zigzag = _reversals(pts)
     corners = max(0, len(pts) - 2)
     deviation = max((abs((q[0] - a[0]) * (b[1] - a[1]) - (q[1] - a[1]) * (b[0] - a[0])) / span
                      for q in pts[1:-1]), default=0.0)
-    return (stub, slanted, tier, corners, round(deviation, 2), round(length / span, 3))
+    return (stub, slanted, zigzag, tier, corners, round(deviation, 2),
+            round(length / span, 3))
 
 
 def _align_spine(placed: dict, edges: list, direction: str) -> int:
@@ -1886,43 +1911,77 @@ def _align_spine(placed: dict, edges: list, direction: str) -> int:
     return moved
 
 
-def _orthogonal_path(a: list, b: list, waypoints: list, direction: str = "LR") -> list[list[float]]:
+def _rank_gaps(placed: dict, direction: str) -> dict[int, float]:
+    """相邻两层之间的**空档**坐标（LR 是 x，TB 是 y）。
+
+    为什么必须有它：虚节点坐的是**层内的列**，不是层与层之间的空档 —— 沿虚节点的 x
+    走竖段，就会穿过它所在的那一列。实测（04-state）：`paid→refunding` 的所有正交候选
+    都被挡住，退回一条 1128px 的斜线，一条边就占了整张图斜段的一半。
+
+    空档的性质正好相反：两列之间那 120px（rankSeparation）里，**整条高度**都是空的。
+    所以规矩是：**竖段走空档，横段走虚节点保留的行**。
+    键是空档**下面/左侧**那一层的 rank；两层之间没有更高的层时不出现在表里。
+    """
+    by_rank: dict[int, list] = {}
+    for nid, node in placed.items():
+        if nid.startswith(DUMMY_PREFIX):
+            continue
+        by_rank.setdefault(node.rank, []).append(node)
+    gaps: dict[int, float] = {}
+    ranks = sorted(by_rank)
+    for lower, upper in zip(ranks, ranks[1:]):
+        if direction == "LR":
+            right = max(node.x + node.width for node in by_rank[lower])
+            left = min(node.x for node in by_rank[upper])
+            gaps[lower] = (right + left) / 2
+        else:
+            bottom = max(node.y + node.height for node in by_rank[lower])
+            top = min(node.y for node in by_rank[upper])
+            gaps[lower] = (bottom + top) / 2
+    return gaps
+
+
+def _orthogonal_path(a: list, b: list, waypoints: list, direction: str,
+                     gaps: dict[int, float], start_rank: int, end_rank: int) -> list[list[float]]:
     """走出只含**横段与竖段**的路径。
 
-    三条规矩，都是从实测的“钩子”里总结出来的：
+    规矩（都是从实测的“钩子”和“斜段”里总结的）：
 
-    1. **先沿主轴走**：LR 先横、TB 先竖 —— 反过来等于一出来就横穿自己那一行。
-       （第一版只写了 LR 的形态，竖版流程上一直在横着穿同层。）
-    2. **竖段走在列间空档里**（LR）/ **横段走在层间空档里**（TB），不走目标那一列/行 ——
-       走目标那一列的话，线会贴着目标上下穿、压到**同层的兄弟节点**，图上就是钩子。
-    3. **横段走在虚节点给的行上** —— 虚节点是分层布局为长边预留的空位，
-       它所在的行在它穿过的列里是空的。多层的边就沿着这些行推进。
+    1. **竖段走层间空档**（LR）/ **横段走层间空档**（TB）—— 空档里整条高度都是空的，
+       走在里面不可能撞到节点。**不要走虚节点那一列**：虚节点坐的是层内的列，
+       沿它走等于横穿那一层（实测就是这么退回斜线的）。
+    2. **另一条腿走虚节点保留的行** —— 虚节点是分层布局为长边留的空位，
+       它所在的行在它穿过的列里是空的。
+    3. **先沿主轴走**：LR 先横、TB 先竖 —— 反过来等于一出来就横穿自己那一层。
 
-    背景：斜段曾占全部连线长度的 49.5%。用户的原话是「就是那种 90 度拐弯的线不行吗」
-    —— 要的是正交 + 90 度角，不是“把斜线拉直”。
+    背景：斜段曾占全部连线长度的 49.5%；用户的原话是「就是那种 90 度拐弯的线不行吗」。
     """
-    gap = (a[0] + b[0]) / 2.0 if direction == "LR" else (a[1] + b[1]) / 2.0
+    lanes = [gaps[r] for r in sorted(gaps) if start_rank <= r < end_rank]
     pts: list[list[float]] = [list(a)]
     if direction == "LR":
-        pts.append([gap, a[1]])                    # 先横：出源列，进空档
         row = a[1]
-        for x, y in waypoints:
-            pts.append([x, row])                   # 横段：沿上一站的行推进
-            pts.append([x, y])                     # 竖段：在它所在的空档里换行
+        for index, (x, y) in enumerate(waypoints):
+            lane = lanes[min(index, len(lanes) - 1)] if lanes else (a[0] + b[0]) / 2
+            pts.append([lane, row])            # 横段：走到这一站前面的空档
+            pts.append([lane, y])              # 竖段：在空档里换到它的行
+            pts.append([x, y])                 # 横段：沿它保留的行穿过那一层
             row = y
-        pts.append([gap, row])                     # 横段：回到空档
-        pts.append([gap, b[1]])                    # 竖段：在空档里换到目标的行
-        pts.append(list(b))                        # 横段：从空档进目标
+        lane = lanes[-1] if lanes else (a[0] + b[0]) / 2
+        pts.append([lane, row])                # 横段：回到空档
+        pts.append([lane, b[1]])               # 竖段：在空档里换到目标的行
+        pts.append(list(b))                    # 横段：从空档进目标
     else:
-        pts.append([a[0], gap])                    # 先竖：出源层，进空档
         column = a[0]
-        for x, y in waypoints:
-            pts.append([column, y])                # 竖段：沿上一站的列推进
-            pts.append([x, y])                     # 横段：在它所在的空档里换列
+        for index, (x, y) in enumerate(waypoints):
+            lane = lanes[min(index, len(lanes) - 1)] if lanes else (a[1] + b[1]) / 2
+            pts.append([column, lane])         # 竖段：走到这一站前面的空档
+            pts.append([x, lane])              # 横段：在空档里换到它的列
+            pts.append([x, y])                 # 竖段：沿它保留的列穿过那一层
             column = x
-        pts.append([column, gap])                  # 竖段：回到空档
-        pts.append([b[0], gap])                    # 横段：在空档里换到目标的列
-        pts.append(list(b))                        # 竖段：从空档进目标
+        lane = lanes[-1] if lanes else (a[1] + b[1]) / 2
+        pts.append([column, lane])             # 竖段：回到空档
+        pts.append([b[0], lane])               # 横段：在空档里换到目标的列
+        pts.append(list(b))                    # 竖段：从空档进目标
     return _simplify_path(pts)
 
 
