@@ -54,7 +54,7 @@ ls -d "$VAULT/01 Projects"/*/
 
 ## 当前 Areas 结构
 
-> **当前状态（2026-09-12 探查）**：`02 Areas/` 目录**为空**（0 个文件）——历史上存在的领域目录已被重置或迁移。Agent 处理 Areas 相关操作前，必须先 `ls` 真实目录，不能依赖历史假设。
+> **当前状态（2026-09-12 探查）**：`02 Areas/` 下**没有领域子目录**，只有一个索引文件。历史上存在的领域目录已被重置或迁移。Agent 处理 Areas 相关操作前，必须先 `ls` 真实目录，不能依赖历史假设。
 
 **历史领域**：曾有两三个领域目录，现在都已不在。**具体名字不在这里记录** —— 探查 `ls "$VAULT/02 Areas"` 即知现状。
 
@@ -135,7 +135,11 @@ Templater 脚本：
 - 删除/移动笔记用 `git rm` / `git mv`，这样可回滚；不要直接 `rm`。
 - 大规模结构调整（删目录、改编号）建议单独提交，commit message 写清原因，方便日后 `git revert`。
 - 工作区状态文件（`workspace*.json`、`*冲突文件*.json`）被忽略，这是有意的。
-- **提交时会自动跑链接检查**（`.githooks/pre-commit`）：只在提交涉及 `.md` 时运行，发现失效引用会提示，但**不阻塞提交**——失效链接在 vault 里经常是有意为之（先写笔记、目标还没写）。换机器后需执行一次 `git config core.hooksPath .githooks` 才会生效。
+- **提交时跑两道检查**（`.githooks/pre-commit`），两者阻塞度不同：
+  - **链接检查**（只在提交涉及 `.md` 时运行）：**不阻塞**——失效链接在 vault 里经常是有意为之（先写笔记、目标还没写）。
+  - **配置路径检查**（每次都跑）：**阻塞**——`.obsidian/` 配置里指向不存在文件的值从来没有“故意这样写”的解释，插件会静默忽略它（真实案例：vault 搬家后 better-export-pdf 的 cssSnippet 失效，PDF 静默地不带自定义样式）。引用目录而非文件的路径只看不拦。
+  检查器来自 agent-skills 仓库的 PKB skill；位置可用 `git config hooks.agentSkillsRepo` 或 `$AGENT_SKILLS_REPO` 覆盖。
+- 换机器后需执行一次 `git config core.hooksPath .githooks` 才会生效。
 
 ## 探查命令示例
 

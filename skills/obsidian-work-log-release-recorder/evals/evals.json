@@ -27,8 +27,8 @@
     },
     {
       "id": 5,
-      "prompt": "帮我整理一下本周的周报，把项目进展汇总一下。",
-      "expected_output": "不触发本 skill，除非内容与发版相关。常规周报由 obsidian-personal-knowledge-base 按 references/work-management.md 维护；本 skill 只负责周发版笔记（发版）。若确实存在与发版相关的变更，只记那部分。",
+      "prompt": "把这周做的事记一下。",
+      "expected_output": "这句话同时命中本 skill 的触发词（记一下 / 记录）和它的排除项（笼统的“这周做了什么”汇总）—— 是本 skill 与 PKB 最难分的一句。正确做法是不直接动手：先问用户要做哪一种，是要一份周报（属于 obsidian-personal-knowledge-base，按它的 references/work-management.md 维护），还是要记录本周已落地的发版相关事实（属于本 skill，写成周发版笔记）。用户回答前不创建任何笔记。若用户明确只与发版相关，只记那部分。",
       "files": []
     },
     {

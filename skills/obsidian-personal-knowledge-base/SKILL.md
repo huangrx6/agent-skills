@@ -37,6 +37,7 @@ python3 scripts/vault_path.py --explain     # 路径 + 来源 + 目录是否存�
 5. 编辑前打开最近的索引、MOC、模板或主笔记。
 6. 编辑或创建**最小但有用**的笔记；编辑已有笔记时保留原 frontmatter。
 7. 只在有助于检索时更新导航；动了文件名、目录或编号就跑一次「链接检查」。
+8. **自己造成的漂移，自己同步**：这次操作若改变了目录结构、文件数量或 hook 行为，同一次里检查 `vault-map.md` 与相关 SKILL.md 有没有描述它，有就顺手改。这是与「探查发现漂移 → 记漂移记录」并列的另一条路径：那条管别人留下的，这条管你刚造成的。
 
 ## 探查规则
 
@@ -150,7 +151,4 @@ python3 scripts/check_paths.py                     # .obsidian/ 配置里的失�
 
 ## 安装
 
-通过仓库根的 `npx skills add huangrx6/agent-skills` 安装（详见仓库根 [README.md](../../README.md)）。安装后：
-
-1. 验证本机 vault 路径是否与 `references/vault-map.md` 描述一致
-2. Agent 第一次触发本 skill 时会自动读取 `references/vault-map.md` 确认结构
+通过仓库根的 `npx skills add huangrx6/agent-skills` 安装（详见仓库根 [README.md](../../README.md)）。安装后验证本机 vault 路径是否与 `references/vault-map.md` 一致——第一次触发时本 skill 会自动读它确认结构。

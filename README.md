@@ -61,7 +61,7 @@ git clone https://github.com/<owner>/agent-skills.git
 
 | Icon | Skill | 覆盖 |
 | --- | --- | --- |
-| ![build](skills/obsidian-personal-knowledge-base/assets/icons/obsidian-personal-knowledge-base-light.svg#gh-light-mode-only) | [**skill-builder**](skills/skill-builder/SKILL.md) | 建新 skill 前的 5 分钟决策:该不该建 / 触发描述怎么写 / 范围定 P0 还是 P1 / 起 SKILL.md 一稿的 checklist |
+| ![build](skills/skill-builder/assets/icons/skill-builder-light.svg#gh-light-mode-only) ![build](skills/skill-builder/assets/icons/skill-builder-dark.svg#gh-dark-mode-only) | [**skill-builder**](skills/skill-builder/SKILL.md) | 建新 skill 前的 5 分钟决策:该不该建 / 触发描述怎么写 / 范围定 P0 还是 P1 / 起 SKILL.md 一稿的 checklist |
 
 **触发语法**:
 

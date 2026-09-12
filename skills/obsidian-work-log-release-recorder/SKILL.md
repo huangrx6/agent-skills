@@ -7,13 +7,13 @@ description: Use this skill after completing a coding, deployment, config, datab
 
 This skill turns completed work into durable Obsidian notes. It is intentionally selective: the goal is not to preserve the chat transcript, but to keep the small set of facts that will help the next implementation, release, rollback, or handoff.
 
-## Prerequisites（机器 binding）
+## Prerequisites
 
-This skill is bound to a specific machine and Obsidian vault:
+路径从配置解析，**不绑定本机**（与 PKB 的 Prerequisites 一致；这里不要写任何机器专属路径）：
 
 - vault path resolves from `$OBSIDIAN_VAULT_PATH` or `~/.config/obsidian-vault-path` — never hardcode it
 - 取路径的规范方式：`python3 ../obsidian-personal-knowledge-base/scripts/vault_path.py --explain`
-- **cross-machine reuse is limited**: switching machines or vault paths requires re-aligning references
+- 换机器或 vault 搬家只需改上面两项配置，本 skill 与 PKB 都跟着走
 
 ### Mandatory startup checklist
 
@@ -81,7 +81,7 @@ For this skill, resolve paths by **probing**, not from memory.
 
 部署与运维类的发布工作（打包、上传、解压、配置拷贝、容器重启、前后端分开发布）在 vault 里通常归属于某个 `02 Areas/<领域>/<子主题>/` 目录。
 
-> ⚠️ 这类目录当前不存在 —— `02 Areas/` 是空的。**先探查**；没有匹配领域时，告知用户历史路径已不在，并问清记录该放哪再动手。不要写入任何记忆中的旧路径，也不要假定某类项目一定有对应 Area。
+> ⚠️ 这类目录当前不存在 —— `02 Areas/` 下只有索引文件，没有领域子目录。**先探查**；没有匹配领域时，告知用户历史路径已不在，并问清记录该放哪再动手。不要写入任何记忆中的旧路径，也不要假定某类项目一定有对应 Area。
 
 ## Weekly Release Note
 
@@ -120,6 +120,8 @@ Keep release notes short. Put full scripts or config snippets under `04 发布�
 
 4. Verify link and structure integrity.
    - Ensure new notes are linked from the nearest MOC or parent note.
+   - Run `python3 ../obsidian-personal-knowledge-base/scripts/check_links.py --ignore-template` after creating or moving notes; expect exit 0 (details in PKB's `references/structural-checks.md`).
+   - If this operation changed directory structure, file counts, or hook behaviour, update the description of it in `vault-map.md` or the relevant SKILL.md **in the same operation** — do not leave it for the next probe to discover.
    - Avoid duplicating the same release instructions in multiple places; cross-link instead.
 
 5. Report back briefly — keep the handoff short; the value is in the notes.
