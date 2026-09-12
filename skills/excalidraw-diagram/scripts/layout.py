@@ -49,6 +49,7 @@ import json
 import os
 import sys
 from dataclasses import dataclass
+from typing import Any
 
 DIRECTION_FOR_TYPE = {
     "architecture": "LR",
@@ -617,14 +618,19 @@ def layout(spec: dict, boxes: dict[str, Box],
                         pin_conflicts=pin_conflicts)
 
 
-def boxes_from_spec(spec: dict) -> dict[str, Box]:
-    """按文字反推每个节点的尺寸。尺寸不由模型给，见 text_metrics.py。"""
+def boxes_from_spec(spec: dict) -> dict[str, Any]:
+    """按文字反推每个节点的尺寸。尺寸不由模型给，见 text_metrics.py。
+
+    返回的是 `text_metrics.TextBox` 本身，而不是缩水成 (width, height) 的 `Box`。
+    TextBox 本来就满足“有 width/height”这个用法（布局只用到这两个），
+    而输出层还需要里面的**断行结果与断行宽度** —— 在这里退化成 Box，
+    出口脚本就只能把文字再量一遍，量两遍就多一个不一致的机会。
+
+    真实的 `Box` 只在内部用（给尺寸为 0 的虚节点）。
+    """
     tm = load_sibling("text_metrics")
-    out: dict[str, Box] = {}
-    for n in spec.get("nodes", []):
-        tb = tm.measure(n.get("label", ""), n.get("detail", ""))
-        out[n["id"]] = Box(width=tb.width, height=tb.height)
-    return out
+    return {n["id"]: tm.measure(n.get("label", ""), n.get("detail", ""))
+            for n in spec.get("nodes", [])}
 
 
 def load_sibling(name: str):

@@ -223,7 +223,7 @@ def _palette_colors() -> set[str]:
     colors: set[str] = set()
     for entry in list(palette.KINDS.values()) + list(palette.EDGE_KINDS.values()):
         colors.update(v for k, v in entry.items() if k in ("stroke", "background"))
-    colors.update(v for k, v in palette.CANVAS.items() if k in ("background", "grid"))
+    colors.update(v for k, v in palette.CANVAS.items() if k in ("background", "grid", "text"))
     return colors
 
 

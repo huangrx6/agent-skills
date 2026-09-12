@@ -67,6 +67,8 @@ MAX_KINDS = 6
 CANVAS = {
     "background": "#ffffff",
     "grid": "#f1f3f5",
+    # 节点里的文字色。固定深色 —— 节点底色一律是浅色系（见 KINDS），所以深色文字总是可读的。
+    "text": "#1e1e1e",
     "stroke_style": "hand-drawn",
     "font_family": 2,  # native Excalidraw scene 里 CJK-safe 的那一档
 }

@@ -31,9 +31,10 @@ description: >-
 1. **先拿证据**：图的内容来自代码／配置／文档／运行输出。不要凭目录树猜架构。
 2. **判断图类型**，查下面的策略表（类型决定布局算法，不是学美规则）。
 3. **写规格**：一份 `*.diagram.json`，只有结构（节点／边／分组），见 `references/diagram-spec.md`。
-4. **先校验规格，再算布局**：`python3 scripts/validate_spec.py x.diagram.json` —— 字段集是封闭的，未知字段会判失败（包括坐标）。通过后跑 `scripts/layout.py`（分层 → 层内排序 → 坐标）与 `scripts/check_layout.py`（五项校验，失败时自己调参重跑）。
-5. **看报告**：只有脚本自动重试耗尽时才有报告，此时按报告建议改**内容**，不要改参数。报告里不会出现参数名。
-6. **保留规格文件**，和 `.excalidraw` 放一起；以后的修改改规格再重新生成。
+4. **校验规格**：`python3 scripts/validate_spec.py x.diagram.json` —— 字段集是封闭的，未知字段会判失败（包括坐标）。
+5. **出图**：`python3 scripts/emit_excalidraw.py x.diagram.json` —— 它串起整条流水线（校验 → `layout.py` 分层布局 → `check_layout.py` 五项校验、失败时脚本自己调参重跑 → 写出 `.excalidraw`）。**有阻塞项时不写文件。**
+6. **看报告**：只有脚本自动重试耗尽时才有报告，此时按报告建议改**内容**，不要改参数。报告里不会出现参数名。
+7. **保留规格文件**，和 `.excalidraw` 放一起；以后的修改改规格再重新生成。
 
 ## 图类型 → 布局策略
 
@@ -82,17 +83,35 @@ layout(参数) → 校验 ──通过──→ 输出
 ## 脚本
 
 ```sh
-python3 scripts/validate_spec.py x.diagram.json   # 校验规格（封闭字段集）
-python3 scripts/layout.py x.diagram.json --explain   # 只算布局：分层与层内顺序、坐标、交叉数
-python3 scripts/check_layout.py x.diagram.json       # 五项校验 + 自动调参 + （收敛不了时）出报告
-python3 scripts/text_metrics.py "节点标题"          # 看文字 → 容器尺寸的实际推算
-python3 scripts/palette.py                          # 打印色板与 kind 取值
+python3 scripts/emit_excalidraw.py x.diagram.json     # 出图：串起整条流水线，写 .excalidraw
+python3 scripts/validate_spec.py x.diagram.json       # 只校验规格（封闭字段集）
+python3 scripts/layout.py x.diagram.json --explain    # 只算布局：分层与层内顺序、坐标、交叉数
+python3 scripts/check_layout.py x.diagram.json        # 只跑校验 + 调参报告
+python3 scripts/text_metrics.py "节点标题"            # 看文字 → 容器尺寸的实际推算
+python3 scripts/palette.py                            # 打印色板与 kind 取值
 ```
 
 `check_layout.py` 退出码：0 = 无阻塞项，1 = 有阻塞项，2 = 读不到规格。
 
-**元素落笔（真的写出 `.excalidraw` 文件）还没落地。** 在那之前，本 skill 只做到
-“规格写对 + 尺寸算对 + 布局算对并校验过”—— 能告诉你图长什么样，但还不能交图。
+## 输出格式：`.excalidraw`（plain JSON）
+
+**不是 `.excalidraw.md`。** 后者的场景是 **lz-string** 压缩的（实测插件 `main.js` 里 24 处
+`LZString`、`compressToBase64`），而 lz-string **没有 stdlib Python 等价物** —— 用它就得手抄
+一份 JS 压缩算法或者引依赖。`*.excalidraw` 是普通 JSON，插件原生读写（同目录的
+`my-obsidian-library.excalidrawlib` 就是 plain JSON）。
+
+同一份规格每次生成的字节相同（seed 由元素 id 的 sha256 推出，不用随机数），所以图能进 git、diff 有意义。
+
+## ⚠ 一处必须知道的限制：Excalidraw 会自己重新排版文字
+
+`text_metrics` 算出的尺寸是我们对“文字占多大”的**推算**（CJK 1.00 em / Latin 0.56 em）。
+而容器绑定的文字（`containerId`）在 Excalidraw 里是**由它自己按真实字体重新断行**的 ——
+**渲染器是第二个尺寸来源，而且不在我们控制之内。**
+
+如果它的断行跟我们算的不一样（多出一行），Excalidraw 会把容器撑高，布局随之偏移。
+这不是猜测出来的隐患，是“同一份文字在两套字体度量下必然有偏差”的结果。
+
+**所以：规格与校验全绿不等于渲染出来就是那样。** 详见 `references/validation.md` 第六节。
 
 ## 引用文件
 

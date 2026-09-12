@@ -92,7 +92,12 @@ def size_class_for(units: float) -> tuple[str, float]:
 def _tokens(line: str) -> list[str]:
     """切成断点之间的小块：全角每字一块，拉丁按空白切词（词内不断）。
 
-    拉丁词保留**前导空格**，这样重新拼接时不必特殊处理；行首的空格会被去掉。
+    拉丁词与全角字符都保留**前导空格**，这样重新拼接时不必特殊处理；
+    行首的空格由 `wrap` 去掉。
+
+    全角那一支曾漏掉这个空格：“Web 前端” 里的空格会在词与中文的交界处被吃掉，
+    于是出图上的文字和规格里的 label 不一致 —— 而“脚本忠实地把结构画出来”
+    正是这个 skill 的前提，静默吞字符不算“忠实”。
     """
     toks: list[str] = []
     buf: list[str] = []
@@ -102,7 +107,7 @@ def _tokens(line: str) -> list[str]:
             if buf:
                 toks.append("".join(buf))
                 buf = []
-            toks.append(ch)
+            toks.append((" " if pending_space else "") + ch)
             pending_space = False
         elif ch.isspace():
             if buf:
