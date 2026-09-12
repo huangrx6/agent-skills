@@ -3,20 +3,20 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "我刚改完内部系统A运营分析页面的筛选条件和后端统计口径，顺手把本周发版文档也补一下。前端涉及 web-console 的日志页面，后端涉及 admin-console 的 usage_metrics 和 overview_stats 接口，SQL 有 metrics_v1.sql。",
-      "expected_output": "执行强制启动清单（读 PKB 的 vault-map.md 与 writing-conventions.md，再做单层探查）。探查 02 Areas 发现为空，因此不写入历史路径 02 Areas/客户X/...。告知用户历史路径已不存在，并询问记录该放哪，等确认后再写。只记录已落地的事实，不编造密钥。",
+      "prompt": "我刚改完内部系统 A 的运营分析页面筛选条件和后端统计口径，顺手把本周发版文档也补一下。前端涉及 web-console 的日志页面，后端涉及 admin-console 的 usage_metrics 和 overview_stats 接口，SQL 有 metrics_v1.sql。",
+      "expected_output": "执行强制启动清单（读 PKB 的 vault-map.md 与 writing-conventions.md，再做单层探查）。探查 02 Areas 发现为空，因此不写入任何记忆中的旧领域路径。告知用户历史路径已不存在，并询问记录该放哪，等确认后再写。只记录已落地的事实，不编造密钥。",
       "files": []
     },
     {
       "id": 2,
-      "prompt": "这次只是讨论了下 内部系统B后续可能怎么做，还没定方案，也没改代码。你帮我看看要不要记知识库。",
+      "prompt": "这次只是讨论了下内部系统 B 后续可能怎么做，还没定方案，也没改代码。你帮我看看要不要记知识库。",
       "expected_output": "不创建发版笔记或长期项目笔记。说明未接受、未实施的猜想不应记录，除非有已确认的决定、可复用的约束或明确的下一步动作。",
       "files": []
     },
     {
       "id": 3,
-      "prompt": "今天发布内部系统A：打包 h5_bundle、admin dist、admin-console app，上传到内网主机的 /srv/release，解压后复制 .env.production，然后执行 admin-console/scripts/docker-restart.sh -e prod -s app，前端重启 web-service。把这些落实到本周发版文档里。",
-      "expected_output": "先执行启动清单与探查。由于 02 Areas 下没有匹配目录，询问用户发版笔记该放哪，而不是写进历史客户X路径。位置确认后，用 references/release-note-template.md 的结构写周发版笔记，包含打包、上传、解压、配置拷贝、后端重启、前端重启、验证与回滚。",
+      "prompt": "今天发布内部系统 A：打包 h5_bundle、admin dist、admin-console app，上传到内网主机的 /srv/release，解压后复制 .env.production，然后执行 admin-console/scripts/docker-restart.sh -e prod -s app，前端重启 web-service。把这些落实到本周发版文档里。",
+      "expected_output": "先执行启动清单与探查。由于 02 Areas 下没有匹配目录，询问用户发版笔记该放哪，而不是写进任何记忆中的旧路径。位置确认后，用 references/release-note-template.md 的结构写周发版笔记，包含打包、上传、解压、配置拷贝、后端重启、前端重启、验证与回滚。",
       "files": []
     },
     {
@@ -33,14 +33,14 @@
     },
     {
       "id": 6,
-      "prompt": "我把 某文档解析服务 文档解析服务的本地回归测试跑通了，新建了 tests/regression/ 下的 5 个用例，跑法是 make regression，依赖 Python 3.12 和本地装好的 docflux 包。记一下。",
-      "expected_output": "跨领域验证（非客户X项目）：执行启动清单后探查 01 Projects，找到 02 某项目/ 并把内容写在那里，而不是任何客户X路径。应用 landed points 过滤器，只记已落地事实（用例目录、命令、依赖版本），不记原始对话。因为不涉及发版，不创建周发版笔记。",
+      "prompt": "我把某文档解析服务的本地回归测试跑通了，新建了 tests/regression/ 下的 5 个用例，跑法是 make regression，依赖 Python 3.12 和本地装好的解析包。记一下。",
+      "expected_output": "跨领域验证（与任何特定客户或系统无关）：执行启动清单后探查 01 Projects，找到与该项目对应的目录并把内容写在那里，而不是写入任何记忆中的领域路径。应用 landed points 过滤器，只记已落地事实（用例目录、命令、依赖版本），不记原始对话。因为不涉及发版，不创建周发版笔记。",
       "files": []
     },
     {
       "id": 7,
       "prompt": "开源项目 v2.3.0 发布了：打了 tag v2.3.0，构建产物传到 GitHub Release，更新了 CHANGELOG 和 npm 包。写成发版记录。",
-      "expected_output": "跨领域验证（非平台运维场景）：执行启动清单并探查。找不到匹配的 Areas 目录时，询问用户这个开源项目的记录应放哪（01 Projects 下的项目目录？03 Resources？），等确认后再写。确认位置后用 release-note-template 的结构记录，但不套用客户X运维特有的字段假设（如 SQL 脚本、Nginx 配置、内网主机）。",
+      "expected_output": "跨领域验证（非平台运维场景）：执行启动清单并探查。找不到匹配的 Areas 目录时，询问用户这个开源项目的记录应放哪（01 Projects 下的项目目录？03 Resources？），等确认后再写。确认位置后用 release-note-template 的结构记录，但不套用平台运维特有的字段假设（如 SQL 脚本、Nginx 配置、内网主机）。",
       "files": []
     }
   ]

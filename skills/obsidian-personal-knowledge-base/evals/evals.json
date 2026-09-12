@@ -4,13 +4,13 @@
     {
       "id": 1,
       "prompt": "帮我看看 01 Projects 下现在有哪些项目，然后更新项目区索引。",
-      "expected_output": "对 01 Projects 做单层探查，拿真实目录作为结论依据，而不是引用 vault-map.md 的记载。如果真实结构与 vault-map.md 的「当前 Projects 结构」不符，以文件系统为准，向用户报告漂移，并按 vault-map.md 的「漂移记录」给该段 +1。更新索引时列出真实存在的项目，不列文档里记的。",
+      "expected_output": "对 01 Projects 做单层探查，拿真实目录作为结论依据，而不是引用 vault-map.md 的记载。如果真实结构与 vault-map.md 的记录不符，以文件系统为准，向用户报告漂移，并按 vault-map.md 的「漂移记录」给该段 +1。更新索引时列出真实存在的项目，不列文档里记的。",
       "files": []
     },
     {
       "id": 2,
-      "prompt": "帮我在 02 Areas 下建一个客户X领域的记录，把内部系统A的部署信息整理进去。",
-      "expected_output": "加载 vault-map.md 与 writing-conventions.md，先探查 02 Areas，发现它为空、没有「客户X」目录。不往 02 Areas/客户X/ 写任何东西（那是已不存在的历史路径）。告知用户该目录不存在，并询问是否新建领域、建在哪，等确认后再动手。",
+      "prompt": "帮我在 02 Areas 下建一个某领域的新记录，把一组部署信息整理进去。",
+      "expected_output": "加载 vault-map.md 与 writing-conventions.md，先探查 02 Areas，发现它为空、没有该领域目录。不往任何记忆中的旧领域路径写东西。告知用户该目录不存在，并询问是否新建领域、建在哪，等确认后再动手。",
       "files": []
     },
     {

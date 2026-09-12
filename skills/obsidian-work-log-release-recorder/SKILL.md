@@ -77,11 +77,11 @@ For this skill, resolve paths by **probing**, not from memory.
 3. If the intended directory does not exist, **ask the user where to create it** — do not write into a non-existent path.
 4. Update the nearest MOC/index after creating a new durable note.
 
-### Common scenario: AsiaInfo / 内部系统A operations
+### Common scenario：部署与运维类发布
 
-Release and operations work for 内部系统A (deployment, server paths, package movement, Docker restart, FastAPI backend release, H5/admin frontend release) historically lived at `02 Areas/客户X/03 内部系统A/`.
+部署与运维类的发布工作（打包、上传、解压、配置拷贝、容器重启、前后端分开发布）在 vault 里通常归属于某个 `02 Areas/<领域>/<子主题>/` 目录。
 
-> ⚠️ **As of 2026-09-11 that directory does not exist — `02 Areas/` is empty.** Probe first; if no matching area exists, tell the user the historical path is gone and ask where the notes should live before creating anything.
+> ⚠️ 这类目录当前不存在 —— `02 Areas/` 是空的。**先探查**；没有匹配领域时，告知用户历史路径已不在，并问清记录该放哪再动手。不要写入任何记忆中的旧路径，也不要假定某类项目一定有对应 Area。
 
 ## Weekly Release Note
 
