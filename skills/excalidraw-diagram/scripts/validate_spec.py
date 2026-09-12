@@ -34,8 +34,8 @@ import sys
 # 让"顺手加一个"变得有摩擦。
 TOP_FIELDS = {"type", "title", "direction", "detail", "groups", "nodes", "edges"}
 GROUP_FIELDS = {"id", "label", "description"}
-NODE_FIELDS = {"id", "label", "kind", "shape", "emphasis", "group", "detail",
-               "rank", "pin"}
+NODE_FIELDS = {"id", "label", "kind", "shape", "emphasis", "icon", "group",
+               "detail", "rank", "pin"}
 EDGE_FIELDS = {"id", "from", "to", "label", "kind"}
 
 DIAGRAM_TYPES = {"architecture", "flow", "state", "dependency", "mindmap", "network"}
@@ -199,6 +199,13 @@ def validate(spec: dict) -> Issues:
             # 同 kind / shape 一条原则：不 fallback。
             issues.error("UNKNOWN_EMPHASIS", f"{where}.emphasis",
                          f"未知 emphasis {emphasis!r}；允许的取值：{sorted(EMPHASIS)}")
+
+        icon = n.get("icon")
+        if icon is not None and (not isinstance(icon, str) or not icon.strip()):
+            # 只查"是个非空字符串" —— 素材库里有没有这个名字，要到出图时才知道
+            # （那里才有库）。库没给却指定了图标，emit 会明确报错，不静默忽略。
+            issues.error("BAD_ICON", f"{where}.icon",
+                         "icon 必须是素材库里的项名（非空字符串）")
 
         grp = n.get("group")
         if grp is not None and grp not in group_ids:

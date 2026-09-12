@@ -82,6 +82,26 @@ element_bounds = _EMIT.element_bounds
 scene_bounds = _EMIT.scene_bounds
 
 
+def _colour(value: Any, fallback: Any = None) -> Any:
+    """把 Excalidraw 的特殊颜色值换成 PIL 能认的。
+
+    素材库里的元素大量使用 `transparent`（背景）和 `currentColor`（描边跟随文字色），
+    而 PIL 只认 CSS 颜色名与 #RRGGBB —— 直接传会抛 `unknown color specifier`。
+
+    实测踩过：带图标的图让预览**直接崩掉**，而这之前它只是"画不出来不吭声"。
+    两种都不能要：前者看不见图，后者看着一张残图下结论。
+    """
+    if value is None:
+        return fallback
+    if not isinstance(value, str):
+        return fallback
+    if value in ("transparent", "none", ""):
+        return None
+    if value == "currentColor":
+        return fallback
+    return value
+
+
 def _px(value: Any) -> int:
     """把算出来的浮点尺寸收成正整数像素。
 
@@ -158,14 +178,16 @@ def render(scene: dict, out_path: str, scale: float = 1.0, pad: float = 40.0) ->
             if isinstance(ratio, (int, float)):
                 radius = e["height"] * ratio * scale
         draw.rounded_rectangle([x0, y0, x1, y1], radius=radius,
-                               fill=e["backgroundColor"], outline=e["strokeColor"],
+                               fill=_colour(e.get("backgroundColor")),
+                               outline=_colour(e.get("strokeColor"), "#666666"),
                                width=_px(2 * scale))
 
     for e in ellipses:
         x0, y0 = to_px(e["x"], e["y"])
         x1, y1 = to_px(e["x"] + e["width"], e["y"] + e["height"])
-        draw.ellipse([x0, y0, x1, y1], fill=e["backgroundColor"],
-                     outline=e["strokeColor"], width=_px(2 * scale))
+        draw.ellipse([x0, y0, x1, y1], fill=_colour(e.get("backgroundColor")),
+                     outline=_colour(e.get("strokeColor"), "#666666"),
+                     width=_px(2 * scale))
 
     for e in diamonds:
         cx0, cy0 = to_px(e["x"] + e["width"] / 2, e["y"])
@@ -173,7 +195,8 @@ def render(scene: dict, out_path: str, scale: float = 1.0, pad: float = 40.0) ->
         cx2, cy2 = to_px(e["x"] + e["width"] / 2, e["y"] + e["height"])
         cx3, cy3 = to_px(e["x"], e["y"] + e["height"] / 2)
         draw.polygon([cx0, cy0, cx1, cy1, cx2, cy2, cx3, cy3],
-                     fill=e["backgroundColor"], outline=e["strokeColor"],
+                     fill=_colour(e.get("backgroundColor")),
+                     outline=_colour(e.get("strokeColor"), "#666666"),
                      width=_px(2 * scale))
 
     for e in arrows:
@@ -183,11 +206,13 @@ def render(scene: dict, out_path: str, scale: float = 1.0, pad: float = 40.0) ->
         lw = _px(2 * scale)
         if e.get("strokeStyle") == "dashed":
             for a, b in zip(pts, pts[1:]):
-                _dashed_line(draw, a, b, e["strokeColor"], lw)
+                _dashed_line(draw, a, b, _colour(e.get("strokeColor"), "#666666"), lw)
         else:
-            draw.line(pts, fill=e["strokeColor"], width=lw, joint="curve")
+            draw.line(pts, fill=_colour(e.get("strokeColor"), "#666666"),
+                      width=lw, joint="curve")
         if e.get("endArrowhead"):
-            _arrow_head(draw, pts[-2], pts[-1], e["strokeColor"], scale)
+            _arrow_head(draw, pts[-2], pts[-1],
+                        _colour(e.get("strokeColor"), "#666666"), scale)
 
     for e in texts:
         f = font_for(e["fontSize"])
@@ -200,10 +225,12 @@ def render(scene: dict, out_path: str, scale: float = 1.0, pad: float = 40.0) ->
             if centered:
                 draw.text(to_px(e["x"] + e["width"] / 2,
                                 e["y"] + e["fontSize"] * line_height * (i + 0.5)),
-                          line, font=f, fill=e["strokeColor"], anchor="mm")
+                          line, font=f, fill=_colour(e.get("strokeColor"), "#333333"),
+                          anchor="mm")
             else:
                 draw.text(to_px(e["x"], e["y"] + e["fontSize"] * line_height * i),
-                          line, font=f, fill=e["strokeColor"], anchor="la")
+                          line, font=f, fill=_colour(e.get("strokeColor"), "#333333"),
+                          anchor="la")
 
     img.save(out_path)
     if skipped:

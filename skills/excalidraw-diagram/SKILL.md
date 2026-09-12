@@ -147,6 +147,7 @@ python3 dev-tools/preview.py x.excalidraw out.png
 - `references/visual-design.md`：视觉设计规范 —— 总原则（不追求统一颜色，而追求统一审美）、"好看/大气" 这类不可机械校验项与可校验项的**分界**，以及实测出来的 9 条问题清单。
 - `references/diagram-spec.md`：内容层契约 —— 允许写什么、刻意不存在的字段、`kind` 封闭枚举与色板、尺寸档位与字号。
 - `references/validation.md`：五项校验的阈值与级别、自动调参循环的细节、报告该说什么。
+- `references/icons.md`：图标/素材库 —— 怎么查、按语义怎么选、怎么写进规格，以及它为什么是第一个**外部尺寸来源**。
 
 ## 与 PKB 的关系
 

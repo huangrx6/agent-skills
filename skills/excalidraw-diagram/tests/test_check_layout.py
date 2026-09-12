@@ -401,6 +401,27 @@ class TestSizeSourcePremise(unittest.TestCase):
                 self.assertAlmostEqual(fresh.width, box.text.width, places=6,
                                        msg="盒子里的文字不再是现量出来的")
 
+    def test_icon_adds_an_external_term_to_the_chain(self):
+        """图标是**第一个外部尺寸来源**（宽高来自 .excalidrawlib 文件）。
+
+        这条不是"再确认一遍尺寸链"，而是把这个新项**写进前提里**：
+        盒子 = 形状包围盒 + 图标宽 + 间隙。哪一步变了，这里会响。
+        """
+        spec = {"type": "flow", "direction": "TB",
+                "nodes": [{"id": "a", "kind": "service", "label": "订单服务",
+                           "icon": "Some Icon"}]}
+        # 对照组不带 icon 字段 —— 否则两边都含保守占位，量不出图标的贡献
+        bare = {"type": "flow", "direction": "TB",
+                "nodes": [{"id": "a", "kind": "service", "label": "订单服务"}]}
+        plain = L.boxes_from_spec(bare)["a"]
+        sized = L.boxes_from_spec(spec, {"a": (40.0, 22.0)})["a"]
+        self.assertAlmostEqual(plain.width + 40.0 + L.ICON_GAP, sized.width, places=6)
+        self.assertGreaterEqual(sized.height, 22.0,
+                                "盒子不能比图标还矮，否则图标会溢出来")
+        # 没有尺寸表时也要留出保守的占位 —— 宁可多留白，也不能盖住文字
+        fallback = L.boxes_from_spec(spec, {"a": (0.0, 0.0)})["a"]
+        self.assertGreater(fallback.width, plain.width)
+
     def test_shape_actually_changes_the_geometry(self):
         """形状不改变几何的话，"形状"就只是换了个 type 字段，没有意义。
 

@@ -78,6 +78,7 @@ L = _load_sibling("layout")
 palette = _load_sibling("palette")
 tm = _load_sibling("text_metrics")
 shapes = _load_sibling("shapes")
+icons = _load_sibling("icons")
 
 
 def _stable_int(key: str, salt: str = "") -> int:
@@ -132,7 +133,8 @@ def _base(el_id: str, el_type: str, x: float, y: float, w: float, h: float,
 
 # ── 节点：矩形 + 容器绑定的文字 ─────────────────────────────
 def node_elements(node: dict, placed, box, arrows_out: list[str],
-                    arrows_in: list[str]) -> list[dict]:
+                    arrows_in: list[str], icon_src: list | None = None,
+                    icon_height: float | None = None) -> list[dict]:
     nid = node["id"]
     shape_id = _eid("node", nid)
     title_id = _eid("title", nid)
@@ -162,7 +164,23 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
     detail_h = len(text.detail_lines) * tm.FONT_DETAIL * tm.LINE_HEIGHT
     top = inner_y + (inner_h - (title_h + detail_h)) / 2.0
     content_w = text.break_units * tm.FONT_NODE
-    tx = placed.x + (placed.width - content_w) / 2.0    # 形状内水平居中
+
+    # 图标（可选）放左侧，文字在它右边那块区域里居中。
+    # 文字**不再在整个盒子里居中** —— 盒子已经为图标加宽过（layout.boxes_from_spec），
+    # 这里必须把加出来的那部分让给图标，否则两者会叠在一起。
+    icon_w = 0.0
+    if icon_src:
+        height = icon_height if icon_height else icons.ICON_HEIGHT
+        scale = icons.fit_scale(icon_src, height)
+        icon_w = icons.intrinsic_size(icon_src)[0] * scale
+        elements += icons.place(icon_src,
+                                placed.x + tm.PADDING_X,
+                                inner_y + (inner_h - height) / 2.0,
+                                key=_eid("icon", nid), target_height=height)
+    gap = (layout_gap() if icon_w else 0.0)
+    left = placed.x + tm.PADDING_X + icon_w + gap
+    right = placed.x + placed.width - tm.PADDING_X
+    tx = left + max(0.0, (right - left - content_w) / 2.0)
 
     elements.append(_text_block(title_id, shape_id, text.lines, tx, top,
                                 content_w, tm.FONT_NODE))
@@ -170,6 +188,11 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
         elements.append(_text_block(detail_id, shape_id, text.detail_lines, tx,
                                     top + title_h, content_w, tm.FONT_DETAIL))
     return elements
+
+
+def layout_gap() -> float:
+    """图标与文字之间留的空隙。**单一来源**：布局算盒子宽度时用的是同一个数。"""
+    return L.ICON_GAP
 
 
 def text_band(shape_name: str, placed) -> tuple[float, float]:
@@ -551,7 +574,8 @@ def title_element(title: str | None) -> dict | None:
     }
 
 
-def build_scene(spec: dict, result, boxes: dict) -> dict:
+def build_scene(spec: dict, result, boxes: dict,
+                icon_lookup=None, icon_height: float | None = None) -> dict:
     elements: list[dict] = []
     by_id = {n["id"]: n for n in spec.get("nodes", [])}
 
@@ -568,8 +592,18 @@ def build_scene(spec: dict, result, boxes: dict) -> dict:
         placed = result.placed.get(nid)
         if placed is None:
             continue
-        elements += node_elements(by_id[nid], placed, boxes[nid],
-                                  arrows_out.get(nid, []), arrows_in.get(nid, []))
+        icon_src = None
+        if icon_lookup is not None and by_id[nid].get("icon"):
+            icon_src = icon_lookup(by_id[nid]["icon"])
+        if icon_src:
+            # 图标里的元素挂同一个 groupId；`boundElements` 只绑定**主体**那个元素，
+            # 否则 Excalidraw 里拖动时会连图标一起拖走（图标是装饰，不该跟着动）。
+            elements += node_elements(by_id[nid], placed, boxes[nid],
+                                      arrows_out.get(nid, []), arrows_in.get(nid, []),
+                                      icon_src=icon_src, icon_height=icon_height)
+        else:
+            elements += node_elements(by_id[nid], placed, boxes[nid],
+                                      arrows_out.get(nid, []), arrows_in.get(nid, []))
 
     # `result.edges` 里的 points **已经是绝对坐标**（`layout._points` 用的是 placed 的坐标），
     # 所以这里直接用，**不能再加一遍起点**。
@@ -620,7 +654,74 @@ class SpecError(ValueError):
     """
 
 
-def emit(spec: dict, *, params=None) -> tuple[dict, Any, Any, list]:
+def load_icons(spec: dict, library_path: str | None = None,
+               icon_height: float | None = None):
+    """把规格里用到的图标从素材库取出来。**一个都不要就完全不碰文件。**
+
+    返回 `(lookup, sizes)`：
+      - `lookup(name)` → 那一项的元素数组
+      - `sizes` → `{node_id: (宽, 高)}`，给布局算盒子用
+
+    名字不存在时**判失败不 fallback** —— 静默换一个图标，看图的人根本不知道
+    原本想要的是什么（与 `kind` / `shape` / `emphasis` 同一条规矩）。
+    """
+    wanted = {n["icon"] for n in spec.get("nodes", []) if n.get("icon")}
+    if not wanted:
+        return None, {}
+
+    path, source = icons.library_path(library_path)
+    if not path:
+        raise icons.LibraryError(
+            f"规格里有节点指定了图标，但没找到素材库（{source}）。"
+            f"用 --library 指定，或写一行路径到 ~/.config/excalidraw-library-path")
+    library = icons.load(path)
+
+    lookup = {}
+    sizes = {}
+    for name in sorted(wanted):
+        elements = icons.resolve(library, name)      # 找不到会抛错并列出可用名字
+        lookup[name] = elements
+    for node in spec.get("nodes", []):
+        name = node.get("icon")
+        if not name:
+            continue
+        elements = lookup[name]
+        scale = icons.fit_scale(elements, icon_height or icons.ICON_HEIGHT)
+        width, height = icons.intrinsic_size(elements)
+        sizes[node["id"]] = (width * scale, height * scale)
+    return lookup, sizes
+
+
+def icon_readability_issues(spec: dict, lookup: dict,
+                            icon_height: float | None = None) -> list:
+    """图标自带的文字缩到目标高度后看不清 —— 是**选型问题**，不是布局问题。
+
+    实测：vault 里那个素材库是厂商**示意图**集合（图形 + 自带标签），缩到节点里
+    当图标用，标签会变成 2px 噪点。图长得没错，是素材选错了。
+    这件事只有拿到素材库才知道，所以只能在这里报。
+    """
+    if not lookup:
+        return []
+    out = []
+    for node in spec.get("nodes", []):
+        name = node.get("icon")
+        if not name:
+            continue
+        got = icons.readability(lookup[name], icon_height or icons.ICON_HEIGHT)
+        if got is None:
+            continue
+        smallest, _scale = got
+        if smallest < icons.MIN_LEGIBLE_PT:
+            out.append(_check_layout().Issue(
+                "icon", False, node["id"],
+                f"图标 {name!r} 自带的文字缩到 {smallest:.1f}px，看不清",
+                advice="这个素材是带文字的示意图、不是单图形图标：换一个更简单的，"
+                       "或把图标高度调大。"))
+    return out
+
+
+def emit(spec: dict, *, params=None, library: str | None = None,
+         icon_height: float | None = None) -> tuple[dict, Any, Any, list]:
     """跑完整条流水线并返回场景。**校验有阻塞项就不出图。**
 
     顺序刻意是 validate → layout → check → emit：出图是最后一步，
@@ -633,11 +734,18 @@ def emit(spec: dict, *, params=None) -> tuple[dict, Any, Any, list]:
                            for e in report.errors)
         raise SpecError(f"规格不通过，没有出图：\n{detail}")
 
-    boxes = L.boxes_from_spec(spec)
+    # 图标必须在算盒子**之前**解析出来 —— 它会影响节点尺寸（第一个外部尺寸来源）
+    lookup, icon_sizes = load_icons(spec, library, icon_height)
+    boxes = L.boxes_from_spec(spec, icon_sizes)
     result, outcome, attempts = _check_layout().layout_with_retry(spec, boxes, params)
+    extra = icon_readability_issues(spec, lookup or {}, icon_height)
+    if extra:
+        outcome = _check_layout().Outcome(issues=[*outcome.issues, *extra])
     if outcome.blocking:
         return {}, result, outcome, attempts
-    return build_scene(spec, result, boxes), result, outcome, attempts
+    icon_lookup = (lambda name: lookup.get(name)) if lookup else None
+    return (build_scene(spec, result, boxes, icon_lookup, icon_height),
+            result, outcome, attempts)
 
 
 def _check_layout():
@@ -649,6 +757,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("spec", help="*.diagram.json")
     ap.add_argument("-o", "--out", help="输出路径（默认与规格同名，后缀 .excalidraw）")
     ap.add_argument("--stdout", action="store_true", help="打到标准输出，不写文件")
+    ap.add_argument("--library", help="*.excalidrawlib（规格里用到 icon 时才需要）")
+    ap.add_argument("--icon-height", type=float,
+                    help="图标缩放到多高（默认 %(default)s；素材自带文字看不清时会提示）")
     args = ap.parse_args(argv)
 
     try:
@@ -659,7 +770,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     try:
-        scene, result, outcome, attempts = emit(spec)
+        scene, result, outcome, attempts = emit(spec, library=args.library,
+                                                icon_height=args.icon_height)
     except SpecError as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -668,6 +780,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     except KeyError as exc:
         print(f"规格里有个值不认识：{exc}", file=sys.stderr)
+        return 1
+    except icons.LibraryError as exc:
+        print(f"图标素材库：{exc}", file=sys.stderr)
         return 1
 
     if not scene:

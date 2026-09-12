@@ -83,6 +83,12 @@ PARAM_LIMIT: dict[str, float] = {
     "barycenterRounds": 12.0,
 }
 DUMMY_PREFIX = "__dummy_"
+# ── 图标占位（有 `icon` 字段的节点）────────────────────────
+# 图标缩放到 `icons.ICON_HEIGHT` 高，宽度随素材比例变。这两个数是当**尺寸拿不到时**
+# 的保守占位（宁可多留白，也不能让图标盖住文字），以及上下留的空隙。
+ICON_RESERVE = 30.0
+ICON_GAP = 10.0
+ICON_VERTICAL_PAD = 6.0
 
 # ── 绕行：连线不许穿过别的节点（P2 / P10）────────────────────
 #
@@ -857,20 +863,34 @@ class NodeBox:
     text: Any          # text_metrics.TextBox
 
 
-def boxes_from_spec(spec: dict) -> dict[str, Any]:
+def boxes_from_spec(spec: dict, icon_sizes: dict | None = None) -> dict[str, Any]:
     """由文字 + 形状反推每个节点的尺寸。**尺寸不由模型给。**
 
-    尺寸链：文字 → text_metrics.measure（断行、容器宽高）→ shapes.box_for（形状包围盒）。
-    两者都由本 skill 自己算，所以“尺寸只有一个来源”这个前提仍然成立 ——
-    只是从一个来源变成了两个步骤（详见 references/validation.md 第六节）。
+    尺寸链：文字 → `text_metrics.measure` → `shapes.box_for` → （有图标时）为图标加宽。
+
+    `icon_sizes` 是 `{node_id: (宽, 高)}`，由调用方从**素材库**里量好传进来
+    （图标是缩放到固定高度的，所以这里只需要尺寸，不需要库本身 —— 布局不该知道
+    “素材库”这个概念）。
+
+    ⚠ 这是**第一个外部尺寸来源**：前面的每一步都是我们自己算的，而图标的宽高
+    来自那个 `.excalidrawlib` 文件。所以 `references/validation.md` 第六节里
+    “尺寸只有一个来源”那条前提从这一版起不再成立 —— 已按约定先改文档，
+    再改 `TestSizeSourcePremise`（它先失败，那就是流程在起作用）。
     """
     tm = load_sibling("text_metrics")
     sh = load_sibling("shapes")
+    sizes = icon_sizes or {}
     out: dict[str, NodeBox] = {}
     for n in spec.get("nodes", []):
         text = tm.measure(n.get("label", ""), n.get("detail", ""))
         shape = sh.resolve(n)
         width, height = sh.box_for(shape, text.width, text.height)
+        if n.get("icon"):
+            # 图标放左边，文字排在它右边（见 emit 的 node_elements）。
+            # 拿不到尺寸就用一个保守的占位 —— 宁可多留白，也不能让图标盖住文字。
+            icon_w, icon_h = sizes.get(n["id"], (0.0, 0.0))
+            width += (icon_w or ICON_RESERVE) + ICON_GAP
+            height = max(height, icon_h + 2 * ICON_VERTICAL_PAD)
         out[n["id"]] = NodeBox(id=n["id"], shape=shape, width=width,
                                 height=height, text=text)
     return out
