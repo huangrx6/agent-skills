@@ -49,6 +49,7 @@ def _load(name: str, path: str):
 
 STATE = _load("git_state", os.path.join(SCRIPTS, "git_state.py"))
 GUARD = _load("git_guard", os.path.join(SCRIPTS, "git_guard.py"))
+WORKTREE = _load("worktree", os.path.join(SCRIPTS, "worktree.py"))
 
 
 # ── 夹具 ──────────────────────────────────────────────────────────────────
@@ -440,6 +441,129 @@ class TestUnknownAction(RepoCase):
         code, verdict = self.guard("git-reset-please")
         self.assertEqual(GUARD.BLOCK, code)
         self.assertIn("clean-untracked", verdict["reasons"][0])
+
+
+# ── worktree ──────────────────────────────────────────────────────────
+class WorktreeCase(RepoCase):
+    def cli(self, *argv: str) -> tuple[int, str]:
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
+            code = WORKTREE.main([*argv, "--repo", self.repo.path])
+        return code, buffer.getvalue()
+
+    def beside(self, branch: str) -> str:
+        return WORKTREE.target_path(self.repo.path, branch)
+
+
+class TestWorktreePlacement(WorktreeCase):
+    def test_create_puts_it_beside_the_repo(self):
+        """放置约定（已拍板）：**仓库同级**。
+
+        这条用例是那个约定的看门人 —— 换位置就得改这里，而改的时候会看到为什么：
+        同级意味着在仓库之外，不用改 .gitignore、`git status` 也看不见它。
+        """
+        self.repo.commit("一")
+        target = self.beside("feat/x")
+        self.addCleanup(shutil.rmtree, target, ignore_errors=True)
+        code, output = self.cli("create", "feat/x")
+        self.assertEqual(0, code, output)
+        self.assertTrue(os.path.isdir(target))
+        self.assertEqual(os.path.dirname(os.path.abspath(self.repo.path)),
+                         os.path.dirname(target))
+        self.assertEqual("feat/x", WORKTREE.S.run_git(
+            target, "branch", "--show-current")[1].strip())
+
+    def test_slug_flattens_slashes(self):
+        self.assertEqual("feat-ui-shadcn", WORKTREE.slug_for("feat/ui-shadcn"))
+        self.assertEqual("hotfix-1", WORKTREE.slug_for("hotfix/1"))
+        self.assertTrue(WORKTREE.slug_for("///"), "极端输入也要出一个能当目录名的结果")
+
+    def test_create_refuses_when_the_branch_exists(self):
+        self.repo.commit("一")
+        self.repo.git("branch", "feat/x")
+        code, output = self.cli("create", "feat/x")
+        self.assertEqual(1, code)
+        self.assertIn("已经有分支", output)
+
+    def test_create_refuses_when_the_target_exists(self):
+        self.repo.commit("一")
+        target = self.beside("feat/x")
+        os.makedirs(target, exist_ok=True)
+        self.addCleanup(shutil.rmtree, target, ignore_errors=True)
+        code, output = self.cli("create", "feat/x")
+        self.assertEqual(1, code)
+        self.assertIn("已经存在", output)
+
+    def test_create_refuses_when_the_sibling_is_inside_another_repo(self):
+        """同级目录落在**另一个**仓库里的话，那个仓库会把新目录当成未跟踪内容收进去。"""
+        outer = tempfile.mkdtemp(prefix="gitdev-outer-")
+        self.addCleanup(shutil.rmtree, outer, ignore_errors=True)
+        subprocess.run(["git", "init", "-b", "main", outer],
+                       capture_output=True, text=True, check=True)
+        inner = os.path.join(outer, "inner")
+        subprocess.run(["git", "init", "-b", "main", inner],
+                       capture_output=True, text=True, check=True)
+        clone = Repo(inner)
+        clone.git("commit", "--allow-empty", "-m", "一")
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
+            code = WORKTREE.main(["create", "feat/x", "--repo", inner])
+        self.assertEqual(1, code)
+        self.assertIn("另一个 git 仓库", buffer.getvalue())
+
+
+class TestWorktreeLifecycle(WorktreeCase):
+    def test_prune_clears_records_whose_directory_is_gone(self):
+        self.repo.commit("一")
+        self.cli("create", "feat/x")
+        shutil.rmtree(self.beside("feat/x"), ignore_errors=True)
+        self.assertEqual(2, len(STATE.snapshot(self.repo.path)["worktrees"]))
+        code, output = self.cli("prune")
+        self.assertEqual(0, code, output)
+        self.assertEqual(1, len(STATE.snapshot(self.repo.path)["worktrees"]))
+
+    def test_remove_refuses_while_there_are_uncommitted_changes(self):
+        self.repo.commit("一")
+        self.cli("create", "feat/x")
+        target = self.beside("feat/x")
+        self.addCleanup(shutil.rmtree, target, ignore_errors=True)
+        with open(os.path.join(target, "dirty.txt"), "w", encoding="utf-8") as handle:
+            handle.write("x\n")
+        code, output = self.cli("remove", target)
+        self.assertEqual(GUARD.BLOCK, code)
+        self.assertIn("只存在于那个目录里", output)   # 真正的损失是未提交的改动
+        self.assertTrue(os.path.isdir(target), "被拒绝时不许动它")
+
+    def test_remove_works_when_clean_and_merged(self):
+        self.repo.commit("一")
+        self.cli("create", "feat/x")
+        target = self.beside("feat/x")
+        code, output = self.cli("remove", target)
+        self.assertEqual(0, code, output)
+        self.assertFalse(os.path.isdir(target))
+        # 回收 worktree 不该顺手删分支 —— 那是另一件事，另一道判据
+        self.assertIn("feat/x", self.repo.git("branch", "--format=%(refname:short)"))
+
+    def test_repo_option_works_after_the_subcommand(self):
+        """回归：`--repo` 曾经只能写在子命令前面，写在后面会被 argparse 拒掉。
+
+        人两个位置都会写（我自己第一次就是这么跑的），所以两边都得认。
+        """
+        self.repo.commit("一")
+        code, output = self.cli("list")
+        self.assertEqual(0, code)
+        self.assertIn(self.repo.path, output)
+
+    def test_list_stale_hides_healthy_worktrees(self):
+        self.repo.commit("一")
+        self.cli("create", "feat/x")
+        target = self.beside("feat/x")
+        self.addCleanup(shutil.rmtree, target, ignore_errors=True)
+        with open(os.path.join(target, "dirty.txt"), "w", encoding="utf-8") as handle:
+            handle.write("x\n")
+        code, output = self.cli("list", "--stale")
+        self.assertEqual(0, code)
+        self.assertNotIn("feat/x", output, "有未提交的不算可回收")
 
 
 if __name__ == "__main__":

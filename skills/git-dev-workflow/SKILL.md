@@ -45,6 +45,7 @@ description: >-
 | `git_state.py` | 只读状态快照：分支 / 基线 / 工作区分类 / 上游与未推送 / worktree / stash / 子模块指针 / 中间态 / 钩子 | `0` 正常，`1` 不是仓库，`2` 中间态 |
 | `git_guard.py` | 八个不可逆动作的预检，输出「会丢什么 + 结论 + 确认则执行这一条」 | `0` SAFE，`3` WARN，`4` BLOCK |
 | `commit_style.py` | 按 Conventional Commits v1.0.0 的 16 条校验一条提交信息 | `0` 合规或不适用，`1` 有规范违规 |
+| `worktree.py` | 建 / 列 / 查 stale / prune / 回收 worktree；默认放**仓库同级** | `0` 成功，`1` 被拒，`3`/`4` 沿用 guard 的结论 |
 
 `git_guard.py` 认识的动作（`--list` 也能列）：
 
@@ -59,21 +60,27 @@ description: >-
 | `force-push` | 是不是基线分支；远端有没有本地没有的提交；拿不到远端状态就拦 |
 | `bypass-hooks` | 仓库装了钩子就一律拦 |
 
-## worktree 的三项前置
+## worktree：放同级，回收看两件事
 
-回收一个 worktree 之前，三项**都要**满足：**已并入基线** + **无未推送提交** + **无未提交改动**。
-目录已经不存在的那种不算 —— 那是 `git worktree prune` 的活。
+`worktree.py create` 默认把新 worktree 放在**仓库同级**（在仓库之外：不用改 `.gitignore`，
+`git status` 也看不见它）。
+
+回收的判据只有一件是硬的：**那个目录里有没有未提交改动**（有 → 拦 —— 未提交的内容只存在
+于那个目录里）。分支没并进基线只是**提醒**：`git worktree remove` 不删分支、不删提交，
+所以那不算数据丢失。目录已经被删掉的那种用 `prune`，不是 `remove`。
 
 ## 能力边界（当前实现到哪，别读成承诺）
 
-- **已实现**：`git_state.py`（R1）、`git_guard.py`（R2）、`commit_style.py`（R5）。
-- **还没实现**：worktree 建/列/回收的命令封装、提交分组建议、前后对照报告。**在做出来之前不要声称有这些能力。**
+- **已实现**：`git_state.py`（R1）、`git_guard.py`（R2）、`commit_style.py`（R5）、`worktree.py`。
+- **还没实现**：提交分组建议、前后对照报告。**在做出来之前不要声称有这些能力。**
 - **本 skill 不做**：PR / review / CI / 托管平台操作；一键批量删分支；拆到 hunk 级的提交拆分；自动改你的 git 配置（比如 `pull.rebase`）；绕过钩子；承诺"能救回所有误操作"。
 
 ## 参考
 
 - `references/commit-messages.md` —— 规范的 16 条逐条落地、本仓库的 type 表、
   **哪些是规范其实允许的**（`FEAT:` 不违规、其它 type 可以用）、中文怎么写。
+- `references/worktrees.md` —— 放哪（同级，含为什么）、命名、回收判据
+  （含**改过一次**的理由）、交给并行 agent 的用法、四个坑。
 
 ## 判据写在代码里，不写在文档里
 

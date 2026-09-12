@@ -329,6 +329,23 @@ def local_branches(repo: str, baseline: str = "") -> list[dict]:
     return out
 
 
+def same_path(first: str, second: str) -> bool:
+    """比较路径时**解析符号链接**。
+
+    macOS 上这是必须的：`tempfile` 给的 `/var/folders/...` 实际是
+    `/private/var/folders/...`，只比 abspath 会把同一个目录认成两个。
+    用例就是这么把它抓出来的：worktree 明明在清单里，却被判成「清单里没有这个路径」。
+    真实环境里同样会撞上（`/tmp`、symlink 过的家目录）。
+
+    **唯一实现**：worktree 清单、guard 的路径比对都用它。
+    （写这个脚本时先在 guard 里写了一份、又在 state 里写了一份 —— 两份必然漂移，已收回。）
+    """
+    try:
+        return os.path.realpath(first) == os.path.realpath(second)
+    except OSError:
+        return first == second
+
+
 def worktree_state(repo: str, known: dict | None = None) -> list[dict]:
     """worktree 清单。
 
@@ -362,7 +379,7 @@ def worktree_state(repo: str, known: dict | None = None) -> list[dict]:
             item["exists"] = is_dir(item["path"])
             if item["exists"]:
                 cached = next((v for k, v in known.items()
-                               if _same_path(k, item["path"])), None)
+                               if same_path(k, item["path"])), None)
                 if cached:
                     item["dirty"] = cached["dirty"]
                     item["unpushed"] = cached["unpushed"]
@@ -371,18 +388,6 @@ def worktree_state(repo: str, known: dict | None = None) -> list[dict]:
                     item["unpushed"] = unpushed(item["path"])["count"]
         out.append(item)
     return out
-
-
-def _same_path(first: str, second: str) -> bool:
-    """比较路径时**解析符号链接**。
-
-    macOS 上 `/var/folders/...` 实际是 `/private/var/folders/...`，只比 abspath 会把
-    同一个目录当成两个。（同样适用于 `/tmp`、symlink 过的家目录。）
-    """
-    try:
-        return os.path.realpath(first) == os.path.realpath(second)
-    except OSError:
-        return first == second
 
 
 def stash_state(repo: str) -> list[dict]:

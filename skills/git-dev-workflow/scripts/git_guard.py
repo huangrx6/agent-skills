@@ -130,20 +130,6 @@ def _describe(entries: list[dict], limit: int = 12) -> str:
     return f"{len(entries)} 项（{summary}）：{names}"
 
 
-def _same_path(first: str, second: str) -> bool:
-    """比较路径时**解析符号链接**。
-
-    macOS 上这是必须的：`tempfile` 给的 `/var/folders/...` 实际是
-    `/private/var/folders/...`，只比 abspath 会把同一个目录认成两个。
-    用例就是这么把它抓出来的：worktree 明明在清单里，却被判成「清单里没有这个路径」。
-    真实环境里同样会撞上（`/tmp`、symlink 过的家目录）。
-    """
-    try:
-        return os.path.realpath(first) == os.path.realpath(second)
-    except OSError:
-        return first == second
-
-
 def _tri(value: bool | None) -> str:
     """三态描述：True / False / None。
 
@@ -256,7 +242,7 @@ def guard_delete_branch(state: dict, name: str) -> Verdict:
 
 def guard_delete_worktree(state: dict, path: str) -> Verdict:
     target = os.path.realpath(path)
-    item = next((w for w in state["worktrees"] if _same_path(w["path"], target)), None)
+    item = next((w for w in state["worktrees"] if S.same_path(w["path"], target)), None)
     evidence = []
     if item is None:
         return Verdict(f"delete-worktree {path}", BLOCK,
@@ -270,17 +256,29 @@ def guard_delete_worktree(state: dict, path: str) -> Verdict:
     merged = S.merged_into(state["root"], item["branch"], baseline) if item["branch"] else None
     evidence.append(f"目录存在；未提交 {item['dirty']} 项；仅存在于本地的提交 {item['unpushed']} 条")
     evidence.append(f"是否已并入 {baseline or '(无基线)'}：{_tri(merged)}")
+
+    # 判据只有一条硬的：**那个目录里的未提交改动**。
+    #
+    # 原设计是「三项前置：已并入 / 无未推送 / 无未提交」。实测（用例断言过）表明
+    # `git worktree remove` **不删分支、不删提交** —— 它只拿掉工作目录和记录。
+    # 所以「无未推送」不是数据丢失条件：没有远端的仓库里它恒为真，会把回收卡死；
+    # 而它想防的「那份工作没人管了」是个提醒，不是损失。判据按事实改：
+    # 脏 → BLOCK（真丢），分支未并入 → WARN（不丢，但得确认不是做到一半）。
     blocking: list[str] = []
+    warning: list[str] = []
     if item["dirty"]:
-        blocking.append(f"那个目录里有 {item['dirty']} 项未提交的改动")
-    if item["unpushed"]:
-        blocking.append(f"那个分支上有 {item['unpushed']} 条提交没进任何远端")
-    if not merged:
-        blocking.append("无法确认它的提交已在别处 —— 三项前置里这一项没过")
-    return Verdict(f"delete-worktree {path}", level_from(blocking, []),
-                   blocking, evidence,
+        blocking.append(f"那个目录里有 {item['dirty']} 项未提交的改动 —— "
+                        "它们只存在于那个目录里，删掉就真没了")
+    if merged:
+        evidence.append("已并入基线：提交能从基线走到，回收不会丢东西")
+    else:
+        warning.append("这个 worktree 上的分支还没并进基线 —— 提交不会丢（分支还在），"
+                       "但先确认你不是正在做到一半")
+    return Verdict(f"delete-worktree {path}", level_from(blocking, warning),
+                   blocking + warning, evidence,
                    command=f"git worktree remove {item['path']}",
-                   caveat="三项前置（已并入 / 无未推送 / 无未提交）都满足才动")
+                   caveat="回收只拿掉目录和记录：分支、提交都还在"
+                          + ("；那个目录里的未提交改动才是真会丢的东西" if item["dirty"] else ""))
 
 
 def _patch_id(repo: str, args: list[str]) -> str:
