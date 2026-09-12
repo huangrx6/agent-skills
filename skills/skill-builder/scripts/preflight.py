@@ -183,20 +183,28 @@ def checks(root: str) -> list[dict]:
 
 
 def install_drift(root: str) -> tuple[bool, str]:
-    """仓库 vs pi 安装位（`~/.agents/skills`）有没有漂移。
+    """仓库 vs pi 安装位（`~/.agents/skills`）的状态。
 
-    为什么进 preflight：pi 加载的是**副本**，不是仓库 —— 实测过一次「仓库改了 13 个
+    为什么进 preflight：pi 加载的是**安装位**，不是仓库 —— 实测过一次「仓库改了 13 个
     文件、安装位一个都没有」，那个 skill 在下一个会话里会画出旧配色旧框线，
-    而且不知道新能力存在。这类“改得再好，不跑同步就等于没改”的事必须在报告里可见。
+    而且不知道新能力存在。这类“改得再好、没装过去就等于没改”的事必须在报告里可见。
 
-    ⚠️ 只报告、**不算失败**：钩子是在 commit **之前**跑的，那时候安装位按定义就是
-    旧的 —— 把它算成失败，等于每次提交都挂。所以这里只给一条能照抄的命令。
+    安装器默认装**软链**（那种永不漂移，这里报的就是“软链指向本仓库”）；装成副本时
+    比内容。两种都报出来，读报告的人不用猜装的是哪种。
+
+    ⚠️ 只报告、**不算失败**：钩子是在 commit **之前**跑的，那时候副本形态的安装位
+    按定义就是旧的 —— 把它算成失败，等于每次提交都挂。
     """
     code, out = _run([sys.executable, os.path.join(root, "tools", "install_skills.py"),
                       "--check"], root)
+    lines = [line.strip() for line in out.split("\n") if line.strip()]
     if code == 0:
-        return True, "与仓库一致"
-    bad = [line.strip() for line in out.split("\n") if line.strip().startswith("✗")]
+        oks = [line for line in lines if line.startswith("✓")]
+        linked = sum(1 for line in oks if "软链" in line)
+        if oks and linked == len(oks):
+            return True, f"{linked} 个 skill 以软链指向本仓库（不可能漂移）"
+        return True, f"与仓库一致（{len(oks)} 个）"
+    bad = [line for line in lines if line.startswith("✗")]
     return False, "；".join(bad) or "与仓库不一致"
 
 

@@ -42,21 +42,38 @@ git clone https://github.com/<owner>/agent-skills.git
 #   Codex 全局级:    ~/.codex/skills/<name>
 ```
 
-### ⚠️ 装了之后：**安装位不会自己跟着仓库走**
+### 装了之后：用**引用**（软链）还是副本？
 
-`npx skills add` 是**复制**，不是链接 —— 所以仓库里改了，安装位还是旧的。实测过一次：
+`npx skills add` 是**复制**，不是链接 —— 仓库里改了，安装位还是旧的。实测过一次：
 某个 skill 的安装位比仓库**少 571 行**，当天新加的能力一个都没有，而它在下一个会话里
-会照旧配置出图、连新能力叫什么都不知道。软链没这个问题（它本来就不会漂）。
+会照旧配置出图、连新能力叫什么都不知道。
 
-所以每次改完 `skills/`：
+所以本仓库自带的安装器**默认装成软链**（装的就是仓库那一份，从根上没有"两份东西
+必然漂移"这件事）：
 
 ```sh
-python3 tools/install_skills.py            # 仓库 → ~/.agents/skills（会删掉安装位多出来的文件）
-python3 tools/install_skills.py --check    # 只比对，不一致退出码 1（给 CI / 钩子用）
+python3 tools/install_skills.py            # 默认：装成软链（推荐）
+python3 tools/install_skills.py --copy     # 要副本（比如仓库会被移走）
+python3 tools/install_skills.py --check    # 软链指向对不对 / 副本内容一致吗
 ```
 
+**"pi 认不认软链"不是猜的**，两处证据：
+
+1. 源码 `dist/core/skills.js` 对每个目录项先 `entry.isDirectory()`，若是
+   `isSymbolicLink()` 再用 `statSync`（会跟随软链）取真实类型 —— 注释就是
+   `// For symlinks, check if they point to a directory and follow them`；
+2. 用**它自己的** `loadSkillsFromDir()` 实测：放两个指向本仓库的软链 + 一个普通目录，
+   结果两个 skill 都被发现、非 skill 目录被正确忽略；再验主文件内容 ——
+   真实路径落在仓库、只有仓库新版才有的字串能读到。
+
+两个边界：
+
+- 软链指向仓库，所以**未提交的修改也是活的**（开发时正是想要的）；仓库被移走则链接失效，
+  重跑一次安装器即可。
+- 想让某个 skill 用副本共存（例如固定一个发布版），用 `--copy` 单独装。
+
 `skills/skill-builder/scripts/preflight.py` 的报告里也会带一行安装位状态——
-**只报告、不算失败**（钩子在 commit 之前跑，那时安装位按定义就是旧的）。
+**只报告、不算失败**（钩子在 commit 之前跑）。
 
 ---
 
@@ -110,7 +127,7 @@ python3 tools/install_skills.py --check    # 只比对，不一致退出码 1（
 - 正文余量不足 10 行时脚本会另提示一行(`!` 前缀,不影响退出码):**下次要往正文加规则前,先做 references 瘦身**。瘦身由下一次真实需求触发,不靠“等哪天有空”——一直没空就一直不做。
 - **Obsidian 类**的 vault 路径从配置解析(见上方 Skills 索引),换机器或 vault 搬家只改一处,不要在文档或脚本里写死。某个 skill 真的不可移植时才显式声明——而**把它改造成可移植之后,必须在同一次里删掉那条声明**,否则就成了自相矛盾(`validate_skill.py` 会把这种情况判为失败)
 - 本仓库的 `.skill-lock.json` 已被 `.gitignore` 排除——那是 pi 工具的本地 lock,每台机器自己生成
-- **改完 skill 记得同步安装位**:`python3 tools/install_skills.py`（原因与边界见上方安装一节）
+- **改完 skill 不用同步安装位**：安装器默认装的是**软链**，装的就是仓库那一份（见上方安装一节）。想确认状态就跑 `python3 tools/install_skills.py --check`
 
 ### 什么时候可以不修(停止判据)
 

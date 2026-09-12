@@ -57,9 +57,11 @@ fi
 # 它们的防线:代码块里的 [[ ]] 不是 wikilink、含空格的路径不能被截断、扫描范围不能
 # 扩散、“不绑定本机”不能被当成绑定声明…… 不跑的话,那些测试和没写一样 —— 改坏了
 # 脚本也不会有人发现防线已经失效。
-# 扫全部 skills/*/tests/ 而不写死某一个:新加测试目录时不用改这里。
+# 扫全部 skills/*/tests/ 与 tools/tests，而不写死某一个:新加测试目录时不用改这里。
+# tools/tests 是仓库级工具（装 skill 的安装器）的用例 —— 那个脚本**会往用户主目录
+# 写东西**，判错了代价很实，所以它也得进这道门。
 # 代价实测每个目录 0.3~0.4 秒。
-for d in "$ROOT"/skills/*/tests; do
+for d in "$ROOT"/skills/*/tests "$ROOT"/tools/tests; do
   [ -d "$d" ] || continue
   OUT=$(cd /tmp && python3 -m unittest discover -s "$d" 2>&1)
   STATUS=$?
