@@ -1,0 +1,41 @@
+{
+  "skill_name": "pingcode",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我看看我在 PingCode 上还有哪些任务没做完。",
+      "expected_output": "用 `workitem mine --open-only`（未完成的判据是 state.type != completed），输出紧凑表格：编号 / 标题 / 类型 / 状态 / 优先级 / 截止 / 链接。结论里要能逐条对上真实返回的编号。不允许凭记忆报任务名，也不允许把已完成的也列进来充数。若本地没有令牌，要说清下一步是 `auth login`，而不是编一个结果或要求用户自己去看网页。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "把 SCR-12 这个缺陷标记成已完成。",
+      "expected_output": "先 `workitem show SCR-12` 确认它确实是那个缺陷（标题、状态一并对上），再 `workitem set-state SCR-12 已完成`。状态要走「先查该类型可用状态、再 PATCH state_id」这条路——因为官方要求 state_id 同时满足该类型的「状态方案」与「状态流转」。若状态名对不上，要把该类型**可用的状态列表**列出来让用户选，不能随手挑一个近似的。回显里要出现编号与改后的状态。",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "在演示项目下面给我建一个缺陷：登录页偶发 500，负责人是我，截止这周五。",
+      "expected_output": "用 `workitem create`，`--type bug --title …`，项目名走解析（拿不到就报错或问，不要猜 ID）。因为涉及多个字段，合理的做法是先加 `--dry-run` 回显将要发送的 body（project_id / type_id / title 都是解析后的真 id），确认后再真发。相对时间（「这周五」）要换算成具体日期再填 `--end`。企业令牌下 `--assignee @me` 不可用，要说明原因并改用人名或用户 ID。不允许直接拼 `/v1/project/work_items` 这类路径。",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "这个项目进度怎么样了？我上周建的迭代里有几个任务还开着？",
+      "expected_output": "`project progress` 拿进度；`workitem list --sprint <迭代名>` 列该迭代的工作项，并说明其中几条未完成（state.type != completed）。迭代名匹配到多个时要**列出候选让用户确认**，不能自动取第一个——两个同名迭代选错，报表就指向了别的团队。结论里的数字必须来自真实返回（总数、未完成数），不能用「大概」「应该」这类词。",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "我在 PingCode 上是不是没配好？取数据老是失败。",
+      "expected_output": "先 `auth status` / `config show` 看事实：令牌来源、授权模式、到期还剩多久、有没有 refresh_token、host 解析出来的 REST 根与 OAuth2 根，以及凭据是配了还是没配（**不回显 secret**）。再按错误码给下一步：401 → `auth login`；403 → 指出该端点需要的 scope（在后台勾上）；429 → 报出官方建议的等待秒数与剩余配额；连不上 → 提示私有部署的 host 要带 `/open`。不允许只说「配置有问题」而不给出可执行的下一步，也不允许把 secret 或令牌打进输出。",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "帮我删掉那个重复的项目。",
+      "expected_output": "说明官方**没有删除项目的接口**（只有创建 / 部分更新 / 复制 / 改项目状态），所以「删项目」这件事本 skill 做不到，要用网页端或改项目状态（`project update --state`）。若用户其实要删的是**工作项**，那可以：`workitem delete <ref> --yes`（不可逆，缺 `--yes` 必须拒绝执行）。不允许把「不能删项目」含糊成「操作失败」，也不允许在没有 `--yes` 的情况下直接删。",
+      "files": []
+    }
+  ]
+}

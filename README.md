@@ -1,6 +1,6 @@
 # ![agent-skills](assets/icons/agent-skills-light.svg#gh-light-mode-only) ![agent-skills](assets/icons/agent-skills-dark.svg#gh-dark-mode-only) **Agent Skills**
 
-> 个人精选的 AI Coding Agent skill 集合。从头重建，只保留真正高频触发的：Obsidian 工作流、技术图、git 写操作，以及「建 skill」本身的元能力。
+> 个人精选的 AI Coding Agent skill 集合。从头重建，只保留真正高频触发的：Obsidian 工作流、技术图、git 写操作、PingCode 项目与工作项，以及「建 skill」本身的元能力。
 
 ## 这是什么
 
@@ -65,33 +65,34 @@ Codex        全局级  →  ~/.codex/skills/<name>
 
 ---
 
-## Skills 索引（5 个）
+## Skills 索引（6 个）
 
 ### Obsidian 工作流（2 个）
 
 围绕 Huangrx6 的 Obsidian vault 构建的工作流。**vault 路径不写死在文档里** —— 按 `$OBSIDIAN_VAULT_PATH` → `~/.config/obsidian-vault-path` 的顺序解析，换机器或 vault 搬家只改一处。
 
-| Icon | Skill | 覆盖 |
-| --- | --- | --- |
-| ![vault](skills/obsidian-personal-knowledge-base/assets/icons/obsidian-personal-knowledge-base-light.svg#gh-light-mode-only) ![vault](skills/obsidian-personal-knowledge-base/assets/icons/obsidian-personal-knowledge-base-dark.svg#gh-dark-mode-only) | [**obsidian-personal-knowledge-base**](skills/obsidian-personal-knowledge-base/SKILL.md) | 在 PARA + MOC vault 内创建、更新、移动、审阅笔记；按 Inbox / Projects / Areas / Resources / Archive / Assets / System 判断归属 |
-| ![record](skills/obsidian-work-log-release-recorder/assets/icons/obsidian-work-log-release-recorder-light.svg#gh-light-mode-only) ![record](skills/obsidian-work-log-release-recorder/assets/icons/obsidian-work-log-release-recorder-dark.svg#gh-dark-mode-only) | [**obsidian-work-log-release-recorder**](skills/obsidian-work-log-release-recorder/SKILL.md) | 任务结束后把可复用事实沉淀到长期知识；维护周发版记录（脚本、配置、部署路径、验证、回滚、执行假设） |
+| Skill | 覆盖 |
+| --- | --- |
+| [**obsidian-personal-knowledge-base**](skills/obsidian-personal-knowledge-base/SKILL.md) | 在 PARA + MOC vault 内创建、更新、移动、审阅笔记；按 Inbox / Projects / Areas / Resources / Archive / Assets / System 判断归属 |
+| [**obsidian-work-log-release-recorder**](skills/obsidian-work-log-release-recorder/SKILL.md) | 任务结束后把可复用事实沉淀到长期知识；维护周发版记录（脚本、配置、部署路径、验证、回滚、执行假设） |
 
-### 通用能力（2 个）
+### 通用能力（3 个）
 
 不绑定某个 vault 或某个工具，按需触发的确定性能力。
 
-| Icon | Skill | 覆盖 |
-| --- | --- | --- |
-| ![diagram](skills/excalidraw-diagram/assets/icons/excalidraw-diagram-light.svg#gh-light-mode-only) ![diagram](skills/excalidraw-diagram/assets/icons/excalidraw-diagram-dark.svg#gh-dark-mode-only) | [**excalidraw-diagram**](skills/excalidraw-diagram/SKILL.md) | 把系统画成可编辑的 Excalidraw 图（架构 / 依赖 / 流程 / 状态 / 部署拓扑 / 思维导图）：区域（网格底 + 虚线框）、四组样式轴（填充 / 描边 / 边角 / 线条）、一套配色系统；模型只描述结构，坐标全由脚本算 |
-| ![git](skills/git-dev-workflow/assets/icons/git-dev-workflow-light.svg#gh-light-mode-only) ![git](skills/git-dev-workflow/assets/icons/git-dev-workflow-dark.svg#gh-dark-mode-only) | [**git-dev-workflow**](skills/git-dev-workflow/SKILL.md) | git 写操作（提交 / 分支 / 丢弃改动 / 删分支与 worktree / 改写历史 / force push）前的状态核对与拦截：先读真实状态，不可逆动作前跑机械前置检查，报告只引原始输出 |
+| Skill | 覆盖 |
+| --- | --- |
+| [**excalidraw-diagram**](skills/excalidraw-diagram/SKILL.md) | 把系统画成可编辑的 Excalidraw 图（架构 / 依赖 / 流程 / 状态 / 部署拓扑 / 思维导图）：区域（网格底 + 虚线框）、四组样式轴、一套配色系统；模型只描述结构，坐标全由脚本算 |
+| [**git-dev-workflow**](skills/git-dev-workflow/SKILL.md) | git 写操作（提交 / 分支 / 丢弃改动 / 删分支与 worktree / 改写历史 / force push）前的状态核对与拦截：先读真实状态，不可逆动作前跑机械前置检查，报告只引原始输出 |
+| [**pingcode**](skills/pingcode/SKILL.md) | PingCode 项目 / 工作项（史诗·特性·用户故事·任务·缺陷）的命令行：查我的待办与缺陷、按条件搜、看详情、建项目、建改工作项（描述 / 起止日期 / 负责人 / 优先级 / 父项 / 迭代）、改状态、加评论、删工作项。端点来自官方文档生成的端点表（发送前校验），名字→ID 解析歧义时列候选而不猜 |
 
 ### 元能力（1 个）
 
 不绑定具体业务场景，Agent 在本仓库内工作时反复用到的元 skill。
 
-| Icon | Skill | 覆盖 |
-| --- | --- | --- |
-| ![build](skills/skill-builder/assets/icons/skill-builder-light.svg#gh-light-mode-only) ![build](skills/skill-builder/assets/icons/skill-builder-dark.svg#gh-dark-mode-only) | [**skill-builder**](skills/skill-builder/SKILL.md) | 建新 skill 前的 5 分钟决策：该不该建 / 触发描述怎么写 / 范围定 P0 还是 P1 / 起 `SKILL.md` 一稿的 checklist |
+| Skill | 覆盖 |
+| --- | --- |
+| [**skill-builder**](skills/skill-builder/SKILL.md) | 建新 skill 前的 5 分钟决策：该不该建 / 触发描述怎么写 / 范围定 P0 还是 P1 / 起 `SKILL.md` 一稿的 checklist |
 
 **触发语法**：
 
@@ -100,6 +101,7 @@ Codex        全局级  →  ~/.codex/skills/<name>
 使用 $obsidian-work-log-release-recorder 帮我 <记录 / 沉淀 / 写发版文档>
 使用 $excalidraw-diagram 帮我 <画架构图 / 画流程图 / 把这段说明画出来>
 使用 $git-dev-workflow 帮我 <提交 / 建分支 / 丢弃改动 / 清理分支 / 改写历史>
+使用 $pingcode 帮我 <查我的任务与缺陷 / 建项目 / 建任务或缺陷 / 改状态 / 看项目进度>
 使用 $skill-builder 帮我 <判断要不要建 skill / 评审触发描述 / 起 SKILL.md 一稿>
 ```
 
@@ -115,6 +117,7 @@ Codex        全局级  →  ~/.codex/skills/<name>
 | P0 | `skill-builder`（建 skill 的元能力） | ✅ 2026-09 |
 | P0 | `excalidraw-diagram`（技术图） | ✅ 2026-09 |
 | P0 | `git-dev-workflow`（git 写操作） | ✅ 2026-09 |
+| P1 | `pingcode`（PingCode 项目 / 工作项） | ✅ 2026-09（真实租户全链路待实测） |
 | P1 | Obsidian 工作流闭环补齐 | ⏳ 待开工 |
 | P2 | 日常高频触发类 | ⏳ 等 P1 落地后，根据真实触发日志再定 |
 

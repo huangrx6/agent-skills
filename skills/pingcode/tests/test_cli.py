@@ -1,0 +1,348 @@
+#!/usr/bin/env python3
+"""CLI 层（scripts/pingcode.py）的回归测试。
+
+为什么需要
+----------
+命令行是唯一被人和 Agent 直接调用的面 —— 出错的代价最大，而且**大多不会抛异常**：
+写错的项目、写错的状态、少一个 --yes，都会"看起来成功了"。
+
+这里的做法是把**真实 Client 的传输换掉**（注入假的 `opener`），而不是 mock
+`urllib.request.urlopen`：重试、分页、参数拼装、dry-run、错误翻译全都还是真代码在跑。
+参考实现 mock 的是 `urlopen` 本身，所以路径写错、参数写错都测不出来。
+
+覆盖的关键行为：
+  · dry-run 真的不发请求，并且把要发的 body 打出来
+  · 创建 / 改状态 / 删除分别打到正确的端点，body 里的 id 是**解析后的**真 id
+  · 状态名不存在时给出该类型的可用状态列表（而不是只报一句失败）
+  · 项目名有歧义时列候选并中止（不能猜）
+  · 删除缺 --yes 时拒绝
+  · 上下文（当前项目）真的被 create 用上
+  · 逃生口 `api` 会把官方文档里不存在的路径拦下来
+
+跑法：
+    python3 -m unittest discover -s tests -v
+"""
+
+from __future__ import annotations
+
+import contextlib
+import importlib.util
+import io
+import json
+import os
+import sys
+import tempfile
+import unittest
+import urllib.error
+from email.message import Message
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SCRIPTS = os.path.join(os.path.dirname(HERE), "scripts")
+
+
+def _load(name: str):
+    """按脚本内部一致的模块名加载（否则异常类会对不上）。"""
+    key = f"_pingcode_{name}"
+    spec = importlib.util.spec_from_file_location(key, os.path.join(SCRIPTS, f"{name}.py"))
+    if spec is None or spec.loader is None:
+        raise RuntimeError(name)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[key] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+pc = _load("pingcode")
+cfg = _load("config")
+resolve = _load("resolve")
+
+
+class FakeResponse(io.BytesIO):
+    def __init__(self, payload, status: int = 200) -> None:
+        body = payload if isinstance(payload, bytes) else json.dumps(payload).encode("utf-8")
+        super().__init__(body)
+        self.status = status
+        self.headers: dict = {}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.close()
+
+
+def header_message(headers: dict) -> Message:
+    message = Message()
+    for key, value in headers.items():
+        message[key] = str(value)
+    return message
+
+
+def http_error(code: int, payload) -> urllib.error.HTTPError:
+    return urllib.error.HTTPError("https://x/y", code, "err", header_message({}),
+                                  io.BytesIO(json.dumps(payload).encode("utf-8")))
+
+
+class Router:
+    """按 (method, url 里的一段) 路由；更长的 needle 先匹配。"""
+
+    def __init__(self, routes: dict) -> None:
+        self.routes = sorted(routes.items(), key=lambda kv: len(kv[0][1]), reverse=True)
+        self.calls: list[tuple[str, str, object]] = []
+
+    def __call__(self, request, timeout=None):  # noqa: ARG002
+        body = request.data
+        self.calls.append((request.method, request.full_url,
+                           json.loads(body.decode("utf-8")) if body else None))
+        for (method, needle), payload in self.routes:
+            if method == request.method and needle in request.full_url:
+                if isinstance(payload, Exception):
+                    raise payload
+                return FakeResponse(payload)
+        raise http_error(404, {"message": f"测试里没有为 {request.method} {request.full_url} 配路由"})
+
+    def find(self, method: str, needle: str) -> list:
+        return [c for c in self.calls if c[0] == method and needle in c[1]]
+
+
+WORKITEM = {
+    "id": "w1", "identifier": "DOC-1", "title": "登录页 500", "type": "bug",
+    "state": {"id": "st1", "name": "新建", "type": "pending"},
+    "priority": {"id": "pr1", "name": "高"},
+    "project": {"id": "pj1", "name": "演示项目"},
+    "assignee": {"id": "u1", "display_name": "John"},
+    "end_at": 1577808000, "html_url": "https://x/w1",
+}
+
+PROJECTS = [
+    {"id": "pj1", "identifier": "DEMO", "name": "演示项目"},
+    {"id": "pj2", "identifier": "DEMO2", "name": "示例项目 B"},
+]
+TYPES = [{"id": "bug", "name": "缺陷"}, {"id": "task", "name": "任务"}]
+STATES = [{"id": "st1", "name": "新建", "type": "pending"},
+          {"id": "st2", "name": "已完成", "type": "completed"}]
+SPRINTS = [{"id": "sp1", "name": "Sprint 12"}]
+PRIORITIES = [{"id": "pr1", "name": "高"}]
+
+
+class CliCase(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self._saved = {k: os.environ.get(k) for k in
+                       (cfg.ENV_DIR, cfg.ENV_TOKEN, cfg.ENV_ID, cfg.ENV_SECRET, cfg.ENV_HOST)}
+        for key in self._saved:
+            os.environ.pop(key, None)
+        os.environ[cfg.ENV_DIR] = self._tmp.name
+        self.addCleanup(self._restore_env)
+
+        cfg.write_private(cfg.path_of(cfg.CREDENTIALS),
+                          {"host": "open.pingcode.com", "auth_mode": "user",
+                           "client_id": "cid", "client_secret": "sec"})
+        cfg.save_token({"access_token": "tok", "expires_in": 2592000}, "user")
+        self.seed_dictionaries()
+
+    def _restore_env(self) -> None:
+        for key, value in self._saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+    def seed_dictionaries(self) -> None:
+        resolve.store("projects", {}, PROJECTS)
+        resolve.store("types", {"project_id": "pj1"}, TYPES)
+        resolve.store("states", {"project_id": "pj1", "workitem_type_id": "bug"}, STATES)
+        resolve.store("sprints", {"project_id": "pj1"}, SPRINTS)
+        resolve.store("priorities", {"project_id": "pj1"}, PRIORITIES)
+        resolve.store("users", {}, [{"id": "u1", "name": "john", "display_name": "John"}])
+
+    # ── 运行与断言 ──
+    def run_cli(self, argv: list[str], routes: dict | None = None) -> tuple[int, str, str, Router]:
+        router = Router(routes or {})
+        original = pc._client.Client
+
+        class Bound(original):  # type: ignore[misc, valid-type]
+            def __init__(self, *args, **kwargs):
+                kwargs["opener"] = router
+                super().__init__(*args, **kwargs)
+
+        pc._client.Client = Bound
+        out, err = io.StringIO(), io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                code = pc.main(argv)
+        finally:
+            pc._client.Client = original
+        return code, out.getvalue(), err.getvalue(), router
+
+    # ── 只读 ──
+    def test_列出项目(self):
+        code, out, _err, _router = self.run_cli(
+            ["project", "list"], {("GET", "/v1/pjm/projects"): {"values": PROJECTS, "total": 2}})
+        self.assertEqual(0, code)
+        self.assertIn("演示项目", out)
+        self.assertIn("示例项目 B", out)
+
+    def test_列出某项目的类型(self):
+        code, out, _err, _router = self.run_cli(["list", "types", "--project", "演示项目"])
+        self.assertEqual(0, code)
+        self.assertIn("缺陷", out)
+        self.assertIn("bug", out)
+
+    def test_看一个工作项_带描述(self):
+        item = dict(WORKITEM, description="详细的复现步骤")
+        code, out, _err, _router = self.run_cli(["workitem", "show", "DOC-1"],
+                                                {("GET", "/v1/pjm/workitems/"): item})
+        self.assertEqual(0, code)
+        self.assertIn("DOC-1", out)
+        self.assertIn("缺陷", out)
+        self.assertIn("详细的复现步骤", out)
+
+    def test_full_出原始_json(self):
+        code, out, _err, _router = self.run_cli(["workitem", "show", "DOC-1", "--full"],
+                                                {("GET", "/v1/pjm/workitems/"): WORKITEM})
+        self.assertEqual(0, code)
+        self.assertIn('"identifier": "DOC-1"', out)
+
+    # ── 创建 ──
+    def test_创建的_dry_run_不发请求且打出_body(self):
+        code, out, _err, router = self.run_cli(
+            ["workitem", "create", "--project", "演示项目", "--type", "bug",
+             "--title", "登录报 500", "--assignee", "John", "--start", "2026-09-20",
+             "--dry-run"])
+        self.assertEqual(0, code)
+        self.assertIn("--dry-run", out)
+        self.assertIn('"project_id": "pj1"', out)
+        self.assertIn('"type_id": "bug"', out)
+        self.assertIn('"assignee_id": "u1"', out, "人名要解析成 id")
+        self.assertIn("登录报 500", out)
+        self.assertEqual([], router.calls, "dry-run 不能真的发请求")
+
+    def test_创建打对了端点且_id_是解析后的(self):
+        created = dict(WORKITEM, id="w9", identifier="DOC-9", title="登录报 500")
+        code, out, _err, router = self.run_cli(
+            ["workitem", "create", "--project", "演示项目", "--type", "缺陷",
+             "--title", "登录报 500", "--start", "2026-09-20", "--end", "2026-09-30"],
+            {("POST", "/v1/pjm/workitems"): created})
+        self.assertEqual(0, code)
+        posts = router.find("POST", "/v1/pjm/workitems")
+        self.assertEqual(1, len(posts))
+        body = posts[0][2]
+        self.assertEqual("pj1", body["project_id"])
+        self.assertEqual("bug", body["type_id"], "中文名「缺陷」要解析成 bug")
+        self.assertEqual("2026-09-20", __import__("datetime").datetime.fromtimestamp(
+            body["start_at"]).strftime("%Y-%m-%d"))
+        self.assertIn("DOC-9", out)
+
+    def test_创建用得上下文里的项目(self):
+        self.run_cli(["config", "context", "--project", "演示项目"])
+        code, _out, _err, router = self.run_cli(
+            ["workitem", "create", "--type", "task", "--title", "x", "--dry-run"])
+        self.assertEqual(0, code)
+        self.assertEqual([], router.calls)
+        # dry-run 也要能解析出项目，否则说明上下文没被用上
+        self.assertEqual("pj1", resolve.project_id(
+            pc._client.Client(bearer=lambda: "", host="h", opener=lambda r, timeout=None: None),
+            "演示项目")[0])
+
+    def test_创建缺标题时_argparse_先挡住(self):
+        with self.assertRaises(SystemExit) as ctx:
+            self.run_cli(["workitem", "create", "--project", "演示项目", "--type", "bug"])
+        self.assertEqual(2, ctx.exception.code, "缺必填参数时 argparse 直接退 2")
+
+    # ── 改状态 ──
+    def test_改状态用解析后的_state_id(self):
+        updated = dict(WORKITEM, state={"id": "st2", "name": "已完成", "type": "completed"})
+        code, out, _err, router = self.run_cli(
+            ["workitem", "set-state", "DOC-1", "已完成"],
+            {("GET", "/v1/pjm/workitems/"): WORKITEM, ("PATCH", "/v1/pjm/workitems/w1"): updated})
+        self.assertEqual(0, code)
+        patches = router.find("PATCH", "/v1/pjm/workitems/w1")
+        self.assertEqual([{"state_id": "st2"}], [p[2] for p in patches])
+        self.assertIn("已完成", out)
+
+    def test_改状态时名字不存在要列出可用状态(self):
+        code, _out, err, router = self.run_cli(
+            ["workitem", "set-state", "DOC-1", "随便写的状态"],
+            {("GET", "/v1/pjm/workitems/"): WORKITEM})
+        self.assertEqual(1, code)
+        self.assertIn("新建", err)
+        self.assertIn("已完成", err)
+        self.assertEqual([], router.find("PATCH", "/v1/pjm/workitems/w1"), "不能瞎改")
+
+    # ── 删除 ──
+    def test_删除缺_yes_要拒绝(self):
+        code, _out, err, router = self.run_cli(
+            ["workitem", "delete", "DOC-1"], {("GET", "/v1/pjm/workitems/"): WORKITEM})
+        self.assertEqual(1, code)
+        self.assertIn("--yes", err)
+        self.assertEqual([], router.find("DELETE", "/v1/pjm/workitems/w1"))
+
+    def test_删除带_yes_会打_DELETE(self):
+        code, out, _err, router = self.run_cli(
+            ["workitem", "delete", "DOC-1", "--yes"],
+            {("GET", "/v1/pjm/workitems/"): WORKITEM, ("DELETE", "/v1/pjm/workitems/w1"): {}})
+        self.assertEqual(0, code)
+        self.assertIn("已删除", out)
+        self.assertEqual(1, len(router.find("DELETE", "/v1/pjm/workitems/w1")))
+
+    # ── 歧义与错误 ──
+    def test_项目名有歧义要列候选并中止(self):
+        code, _out, err, router = self.run_cli(
+            ["workitem", "create", "--project", "项目", "--type", "bug", "--title", "x"])
+        self.assertEqual(1, code)
+        self.assertIn("演示项目", err)
+        self.assertIn("示例项目 B", err)
+        self.assertEqual([], router.calls, "有歧义就不能发任何请求")
+
+    def test_逃生口会拦下官方文档里没有的路径(self):
+        code, _out, err, router = self.run_cli(["api", "--path", "/v1/project/work_items"])
+        self.assertEqual(1, code)
+        self.assertIn("官方文档里没有", err)
+        self.assertIn("/v1/pjm/workitems", err, "要给最接近的候选")
+        self.assertEqual([], router.calls)
+
+    def test_逃生口带_force_才真发(self):
+        code, out, _err, router = self.run_cli(
+            ["api", "--path", "/v1/whatever", "--force", "--full"],
+            {("GET", "/v1/whatever"): {"ok": True}})
+        self.assertEqual(0, code)
+        self.assertIn("ok", out)
+        self.assertEqual(1, len(router.find("GET", "/v1/whatever")))
+
+    def test_401_要说去重新授权(self):
+        code, _out, err, _router = self.run_cli(
+            ["project", "list"], {("GET", "/v1/pjm/projects"): http_error(401, {"message": "invalid"})})
+        self.assertEqual(1, code)
+        self.assertIn("auth login", err)
+
+    def test_whoami_用企业令牌要提示换模式(self):
+        cfg.save_token({"access_token": "e", "expires_in": 2592000}, "enterprise")
+        code, _out, err, _router = self.run_cli(["whoami"])
+        self.assertEqual(1, code)
+        self.assertIn("用户令牌", err)
+
+    def test_whoami_用用户令牌能出结果(self):
+        code, out, _err, _router = self.run_cli(
+            ["whoami"], {("GET", "/v1/myself"): {"id": "u1", "name": "john", "display_name": "John"}})
+        self.assertEqual(0, code)
+        self.assertIn("John", out)
+
+    # ── 配置 ──
+    def test_config_context_能设也能清(self):
+        code, out, _err, _router = self.run_cli(["config", "context", "--project", "演示项目"])
+        self.assertEqual(0, code)
+        self.assertIn("演示项目", out)
+        self.assertEqual("演示项目", cfg.load_context()["project"])
+        self.run_cli(["config", "context", "--clear"])
+        self.assertEqual({}, cfg.load_context())
+
+    def test_没有上下文与参数时报错要说怎么补(self):
+        code, _out, err, _router = self.run_cli(["workitem", "create", "--type", "bug", "--title", "x"])
+        self.assertEqual(1, code)
+        self.assertIn("--project", err)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
