@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""九项校验 + 自动调参循环 + 报告生成。
+"""十项校验 + 自动调参循环 + 报告生成。
 
 ## 为什么校验和调参在同一个文件里
 
@@ -81,7 +81,7 @@ MAX_TUNE_ROUNDS = 4       # 调参轮数上限
 TOLERANCE = 0.5           # 浮点比较容差（#3 断言用）
 
 # 命中这几类就别调参了 —— 改参数没用，那是脚本 bug 或内容错误
-STOP_ON = frozenset({"text", "palette"})
+STOP_ON = frozenset({"text", "palette", "region_label"})
 # 可以靠调参解决的项。注意 #5（交叉数）是**软**项 —— 它不阻塞输出，但仍然是可调的。
 # 只看“阻不阻塞”会让它永远调不动，而 validation.md 明写着它可自动修。
 TUNABLE = frozenset({"gap", "edge", "crossing", "through", "overlap", "slant"})
@@ -107,6 +107,7 @@ CHECK_LABEL = {
     # 而报告里漏了标签就会 KeyError（建表时就踩过一次）。
     "overlap": "连线重合",
     "slant": "连线斜段",
+    "region_label": "区域标题溢出",
 }
 # 报告里用的中文说法。**参数名不许出现在报告里** —— 一旦报告写"建议调大某某"，
 # 参数选择权就又回到模型手上了（validation.md 第二节）。
@@ -461,7 +462,62 @@ def check_edge_slant(result: ResultT) -> list[Issue]:
     return out
 
 
-# ── #7 区域 ─────────────────────────────────────────────────
+# ── #10 区域标题（后置断言 + 一条内容级上限）─────────────
+def check_region_labels(spec: dict, result: ResultT,
+                        boxes: dict[str, BoxT]) -> list[Issue]:
+    """区域标题必须装在标题带里。
+
+    **两条性质不同的失败共用一个 check**（`Issue` 的 docstring 里就写了这种情况）：
+      - 断行与尺寸对不上 / 标题比区域宽 / 标题块压到成员 → **脚本内部不一致**，
+        不给内容建议（否则模型会去干“缩短标签”这件没用的事）
+      - 标题被断成太多行 → **内容问题**，建议缩短标题或拆区域
+
+    为什么加这一条：这个溢出**真实发生过**。用户拿截图来问“这种块的 title 会溢出”，
+    而当时九项校验里**没有一项在量区域标题** —— 标题宽度压根没进过任何尺寸链，
+    报告全绿而图上两头各冒出去 22px。
+
+    现在尺寸链是“区域宽度（由成员定）→ 断行 → 行数 → 标题带高度”，
+    所以前一类构造上不该失败 —— 它一旦报就是脚本 bug。留着的意义：
+    下次改断行或改标题带时，它会立刻变成真实的门（和 #1 / #3 那两条后置断言同理）。
+    """
+    out: list[Issue] = []
+    for region in L.region_boxes(spec, result.placed, boxes):
+        lines = list(region.get("label_lines") or ())
+        if not lines:
+            continue
+        expect, expect_width = L.region_label_lines(region["label"], region["width"])
+        if list(expect) != lines or abs(expect_width - region["label_width"]) > TOLERANCE:
+            out.append(Issue(
+                "region_label", True, region["id"],
+                "标题断行与区域尺寸对不上。这是生成脚本的内部不一致"
+                "（测量与落笔不符），不是你内容的问题。"))
+            continue
+        inner = region["width"] - 2 * L.REGION_LABEL_MARGIN
+        if region["label_width"] > inner + TOLERANCE:
+            out.append(Issue(
+                "region_label", True, region["id"],
+                f"标题宽 {region['label_width']:.0f}px，而区域只有 {inner:.0f}px 可用 —— "
+                f"这是生成脚本的内部不一致，不是你内容的问题。"))
+            continue
+        members = [result.placed[nid] for nid in region.get("members", ())
+                   if nid in result.placed]
+        if members and region["label_y"] + region["label_height"] > \
+                min(node.y for node in members) - L.REGION_PAD + TOLERANCE:
+            out.append(Issue(
+                "region_label", True, region["id"],
+                "标题块压到了成员节点上 —— 这是生成脚本的内部不一致。"))
+            continue
+        if len(lines) > L.REGION_TITLE_MAX_LINES:
+            out.append(Issue(
+                "region_label", True, region["id"],
+                f"区域标题被断成 {len(lines)} 行"
+                f"（超过 {L.REGION_TITLE_MAX_LINES} 行，标题带要占 "
+                f"{region['label_height'] + L.REGION_LABEL_TOP + L.REGION_LABEL_GAP:.0f}px 高）",
+                advice="区域标题太长：换更短的说法，或把这一区拆成两块。"))
+    return out
+
+
+# ── #7 区域 ────────────────────────────────────────────────
 def check_regions(spec: dict, result: ResultT, boxes: dict[str, BoxT]) -> list[Issue]:
     """区域之间**要么分开、要么一个完全包住另一个** —— 不许部分重叠。
 
@@ -529,6 +585,7 @@ def check(spec: dict, result: ResultT,
         *check_edge_overlap(result),
         *check_edge_slant(result),
         *check_regions(spec, result, boxes),
+        *check_region_labels(spec, result, boxes),
     ])
 
 
@@ -672,7 +729,7 @@ def format_report(spec: dict, attempts: list[Attempt], outcome: Outcome) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="九项校验 + 自动调参（报告里不出现参数名）")
+    ap = argparse.ArgumentParser(description="十项校验 + 自动调参（报告里不出现参数名）")
     ap.add_argument("spec", help="*.diagram.json")
     ap.add_argument("--json", action="store_true", help="附带机器可读结果")
     args = ap.parse_args(argv)

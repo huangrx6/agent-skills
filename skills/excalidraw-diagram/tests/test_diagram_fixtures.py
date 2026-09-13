@@ -209,6 +209,32 @@ def measure(scene: dict) -> dict:
     # P4：有没有标题（字号 >= 20 才算标题，节点标题是 16）
     has_title = any(e["type"] == "text" and e.get("fontSize", 0) >= 20 for e in elements)
 
+    # P18：边标签互相压 / 压区域标题 / 压节点文字
+    #
+    # 标签以前只避让**连线与节点框** —— 它们互相不知道对方存在。
+    # 实测一张 12 条边的密集图：**7 对标签互相重叠**；另一张图里两条边的
+    # “同步调用”压在区域标题「探针与门禁」上。两个叠在一起的标签谁也读不清，
+    # 严重性与压节点框同级。
+    edge_labels = [e for e in elements if e["id"].startswith("elabel")]
+    region_titles = [e for e in elements if e["id"].startswith("region-label-")]
+    node_texts = [e for e in elements if e["type"] == "text" and e.get("containerId")]
+
+    def _pairs(first: list, second: list) -> int:
+        count = 0
+        for i, a in enumerate(first):
+            for j, b in enumerate(second):
+                if a is b or (first is second and j <= i):
+                    continue
+                if (a["x"] < b["x"] + b["width"] and a["x"] + a["width"] > b["x"]
+                        and a["y"] < b["y"] + b["height"]
+                        and a["y"] + a["height"] > b["y"]):
+                    count += 1
+        return count
+
+    label_pairs = _pairs(edge_labels, edge_labels)
+    label_on_region_title = _pairs(edge_labels, region_titles)
+    label_on_node_text = _pairs(edge_labels, node_texts)
+
     # P5：用了几种形状（顶盖不算 —— 它是圆柱的一部分，不是另一种节点形状）
     shapes = {e["type"] for e in rects}
 
@@ -226,6 +252,9 @@ def measure(scene: dict) -> dict:
 
     return {"nodes": len(rects), "edges": len(arrows), "labels": len(labels),
             "through_nodes": through, "labels_on_lines": crossed,
+            "label_pairs": label_pairs,
+            "label_on_region_title": label_on_region_title,
+            "label_on_node_text": label_on_node_text,
             "max_fanout": max(fanout.values()) if fanout else 0,
             "has_title": has_title, "shape_kinds": sorted(shapes),
             "aspect": aspect, "size": (round(width), round(height))}
@@ -272,6 +301,24 @@ class TestKnownProblemsDoNotWorsen(unittest.TestCase):
             spec = json.load(fh)
         scene, _, _, _ = E.emit(spec)
         return measure(scene)
+
+    def test_labels_do_not_overlap_each_other(self):
+        """P18：边标签之间、边标签与区域标题/节点文字**一个都不许重叠**。
+
+        这里直接断言 0，而不是“不超过已知值” —— 因为它已经是 0 了
+        （和 P3 的“六张图压线数 = 0”同一个做法：修好之后升级成结构性不变量）。
+        没有这一条时，密集图里的重叠**没有任何校验器会报**：标签搜位置只看
+        连线与节点框，而这两样都不是“另一个标签”。
+        """
+        for path in spec_paths():
+            name = os.path.basename(path).replace(".json", "")
+            with self.subTest(fixture=name):
+                m = self.measured(path)
+                self.assertEqual(0, m["label_pairs"], f"{name} 有标签互相重叠")
+                self.assertEqual(0, m["label_on_region_title"],
+                                 f"{name} 有标签压在区域标题上")
+                self.assertEqual(0, m["label_on_node_text"],
+                                 f"{name} 有标签压在节点文字上")
 
     def test_through_node_count_does_not_grow(self):
         for path in spec_paths():

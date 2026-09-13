@@ -2995,8 +2995,52 @@ class NodeBox:
 
 
 REGION_PAD = 26.0        # 区域边框到成员节点的距离
-REGION_HEAD = 40.0       # 区域标题要占的高度（留在成员节点**上方**的空白带）
+# 区域标题的字号：比节点标题（16）大一步 —— 参考图里它就是整块区域的名字。
+REGION_LABEL_SIZE = 20.0
+REGION_LABEL_TOP = 10.0      # 标题离区域顶边的距离
+REGION_LABEL_GAP = 5.0       # 标题块与成员节点之间至少留的空
+# 标题离左右边框至少留这么多 —— 与 `emit._region_label_x` 里挑位用的 8px 是同一个数
+REGION_LABEL_MARGIN = 8.0
+# 单行标题时占的高度。**它就是下面那个和**（10 + 20×1.25 + 5 = 40），
+# 由 `test_region_head_matches_the_single_line_band` 钉住 —— 两处各写一个数迟早会漂。
+# 多行时的高度**逐区域由断行结果算**（见 `region_boxes`），不是这个常数。
+REGION_HEAD = 40.0
+# 标题最多断成几行。**这是判断，不是推导**：标题带是为了让区域有个名字，
+# 不是拿来放一段话的。超过就报告建议缩短 —— 与节点那边
+# 「标签超过最大断行档位就判失败」是同一类内容级问题。
+REGION_TITLE_MAX_LINES = 2
 REGION_MIN_GAP = 18.0    # 两个区域贴在一起时至少留这么多
+
+
+def region_label_lines(label: str, width: float) -> tuple[list[str], float]:
+    """把区域标题**断到区域的宽度里**。返回 `(行, 最宽一行的像素宽)`。
+
+    尺寸链和节点是同一套，只是两端互换：
+      区域宽度（由成员节点定）→ 断行 → 行数 → **标题带高度**
+
+    反过来（先给标题带一个固定高度，再让文字去挤那个宽度）就是用户报的那个 bug：
+    实测一个 368px 的标题画在 324px 的可用宽度里，两头各冒出去 22px，
+    而当时的九项校验里**没有一项在量区域标题** —— 标题宽度压根没进过任何尺寸链。
+    """
+    if not label:
+        return [], 0.0
+    # 下限 1 个单位：区域比一个字还窄时也不让断行退化成死循环
+    max_units = max(1.0, (width - 2 * REGION_LABEL_MARGIN) / REGION_LABEL_SIZE)
+    lines, _forced = _tm.wrap(label, max_units)
+    # 行数定下来之后，在**同一行数**里挑最均衡的一版。
+    # 贪心断行会把最后一行剩下一两个字（实测 "…× 执行 × 物 / 化对齐"），
+    # 而把断行宽度收窄一档就能断在空格上（"三真源：完成 = 期望 / × 执行 × 物化对齐"）。
+    # 必须卡死**行数不变** —— 否则"最窄"这个目标会把它断成四行。
+    count = len(lines)
+    widest = max(_tm.weighted_units(line) for line in lines)
+    for factor in (0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5):
+        candidate, _ = _tm.wrap(label, max_units * factor)
+        if len(candidate) != count:
+            continue
+        candidate_widest = max(_tm.weighted_units(line) for line in candidate)
+        if candidate_widest < widest - 1e-6:
+            lines, widest = candidate, candidate_widest
+    return lines, widest * REGION_LABEL_SIZE
 
 
 def region_boxes(spec: dict, placed: dict, boxes: dict) -> list[dict]:
@@ -3010,7 +3054,13 @@ def region_boxes(spec: dict, placed: dict, boxes: dict) -> list[dict]:
     用**成员节点自己的包围盒**算（不是虚线节点那种内部东西），所以区域一定
     框得住它画的每一个节点。标题带留在顶边以上，区域标题因此不会压到任何节点。
 
-    返回 [{id, label, level, x, y, width, height, label_x, label_y}, ...]，
+    **标题按区域的宽度断行，标题带的高度由断行结果算** —— 于是"标题比区域宽"
+    在构造上不可能发生（见 `region_label_lines`）。断行结果与测好的尺寸一起
+    放进返回值，落笔那边（`emit.region_elements`）直接用，**不重新量一遂**：
+    同一件文字量两遂必然漂移，而漂移的那一遂会让框和字对不上。
+
+    返回 `[{id, label, label_lines, label_size, label_width, label_height,
+    level, members, x, y, width, height, label_x, label_y}, ...]`，
     顺序沿用 `groups` 的声明顺序（先声明的画在更下面）。
     """
     members: dict[str, list[str]] = {}
@@ -3028,21 +3078,32 @@ def region_boxes(spec: dict, placed: dict, boxes: dict) -> list[dict]:
         top = min(placed[nid].y for nid in ids)
         right = max(placed[nid].x + boxes[nid].width for nid in ids)
         bottom = max(placed[nid].y + boxes[nid].height for nid in ids)
-        x = left - REGION_PAD
-        y = top - REGION_PAD - REGION_HEAD
         width = (right - left) + REGION_PAD * 2
-        height = (bottom - top) + REGION_PAD * 2 + REGION_HEAD
+        label = group.get("label") or ""
+        lines, label_width = region_label_lines(label, width)
+        label_height = len(lines) * REGION_LABEL_SIZE * _tm.LINE_HEIGHT
+        # 标题带的高度 = 上边距 + 标题块 + 与成员之间的空；没有标题时用单行那个数
+        head = ((REGION_LABEL_TOP + label_height + REGION_LABEL_GAP)
+                if lines else REGION_HEAD)
+        x = left - REGION_PAD
+        y = top - REGION_PAD - head
+        height = (bottom - top) + REGION_PAD * 2 + head
         out.append({
             "id": group["id"],
-            "label": group.get("label") or "",
+            "label": label,
             "level": group.get("level", "tint"),
+            # 标签断行结果与实际占的尺寸 —— 落笔那边直接用这几个数
+            "label_lines": list(lines),
+            "label_size": REGION_LABEL_SIZE,
+            "label_width": round(label_width, 2),
+            "label_height": round(label_height, 2),
             # 成员列表一起带出去：校验器要判"框里有没有夹着非成员"
             "members": list(ids),
             "x": round(x, 2), "y": round(y, 2),
             "width": round(width, 2), "height": round(height, 2),
             # 标题在标题带里**水平居中**（参考图就是这个样子）
             "label_x": round(x + width / 2.0, 2),
-            "label_y": round(top - REGION_PAD - REGION_HEAD + 10.0, 2),
+            "label_y": round(y + REGION_LABEL_TOP, 2),
         })
     return out
 
@@ -3153,6 +3214,9 @@ def load_sibling(name: str):
 # `emphasis_scale` 的值住在 palette 的 EMPHASIS 里。
 # 必须放在 load_sibling 定义**之后** —— 模块级代码自顶向下跑（这个坑踩过两次）。
 _palette = load_sibling("palette")
+# 量区域标题用的那一份。**模块级只加载一次**：`region_boxes` 每次出图会被调两次
+# （校验一次、落笔一次），`load_sibling` 每调一次就重新 exec 一遂模块。
+_tm = load_sibling("text_metrics")
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="分层布局（干跑，看坐标与交叉数）")

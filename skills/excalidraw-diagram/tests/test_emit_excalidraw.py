@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import math
 import os
 import subprocess
 import sys
@@ -55,6 +56,8 @@ E = _load("emit_excalidraw", EMIT)
 L = E.L
 palette = E.palette
 V = E._load_sibling("validate_spec")
+# 量文字用的那一份（跟 E / L 同源）：区域标题的行宽得用它算。
+tm = L._tm
 
 
 def spec_of(ids, edges, **kw) -> dict:
@@ -67,6 +70,17 @@ def build(spec: dict) -> dict:
     scene, result, outcome, attempts = E.emit(spec)
     assert scene, f"没出图：{[i.line() for i in outcome.blocking]}"
     return scene
+
+
+def _point_segment_distance(point, first, second) -> float:
+    """点到线段的距离 —— 边标签“离自己那条线多远”就靠它量。"""
+    ax, ay = first
+    bx, by = second
+    dx, dy = bx - ax, by - ay
+    if dx == 0 and dy == 0:
+        return math.dist(point, first)
+    t = max(0.0, min(1.0, ((point[0] - ax) * dx + (point[1] - ay) * dy) / (dx * dx + dy * dy)))
+    return math.dist(point, (ax + t * dx, ay + t * dy))
 
 
 class TestSceneEnvelope(unittest.TestCase):
@@ -748,6 +762,175 @@ class TestStyleAxes(unittest.TestCase):
         codes = {i["code"] for i in issues}
         self.assertIn("BAD_STYLE_VALUE", codes)
         self.assertIn("BAD_STYLE_AXIS", codes)
+
+
+class TestRegionLabelElements(unittest.TestCase):
+    """区域标题的落笔：断行与尺寸**来自 layout**，不在这里重新量一遂（P17）。
+
+    重新量一遂就会漂 —— 而“框与字对不上”正是用户报的那个溢出的根。
+    """
+
+    SPEC = {
+        "type": "architecture", "direction": "LR", "title": "T",
+        "groups": [{"id": "truth", "label": "三真源：完成 = 期望 × 执行 × 物化对齐"}],
+        "nodes": [{"id": "a", "label": "A", "kind": "service", "group": "truth"},
+                  {"id": "b", "label": "B", "kind": "plain"}],
+        "edges": [{"from": "a", "to": "b"}],
+    }
+
+    def scene(self):
+        boxes = L.boxes_from_spec(self.SPEC)
+        result = L.layout(self.SPEC, boxes)
+        return E.build_scene(self.SPEC, result, boxes, None, None), boxes, result
+
+    def label(self):
+        scene, _boxes, _result = self.scene()
+        return next(e for e in scene["elements"] if e["id"].startswith("region-label-"))
+
+    def test_text_carries_the_wrapped_lines(self):
+        element = self.label()
+        self.assertIn("\n", element["text"], "长标题没有被断行 —— 它会从区域里冒出去")
+        self.assertEqual(element["text"], element["originalText"])
+
+    def test_element_geometry_equals_the_layout_box(self):
+        """宽高必须**逐字**等于 `region_boxes` 算好的那一份。"""
+        element = self.label()
+        scene, boxes, result = self.scene()
+        region = next(r for r in L.region_boxes(self.SPEC, result.placed, boxes)
+                      if r["id"] == "truth")
+        self.assertAlmostEqual(element["width"], region["label_width"], places=2)
+        self.assertAlmostEqual(element["height"], region["label_height"], places=2)
+        self.assertAlmostEqual(element["y"], region["label_y"], places=2)
+        self.assertEqual(element["fontSize"], region["label_size"])
+
+    def test_every_line_fits_inside_the_region(self):
+        element = self.label()
+        scene, boxes, result = self.scene()
+        region = L.region_boxes(self.SPEC, result.placed, boxes)[0]
+        usable = region["width"] - 2 * L.REGION_LABEL_MARGIN + 0.01
+        self.assertLessEqual(element["width"], usable)
+        for line in element["text"].split("\n"):
+            self.assertLessEqual(tm.weighted_units(line) * element["fontSize"], usable,
+                                 f"这一行还是比区域宽：{line!r}")
+
+    def test_label_is_not_container_bound(self):
+        """区域标题是**独立文字**（`containerId: None`）—— 所以断行由我们说了算。
+
+        节点标签是容器绑定的，Excalidraw 会按真实字体**重排**它（那是已知限制）；
+        区域标题带显式换行符且不绑容器，渲染器不会自己再断一遂。
+        """
+        self.assertIsNone(self.label()["containerId"])
+
+
+class TestEdgeLabelCollisions(unittest.TestCase):
+    """P18：边标签互相压 / 压区域标题 / 飘得离自己那条线太远。
+
+    这一组用例用**密集图**：自带 fixture 里最多只有 5 个边标签，
+    在它们上面根本触发不了重叠（实测：把修复退回去，7 张 fixture 仍然是 0）。
+    用户报回来的正是密集那种：“线上的文本和其他线上的文本可能会重叠，
+    特别是线比较密集的时候”。
+    """
+
+    # 12 条边、每条一个计数标签（用户那张包依赖图的形状）。
+    DENSE = {
+        "type": "dependency", "direction": "LR", "title": "密集标签",
+        "nodes": [{"id": "cap", "kind": "service", "label": "capabilities",
+                   "group": "rt"},
+                  {"id": "prov", "kind": "service", "label": "providers",
+                   "group": "rt"},
+                  {"id": "app", "kind": "service", "label": "application",
+                   "group": "rt"}],
+        "groups": [{"id": "rt", "label": "运行时链路"}],
+        "edges": [{"from": "cap", "to": "app", "label": "18 处"},
+                  {"from": "prov", "to": "app", "label": "2 处"},
+                  {"from": "cap", "to": "prov", "label": "4 处"},
+                  {"from": "prov", "to": "cap", "label": "31 处"},
+                  {"from": "cap", "to": "app", "label": "33 处"},
+                  {"from": "prov", "to": "app", "label": "15 处"},
+                  {"from": "cap", "to": "prov", "label": "16 处"},
+                  {"from": "prov", "to": "cap", "label": "29 处"},
+                  {"from": "cap", "to": "app", "label": "24 处"},
+                  {"from": "prov", "to": "app", "label": "0 处"},
+                  {"from": "cap", "to": "prov", "label": "3 处"},
+                  {"from": "prov", "to": "cap", "label": "42 处"}],
+    }
+
+    # 用户截图里那一处：边的自动 kind 标签压在一个区域标题上。
+    # 这份规格是**最小的可复现**：把“区域标题不算避让物”退回去，它就会重叠（实测 1 处）。
+    WITH_TITLE = {
+        "type": "flow", "direction": "TB", "title": "T", "detail": "diagnostic",
+        "groups": [{"id": "g", "label": "探针与门禁"}],
+        "nodes": [{"id": "src", "kind": "service", "label": "入口"},
+                  {"id": "n0", "kind": "service", "label": "步骤0", "group": "g"},
+                  {"id": "n1", "kind": "service", "label": "步骤1", "group": "g"}],
+        "edges": [{"from": "src", "to": "n0"}, {"from": "src", "to": "n1"},
+                  {"from": "n0", "to": "n1"}],
+    }
+
+    @staticmethod
+    def _rects(elements, prefix, container=False):
+        out = []
+        for el in elements:
+            if prefix and el["id"].startswith(prefix):
+                out.append(el)
+            elif container and el["type"] == "text" and el.get("containerId"):
+                out.append(el)
+        return out
+
+    @staticmethod
+    def _overlaps(first, second):
+        pairs = []
+        for i, a in enumerate(first):
+            for j, b in enumerate(second):
+                if a is b or (first is second and j <= i):
+                    continue
+                if (a["x"] < b["x"] + b["width"] and a["x"] + a["width"] > b["x"]
+                        and a["y"] < b["y"] + b["height"]
+                        and a["y"] + a["height"] > b["y"]):
+                    pairs.append((a.get("text"), b.get("text")))
+        return pairs
+
+    def test_dense_labels_do_not_overlap(self):
+        """12 个标签挤在同一片空档里 —— 以前实测 **7 对重叠**，且没有任何校验会报。"""
+        scene, _result, _outcome, _attempts = E.emit(self.DENSE)
+        labels = self._rects(scene["elements"], "elabel")
+        self.assertEqual(12, len(labels), "这份规格应该每个边都有标签")
+        self.assertEqual([], self._overlaps(labels, labels), "边标签之间还在重叠")
+
+    def test_labels_avoid_region_titles(self):
+        """区域标题也是要读的字 —— 而它不是节点、也不是连线。"""
+        scene, _result, _outcome, _attempts = E.emit(self.WITH_TITLE)
+        labels = self._rects(scene["elements"], "elabel")
+        titles = self._rects(scene["elements"], "region-label-")
+        self.assertTrue(labels, "这份规格应该补出自动 kind 标签")
+        self.assertTrue(titles)
+        self.assertEqual([], self._overlaps(labels, titles), "边标签压在区域标题上")
+
+    def test_labels_do_not_sit_on_node_text(self):
+        scene, _result, _outcome, _attempts = E.emit(self.WITH_TITLE)
+        labels = self._rects(scene["elements"], "elabel")
+        node_texts = self._rects(scene["elements"], "", container=True)
+        self.assertEqual([], self._overlaps(labels, node_texts), "边标签压在节点文字上")
+
+    def test_labels_stay_near_their_own_edge(self):
+        """标签要**贴着自己那条线**、沿它滑开，而不是为了避让飘到很远的地方。
+
+        实测：把“先沿线滑、再往外推”写反（先进退让量）时，最大偏离 **191px**，
+        一堆标签飘在离自己那条线很远的地方 —— 用户看到的“太拥挤”就是那个。
+        换回来之后同一张图最大偏离降到 **35px**。
+        """
+        scene, result, _outcome, _attempts = E.emit(self.DENSE)
+        labels = self._rects(scene["elements"], "elabel")
+        self.assertEqual(len(result.edges), len(labels), "标签与边一一对应才能配对")
+        worst = 0.0
+        for edge, label in zip(result.edges, labels):
+            centre = (label["x"] + label["width"] / 2.0,
+                      label["y"] + label["height"] / 2.0)
+            pts = edge["points"]
+            worst = max(worst, min(_point_segment_distance(centre, a, b)
+                                   for a, b in zip(pts, pts[1:])))
+        self.assertLessEqual(worst, 60.0,
+                             f"有标签离自己那条线 {worst:.0f}px —— 看不出它属于哪条边")
 
 
 class TestDetailLevels(unittest.TestCase):

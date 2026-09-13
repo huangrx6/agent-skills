@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""check_layout.py 的回归测试：九项校验 + 自动调参 + 报告措辞。
+"""check_layout.py 的回归测试：十项校验 + 自动调参 + 报告措辞。
 
 ## 用例的着力点
 
@@ -629,6 +629,72 @@ class TestEdgeShapeChecks(unittest.TestCase):
         spec = spec_of(["web", "api", "db"], [("web", "api"), ("api", "db")])
         _, outcome, _ = run(spec)
         self.assertEqual([], outcome.issues)
+
+
+class TestRegionTitle(unittest.TestCase):
+    """#10 区域标题不能溢出（P17）。
+
+    用户拿截图来问「这种块的 title 会溢出」—— 一个 368px 的标题画在 324px 的
+    可用宽度里，而当时**没有任何检查在量区域标题**。
+    """
+
+    @staticmethod
+    def _spec(label, node_label="A"):
+        return {"type": "flow", "direction": "TB",
+                "groups": [{"id": "g", "label": label}],
+                "nodes": [{"id": "a", "label": node_label, "kind": "service", "group": "g"},
+                          {"id": "b", "label": "B", "kind": "plain"}],
+                "edges": [{"from": "a", "to": "b"}]}
+
+    def _issues(self, spec):
+        boxes = L.boxes_from_spec(spec)
+        result = L.layout(spec, boxes)
+        return C.check_region_labels(spec, result, boxes)
+
+    def test_a_normal_title_is_silent(self):
+        self.assertEqual([], self._issues(self._spec("适配层")))
+        self.assertEqual([], self._issues(self._spec("三真源：完成 = 期望 × 执行 × 物化对齐")))
+
+    def test_overlong_title_blocks_with_content_advice(self):
+        """标题断到超过上限 -> 内容问题，建议缩短/拆区（与节点标签超长同一类）。"""
+        issues = self._issues(self._spec("这一整块是给外部系统做协议适配与版本协商的地方" * 2))
+        self.assertTrue(issues, "标题断了很多行，却没有报")
+        issue = issues[0]
+        self.assertEqual("region_label", issue.check)
+        self.assertTrue(issue.blocking)
+        self.assertIn("拆", issue.advice or "", "建议要是内容级的")
+
+    def test_broken_wrap_is_reported_as_a_script_bug(self):
+        """后置断言那一支：断行与尺寸对不上时不给内容建议（改标签没用）。"""
+        spec = self._spec("适配层")
+        boxes = L.boxes_from_spec(spec)
+        result = L.layout(spec, boxes)
+        original = L.region_boxes
+
+        def broken(*args, **kwargs):
+            regions = original(*args, **kwargs)
+            for region in regions:
+                region["label_width"] = region["width"] + 50.0      # 人为破坏
+            return regions
+
+        L.region_boxes = broken
+        try:
+            issues = C.check_region_labels(spec, result, boxes)
+        finally:
+            L.region_boxes = original
+        self.assertEqual(1, len(issues))
+        self.assertTrue(issues[0].blocking)
+        self.assertIsNone(issues[0].advice, "脚本内部不一致不该给内容建议")
+        self.assertIn("内部不一致", issues[0].detail)
+
+    def test_no_parameter_can_fix_it(self):
+        """它属于「别调参了」那一类：加间距不会让标题变短。"""
+        self.assertIn("region_label", C.STOP_ON)
+        self.assertNotIn("region_label", C.TUNABLE)
+        before = dict(C.L.DEFAULT_PARAMS)
+        outcome = C.Outcome(issues=[C.Issue("region_label", True, "g", "为了测这个")])
+        self.assertEqual(before, C._step(before, outcome),
+                         "调参表不该为区域标题动任何参数")
 
 
 class TestCli(unittest.TestCase):

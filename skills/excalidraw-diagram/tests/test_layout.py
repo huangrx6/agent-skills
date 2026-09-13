@@ -861,3 +861,82 @@ class TestRegions(unittest.TestCase):
         region = L.region_boxes(spec, placed, boxes)[0]
         top_of_members = min(placed[n].y for n in ("a", "b"))
         self.assertLess(region["label_y"] + L.REGION_HEAD, top_of_members)
+
+    # ── 区域标题不许溢出（P17）───────────────────────────────
+    # 用户拿截图来问「这种块的 title 会溢出」：一个 368px 的标题画在 324px 的
+    # 可用宽度里，两头各冒出去 22px，而当时**没有任何检查在量区域标题**。
+
+    def test_region_head_matches_the_single_line_band(self):
+        """单行标题时的标题带高度 = 上边距 + 一行字 + 间隙。
+
+        `REGION_HEAD` 是个字面量（它定义在 `load_sibling` 之前，拿不到行高），
+        所以这里把那个恒等式钉死 —— 两处各写一个数迟早会漂。
+        """
+        tm = _load("tm_for_region_test", os.path.join(SCRIPTS, "text_metrics.py"))
+        self.assertAlmostEqual(
+            L.REGION_HEAD,
+            L.REGION_LABEL_TOP + L.REGION_LABEL_SIZE * tm.LINE_HEIGHT + L.REGION_LABEL_GAP,
+            places=2, msg="REGION_HEAD 与单行标题带的公式对不上了")
+
+    def test_region_title_wraps_to_the_region_width(self):
+        """标题按**区域的宽度**断行：任何长度、任何宽度的区域都不许冒出去。
+
+        这是构造性的：宽度 → 断行 → 行数 → 标题带高度，不反过来。
+        """
+        for label in ("三真源：完成 = 期望 × 执行 × 物化对齐",
+                      "这一整块是给外部系统做协议适配的地方",
+                      "short", "A",
+                      "x" * 160):
+            for node_label in ("A", "宽一点的节点标签", "very long node label here"):
+                with self.subTest(label=label, node=node_label):
+                    spec = self.spec(nodes=[
+                        {"id": "a", "label": node_label, "kind": "service", "group": "g1"},
+                        {"id": "b", "label": "B", "kind": "plain"}],
+                        groups=[{"id": "g1", "label": label}],
+                        edges=[{"from": "a", "to": "b"}])
+                    region = self.box_of(spec)[0]
+                    self.assertLessEqual(
+                        region["label_width"],
+                        region["width"] - 2 * L.REGION_LABEL_MARGIN + 0.01,
+                        f"标题还是比区域宽：{region['label_width']} vs {region['width']}")
+
+    def test_region_title_band_grows_with_the_lines(self):
+        """断成两行时标题带跟着变高，而且**不许压到成员节点**。
+
+        固定高度 + 多行文字 = 文字从标题带里溢出来盖住第一排节点 ——
+        所以带高必须由断行结果算。
+        """
+        spec = self.spec(groups=[{"id": "g1", "label": "三真源：完成 = 期望 × 执行 × 物化对齐"}])
+        boxes = L.boxes_from_spec(spec)
+        placed = L.layout(spec, boxes).placed
+        region = L.region_boxes(spec, placed, boxes)[0]
+        self.assertGreater(len(region["label_lines"]), 1, "这份用例需要标题断成多行")
+        self.assertGreater(region["height"], 0)
+        self.assertAlmostEqual(
+            region["label_height"],
+            len(region["label_lines"]) * L.REGION_LABEL_SIZE * 1.25, places=2)
+        top_of_members = min(placed[n].y for n in ("a", "b"))
+        self.assertLessEqual(region["label_y"] + region["label_height"],
+                             top_of_members - L.REGION_PAD + 0.01)
+
+    def test_region_title_break_is_balanced_not_greedy(self):
+        """行数定下来之后挑**最均衡**的一版：贪心会把最后一行剩一两个字。
+
+        实测贪心给的是 `三真源：完成 = 期望 × 执行 × 物 / 化对齐`（把「物化对齐」
+        从中间切开），收窄一档就能断在空格上：`三真源：完成 = 期望 / × 执行 × 物化对齐`。
+        """
+        label = "三真源：完成 = 期望 × 执行 × 物化对齐"
+        lines, _width = L.region_label_lines(label, 340.0)
+        self.assertEqual(2, len(lines))
+        self.assertNotIn("化", lines[0][-1:], f"还是从中间切开了词：{lines}")
+        shortest, longest = sorted(lines, key=len)
+        self.assertGreaterEqual(len(shortest), 0.5 * len(longest), f"两行不均衡：{lines}")
+
+    def test_region_title_check_stays_silent_on_a_good_figure(self):
+        """好图不该多出噪声 —— 这条检查是断言，不是体检。"""
+        CL = _load("check_layout_for_region_label",
+                   os.path.join(SCRIPTS, "check_layout.py"))
+        spec = self.spec(groups=[{"id": "g1", "label": "三真源：完成 = 期望 × 执行 × 物化对齐"}])
+        boxes = L.boxes_from_spec(spec)
+        result = L.layout(spec, boxes)
+        self.assertEqual([], CL.check_region_labels(spec, result, boxes))

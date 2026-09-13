@@ -287,7 +287,9 @@ def shape_elements(element_id: str, shape_name: str, placed,
 # 比节点细（节点 1.5 / 强调 2.5）：区域是背景层。但不低于 1.0 ——
 # 0.75 时手绘的那点抖动几乎看不出来，整块区域会显得比周围"更机械"。
 REGION_STROKE_WIDTH = 1.0
-REGION_LABEL_SIZE = 20.0
+# 区域标题的字号住在 `layout.REGION_LABEL_SIZE` —— 它**决定了标题带的高度**
+# （带高 = 上边距 + 行数 × 字号 × 行高 + 间隙），所以尺寸链在 layout 那一侧。
+# 这里只用它，不再另存一份（两份数值必然漂，而漂的那一份会让框和字对不上）。
 
 
 def edge_kind_label(edge: dict, level: str | None) -> str | None:
@@ -314,19 +316,22 @@ def _region_label_x(region: dict, width: float,
     区域是背景，可它的标题是要读的字，不能让线从字上过。
 
     候选是标题带里的一串位置（居中 + 两边各扫若干点）。返回 `(横坐标, 是否脏)` ——
-    第二个值决定要不要给标题铺底色：标题宽过区域时**根本不存在**干净位置
-    （实测 420px 的标题在 468px 的区域里，而竖线正在正中），那时候只能靠底色。
+    第二个值决定要不要给标题铺底色：标题带里**每一个候选都被线穿过**时
+    （实测 420px 的标题在 468px 的区域里，而竖线正在正中），只能靠底色。
     打分只看"这条线会不会从这段文字的圈里过" —— 和边标签用的是同一套判据。
     """
     if not polylines or width <= 0:
         return region["label_x"], False
-    # 搜索范围**是整块区域的宽度**，只留 8px 不允许贴到框线后面 ——
+    # 搜索范围**是整块区域的宽度**，只留 `REGION_LABEL_MARGIN` 不允许贴到框线后面 ——
     # 一开始卡了 12px 内边距，结果 `boot` 那个 276px 宽的标题在 [−14, 230] 里
     # **每一个候选都被穿过**：竖线在区域正中 x=259，而整个候选区间落在 [−17, 259] 内。
     # 贴着右边缘（268）反而是干净的 —— 标题本来就可以靠边，不必留那么宽的边距。
-    left = region["x"] + 8.0
-    right = region["x"] + region["width"] - 8.0 - width
-    if right < left:                      # 区域比标题还窄：居中，别再折腾
+    margin = L.REGION_LABEL_MARGIN
+    left = region["x"] + margin
+    right = region["x"] + region["width"] - margin - width
+    if right < left:
+        # 构上到不了：标题按区域宽度断行（`layout.region_label_lines`），
+        # 所以 width ≤ 区域宽 - 2×margin。留着当护栅 —— 真要走到这里，说明尺寸链被改坏了。
         return region["label_x"], False
     centre = region["label_x"] - width / 2.0
     best, best_hits = region["label_x"], None
@@ -335,7 +340,8 @@ def _region_label_x(region: dict, width: float,
         x = centre if fraction == 0.5 else left + (right - left) * fraction
         x = max(left, min(right, x))
         hits = _line_hits(x, region["label_y"], width,
-                          REGION_LABEL_SIZE * tm.LINE_HEIGHT, polylines)
+                          region.get("label_height") or L.REGION_LABEL_SIZE * tm.LINE_HEIGHT,
+                          polylines)
         if best_hits is None or hits < best_hits:
             best, best_hits = x + width / 2.0, hits
         if not hits:
@@ -378,10 +384,15 @@ def region_elements(region: dict, style: dict | None = None,
                       extra={"groupIds": [el_id]})]
     label = region.get("label")
     if label:
-        box = tm.measure(label, "", font_size=REGION_LABEL_SIZE)
-        width = max(tm.weighted_units(line) for line in box.lines) * REGION_LABEL_SIZE
-        height = len(box.lines) * REGION_LABEL_SIZE * tm.LINE_HEIGHT
-        text = "\n".join(box.lines)
+        # **断行与尺寸直接用 layout 算好的那份**，不在这里重新量一遂 ——
+        # 标题带的高度就是按那几个数算出来的，这里再量一次就可能对不上
+        # （而“框与字对不上”正是用户报的那个溢出的根。“同一件几何算两遂必然漂移”
+        # 这句在 `_sample_points`/`_segment_may_hit_box` 那两处已经写下过一次）。
+        lines = list(region.get("label_lines") or (label,))
+        size = region.get("label_size", L.REGION_LABEL_SIZE)
+        width = region.get("label_width", 0.0)
+        height = region.get("label_height", 0.0)
+        text = "\n".join(lines)
         label_id = _eid("region-label", region["id"])
         label_x, dirty = _region_label_x(region, width, polylines)
         elements.append({
@@ -390,14 +401,14 @@ def region_elements(region: dict, style: dict | None = None,
                    palette.LEVELS[level]["stroke"], "transparent",
                    extra={"groupIds": [el_id]}),
             "text": text,
-            "fontSize": REGION_LABEL_SIZE,
+            "fontSize": size,
             "fontFamily": palette.CANVAS["font_family"],
             "textAlign": "center",
             "verticalAlign": "top",
             "containerId": None,
             "originalText": text,
             "lineHeight": tm.LINE_HEIGHT,
-            "baseline": round(REGION_LABEL_SIZE * BASELINE_RATIO, 2),
+            "baseline": round(size * BASELINE_RATIO, 2),
         })
         if dirty:
             # 标题宽过区域的时候，标题带里**根本不存在**干净位置（实测：420px 的标题
@@ -657,10 +668,16 @@ def label_position(pts: list, width: float, height: float,
     best_score = -1
     # 取样点与退让量都给足：正交路由之后线段变多，密集图上常常整片中招。
     # 多试一些点的代价很小（一次搜索也就几百次矩形相交判断），比压上去划算。
-    for frac in (0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82, 0.1, 0.9):
-        mid, back, fwd = _midpoint_frame(pts, frac)
-        directions = _candidate_directions(back, fwd)
-        for extra in (0.0, 6.0, 12.0, 20.0, 30.0, 45.0, 65.0, 90.0, 120.0, 160.0):
+    #
+    # **循环顺序是「先沿线滑、再往外推」**（退让量在外层）。
+    # 写反的代价实测过：标签会为了躲开一个障碍而**先往外推 100px**，
+    # 而不肯沿着自己那条线滑开一段 —— 结果一堆标签飘在离自己那条线很远的地方，
+    # 看着又乱又拥挤（实测最大偏离 **191px**），还说不清这行字到底属于哪条边。
+    # 换成先滑再推、最大偏离降到 **31px**，同一张密集图上的重叠仍然是 0。
+    for extra in (0.0, 6.0, 12.0, 20.0, 30.0, 45.0, 65.0, 90.0, 120.0, 160.0):
+        for frac in (0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82, 0.1, 0.9):
+            mid, back, fwd = _midpoint_frame(pts, frac)
+            directions = _candidate_directions(back, fwd)
             for dx, dy in directions:
                 reach = radius + gap + extra
                 x = mid[0] + dx * reach - width / 2
@@ -828,6 +845,10 @@ def build_scene(spec: dict, result, boxes: dict,
     region_polylines = [list(edge["points"]) for edge in result.edges]
     for region in L.region_boxes(spec, result.placed, boxes):
         elements += region_elements(region, style, region_polylines)
+    # 区域标题也是要读的字，而它不是节点、也不是连线 —— 以前没有任何标签避让它。
+    # 用户截图里的那处鸿就是：两条边的“同步调用”压在一个区域标题「探针与门禁」上。
+    region_title_boxes = [(e["x"], e["y"], e["x"] + e["width"], e["y"] + e["height"])
+                          for e in elements if e["id"].startswith("region-label-")]
 
     arrows_out: dict[str, list[str]] = {nid: [] for nid in by_id}
     arrows_in: dict[str, list[str]] = {nid: [] for nid in by_id}
@@ -872,18 +893,28 @@ def build_scene(spec: dict, result, boxes: dict,
     box_keepouts = [(placed.x, placed.y, placed.x + placed.width,
                      placed.y + placed.height)
                     for placed in result.real_nodes().values()]
+    # **已经放好的标签自己也是避让物。** 以前每个标签只看连线和节点，
+    # 互相不知道对方存在 —— 密集图上实测 12 个标签里 **7 对重叠**
+    # （用户的原话：“线上的文本和其他线上的文本可能会重叠”）。
+    # 重叠的两个标签谁也读不清，严重性跟压在节点框上一样，所以与节点同权。
+    # 外扩半个 `LABEL_GAP`：只求“不重叠”会贴在一起，看着一样拥挤。
+    label_keepouts = list(box_keepouts) + region_title_boxes
     for i, (edge, _) in enumerate(arrow_specs):
         elements.append(arrow_element(edge, i, style))
         if not L.shows_edge_label(edge, detail_level):
             continue                      # executive：摘要里不堆边标签
-        label = edge_label_element(edge, i, polylines, box_keepouts)
+        label = edge_label_element(edge, i, polylines, label_keepouts)
         if label is None:
             auto = edge_kind_label(edge, detail_level)
             if auto:
                 label = edge_label_element({**edge, "label": auto}, i, polylines,
-                                           box_keepouts)
+                                           label_keepouts)
         if label:
             elements.append(label)
+            pad = LABEL_GAP / 2.0
+            label_keepouts.append((label["x"] - pad, label["y"] - pad,
+                                   label["x"] + label["width"] + pad,
+                                   label["y"] + label["height"] + pad))
 
     # 图标题最后加：它要按已排好的内容来居中，而它自己**不参与**布局。
     # 放的位置是“内容顶边往上 TITLE_GAP”，所以不需要把别的元素往下挪 ——
