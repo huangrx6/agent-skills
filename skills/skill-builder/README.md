@@ -82,13 +82,17 @@ skills/skill-builder/
 ├── README.md                    # 本文件
 ├── references/
 │   ├── anatomy-and-scope.md     # skill 目录该放什么、哪些内容该进 references
+│   ├── slimming.md              # 正文余量不足时怎么搬（搬什么 / 留什么 / 搬完怎么核对）
+│   ├── reporting.md             # 报告纪律的实测经过、这条防线为什么没闭合
 │   └── skill-readme-template.md # 每个 skill 的 README 模版与硬约束
 ├── scripts/
 │   ├── validate_skill.py        # 结构校验（挡提交的那一道）
 │   ├── check_leakage.py         # 泄露扫描
 │   ├── check_pointers.py        # 指针目标存在性
 │   └── preflight.py             # 全部检查 + 事实快照
-└── tests/                       # 48 条：三个检查器的边界值
+├── tests/                       # 48 条：三个检查器的边界值
+└── evals/
+    └── evals.json               # 6 条行为评估（频率证据 / 边界写进 description / 已量不算）
 ```
 
 ## 边界（不该用它的时候）

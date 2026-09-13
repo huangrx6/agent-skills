@@ -168,6 +168,63 @@ class AssetTest(RepoCase):
         self.assertIn("assets/icons/root.svg", assets)
 
 
+class TreeTest(RepoCase):
+    """README 的「目录结构」树 vs 真实目录。
+
+    这一类已经咬过两次，其中一次是**假陈述**（WLRR 写着「没有 scripts/ 与 tests/」，
+    而它两个都有了）—— 所以否定句要单独查。
+    """
+
+    def with_readme(self, name: str, tree: str) -> str:
+        skill = os.path.join(self.root, "skills", name)
+        os.makedirs(skill, exist_ok=True)
+        with open(os.path.join(skill, "README.md"), "w", encoding="utf-8") as fh:
+            fh.write(f"# {name}\n\n## 目录结构\n\n```text\n{tree}\n```\n")
+        return skill
+
+    def test_真实的顶层目录没提就报(self):
+        skill = self.with_readme("aaa", "skills/aaa/\n├── SKILL.md\n")
+        os.makedirs(os.path.join(skill, "scripts"))
+        self.assertEqual(["scripts 存在，但树里没提"], health.readme_tree_issues(skill))
+
+    def test_提了就过(self):
+        skill = self.with_readme("aaa", "├── scripts/\n└── references/\n")
+        os.makedirs(os.path.join(skill, "scripts"))
+        os.makedirs(os.path.join(skill, "references"))
+        self.assertEqual([], health.readme_tree_issues(skill))
+
+    def test_否定句与事实矛盾是最重的一种(self):
+        skill = self.with_readme("aaa", "├── SKILL.md\n\n没有 `scripts/` 与 `tests/`。")
+        os.makedirs(os.path.join(skill, "scripts"))
+        os.makedirs(os.path.join(skill, "tests"))
+        issues = health.readme_tree_issues(skill)
+        self.assertTrue(any("没有 scripts/" in i for i in issues), issues)
+        self.assertTrue(any("没有 tests/" in i for i in issues), issues)
+
+    def test_否定句与事实一致时不报(self):
+        skill = self.with_readme("aaa", "├── SKILL.md\n\n没有 `scripts/`。")
+        self.assertEqual([], health.readme_tree_issues(skill))
+
+    def test_没有目录结构段就不管(self):
+        skill = os.path.join(self.root, "skills", "aaa")
+        os.makedirs(skill)
+        with open(os.path.join(skill, "README.md"), "w", encoding="utf-8") as fh:
+            fh.write("# aaa\n\n只写了用法，没有目录结构段。\n")
+        os.makedirs(os.path.join(skill, "scripts"))
+        self.assertEqual([], health.readme_tree_issues(skill))
+
+    def test_没有_readme_时不报这个(self):
+        skill = self.make_skill("aaa")
+        os.makedirs(os.path.join(skill, "scripts"))
+        self.assertEqual([], health.readme_tree_issues(skill))
+
+    def test_汇总里会出现这一类(self):
+        skill = self.with_readme("aaa", "├── SKILL.md\n")
+        os.makedirs(os.path.join(skill, "scripts"))
+        groups = health.summarize(health.scan_repo(self.root))
+        self.assertTrue(any("aaa" in item for item in groups["README 目录树过期"]), groups)
+
+
 class ReportTest(RepoCase):
     def test_分类汇总与正文超限(self):
         self.make_skill("紧", body_lines=145)      # 余量 5 < 10

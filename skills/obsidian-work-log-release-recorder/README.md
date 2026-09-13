@@ -81,11 +81,15 @@ skills/obsidian-work-log-release-recorder/
 ├── README.md                       # 本文件
 ├── references/
 │   └── release-note-template.md    # 周发版笔记模板 + 填写规则
+├── scripts/
+│   └── check_release_note.py       # 守本 skill 自己写下的规则（文件名/周号/骨架/重复周/已挂 MOC）
+├── tests/
+│   └── test_check_release_note.py  # 20 条（夹具从模板生成，模板改了测试跟着变）
 └── evals/
     └── evals.json                  # 8 条行为评估（触发边界 / 位置探查 / 该不该记）
 ```
 
-没有 `scripts/` 与 `tests/` —— 这是刻意的，代价见「已知限制」。
+链接失效**不在这里查** —— 那是 PKB 的 `check_links.py`（SKILL.md 明确要求跑），两者互补不重叠。
 
 ## 边界（不该用它的时候）
 

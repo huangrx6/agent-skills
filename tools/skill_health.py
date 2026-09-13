@@ -29,6 +29,7 @@ import argparse
 import importlib.util
 import json
 import os
+import re
 import sys
 from typing import Any
 
@@ -40,6 +41,13 @@ VALIDATOR = os.path.join("skills", "skill-builder", "scripts", "validate_skill.p
 SCAN_SUFFIXES = (".md", ".json", ".py", ".js", ".sh", ".yml", ".yaml", ".toml")
 SKIP_DIRS = {".git", "__pycache__", ".venv", "node_modules", ".idea", ".pytest_cache"}
 MAX_SCAN_BYTES = 2 * 1024 * 1024
+
+# README 里的「## 目录结构」 → 第一个 ```text 块
+TREE_BLOCK_RE = re.compile(r"^## 目录结构\n.*?```text\n(.*?)```", re.DOTALL | re.MULTILINE)
+# 「没有 `scripts/` 与 `tests/`」这类否定句 —— 它比遗漏更糟：是句错话
+NEGATION_SENTENCE_RE = re.compile(r"[^。\n]*没有[^。\n]*")
+TURN_RE = re.compile(r"但|不过|然而|而是")
+DIR_TOKEN_RE = re.compile(r"`?([A-Za-z0-9_\-]+)/`?")
 
 
 def _load_validator(root: str):
@@ -121,6 +129,52 @@ def asset_report(root: str, skills_dir: str) -> dict[str, Any]:
     return files
 
 
+def contradicted_dirs(block: str, skill_dir: str) -> list[str]:
+    """否定句里点名、但其实存在的目录。
+
+    按**句**提取而不是只取「没有」紧后面那个 —— 实测：写成「没有 `scripts/` 与 `tests/`」时
+    只认得到第一个。句内先砍掉转折词后面的部分（「没有 scripts/，但 tests/ 里有」
+    不该把 tests 算进来）。
+    """
+    out: list[str] = []
+    for sentence in NEGATION_SENTENCE_RE.findall(block):
+        turn = TURN_RE.search(sentence)
+        head = sentence[:turn.start()] if turn else sentence
+        for name in DIR_TOKEN_RE.findall(head):
+            if name not in out and os.path.isdir(os.path.join(skill_dir, name)):
+                out.append(name)
+    return out
+
+
+def readme_tree_issues(skill_dir: str) -> list[str]:
+    """README 的「目录结构」树与真实目录是否一致。
+
+    这一类已经咬过两次，其中一次是**假陈述**：WLRR 的 README 写着
+    「没有 `scripts/` 与 `tests/` —— 这是刻意的」，而它两个都有了。
+    所以同时查两件事：
+      1. 真实存在的顶层条目有没有出现在树里
+      2. 有没有「没有 X」这种否定句与事实矛盾（比遗漏更糟——那是句错话）
+
+    没有「## 目录结构」段的 README 直接放过（不是强制格式）。
+    """
+    text = read_text(os.path.join(skill_dir, "README.md"))
+    if not text:
+        return []
+    match = TREE_BLOCK_RE.search(text)
+    if not match:
+        return []
+    block = match.group(1)
+    issues: list[str] = []
+    for entry in sorted(listdir(skill_dir)):
+        if entry in ("README.md", "SKILL.md") or entry.startswith("."):
+            continue
+        if entry not in block:
+            issues.append(f"{entry} 存在，但树里没提")
+    for name in contradicted_dirs(block, skill_dir):
+        issues.append(f"树里写着「没有 {name}/」，但它确实存在")
+    return issues
+
+
 def scan_skill(root: str, name: str, validator) -> dict[str, Any]:
     skill_dir = os.path.join(root, "skills", name)
     skill_md = os.path.join(skill_dir, "SKILL.md")
@@ -145,6 +199,7 @@ def scan_skill(root: str, name: str, validator) -> dict[str, Any]:
         "script_lines": sum(count_lines(p) for p in walk_files(os.path.join(skill_dir, "scripts"))),
         "test_files": len([f for f in walk_files(os.path.join(skill_dir, "tests"))
                            if f.endswith(".py")]),
+        "tree_issues": readme_tree_issues(skill_dir),
     }
 
 
@@ -177,6 +232,8 @@ def summarize(report: dict[str, Any]) -> dict[str, list[str]]:
         "缺 README.md": [s["name"] for s in skills if not s["has_readme"]],
         "缺 evals": [s["name"] for s in skills if not s["has_evals"]],
         "缺 SKILL.md": [s["name"] for s in skills if not s["has_skill_md"]],
+        "README 目录树过期": [f"{s['name']}（{'；'.join(s['tree_issues'])}）"
+                              for s in skills if s["tree_issues"]],
         "死文件": dead,
     }
 
