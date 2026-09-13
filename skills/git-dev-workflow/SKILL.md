@@ -3,6 +3,8 @@ name: git-dev-workflow
 description: >-
   Use this skill before any local git write operation: committing, branching, discarding
   uncommitted changes, deleting branches or worktrees, rewriting history, or force-pushing.
+  中文触发：提交 / 提交一下 / 建分支 / 丢弃改动 / 清理分支 / 删 worktree / 改写历史 / 强行推送 /
+  这些改动能丢吗 / 这个仓库推上去了吗。
   It reads the repository's real state first (never describes it from memory), runs a
   mechanical pre-check before irreversible actions, and reports facts by quoting raw output.
   Also use it when judging whether uncommitted changes can be safely thrown away, or when a

@@ -2,6 +2,7 @@
 name: skill-builder
 description: >-
   Use this skill before creating a new skill, or when judging whether an existing skill's trigger description is too broad / too narrow / too vague.
+  中文触发：建一个 skill / 要不要包成 skill / 触发描述太宽还是太窄 / 这个 skill 老是不触发 / 评审一下这个 skill / 现有 skill 触发重叠。
   Decides whether a skill is the right tool, defines a non-flaky trigger description, scopes the new skill to P0 / P1 / P2, and produces a SKILL.md checklist.
   Also use it when an existing skill keeps getting missed or over-firing, to revise the description.
   Do NOT use for: editing an existing skill's body content, writing a one-off prompt that does not need to persist, running formal eval to validate trigger accuracy, or maintaining references/ assets/ scripts/ inside an existing skill.
@@ -76,12 +77,13 @@ P0 是新 skill 的最佳档。P1 / P2 一开始就要警惕——很可能该�
 
 description 是 Agent 唯一的触发器,占整张 SKILL.md 工作量的 60%。
 
-### 六条规则（每条都带反例）
+### 七条规则（每条都带反例）
 
 - 第一句 `Use this skill when...` 说清触发场景。**别写“AI 助手”“提高效率”“通用工具”** —— 太宽，Agent 不知道何时触发。
 - 列 3-6 个具体动词 + 1-3 个对象（`整理`、`归位`、`创建`、`审阅` + `笔记`）。**别列举具体文件路径、人名、机器** —— 太窄，换环境就不触发。
 - 第二句 `Do NOT use this skill when...`，边界尽量具体。**没有 Do NOT 边界几乎一定误触发**；也别堆关键词（`X、Y、Z`），那没有权重信号。
 - 动词要具体。**别用“处理”“搞定”“做”** —— 没说做什么动作。
+- **必须列出人真会说的中文说法**：`提交` / `记一下` / `建个 skill` 这类原话要写进去。纯英文描述在中文对话里不会触发 —— 实测（9 个会话）：两个「中文 0 字」的 skill 一次都没被自动触发过，而中文触发词最多的那个自动触发了 2 次。
 - 总长度 ≤ 800 字符，太长会触发阈值被截断。
 - 真的跨机不可用时才显式声明；而**把它改造成从配置读路径之后，必须在同一次里删掉那条声明** —— 留着会自相矛盾（实测 WLRR：上面说绑定本机，下面说路径从配置解析），agent 会据此拒绍在别的机器上工作。
 
