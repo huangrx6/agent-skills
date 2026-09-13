@@ -115,6 +115,7 @@ Codex        全局级  →  ~/.codex/skills/<name>
 
 ```sh
 python3 tools/skill_health.py                            # 规模 / 余量 / 缺 README / 缺 evals / 死文件
+python3 tools/skill_trigger_log.py                       # 哪个 skill 真在被用（从 pi 会话记录里读）
 python3 skills/skill-builder/scripts/validate_skill.py   # 结构硬错误
 ```
 
