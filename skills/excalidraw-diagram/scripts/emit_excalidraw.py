@@ -293,17 +293,25 @@ REGION_STROKE_WIDTH = 1.0
 
 
 def edge_kind_label(edge: dict, level: str | None) -> str | None:
-    """`detail: diagnostic` 时，额外给每条边补上 kind 的中文说明。
+    """`detail: diagnostic` 时，给**不是默认 kind** 的边补上它的中文说明。
 
     为什么这算「诊断用」：一条虚线的边，光看图分不出它是**异步**还是**可选** ——
     那是语义差别，排查问题时恰恰要看这个。（放在 emit 而不是 layout，是因为它要用
     `palette`；layout 里色板叫 `_palette`，那边没必要为这一处多引一个字段。）
 
+    **默认 kind（`sync`）不补。** 实线 + 箭头方向已经说明了“同步调用”，再写一遍
+    是零信息量，而密集图上它会变成一大片重复的字 —— 用户的原话是
+    “太拥挤了看着”（一片区域里四五个“同步调用”）。实测一张 12 条边的图里，
+    默认 kind 占绝大多数，所以这条一下子就去掉了大部分标签。
+    `data` 仍然要补：它也是实线，光看线看不出它是“调用”还是“读写”。
+
     用户自己写了 `label` 就听用户的 —— 自动补的从不让位给人写的东西。
     """
     if level != "diagnostic" or edge.get("label"):
         return None
-    kind = edge.get("kind") or "sync"
+    kind = edge.get("kind") or palette.DEFAULT_EDGE_KIND
+    if kind == palette.DEFAULT_EDGE_KIND:
+        return None
     return palette.EDGE_KINDS.get(kind, {}).get("zh")
 
 
@@ -454,8 +462,8 @@ def arrow_element(edge: dict, index: int,
     rel = [[round(px - x0, 2), round(py - y0, 2)] for px, py in pts]
     xs = [p[0] for p in rel]
     ys = [p[1] for p in rel]
-    kind = edge.get("kind") or "sync"
-    edge_style = palette.EDGE_KINDS.get(kind, palette.EDGE_KINDS["sync"])
+    kind = edge.get("kind") or palette.DEFAULT_EDGE_KIND
+    edge_style = palette.EDGE_KINDS.get(kind, palette.EDGE_KINDS[palette.DEFAULT_EDGE_KIND])
 
     el_id = _eid("edge", f"{edge['from']}-{edge['to']}", index)
     # 拐角**不圆**。用户的原话是「就是那种 90 度拐弯的线不行吗」，而 Excalidraw 的

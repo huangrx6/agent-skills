@@ -857,14 +857,17 @@ class TestEdgeLabelCollisions(unittest.TestCase):
 
     # 用户截图里那一处：边的自动 kind 标签压在一个区域标题上。
     # 这份规格是**最小的可复现**：把“区域标题不算避让物”退回去，它就会重叠（实测 1 处）。
+    # 边用 `async` 是因为**默认 kind 不再自动补标签**（那正是“同步调用”满屏的原因）——
+    # 要复现“标签压标题”，就得用会真的补出标签的那种边。
     WITH_TITLE = {
         "type": "flow", "direction": "TB", "title": "T", "detail": "diagnostic",
         "groups": [{"id": "g", "label": "探针与门禁"}],
         "nodes": [{"id": "src", "kind": "service", "label": "入口"},
                   {"id": "n0", "kind": "service", "label": "步骤0", "group": "g"},
                   {"id": "n1", "kind": "service", "label": "步骤1", "group": "g"}],
-        "edges": [{"from": "src", "to": "n0"}, {"from": "src", "to": "n1"},
-                  {"from": "n0", "to": "n1"}],
+        "edges": [{"from": "src", "to": "n0", "kind": "async"},
+                  {"from": "src", "to": "n1", "kind": "async"},
+                  {"from": "n0", "to": "n1", "kind": "async"}],
     }
 
     @staticmethod
@@ -1000,6 +1003,43 @@ class TestDetailLevels(unittest.TestCase):
         self.assertIn("用户写的", texts)
         self.assertFalse(any("异步" in t for t in texts),
                          "用户已经写了标签，就不该再自动补一个")
+
+    def test_diagnostic_skips_the_default_kind(self):
+        """**默认 kind 不补标签** —— 实线 + 箭头方向已经说明“同步调用”了。
+
+        不补的理由是密集图上的观感：一片区域里四五个“同步调用”是零信息量的重复，
+        用户的原话是“太拥挤了看着”。实测一张 12 条边的图里默认 kind 占绝大多数，
+        这条一下子就去掉了大部分标签。
+        """
+        for explicit in (True, False):
+            with self.subTest(explicit_sync=explicit):
+                spec = self.spec("diagnostic")
+                spec["edges"][0].pop("label")
+                if explicit:
+                    spec["edges"][0]["kind"] = palette.DEFAULT_EDGE_KIND
+                else:
+                    spec["edges"][0].pop("kind")          # 不写 = 默认
+                boxes = L.boxes_from_spec(spec)
+                result = L.layout(spec, boxes)
+                scene = E.build_scene(spec, result, boxes, None, None)
+                texts = [el.get("text", "") for el in scene["elements"]
+                         if el["type"] == "text"]
+                self.assertFalse(any("同步" in t for t in texts),
+                                 f"默认 kind 还是被补了标签：{texts}")
+
+    def test_diagnostic_still_labels_non_default_solid_kinds(self):
+        """`data` 也是实线，但**不是默认** —— 光看线分不出“调用”与“读写”，所以要补。
+
+        判据是“这条边不是默认那一种”，不是“它是不是虚线”。
+        """
+        spec = self.spec("diagnostic")
+        spec["edges"][0].pop("label")
+        spec["edges"][0]["kind"] = "data"
+        boxes = L.boxes_from_spec(spec)
+        result = L.layout(spec, boxes)
+        scene = E.build_scene(spec, result, boxes, None, None)
+        texts = [el.get("text", "") for el in scene["elements"] if el["type"] == "text"]
+        self.assertTrue(any("数据读写" in t for t in texts), texts)
 
 
 class TestEveryTopFieldIsRead(unittest.TestCase):
