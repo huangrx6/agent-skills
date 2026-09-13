@@ -154,6 +154,15 @@ WRAP_SEGMENT_GAP = 220.0
 # `disposable→failure`）拿到同一个空档 x，**精确重叠**画成了同一条线 ——
 # 看上去是"一根线"，其实是两根。现在按用过的次数依次错开。
 WRAP_LANE_STEP = 34.0
+# 通用车道分配（`_spread_lanes`）：同一条车道线上重叠的段要错开时用这两个数。
+# 步长沿用折段那套（34px）；空档放不下就压密，但不再低于 LANE_STEP_MIN ——
+# 再密就分不出是两条线了，宁可夹在空档边上。
+LANE_STEP_MIN = 14.0
+LANE_EDGE_MARGIN = 10.0      # 车道离空档边界（节点外缘）至少留这么多
+# 两条线共线重合约 1px 就算“画成一根线” —— 车道分配要避开的正是它。
+# **唯一定义在这里**：`check_layout` 的「连线重合」检查也从这里取，
+# 两边各写一个数迟早会漂（`EDGE_MIN` 那条注释说的就是这件事）。
+EDGE_OVERLAP_MIN = 1.0
 # 主轴超过这么长才考虑折。**比例分不出"三个节点排一行"和"十三个节点排一行"** ——
 # 两者都是 13:1，但前者是一张小图（一屏放得下），后者才是真长条。
 # 少了这条，几张测试用的小图都会被折，几何也跟着变得莫名其妙。
@@ -1523,6 +1532,315 @@ def _follow(origin_idx: int, origin_edge: dict, segments: list[dict],
     return [c for c in chain if c in placed]
 
 
+def _corridors(placed: dict[str, Placed], direction: str) -> dict[int, tuple[float, float]]:
+    """相邻两层之间的空档区间 `{下层 rank: (低, 高)}`（LR 是 x，TB 是 y）。
+
+    与 `_rank_gaps` 同一件事的**区间版**：那个只给中线（车道默认坐标），
+    这里还要给出这条带子的**边界** —— 车道在带子里左右挪才不会挪进节点。
+    """
+    by_rank: dict[int, list] = {}
+    for nid, node in placed.items():
+        if nid.startswith(DUMMY_PREFIX):
+            continue
+        by_rank.setdefault(node.rank, []).append(node)
+    out: dict[int, tuple[float, float]] = {}
+    ranks = sorted(by_rank)
+    for lower, upper in zip(ranks, ranks[1:]):
+        if direction == "LR":
+            low = max(n.x + n.width for n in by_rank[lower])
+            high = min(n.x for n in by_rank[upper])
+        else:
+            low = max(n.y + n.height for n in by_rank[lower])
+            high = min(n.y for n in by_rank[upper])
+        out[lower] = (low, high)
+    return out
+
+
+def _shift_limits(pts: list, si: int, axis: int) -> tuple[float, float]:
+    """这一段沿 `axis` 平移 δ 时，δ 被什么夹住 —— 由**相邻两段**的长度下限决定。
+
+    为什么不能只靠事后复核：把车道往源节点那一侧挪时，第一段（贴点引出线）
+    会被压短 —— 实测 01-architecture 里 10px，`_path_is_sane` 于是把整条边退掉，
+    重叠又回来了。**事先算清楚能挪多少**，比“挪完发现不行再退回来”稳得多。
+
+    相邻段与这一段的**方向相反**（横平竖直的折线是交替的），所以平移 δ 会让
+    前一段长 δ、后一段短 δ；两边都要求 ≥ EDGE_MIN，而且**不许反向**
+    （反向就是在图上多了个回勾）。返回 `(-inf, inf)` 表示没有约束。
+    """
+    low, high = -math.inf, math.inf
+    a, b = pts[si], pts[si + 1]
+    if si > 0:
+        span = a[axis] - pts[si - 1][axis]
+        if abs(span) > 0.5:
+            if span > 0:
+                low = max(low, EDGE_MIN - span)
+            else:
+                high = min(high, -EDGE_MIN - span)
+    if si + 2 < len(pts):
+        span = pts[si + 2][axis] - b[axis]
+        if abs(span) > 0.5:
+            if span > 0:
+                high = min(high, span - EDGE_MIN)
+            else:
+                low = max(low, span + EDGE_MIN)
+    return low, high
+
+
+def _lane_window(item: list, placed: dict[str, Placed],
+                 direction: str, corridors: dict) -> tuple[float, float] | None:
+    """这一条段可以挪到哪个坐标区间 —— `None` = 没有位置约束。
+
+    两种来源，取交集：
+    - **端口段**：挪的是贴点，它必须留在**那一面**上（离角留 `PORT_SNAP_MARGIN`）。
+    - **空档里的段**：只能在同一空档内挪。注意空档的坐标轴是主轴
+      （LR 是 x、TB 是 y），所以只有固定轴正好等于主轴的那些段才用得上它 ——
+      横穿某一层的那种段（LR 的横段、TB 的竖段）不靠空档定位，没这个约束。
+    再叠上 `_shift_limits`：相邻两段不许被压到可见下限以下、也不许反向。
+    """
+    fixed_axis, coord, port = item[2], item[3], item[7]
+    low, high = coord + item[8], coord + item[9]
+    bounds = None
+    if port is not None:
+        box = placed.get(port)
+        if box is None:
+            return None
+        if fixed_axis == 0:
+            bounds = (box.x + PORT_SNAP_MARGIN, box.x + box.width - PORT_SNAP_MARGIN)
+        else:
+            bounds = (box.y + PORT_SNAP_MARGIN, box.y + box.height - PORT_SNAP_MARGIN)
+    elif fixed_axis == (0 if direction == "LR" else 1):
+        for span_low, span_high in corridors.values():
+            if span_low - 1.0 <= coord <= span_high + 1.0:
+                bounds = (span_low + LANE_EDGE_MARGIN, span_high - LANE_EDGE_MARGIN)
+                break
+    if bounds is not None:
+        low, high = max(low, bounds[0]), min(high, bounds[1])
+    if low > high:
+        return None                              # 无处可挪
+    return (low, high)
+
+
+def _pick_lane(center: float, lane_no: int, step: float,
+               window: tuple[float, float] | None, ok) -> float:
+    """给一条车道选个落脚点。
+
+    候选顺序沿用折段那套“对称往两边散”，但每一步都要过 `ok` —— 那个判据里既有
+    窗口（不能挪到节点里去），也有**全局占用**（不能挪到另一条线头上）。
+    实测踩过：只比同组内的坐标，`a2→b1` 被挪到了 `a1→b1` 所在的那一行 ——
+    重合换了一对而已。
+
+    实在找不到合适的就退到“夹在窗口里、离已占用的点最远”的候选：空档确实放不下时
+    如实把重合留给 `check_layout` 去报，而不是直接把这条段丢掉不管。
+    """
+    def clamp(value: float) -> float:
+        if window is None:
+            return value
+        return min(max(value, window[0]), window[1])
+
+    side = -1.0 if lane_no % 2 else 1.0
+    magnitude = ((lane_no + 1) // 2) * step
+    fallback = None
+    fallback_gap = -1.0
+    for k in range(1, 6):
+        span = magnitude + (k - 1) * step
+        for candidate in (center + side * span, center - side * span):
+            target = clamp(candidate)
+            accepted, gap = ok(target)
+            if accepted:
+                return target
+            if gap > fallback_gap:
+                fallback, fallback_gap = target, gap
+    return fallback if fallback is not None else center
+
+
+def _spread_lanes(routed: list[dict], placed: dict[str, Placed],
+                  direction: str) -> int:
+    """把**共线且区间重叠**的段错开 —— 治「线与线重合」。
+
+    病根：`_orthogonal_path` 里所有跨层段用的都是**同一个**车道坐标
+    （`_rank_gaps` 给的空档中线）。于是同一个空档里，只要两条边的交叉轴区间
+    有重叠，它们就精确画在同一条线上 —— 看上去是一根线，其实是两根。
+    实测：01-architecture 里 `order→user` 与 `order→cache` 在 x=966 上
+    重合 225px；7 张自带图里有 5 张存在重合（最长 225px）。
+    去重逻辑本来只写在折段布局（`coords.bands`）那一个分支里，普通分层一条都没有。
+
+    做法，**先量再挪**：
+      1. 收集**所有**段（含端口引出线），按「固定轴 + 该轴坐标」分组 ——
+         同组就是共线的。斜段不参与（它不与任何段共线）。
+         端口段也收：实测 02-flow 的重合就是两条端口引出线
+         （一条进 `scan` 的顶面、一条从同一个面出来）画在同一条 x 上。
+         但**端口段只有当它垂直于所在那一面时**才允许挪 —— 否则一挪就把
+         贴点推离了那一面。
+      2. 组内按交叉轴区间做**区间着色**（first-fit）：区间重叠的段拿不同车道号。
+      3. 车道坐标 = 原坐标 ± 对称步长（沿用折段那套写法）；
+         空档放不下就压密，压到 `LANE_STEP_MIN` 为止，再不行就夹在空档/那一面里。
+      4. 逐段平移（只改固定轴分量）—— 相邻段方向不变，仍然横平竖直。
+      5. 挪完**逐边复核**：不穿节点 / 不穿自己 / 不留过短段 / 不新增主轴来回；
+         任一不满足就这条边整条回退。不硬拗：宁可留一处重合（校验会报它），
+         也不能为它把线推进节点里。
+
+    返回实际挪动的段数（给用例与调试看）。
+    """
+    items: list[list] = []   # [ei, si, 固定轴, 坐标, 区间低, 区间高, 车道号, 端口节点, δ下限, δ上限]
+    for ei, edge in enumerate(routed):
+        pts = edge["points"]
+        for si in range(len(pts) - 1):
+            a, b = pts[si], pts[si + 1]
+            if math.dist(a, b) < 0.5:
+                continue
+            if abs(a[0] - b[0]) <= 0.5:
+                fixed_axis, cross = 0, 1
+            elif abs(a[1] - b[1]) <= 0.5:
+                fixed_axis, cross = 1, 0
+            else:
+                continue                        # 斜段不与任何段共线
+            port = None
+            normal = None
+            if si == 0 or si == len(pts) - 2:
+                if si == 0:
+                    port, anchor = edge["from"], a
+                else:
+                    port, anchor = edge["to"], b
+                box = placed.get(port)
+                if box is not None:
+                    normal = _outward_normal(anchor, box)
+            if port is not None:
+                if normal is None:
+                    continue
+                # 这一段必须**垂直于那一面**（走出去/进来的方向）才挪得动：
+                # 固定轴 0 = 竖段，只能贴在上下两面；固定轴 1 = 横段，只能贴在左右两面。
+                if (fixed_axis == 0 and normal[0] != 0) or \
+                        (fixed_axis == 1 and normal[1] != 0):
+                    continue
+            items.append([ei, si, fixed_axis, a[fixed_axis],
+                          min(a[cross], b[cross]), max(a[cross], b[cross]),
+                          None, port, *_shift_limits(pts, si, fixed_axis)])
+    if not items:
+        return 0
+
+    # 按「固定轴 + 坐标」分组（同一条直线上的段）。带容差 —— 坐标都是算出来的，
+    # 回舍误差会造出两条本该当成一条的组。
+    groups: list[list] = []
+    for item in sorted(items, key=lambda it: (it[2], it[3])):
+        if groups and groups[-1][0][2] == item[2] \
+                and abs(groups[-1][0][3] - item[3]) <= 1.0:
+            groups[-1].append(item)
+        else:
+            groups.append([item])
+
+    corridors = _corridors(placed, direction)
+    # 全部段的当前占位，按轴分。挪一段就更新它 —— “别把线挪到另一条线头上”
+    # 靠的就是这张全图（而不是单个组）的表。
+    occupancy: dict[tuple[int, int], tuple[int, float, float, float]] = {
+        (item[0], item[1]): (item[2], item[3], item[4], item[5]) for item in items}
+    shifts: dict[tuple[int, int], tuple[int, float]] = {}
+    for group in groups:
+        lanes: list[list[tuple[float, float]]] = []
+        for item in sorted(group, key=lambda it: (it[4], it[5], it[0])):
+            for lane_no, taken in enumerate(lanes):
+                # 只是**端点相接**不算重叠（共用拐点的两段本来就这样）。
+                if all(item[5] <= low + 0.5 or item[4] >= high - 0.5
+                       for low, high in taken):
+                    taken.append((item[4], item[5]))
+                    item[6] = lane_no
+                    break
+            else:
+                item[6] = len(lanes)
+                lanes.append([(item[4], item[5])])
+        if len(lanes) < 2:
+            continue                             # 这一条线上没有要错开的
+        center = group[0][3]
+        window = _lane_window(group[0], placed, direction, corridors)
+        step = WRAP_LANE_STEP
+        if window is not None:
+            room = window[1] - window[0]
+            if room != math.inf:
+                step = max(LANE_STEP_MIN, min(step, room / (len(lanes) + 1)))
+        placed_here: list[float] = [center]
+        for item in group:
+            lane_no = item[6]
+            if lane_no == 0:
+                continue                         # 第 0 道留在原地
+            own = _lane_window(item, placed, direction, corridors)
+            if own is None:
+                continue                         # 自己没地方挪（不是“没有约束”）
+            room = own[1] - own[0]
+            step_here = step if room == math.inf else max(
+                LANE_STEP_MIN, min(step, room / (len(lanes) + 1)))
+
+            def ok(target, _item=item):
+                """`(可用?, 离本组其它落点多远)` —— 窗口在外面已经夹过了。
+                两件事：离**本组**已定的落点够远；不压在**别的边**的某段上。"""
+                gap = min((abs(target - other) for other in placed_here), default=math.inf)
+                if gap < LANE_STEP_MIN:
+                    return False, gap
+                axis, low, high = _item[2], _item[4], _item[5]
+                for (other_ei, _si), spot in occupancy.items():
+                    if other_ei == _item[0] or spot[0] != axis:
+                        continue
+                    if abs(spot[1] - target) > 0.75:
+                        continue
+                    if min(high, spot[3]) - max(low, spot[2]) > EDGE_OVERLAP_MIN:
+                        return False, gap
+                return True, gap
+
+            target = _pick_lane(center, lane_no, step_here, own, ok)
+            placed_here.append(target)
+            occupancy[(item[0], item[1])] = (item[2], target, item[4], item[5])
+            shifts[(item[0], item[1])] = (item[2], round(target - center, 2))
+
+    if not shifts:
+        return 0
+
+    # 一个拐点可能同时是「要挪的竖段」和「要挪的横段」的端点 —— 两条轴互不干扰，
+    # 所以这里按**轴**记冲突，而不是按点。（只按点记会把这种合法的两个方向当成冲突，
+    # 02-flow 的收尾就是因此没挪成。）
+    touched: dict[int, dict[int, dict[int, float]]] = {}
+    for (ei, si), (axis, delta) in sorted(shifts.items()):
+        edge_points = touched.setdefault(ei, {})
+        conflict = False
+        for known, per_axis in edge_points.items():
+            if axis in per_axis and (known in (si, si + 1) or known + 1 in (si, si + 1)):
+                conflict = True
+                break
+        if conflict:
+            continue                             # 共用拐点且同为这一根轴：跳过这一段
+        edge_points.setdefault(si, {})[axis] = delta
+
+    moved = 0
+    for ei, deltas in touched.items():
+        edge = routed[ei]
+        before = [list(p) for p in edge["points"]]
+        trial = [list(p) for p in before]
+        for si, per_axis in deltas.items():
+            for point in (trial[si], trial[si + 1]):
+                for axis, delta in per_axis.items():
+                    point[axis] = round(point[axis] + delta, 2)
+        if _path_is_sane(trial, before, placed, edge["from"], edge["to"]):
+            edge["points"] = trial
+            moved += len(deltas)
+    return moved
+
+
+def _path_is_sane(trial: list, before: list, placed: dict[str, Placed],
+                  head_id: str, tail_id: str) -> bool:
+    """挪过车道的路径还成不成立 —— 车道分配后唯一的复核口。
+
+    四件事：不能穿节点、不能穿自己两端节点的盒子、不能留下过短的段、
+    不能新增主轴来回（挪过头时相邻段会反向，看上去是个回勾）。
+    斜段不可能被造出来（挪的是轴对齐坐标），但检查很便宜，还是查一下。
+    """
+    if nodes_hit_by_polyline(trial, placed, {head_id, tail_id}):
+        return False
+    if _crosses_own_nodes(trial, placed, head_id, tail_id):
+        return False
+    if _is_slanted(trial):
+        return False
+    if any(math.dist(a, b) < EDGE_MIN for a, b in zip(trial, trial[1:])):
+        return False
+    return _reversals(trial) <= _reversals(before)
+
+
 def _anchor_slots(resolved: list, placed: dict[str, Placed],
                   direction: str) -> tuple[dict, dict]:
     """给每个节点两侧的贴点分配位置 —— **治 P1（喷泉）**。
@@ -1617,7 +1935,55 @@ def _points(chain: list[str], placed: dict[str, Placed], direction: str,
             pts.append([px, py + end_off] if direction == "LR" else [px + end_off, py])
         else:
             pts.append([cx, cy])                    # 中间站（虚节点）取自身中心
-    return [[round(x, 2), round(y, 2)] for x, y in pts]
+    pts = [[round(x, 2), round(y, 2)] for x, y in pts]
+    return _snap_ports(pts, chain, placed, direction)
+
+
+PORT_SNAP_MARGIN = 8.0       # 端口对齐之后，落点离节点角至少留这么多（别贴到圆角上）
+
+
+def _snap_ports(pts: list, chain: list[str], placed: dict[str, Placed],
+                direction: str) -> list[list[float]]:
+    """两端端口只差一点点时，把它们**并到同一列/行**上 —— 治「明明该直着下来却是歪的」。
+
+    病根在 `_slots`：贴点偏移是**各自按自己节点的跨度**摊开的
+    （LR 用 `height × ATTACH_SPAN`，TB 用 `width × ATTACH_SPAN`）。两端节点尺寸不同时，
+    同一条边的离开点与到达点天然错开 —— 实测一份 TB 图里错开 23px。
+
+    错开本身不是病（那是正常的一小折），要命的是它**刚好短于 EDGE_MIN**：
+    正交候选里于是多出一段「毛刺」，而排序键当年把毛刺排在斜段**前面**，
+    整条正交路径就这样输给一条两点斜线（实测 1475px，横穿整张图）。
+    用户的原话：「不能像我一样，直接直直的下来吗」。
+
+    所以这里只做一件事：`|错开| < EDGE_MIN` 时把到达点并到离开点那一列/行上，
+    并保证它仍落在目标那一面内、离角至少 `PORT_SNAP_MARGIN`。并上之后
+    正交路径里那段毛刺自然消失 —— 直的就真的直。
+
+    **错开得多的（正常折线）一律不动**：那是画法，不是缺陷。
+    """
+    if len(pts) < 2:
+        return pts
+    axis = 1 if direction == "LR" else 0        # 交叉轴：LR 是 y，TB 是 x
+    start, end = pts[0], pts[-1]
+    if abs(end[axis] - start[axis]) >= EDGE_MIN:
+        return pts                              # 本来就差得远或本来就齐：不动
+    target = placed.get(chain[-1])
+    if target is None:
+        return pts
+    if direction == "LR":
+        low = target.y + PORT_SNAP_MARGIN
+        high = target.y + target.height - PORT_SNAP_MARGIN
+    else:
+        low = target.x + PORT_SNAP_MARGIN
+        high = target.x + target.width - PORT_SNAP_MARGIN
+    if low > high:                              # 那一面比两个边距还窄：不硬对齐
+        return pts
+    aligned = round(min(max(start[axis], low), high), 2)
+    if abs(aligned - start[axis]) >= EDGE_MIN:
+        return pts                              # 对齐要求把落点挪出去太远：不做
+    out = [list(p) for p in pts]
+    out[-1][axis] = aligned
+    return out
 
 
 
@@ -1773,6 +2139,66 @@ def _collinear(a: list, b: list, c: list, tolerance: float = 0.5) -> bool:
     return cross / base <= tolerance
 
 
+def _close_short_legs(pts: list, min_segment: float) -> list:
+    """把过短的段**就地并掉** —— 不是删拐点（删拐点会把正交路径拉成斜线）。
+
+    一段短的竖段（横段同理）连接的是两条**高度差几像素的水平走线**
+    （实测：两个虚节点保留的行只差 3px）。把这两条走线并到同一条高度上，
+    短段长度归零、两条走线共线并被合并 —— 路径全程仍然横平竖直。
+
+    端点保护：只有在走线**确实包含端口**时才让端口参与位移，而且
+    哪一侧包含端口就把新高度取成**另一侧的值**（端口因此一动不动）；
+    两侧都是端口时取中点（位移 < EDGE_MIN/2，且 `_snap_ports` 已先处理过一遍）。
+
+    为什么必须在这里做：排序键现在把斜段排在毛刺前面（斜段不可修复），
+    于是带毛刺的正交路径会被选中 —— 毛刺就必须真的被消掉，不能靠「别选它」躲。
+    消不掉（形状不是横平竖直）时**原样返回**：宁可让 `check_layout` 报一条
+    「连线过短」，也不要为了一根 3px 的毛刺把整条线画成斜线。
+
+    收敛：每轮要么删掉一个重点、要么把一段的长度归零（下一轮删掉它），
+    所以点数单调下降；预算用完就放弃，不会死循环。
+    """
+    work = [list(p) for p in pts]
+    budget = len(work) + 4
+    while budget > 0:
+        budget -= 1
+        found = None
+        for i, (a, b) in enumerate(zip(work, work[1:])):
+            if math.dist(a, b) < min_segment:
+                found = i
+                break
+        if found is None:
+            return work
+        a, b = work[found], work[found + 1]
+        if math.dist(a, b) < 0.5:               # 已经完全重合：并点
+            work.pop(found + 1)
+            continue
+        if abs(a[0] - b[0]) < 0.5:
+            axis = 1                            # 竖段：动 y
+        elif abs(a[1] - b[1]) < 0.5:
+            axis = 0                            # 横段：动 x
+        else:
+            return [list(p) for p in pts]       # 斜的短段：不在这里处理
+        # 两侧的走线：共享同一个坐标的连续点（含端点本身）
+        left = found
+        while left > 0 and abs(work[left - 1][axis] - a[axis]) < 0.5:
+            left -= 1
+        right = found + 1
+        while right < len(work) - 1 and abs(work[right + 1][axis] - b[axis]) < 0.5:
+            right += 1
+        left_has_port = left == 0                # 走线里带着起点
+        right_has_port = right == len(work) - 1  # 走线里带着终点
+        if left_has_port and not right_has_port:
+            target = a[axis]                     # 起点不动：另一侧并过来
+        elif right_has_port and not left_has_port:
+            target = b[axis]                     # 终点不动
+        else:
+            target = (a[axis] + b[axis]) / 2.0   # 两侧都是端口：各让一半
+        for k in range(left, right + 1):
+            work[k][axis] = target
+    return [list(p) for p in pts]
+
+
 def _simplify_path(pts: list, min_segment: float = EDGE_MIN) -> list:
     """去掉共线的中间点和过短的段。
 
@@ -1780,12 +2206,17 @@ def _simplify_path(pts: list, min_segment: float = EDGE_MIN) -> list:
     小毛刺，而 `check_layout` 有可见长度下限（24px），一条这样的段会把整张图判红。
     短线不是几何错误，是视觉噪声：与其让检查去报它，不如生成时就不要它。
 
-    首尾两点（贴点）永远不动，所以箭头还落在原来的位置上；中间太短的段靠**删掉
-    那个拐点**来消掉，删到只剩首尾就成了直线。末段同样处理 —— 第一版只看了中间
-    的点，结果 04-state 的收尾段还是 11px（用例抓到的）。
+    两步，顺序不能反：
+    1. `_close_short_legs` 先**并掉**短的段 —— 并是平移走线，路径仍然横平竖直。
+    2. 再按下面的循环去共线点 / 去掉还剩的短拐点。
+
+    只做第 2 步是不行的：它靠**删拐点**消短段，而删掉一个拐点就把正交路径
+    拉成了斜线，于是函数末尾那条「不许引入斜段」的守卫又会把原本带毛刺的
+    路径退回 —— 毛刺就这样留了下来，再被排序键罚成一条斜线（当时的排序键）。
     """
     if len(pts) <= 2:
         return [list(p) for p in pts]
+    pts = _close_short_legs([list(p) for p in pts], min_segment)
     kept = [list(pts[0])]
     for point in pts[1:-1]:
         if math.dist(kept[-1], point) < min_segment:
@@ -1932,14 +2363,26 @@ def _reversals(pts: list) -> int:
 def _path_rank(pts: list, tier: int) -> tuple:
     """候选路径的排序键。
 
-    顺序：**毛刺段 → 斜段 → 形状档位 → 折点数 → 偏离 → 绕路比**。
+    顺序：**斜段 → 主轴来回 → 毛刺段 → 形状档位 → 折点数 → 偏离 → 绕路比**。
 
-    - 毛刺段（短于可见下限）是**缺陷**：`check_layout` 会因此判红整张图。
     - 斜段是**用户明确不要的东西**（原话：“就是那种 90 度拐弯的线不行吗”）。
       它必须排在这里，而不是靠档位 —— 因为「简化」会把正交折线的拐点合并掉，
       让它变回一条两点斜线，而它仍然带着正交的档位标签。实测踩过：斜段因此
       占了全部连线长度的 20%，而两点路径的“偏离”恒为 0，用度量根本看不出来。
-    - 这两项都是「结构上不该出现」，所以排在审美档位前面；档位只在同类型之间分高下。
+    - 主轴来回（走出去再走回来）也排在前面：它同样属于「结构上不该出现」，
+      而且比多几个拐点难看得多 —— 看上去像给一组节点画了个框。
+    - 毛刺段（短于可见下限）排第三。
+
+    **为什么斜段必须排在毛刺前面**（这一条曾经写反，代价很大）：
+    斜段**不可修复** —— 一条 1475px 的对角线只能重画；毛刺**可以就地修掉** ——
+    十几像素的错位，`_close_short_legs` 一并就没了（端口错位那一路则由
+    `_snap_ports` 提前消掉）。写反的后果是：正交路径里只要出现一段 3px
+    （虚节点保留的两行只差 3px、或两端贴点差 23px），整条正交路径就被
+    一条横穿全图的斜线压掉 —— 实测一份五层架构里有 7 条边这样变成斜线、
+    合计 5886px，而且**校验全绿**（斜段当时不在检查项里）。
+    用户的话：「为什么这么直着过去，这不对吧」。
+
+    这三项都是「结构上不该出现」，所以排在审美档位前面；档位只在同类型之间分高下。
     """
     a, b = pts[0], pts[-1]
     span = math.hypot(b[0] - a[0], b[1] - a[1]) or 1e-9
@@ -1953,7 +2396,7 @@ def _path_rank(pts: list, tier: int) -> tuple:
     corners = max(0, len(pts) - 2)
     deviation = max((abs((q[0] - a[0]) * (b[1] - a[1]) - (q[1] - a[1]) * (b[0] - a[0])) / span
                      for q in pts[1:-1]), default=0.0)
-    return (stub, slanted, zigzag, tier, corners, round(deviation, 2),
+    return (slanted, zigzag, stub, tier, corners, round(deviation, 2),
             round(length / span, 3))
 
 
@@ -2515,6 +2958,13 @@ def layout(spec: dict, boxes: dict[str, Box],
             # 空档本来就夹在左右两块之间，只往一边让会把后面那条挤到右边那块身上去。
             offset = WRAP_LANE_STEP * (used // 2 + 1) * (-1 if used % 2 == 0 else 1)
             e["points"] = wrap_route(pa, placed[e["to"]], band + offset, lane, direction)
+
+    # 最后一道：**把叠在同一条线上的段错开**（见 `_spread_lanes`）。
+    # 必须放在**折段那一块之后** —— 跨栏连线的走法是那里才定下来的，
+    # 早一步做就等于对着一份还没成形的点表算（02-flow 的 `scan→stage` 就是这样漏掉的：
+    # `route_edges` 里它还是一根两点斜线，折段回来后才是最终那个五折点路径）。
+    # 也只在这里做：重叠是**边与边之间**的事，单看一条边永远看不出来。
+    _spread_lanes(routed, placed, direction)
 
     return LayoutResult(direction=direction, params=p, ranks=ranks, order=order,
                         placed=placed, edges=routed, crossings=crossings,

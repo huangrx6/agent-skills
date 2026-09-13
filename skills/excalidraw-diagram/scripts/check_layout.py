@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""五项校验 + 自动调参循环 + 报告生成。
+"""九项校验 + 自动调参循环 + 报告生成。
 
 ## 为什么校验和调参在同一个文件里
 
@@ -84,13 +84,13 @@ TOLERANCE = 0.5           # 浮点比较容差（#3 断言用）
 STOP_ON = frozenset({"text", "palette"})
 # 可以靠调参解决的项。注意 #5（交叉数）是**软**项 —— 它不阻塞输出，但仍然是可调的。
 # 只看“阻不阻塞”会让它永远调不动，而 validation.md 明写着它可自动修。
-TUNABLE = frozenset({"gap", "edge", "crossing", "through"})
+TUNABLE = frozenset({"gap", "edge", "crossing", "through", "overlap", "slant"})
 # `_step` 真的会为它动参数的检查项。
 #
 # 这个集合与 `_step` 的映射表**必须一致**，由 tests/test_check_layout.py 里的
 # 一条用例钉住：放进 TUNABLE 却调不动 = 调参循环对它形同虚设。
 # 这个坑踩过两次（`crossing` 一次、`through` 又一次），所以改成机械检查。
-STEPPABLE = frozenset({"gap", "edge", "crossing", "through"})
+STEPPABLE = frozenset({"gap", "edge", "crossing", "through", "overlap", "slant"})
 
 CHECK_LABEL = {
     "gap": "元素间隙",
@@ -103,6 +103,10 @@ CHECK_LABEL = {
     # （TestEveryCheckHasALabel），加检查时忘不了。
     "through": "连线穿节点",
     "region": "区域重叠",
+    # 加这两项的时候两张表都得跟着加 —— 由 TestEveryCheckHasALabel 钉住，
+    # 而报告里漏了标签就会 KeyError（建表时就踩过一次）。
+    "overlap": "连线重合",
+    "slant": "连线斜段",
 }
 # 报告里用的中文说法。**参数名不许出现在报告里** —— 一旦报告写"建议调大某某"，
 # 参数选择权就又回到模型手上了（validation.md 第二节）。
@@ -367,6 +371,96 @@ def check_edges_through_nodes(spec: dict, result: ResultT) -> list[Issue]:
     return out
 
 
+# ── #8 / #9 连线形状（可调项）────────────────────────────
+# 两项紧挨着放：一个管“两根线画成一根”，一个管“画歪了”。
+# 编号按加进表的顺序，区域（#7）的定义在下面。
+#
+# #8 连线重合：共线重合约 1px 就报 —— 图上那就是“一根线”，看不出是两根。
+# 数值来自 layout.py（那边是唯一定义，车道分配避开重合用的也是它）——
+# 两边各写一个数迟早会漂，而漂的时候生成与检查会对同一张图给出相反结论。
+EDGE_OVERLAP_MIN = L.EDGE_OVERLAP_MIN
+
+
+def check_edge_overlap(result: ResultT) -> list[Issue]:
+    """两根连线画在**同一条线上**（共线 + 区间重叠）—— 可调项。
+
+    为什么它必须存在：这一项以前**根本不在检查表里**，于是“报告全绿”与
+    “看着是一根线”可以同时成立 —— 实测 7 张自带图里有 5 张存在重合
+    （01-architecture 里 `order→user` 与 `order→cache` 在 x=966 上重合 225px）。
+    生成侧现在有 `layout._spread_lanes` 主动错开车道，但那是**尽力而为**
+    （挪进节点就回退），所以还需要这一项把剩下的如实报出来。
+
+    为什么是可调项而不是硬门：空档太窄时确实可能分不开 —— 那是空间不够，
+    不是内容错了。调参循环会先去试更宽的间距（见 `_step`）。
+
+    只查**横平竖直**的段：分层图的连线全部是这样，而这个病就活在那里。
+    径向 / 力导向的斜线是两节点之间的辐条，两条辐条重合意味着两个节点在同一个
+    方向上 —— 那已经被「元素间隙」管住了，不在这里重复一套几何判据。
+    """
+    segs: list[tuple[int, float, float, float, str]] = []
+    for edge in result.edges:
+        pts = edge["points"]
+        name = f"{edge['from']}→{edge['to']}"
+        for a, b in zip(pts, pts[1:]):
+            if abs(a[0] - b[0]) <= 0.5:
+                segs.append((0, a[0], min(a[1], b[1]), max(a[1], b[1]), name))
+            elif abs(a[1] - b[1]) <= 0.5:
+                segs.append((1, a[1], min(a[0], b[0]), max(a[0], b[0]), name))
+    out: list[Issue] = []
+    reported: set[tuple[str, str]] = set()
+    for i in range(len(segs)):
+        for j in range(i + 1, len(segs)):
+            first, second = segs[i], segs[j]
+            if first[0] != second[0] or first[4] == second[4]:
+                continue
+            if abs(first[1] - second[1]) > 0.75:
+                continue                        # 不在同一条线上
+            overlap = min(first[3], second[3]) - max(first[2], second[2])
+            if overlap <= EDGE_OVERLAP_MIN:
+                continue
+            key = ((first[4], second[4]) if first[4] < second[4]
+                   else (second[4], first[4]))
+            if key in reported:
+                continue                        # 一对边只报一次
+            reported.add(key)
+            out.append(Issue(
+                "overlap", False, f"{key[0]} 与 {key[1]}",
+                f"两根线在同一条线上重合约 {overlap:.0f}px，看上去是一根线",
+                advice="连线重合：把其中一条的目标节点换个层或换个位置，或减少同一对节点之间的重复连线。"))
+    return out
+
+
+# ── #9 连线斜段（可调项）──────────────────────────────────
+def check_edge_slant(result: ResultT) -> list[Issue]:
+    """连线上出现了**斜段**（既不水平也不竖直）—— 可调项。
+
+    用户对这件事的原话是「就是那种 90 度拐弯的线不行吗」。分层图里每一条边
+    都有正交候选（`layout._orthogonal_path`），只有当**全部候选都不可用**时
+    才会退回到两点直弦 —— 所以一条斜段出现，就意味着“这一段路真的过不去”，
+    应当在报告里说清楚，而不是让它悄悄地出图。
+
+    为什么从前没报：斜段以前**不在检查表里** —— 生成侧把一条 1475px 的斜线当作“避开
+    3px 毛刺”的选择，而校验对两者都无话可说。现在两边都管上了。
+
+    只查**分层图**（LR / TB）：径向与力导向的连线**就该是**两点直辐条，
+    那是它们的画法，不是缺陷。
+    """
+    if str(getattr(result, "direction", "")) not in ("LR", "TB"):
+        return []
+    out: list[Issue] = []
+    for edge in result.edges:
+        pts = edge["points"]
+        for a, b in zip(pts, pts[1:]):
+            if abs(b[0] - a[0]) > 0.5 and abs(b[1] - a[1]) > 0.5:
+                out.append(Issue(
+                    "slant", False, f"{edge['from']}→{edge['to']}",
+                    "这条连线里有一段是斜的",
+                    advice="斜段是“正交路线全都走不通”的兜底：把跨层的边拆成两段、"
+                           "减少层级，或换一个方向重画。"))
+                break
+    return out
+
+
 # ── #7 区域 ─────────────────────────────────────────────────
 def check_regions(spec: dict, result: ResultT, boxes: dict[str, BoxT]) -> list[Issue]:
     """区域之间**要么分开、要么一个完全包住另一个** —— 不许部分重叠。
@@ -432,6 +526,8 @@ def check(spec: dict, result: ResultT,
         *check_palette(spec),
         *check_crossings(spec, result),
         *check_edges_through_nodes(spec, result),
+        *check_edge_overlap(result),
+        *check_edge_slant(result),
         *check_regions(spec, result, boxes),
     ])
 
@@ -453,6 +549,14 @@ def _step(params: dict[str, float], outcome: Outcome) -> dict[str, float]:
     if "through" in hit:
         # 连线穿过节点时先给更多间距 —— 空间富余了绕行才推得开。
         # 两个方向一起加：穿节点往往横竖都有，分不清该加哪一边。
+        out["nodeSeparation"] = min(params["nodeSeparation"] + L.PARAM_STEP["nodeSeparation"],
+                                    L.PARAM_LIMIT["nodeSeparation"])
+        out["rankSeparation"] = min(params["rankSeparation"] + L.PARAM_STEP["rankSeparation"],
+                                    L.PARAM_LIMIT["rankSeparation"])
+    if "overlap" in hit or "slant" in hit:
+        # 重合与斜段都是**空间不够**的表现：空档宽了，车道才分得开
+        # （`_spread_lanes` 的步长上限就是空档宽度）；正交候选也才有地方落脚。
+        # 和穿节点同一套加法，理由相同 —— 分不清该加横还是竖，就一起加。
         out["nodeSeparation"] = min(params["nodeSeparation"] + L.PARAM_STEP["nodeSeparation"],
                                     L.PARAM_LIMIT["nodeSeparation"])
         out["rankSeparation"] = min(params["rankSeparation"] + L.PARAM_STEP["rankSeparation"],
@@ -568,7 +672,7 @@ def format_report(spec: dict, attempts: list[Attempt], outcome: Outcome) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="五项校验 + 自动调参（报告里不出现参数名）")
+    ap = argparse.ArgumentParser(description="九项校验 + 自动调参（报告里不出现参数名）")
     ap.add_argument("spec", help="*.diagram.json")
     ap.add_argument("--json", action="store_true", help="附带机器可读结果")
     args = ap.parse_args(argv)

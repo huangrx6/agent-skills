@@ -347,7 +347,9 @@
 | 拉丁每字符前进宽度 | `text_metrics.py` | **已实测**：Helvetica 逐个字符量出后向上取整（`tests/test_text_metrics.py` 锁住数值） |
 | 断行档位 S/M/L = 10/16/24 单位 | `text_metrics.py` | **待验证**：依据前作档位与常识设的起点 |
 | `nodeSeparation` 120 / `rankSeparation` 120 | `layout.py` | **待验证**：来自前作 Dagre 默认值 |
-| 阈值 12px / 24px / 边数÷2 | `check_layout.py` | **待验证**：依据前作数值与常识设的起点 |
+| 阈值 12px / 24px / 边数÷2 / 重合 1px | `check_layout.py` | **待验证**：依据前作数值与常识设的起点 |
+| 车道步长 34 / 密度下限 14 / 边距 10 | `layout.py` | **待验证**：34 沿用折段车道那套；两个下限是新定的，未校准 |
+| 贴点对齐容差 `EDGE_MIN` / 边距 8 | `layout.py` | **待验证**：容差复用可见下限（两者必须同源），边距是新定的 |
 | 2 个色相 + 5 档层级 + 3 档 emphasis 派生 | `palette.py` | **已实测**：对比度 / ΔE / 色相跨度 / 颜色密度全部由 `tests/test_palette.py` 锁住（数值是量出来的） |
 | 图标高 22 / 与文字间隙 10 / 无尺寸时占位 30 | `icons.py` `layout.py` | **待验证**：新定的数，没有真实数据校准过 |
 | 标题上方 28px / 上边距 | `emit_excalidraw.py` | **待验证**：与最小间隙同量级再放大一档，未校准 |

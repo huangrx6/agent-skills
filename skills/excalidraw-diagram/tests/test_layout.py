@@ -461,6 +461,164 @@ class TestAvoidNodes(unittest.TestCase):
         self.assertEqual(pts[-1], pushed[-1])
 
 
+class TestOrthogonalRouting(unittest.TestCase):
+    """连线的形状：不许斜、不许重合（P15 / P16）。
+
+    两个用例都对应真实使用里报回来的问题 —— 用户的两句话就是用例名字：
+    「不能像我一样，直接直直的下来吗」与「线与线又重合了」。
+    """
+
+    # 五层架构 + 三条长边：这份规格在修之前会把 `app→parse` 画成一条
+    # **1475px 的对角线**（正交候选里有一小段 3px，而排序键当年把毛刺排在斜段前面）。
+    ARCH = {
+        "type": "architecture", "direction": "LR",
+        "nodes": [{"id": n, "kind": k, "label": lb} for n, k, lb in (
+            ("http", "client", "HTTP 层"), ("app", "service", "Application 用例层"),
+            ("kernel", "plain", "kernel/contracts"), ("cap", "service", "Capability 层"),
+            ("prov", "service", "Provider 层"), ("infra", "data", "Infrastructure"),
+            ("ir", "data", "IR (materialized)"), ("parse", "data", "ParsePlan (expected)"),
+            ("wfs", "data", "WorkflowStore (execution)"))],
+        "edges": [{"from": a, "to": b} for a, b in (
+            ("http", "app"), ("app", "kernel"), ("kernel", "cap"), ("cap", "prov"),
+            ("prov", "infra"), ("infra", "ir"), ("infra", "parse"), ("infra", "wfs"),
+            ("app", "wfs"), ("app", "ir"), ("app", "parse"), ("app", "infra"),
+            ("kernel", "wfs"))],
+    }
+
+    @staticmethod
+    def _slant(pts) -> float:
+        return sum(math.dist(a, b) for a, b in zip(pts, pts[1:])
+                   if abs(b[0] - a[0]) > 0.5 and abs(b[1] - a[1]) > 0.5)
+
+    @staticmethod
+    def _overlap(result) -> list:
+        """共线且区间重叠的段对（与 `check_layout.check_edge_overlap` 同一件事）。"""
+        segs = []
+        for e in result.edges:
+            name = f"{e['from']}→{e['to']}"
+            for a, b in zip(e["points"], e["points"][1:]):
+                if abs(a[0] - b[0]) <= 0.5:
+                    segs.append((0, a[0], min(a[1], b[1]), max(a[1], b[1]), name))
+                elif abs(a[1] - b[1]) <= 0.5:
+                    segs.append((1, a[1], min(a[0], b[0]), max(a[0], b[0]), name))
+        out = []
+        for i, first in enumerate(segs):
+            for second in segs[i + 1:]:
+                if first[0] != second[0] or first[4] == second[4]:
+                    continue
+                if abs(first[1] - second[1]) > 0.75:
+                    continue
+                if min(first[3], second[3]) - max(first[2], second[2]) > L.EDGE_OVERLAP_MIN:
+                    out.append((first[4], second[4]))
+        return out
+
+    def test_ports_align_when_they_almost_line_up(self):
+        """两个**宽度不同**的节点之间的两条边：两端贴点各按自己的跨度摊开，
+        差不到 24px 时就成了一根歪线 —— 现在必须并到同一列上。
+
+        尺寸直接给定，不靠标签长短去凑（`box()` 是测试用的固定尺寸）：
+        源 300 / 目标 270 → 跨度差 30×0.72 = **21.6px < EDGE_MIN**。
+        """
+        spec = {"type": "flow", "direction": "TB",
+                "nodes": [{"id": "src", "kind": "service", "label": "src"},
+                          {"id": "dst", "kind": "data", "label": "dst"}],
+                "edges": [{"from": "src", "to": "dst"},
+                          {"from": "src", "to": "dst"}]}
+        for name, sizes in (("差一点点", (300.0, 270.0)),
+                            ("差得远", (300.0, 120.0))):
+            with self.subTest(name):
+                result = L.layout(spec, {"src": box(sizes[0]), "dst": box(sizes[1])})
+                offsets = []
+                for edge in result.edges:
+                    pts = edge["points"]
+                    self.assertEqual(0.0, self._slant(pts), f"画歪了：{pts}")
+                    offsets.append(round(pts[0][0] - pts[-1][0], 2))
+                if name == "差一点点":
+                    self.assertEqual([0.0, 0.0], offsets,
+                                     "只差 21.6px 却不同列 —— 该直着下来的没直")
+                else:
+                    self.assertTrue(all(abs(d) >= L.EDGE_MIN for d in offsets),
+                                    f"差得远时应当是正常的 Z 形折线，不该硬对齐：{offsets}")
+
+    def test_short_leg_is_closed_not_deleted(self):
+        """3px 的拐弯段要**就地并掉**（平移走线），不是删拐点 ——
+        删掉一个拐点只会把正交路径拉成一条斜线。"""
+        pts = [[0.0, 0.0], [100.0, 0.0], [100.0, 3.0], [300.0, 3.0], [300.0, 100.0]]
+        out = L._simplify_path(pts)
+        self.assertFalse(L._is_slanted(out), f"并毛刺之后反而出现了斜段：{out}")
+        for first, second in zip(out, out[1:]):
+            self.assertGreaterEqual(math.dist(first, second), L.EDGE_MIN - 0.01,
+                                    f"还有过短的段：{out}")
+
+    def test_snap_ports_moves_the_arrival_not_the_departure(self):
+        """`_snap_ports` 的直接契约：只把**到达点**并到离开点那一列上。
+
+        离开端连着上一段（已经在图上定好了），动它会连带把上游的线拉偏；
+        到达端只是贴点，动它不欠任何人的。
+        """
+        placed = {"src": L.Placed("src", 0.0, 0.0, 300.0, 60.0, 0),
+                  "dst": L.Placed("dst", 0.0, 200.0, 270.0, 60.0, 1)}
+        near = [[136.0, 60.0], [141.4, 200.0]]
+        out = L._snap_ports(near, ["src", "dst"], placed, "TB")
+        self.assertEqual(near[0], out[0], "离开端不该动")
+        self.assertAlmostEqual(out[0][0], out[-1][0], delta=0.01)
+        # 差得远（>= EDGE_MIN）时是**正常的折线**，一律不动
+        far = [[136.0, 60.0], [200.0, 200.0]]
+        self.assertEqual(far, L._snap_ports(far, ["src", "dst"], placed, "TB"))
+
+    def test_rank_key_prefers_orthogonal_over_slant(self):
+        """排序键：**斜段排在毛刺前面** —— 这一点曾经写反。
+
+        写反的代价是一条 1475px 的对角线（见 `test_orthogonal_route_beats_a_slanted_chord`）。
+        `_close_short_legs` 现在会把大多数毛刺就地并掉，但并不掉的仍然会走到排序键这一步；
+        那时宁可让校验报一条「连线过短」（可调项，看得见），也不能把整条线画成斜线。
+        """
+        orthogonal_with_burr = [[0.0, 0.0], [60.0, 0.0], [60.0, 5.0], [200.0, 5.0]]
+        slanted_chord = [[0.0, 0.0], [200.0, 5.0]]
+        self.assertLess(L._path_rank(orthogonal_with_burr, 1),
+                        L._path_rank(slanted_chord, 2),
+                        "含毛刺的正交路径输给了斜弦 —— 排序键又被写反了")
+
+    def test_orthogonal_route_beats_a_slanted_chord(self):
+        """一份五层架构 + 三条长边：以前它们会变成横穿全图的斜线（实测 1475px）。
+
+        断言的是**整张图一点斜段都没有**，而不是“某一条边看起来还行” ——
+        这个病的形态就是“正交候选明明可用，却因为一小段毛刺被整条换掉”。
+        """
+        result = L.layout(self.ARCH, L.boxes_from_spec(self.ARCH))
+        worst = max(self._slant(e["points"]) for e in result.edges)
+        self.assertEqual(0.0, worst, "还有斜段 —— 排序键又把正交路径让给斜弦了")
+        for edge in result.edges:
+            self.assertEqual([], L.nodes_hit_by_polyline(
+                edge["points"], result.placed, {edge["from"], edge["to"]}))
+
+    def test_no_two_edges_share_a_lane(self):
+        """同一个空档里的段必须错开（01-architecture 里重合 225px 的那个 bug）。
+
+        用**小图**复现：一个扇出 4 的节点 → 下一层四个节点，四条边出在同一层。
+        """
+        spec = spec_of("order user stock pay cache".split(),
+                       [("order", t) for t in ("user", "stock", "pay", "cache")])
+        result = L.layout(spec, L.boxes_from_spec(spec))
+        self.assertEqual([], self._overlap(result), "有两条边画在了同一条线上")
+
+    def test_overlap_report_matches_the_geometry(self):
+        """校验侧与生成侧必须对同一份几何给出一致结论。
+
+        两边不一致时，“生成侧说错开了”与“校验侧说重合了”会同时成立 ——
+        那正是这一轮要修的毛病（报告全绿，图上却是一根线）。
+        """
+        CL = _load("check_layout_for_overlap", os.path.join(SCRIPTS, "check_layout.py"))
+        spec = spec_of("order user stock pay cache".split(),
+                       [("order", t) for t in ("user", "stock", "pay", "cache")])
+        boxes = L.boxes_from_spec(spec)
+        result, _, _ = CL.layout_with_retry(spec, boxes)
+        issued = CL.check_edge_overlap(result)
+        self.assertEqual([], issued,
+                         f"校验报了重合，图上却查不出来：{[i.where for i in issued]}")
+        self.assertEqual([], self._overlap(result))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
 

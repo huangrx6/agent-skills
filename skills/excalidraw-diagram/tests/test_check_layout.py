@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""check_layout.py 的回归测试：五项校验 + 自动调参 + 报告措辞。
+"""check_layout.py 的回归测试：九项校验 + 自动调参 + 报告措辞。
 
 ## 用例的着力点
 
@@ -70,14 +70,19 @@ def run(spec, params=None):
 
 
 class StubResult:
-    """只带 `real_nodes()` / `edges` 的桩，用来单独测某一项检查的边界。"""
+    """只带 `real_nodes()` / `edges` 的桩，用来单独测某一项检查的边界。
+
+    `direction` 默认给 "LR"：分层项的检查（#9 斜段）只对 LR / TB 生效，
+    桩不给方向的话它会静默跳过 —— 那会让桩上的用例看起来“过了”而实际什么都没查。
+    """
 
     def __init__(self, nodes: dict, edges=None, crossings: int = 0,
-                 crossing_origins=None) -> None:
+                 crossing_origins=None, direction: str = "LR") -> None:
         self._nodes = nodes
         self.edges = edges or []
         self.crossings = crossings
         self.crossing_origins = crossing_origins or []
+        self.direction = direction
 
     def real_nodes(self) -> dict:
         return self._nodes
@@ -200,13 +205,21 @@ class TestTuner(unittest.TestCase):
         self.assertEqual(1, len(attempts), "首轮就该过，不该多跑")
 
     def test_soft_crossing_is_still_tuned(self):
-        """曾经的真 bug：软项永远调不动。同时断言「不阻塞」和「确实被调」。"""
+        """曾经的真 bug：软项永远调不动。同时断言「不阻塞」和「确实被调」。
+
+        这份规格是 K3,3（两列各三个节点、全连通），它同时会报「连线重合」——
+        那是**空间真不够**，调参推不满也不该无限推。所以这里钉住三件事：
+        排序轮数真的在往上走、到上限之后就停在那里、循环不是一轮就结束。
+        """
         spec = spec_of([f"a{i}" for i in (1, 2, 3)] + [f"b{i}" for i in (1, 2, 3)],
                        [(f"a{i}", f"b{j}") for i in (1, 2, 3) for j in (1, 2, 3)])
         _, outcome, attempts = run(spec)
         self.assertFalse(outcome.blocking, "交叉是软项，不该阻塞")
         rounds = [a.params["barycenterRounds"] for a in attempts]
-        self.assertEqual([4.0, 8.0, 12.0], rounds, "软项没有被调参")
+        self.assertEqual([4.0, 8.0, 12.0], rounds[:3], "软项没有被调参")
+        self.assertEqual(sorted(rounds), rounds, "排序轮数只能往上走")
+        self.assertEqual({L.PARAM_LIMIT["barycenterRounds"]}, set(rounds[2:]),
+                         "到上限后该停在那里 —— 后面的轮次是别的项在推")
 
     def test_stops_when_parameter_hits_its_limit(self):
         """到上限后该自己停下，不是把同样的计算再跑一遍。"""
@@ -551,6 +564,71 @@ class TestTunableChecksAreSteppable(unittest.TestCase):
             if issue.check == "through":
                 self.assertFalse(issue.blocking, "穿节点不该阻塞出图")
                 self.assertIn("拆成两段", issue.advice or "", "建议要是内容级的")
+
+
+class TestEdgeShapeChecks(unittest.TestCase):
+    """#8 连线重合 / #9 连线斜段 —— 这两项以前根本不在检查表里。
+
+    在那之前，“报告全绿”与“图上是一根线 / 一条斜线”可以同时成立：
+    实测 7 张自带规格里 5 张有重合（最长 225px），而且报告一条都没报。
+    """
+
+    @staticmethod
+    def _edge(name: str, points) -> dict:
+        return {"from": name, "to": f"{name}!", "points": points}
+
+    def test_overlap_needs_collinear_and_touching_intervals(self):
+        same_line = StubResult({}, [self._edge("a", [[0, 10], [100, 10]]),
+                                    self._edge("b", [[50, 10], [150, 10]])])
+        self.assertEqual(1, len(C.check_edge_overlap(same_line)))
+        touching = StubResult({}, [self._edge("a", [[0, 10], [100, 10]]),
+                                   self._edge("b", [[100, 10], [200, 10]])])
+        self.assertEqual([], C.check_edge_overlap(touching),
+                         "端点相接不算重合 —— 那是共用拐点，本来就该这样")
+        parallel = StubResult({}, [self._edge("a", [[0, 10], [100, 10]]),
+                                    self._edge("b", [[0, 20], [100, 20]])])
+        self.assertEqual([], C.check_edge_overlap(parallel), "平行但不在同一条线上")
+
+    def test_edge_length_is_not_reported_as_overlap(self):
+        """一根线自己跟自己不能算重合。"""
+        one = StubResult({}, [self._edge("a", [[0, 10], [100, 10]]),
+                              self._edge("a", [[20, 10], [80, 10]])])
+        self.assertEqual([], C.check_edge_overlap(one))
+
+    def test_overlap_is_soft_and_tunable(self):
+        result = StubResult({}, [self._edge("a", [[0, 10], [100, 10]]),
+                                 self._edge("b", [[50, 10], [150, 10]])])
+        issue = C.check_edge_overlap(result)[0]
+        self.assertFalse(issue.blocking, "重合是软项：空档不够是空间问题，不是内容错")
+        self.assertIn("重合约", issue.detail)
+        for name in ("overlap", "slant"):
+            with self.subTest(name):
+                self.assertIn(name, C.TUNABLE)
+                self.assertIn(name, C.STEPPABLE)
+                self.assertIn(name, C.CHECK_LABEL)
+
+    def test_slant_is_reported_for_layered_layouts(self):
+        result = StubResult({}, [self._edge("a", [[0, 0], [100, 0], [200, 40]])])
+        issues = C.check_edge_slant(result)
+        self.assertEqual(1, len(issues))
+        self.assertFalse(issues[0].blocking, "斜段是可调项，不卡住出图")
+        self.assertIn("拆", issues[0].advice or "", "建议要是内容级的")
+        axis_aligned = StubResult({}, [self._edge("a", [[0, 0], [100, 0], [100, 40]])])
+        self.assertEqual([], C.check_edge_slant(axis_aligned))
+
+    def test_slant_is_not_reported_for_radial_or_force(self):
+        """径向 / 力导向的连线**就该是**两点直辐条，不能拿分层图的标准去要求它。"""
+        for direction in ("RADIAL", "FORCE"):
+            with self.subTest(direction):
+                result = StubResult({}, [self._edge("a", [[0, 0], [100, 40]])],
+                                    direction=direction)
+                self.assertEqual([], C.check_edge_slant(result))
+
+    def test_a_clean_diagram_reports_neither(self):
+        """干净的图不该因为新加两项就多出噪声 —— 否则没人会看报告。"""
+        spec = spec_of(["web", "api", "db"], [("web", "api"), ("api", "db")])
+        _, outcome, _ = run(spec)
+        self.assertEqual([], outcome.issues)
 
 
 class TestCli(unittest.TestCase):
