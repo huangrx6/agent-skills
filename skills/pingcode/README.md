@@ -152,6 +152,7 @@ CLI 层证明了 dry-run 不发写、写操作打到正确端点且 body 里是�
 | 项 | 状态 |
 | --- | --- |
 | 真实租户只读 + 写全链路（企业令牌） | ✅ 已实测 |
+| **建项目 / 改项目**（`project create` / `project update`） | ⚠️ **未在真实租户跑过** —— 代码与离线测试具备（必填项 type/name/identifier、日期转换、负责人解析都覆盖），但本轮实测只在**已有项目**里建了工作项，没动项目本身。首次真用前建议先 `--dry-run` 看一眼 body |
 | **用户令牌模式**（浏览器授权） | ✅ 已实测：授权 → 本机回调收到 code → 换令牌落盘（30 天） |
 | `refresh_token` 自动续期 | ✅ 已实测：换到新令牌，到期日顺延 30 天，`refresh_token` 保留 |
 | `whoami` / `--assignee @me` 的前提 | ✅ 实测：应用数据范围里要有 `pcp:read:account:personal`；缺了 `/v1/myself` 返回 **403**（报错点名 scope，并给 `--assignee <真名>` 替代）。**加上之后现有令牌直接就能用**，`whoami` 与 `workitem mine --open-only` 均通 |
