@@ -117,7 +117,7 @@ skills/pingcode/
 │   └── format.py           # 紧凑输出白名单 + 时间转换 + 表格
 ├── dev-tools/
 │   └── gen_endpoints.py    # 从官方 api_data.json 生成 endpoints.py
-├── tests/                  # 120 条：契约 / 传输 / 解析 / CLI
+├── tests/                  # 4 个测试文件：契约 / 传输 / 解析 / CLI
 └── evals/
     └── evals.json          # 触发与行为评估
 ```
@@ -135,7 +135,7 @@ skills/pingcode/
 
 ```sh
 cd skills/pingcode
-python3 -m unittest discover -s tests -v     # 134 条：全绿
+python3 -m unittest discover -s tests -v     # 139 条：全绿
 python3 dev-tools/gen_endpoints.py --check   # 端点表与官方文档无漂移（离线时加 --input）
 ```
 
