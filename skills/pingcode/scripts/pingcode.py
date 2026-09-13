@@ -406,7 +406,18 @@ def cmd_workitem_show(args: argparse.Namespace) -> int:
 
 def cmd_workitem_mine(args: argparse.Namespace) -> int:
     client = build_client(args)
-    me = _resolve.user_id(client, "@me", force=args.no_cache)
+    try:
+        me = _resolve.user_id(client, "@me", force=args.no_cache)
+    except _client.ApiError as exc:
+        if exc.status != 403:
+            raise
+        # 实测：应用的数据范围里没有 pcp:read:account:personal 时，/v1/myself 会 403。
+        # 这条报错本身已经点名了 scope，这里再给一个**不用改后台**的替代做法，
+        # 否则「我的任务」这条最常用的路径就成了死胡同。
+        raise CliError(
+            f"{exc}\n  「我」要读 /v1/myself，需要应用数据范围里有 pcp:read:account:personal。\n"
+            "  不想动后台：改用 `workitem list --assignee <你的真名>`（效果一样）。"
+        ) from exc
     params: dict[str, Any] = {"assignee_id": me}
     if args.type:
         params["type_id"] = args.type

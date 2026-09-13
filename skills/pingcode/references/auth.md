@@ -112,7 +112,7 @@ python3 scripts/pingcode.py auth logout                # 只删本地令牌，�
 | --- | --- | --- |
 | 授权页报「应用未配置 'redirect_uri'」 | 应用里没登记回调地址 | 去后台补 `http://localhost:8765/callback`；不行就用 `--code` 那条路（见上） |
 | 401 | 令牌无效/过期/被撤销 | `auth login` 重新授权 |
-| 403 | 应用的数据范围不够（**报错会指出缺哪个 scope**） | 去后台把这个 scope 勾上，然后重新授权 |
+| 403 | 应用的数据范围不够（**报错会指出缺哪个 scope**） | 去后台把这个 scope 勾上，然后重新授权。`whoami` / `@me` 需要 `pcp:read:account:personal`，不想加就用 `--assignee <你的真名>` |
 | 404 | 对象不存在，或路径不对 | 对象确认一遍；路径以生成的端点表为准（`api --list 关键词`） |
 | 429 | 触发了限流 | 报错会带官方建议的等待秒数与剩余配额；CLI 已自动按建议重试 |
 | 连不上 / 域名解析失败 | host 写错（私有部署少了 `/open`）或网络 | `auth status` 会打出解析后的 REST 根与 OAuth2 根 |

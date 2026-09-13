@@ -322,6 +322,18 @@ class CliCase(unittest.TestCase):
             self.assertNotIn(dropped, out, f"{dropped} 不该出现在未完成里")
         self.assertIn("其中未完成 3 条", out, "未知语义值算未完成（宁可多列）")
 
+    def test_mine_缺_scope_时要给不改后台的办法(self):
+        """实测：数据范围里没有 pcp:read:account:personal 时 /v1/myself 会 403。
+        报错要点名 scope，并给出不用改后台的替代做法，否则「我的任务」是死胡同。
+        """
+        code, _out, err, _router = self.run_cli(
+            ["workitem", "mine", "--open-only"],
+            {("GET", "/v1/myself"): http_error(403, {"code": "100027",
+                                                      "message": "'access_token'权限不足"})})
+        self.assertEqual(1, code)
+        self.assertIn("pcp:read:account:personal", err)
+        self.assertIn("--assignee", err)
+
     # ── 改状态 ──
     def test_改状态用解析后的_state_id(self):
         updated = dict(WORKITEM, state={"id": "st2", "name": "已完成", "type": "completed"})
