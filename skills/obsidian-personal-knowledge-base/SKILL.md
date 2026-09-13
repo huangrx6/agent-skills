@@ -1,10 +1,13 @@
 ---
 name: obsidian-personal-knowledge-base
 description: >-
-  操作 Huangrx6 的 Obsidian 知识库（路径从配置读取，见 Prerequisites）。用于在库内创建、新建、写、补一篇、更新、编辑、移动、重命名、审阅、整理、归位笔记；在 Inbox、Projects、Areas、Resources、Archive、Assets、System 之间判断内容归属；维护 MOC、索引、模板、周计划、周报、项目主页、领域主页、学习笔记和技术资源笔记。使用目录专属规则：Areas/Projects 使用轻量工作管理规则，Resources 才使用深度研究和学习笔记规则。
-  处理 Resources 技术学习笔记时，要保证 API 入口、依赖安装、参数说明、可运行示例、轻量 MOC、独立正文、配图清单和表达风格都能直接用于长期复用。
+  Use this skill when 要动一篇 Obsidian 笔记 —— 记一篇 / 建一篇 / 补一段 / 更新 / 改名字 / 挪位置 /
+  审阅一遍 / 整理归位，或者问「这条该放哪个目录」「Inbox 里这几条怎么归位」「顺手把 MOC 更新一下」。
+  在 Inbox、Projects、Areas、Resources、Archive、Assets、System 之间判断内容归属；维护 MOC、索引、模板、
+  周计划、周报、项目主页、领域主页、学习笔记和技术资源笔记。使用目录专属规则：Areas/Projects 使用轻量
+  工作管理规则，Resources 才使用深度研究和学习笔记规则（API 入口、依赖安装、参数说明、可运行示例、
+  轻量 MOC、独立正文、配图清单、表达风格要能长期复用）。
   Do NOT use for recording completed work, landed facts, weekly release notes, or 发版文档 —— use `obsidian-work-log-release-recorder` for those. Also do NOT use for pure discussion, brainstorming, or one-off chat with no note to create or edit.
-  本 skill 一次只服务一个 vault；vault 路径从 $OBSIDIAN_VAULT_PATH 或 ~/.config/obsidian-vault-path 解析，永远不要在文档或代码里写死。
 ---
 
 # Obsidian 个人知识库

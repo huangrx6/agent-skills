@@ -127,6 +127,7 @@ python3 scripts/preflight.py                     # 报告前跑：全部检查 +
 - [ ] 没有“个人吐槽 / 临时想法 / 试验性”段落
 - [ ] **把某段改成“见别处”的指针时，逐词核对目标真的接住了内容** —— “指针写对了” ≠ “内容搬过去了”（实测：删掉 8 条风格规格改成指针，目标文件里一条都没落地）。先跑 `scripts/check_pointers.py` 列出所有指针，再逐条比对
 - [ ] 同步更新根 README 索引表 + Roadmap
+- [ ] **跑 eval 前先把仓库复制出去、并删掉 `evals/`** —— 实测被测 Agent 会在仓库里翻到 `evals/evals.json`，直接读到自己那条 `expected_output`（那次判定作废）；它还可能与兄弟任务互相改文件
 - [ ] `skills-lock.json` 是**派生文件**（`computedHash` = `sha256(SKILL.md)`）：由 `tools/skills_lock.py` 维护，pre-commit 会自动同步 —— **不要手改**；想核对就跑 `--check`
 
 **正文余量不足时怎么搬**：见 `references/slimming.md`（搬什么、留什么、搬完怎么核对）。
