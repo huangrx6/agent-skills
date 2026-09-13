@@ -120,6 +120,8 @@ Keep release notes short. Put full scripts or config snippets under `04 发布�
 
 4. Verify link and structure integrity.
    - Ensure new notes are linked from the nearest MOC or parent note.
+   - Run `python3 scripts/check_release_note.py <笔记路径>` — 它守的是**本 skill 自己写下的规则**（文件名格式、ISO 周号、标题与文件名一致、frontmatter、模板里的章节骨架、同一系统同一周不重复、已挂到 MOC、没有明显密钥值）。章节骨架是**从 `references/release-note-template.md` 读的**，模板改了它跟着改。
+   - **链接是否失效不归它管** —— 那是下面这条 PKB 脚本的事（两者互补，不重叠）。
    - Run `python3 ../obsidian-personal-knowledge-base/scripts/check_links.py --ignore-template` after creating or moving notes; expect exit 0 (details in PKB's `references/structural-checks.md`).
    - If this operation changed directory structure, file counts, or hook behaviour, update the description of it in `vault-map.md` or the relevant SKILL.md **in the same operation** — do not leave it for the next probe to discover.
    - Avoid duplicating the same release instructions in multiple places; cross-link instead.

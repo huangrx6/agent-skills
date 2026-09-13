@@ -104,10 +104,18 @@ python3 skills/skill-builder/scripts/check_leakage.py
 ```
 
 「通过」的意思：结构检查全过（frontmatter 可解析、`name` 与目录名一致、description < 800 字符、
-含 Do NOT 边界、正文 ≤ 150 行）；泄露扫描不报真实名称；体检那一行**如实显示 0 脚本行 / 0 测试**。
+含 Do NOT 边界、正文 ≤ 150 行）；泄露扫描不报真实名称。
 
-写入 vault 之后另加一条：`python3 skills/obsidian-personal-knowledge-base/scripts/check_links.py --ignore-template`，
-退出码 0 = 没有失效 wikilink。
+**写笔记前后各跑一条机械检查**（两者互补，不重叠）：
+
+```sh
+# 守本 skill 自己写下的规则：文件名格式 / ISO 周号 / 标题与文件名一致 / frontmatter /
+# 模板里的章节骨架 / 同一系统同一周不重复 / 已挂到 MOC / 没有明显密钥值
+python3 skills/obsidian-work-log-release-recorder/scripts/check_release_note.py "<笔记路径>"
+
+# 守链接：失效 wikilink 与嵌入（这是 PKB 的脚本，SKILL.md 明确要求跑它）
+python3 skills/obsidian-personal-knowledge-base/scripts/check_links.py --ignore-template
+```
 
 行为层面靠 `evals/evals.json` 的 8 条（触发边界、位置以探查为准、未落地的想法不记、
 与 PKB 撞车时先问）—— 但那是给人看的标尺，见下。
@@ -117,7 +125,9 @@ python3 skills/skill-builder/scripts/check_leakage.py
 | 项 | 状态 |
 | --- | --- |
 | **eval 只是标尺，没有自动跑** | 8 条 eval 的期望输出是文本，仓库里没有任何东西执行它们并判分 |
-| **自己没有脚本，也没有测试** | 刻意为之：它的动作是「判断 + 探查 + 写笔记」，没有可机械断言的确定性产物。代价是**它坏了不会被任何测试发现** |
+| **脚本只守「格式与挂载」，不守「内容对不对」** | `check_release_note.py` 能查文件名、周号、标题、frontmatter、章节骨架、重复周、是否挂到 MOC、有没有明显密钥值。它**不能**判断你记的事实准不准、该记的有没有漏 —— 那仍然靠人。 |
+| **链接失效不归它管** | 那是 PKB 的 `check_links.py`（SKILL.md 已要求跑），两者互补、不重叠。 |
+| **没有真实发版笔记样本** | 探查发现 vault 里现有发版笔记 **0 篇**，所以「校验器」只能按模板与 SKILL.md 写明的规则做 —— 没有发明格式。拿到第一篇真实笔记后要回头对照一次。 |
 | `02 Areas/` 目前只有索引文件，没有领域目录 | **已核实**（`ls` 只看到一个索引 md）。SKILL.md 里「部署运维类发布通常归到 `02 Areas/<领域>/<子主题>/`」现在**没有现成归属**，探查不到必须问用户，不能写进记忆中的旧路径。SKILL.md 自己也标了 ⚠️ |
 | `04 发布依赖清单` | **vault 里不存在**（按目录名搜到 0 个），但 SKILL.md 与模板都引用它放完整脚本/配置片段。第一次真用之前得先确认这个目录建在哪 |
 | 周发版笔记的命名与模板 | **未实测**：vault 里现有发版笔记数量为 **0**，模板没有被真实使用过；ISO 周编号也只按约定写，没有历史笔记可对照 |
