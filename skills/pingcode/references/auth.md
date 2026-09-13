@@ -35,10 +35,29 @@
 ```sh
 python3 scripts/pingcode.py auth login                 # 默认 user：打印授权链接，本机等回调
 python3 scripts/pingcode.py auth login --manual        # 不想起监听：自己贴回调里的 code
-python3 scripts/pingcode.py auth login --mode enterprise
+python3 scripts/pingcode.py auth login --code <code>   # 回调收不到时用（见下）
 python3 scripts/pingcode.py auth status                # 令牌来源 / 模式 / 还剩多久 / 能不能续
 python3 scripts/pingcode.py auth logout                # 只删本地令牌，不动应用凭据
 ```
+
+### 回调收不到怎么办
+
+授权码模式需要后台登记的 **redirect_uri**（应用没配这一项时，授权页会直接报「应用未配置
+'redirect_uri'」）。三条路，从省事到最不依赖：
+
+1. **在后台把这个地址加上**：`http://localhost:8765/callback`。之后 `auth login` 会自己
+   在本机收 code（默认等 180 秒，`--timeout` 可改）。
+2. **后台只允许别的地址**：用那个地址去授权。浏览器跳过去会打不开（那里没有服务），
+   **但地址栏里已经带着 `?code=…`** —— 把 `code=` 后面那段复制出来：
+
+   ```sh
+   python3 scripts/pingcode.py auth login --code <粘贴到这里>
+   ```
+
+   这条路完全不依赖本地监听，也适用于 SSH 到远程机器上授权。
+3. **已有现成的 code**：同上，直接 `--code`。
+
+注意：code 是一次性的、很快过期，拿到了尽快换。
 
 ## 令牌生命周期
 
@@ -91,6 +110,7 @@ python3 scripts/pingcode.py auth logout                # 只删本地令牌，�
 
 | 现象 | 意思 | 怎么办 |
 | --- | --- | --- |
+| 授权页报「应用未配置 'redirect_uri'」 | 应用里没登记回调地址 | 去后台补 `http://localhost:8765/callback`；不行就用 `--code` 那条路（见上） |
 | 401 | 令牌无效/过期/被撤销 | `auth login` 重新授权 |
 | 403 | 应用的数据范围不够（**报错会指出缺哪个 scope**） | 去后台把这个 scope 勾上，然后重新授权 |
 | 404 | 对象不存在，或路径不对 | 对象确认一遍；路径以生成的端点表为准（`api --list 关键词`） |

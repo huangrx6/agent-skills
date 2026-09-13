@@ -403,6 +403,20 @@ class CliCase(unittest.TestCase):
         self.assertIn("John", out)
 
     # ── 配置 ──
+    def test_用_code_直接换令牌_不依赖回调(self):
+        """后台没登记 redirect_uri 或本机收不到回调时，要能从地址栏贴 code 把事办完。"""
+        payload = {"access_token": "at", "refresh_token": "rt", "expires_in": 1791902383}
+        code, out, err, router = self.run_cli(
+            ["auth", "login", "--mode", "user", "--code", "the-code"],
+            {("GET", "/v1/auth/token"): payload})
+        self.assertEqual(0, code, err)
+        self.assertIn("用户令牌已保存", out)
+        self.assertEqual("at", cfg.load_token()["access_token"])
+        self.assertEqual("user", cfg.load_token()["mode"])
+        url = router.find("GET", "/v1/auth/token")[0][1]
+        self.assertIn("grant_type=authorization_code", url)
+        self.assertIn("code=the-code", url)
+
     def test_config_context_能设也能清(self):
         code, out, _err, _router = self.run_cli(["config", "context", "--project", "演示项目"])
         self.assertEqual(0, code)

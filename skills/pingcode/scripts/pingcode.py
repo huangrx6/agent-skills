@@ -221,12 +221,18 @@ def cmd_auth_login(args: argparse.Namespace) -> int:
         print("✓ 企业令牌已保存")
     else:
         url = _auth.authorize_url()
-        print("在浏览器里打开这个地址，登录并点授权：\n  " + url)
-        if args.manual:
-            code = input("把回调地址里的 code 贴进来：").strip()
+        if args.code:
+            # 回调收不到时（后台登记的 redirect_uri 与本机监听对不上、或在远程机器上）
+            # 就手动把地址栏里的 code 拿过来 —— 不依赖本地监听。
+            code = args.code.strip()
+            print("用你给的 code 换令牌。")
         else:
-            code = _auth.wait_for_code(cr.redirect_uri, timeout=args.timeout)
-            print("✓ 收到授权码")
+            print("在浏览器里打开这个地址，登录并点授权：\n  " + url, flush=True)
+            if args.manual:
+                code = input("把回调地址里的 code 贴进来：").strip()
+            else:
+                code = _auth.wait_for_code(cr.redirect_uri, timeout=args.timeout)
+                print("✓ 收到授权码", flush=True)
         record = _auth.exchange_code(code)
         print("✓ 用户令牌已保存")
     state = _config.token_state(record)
@@ -710,6 +716,7 @@ def build_parser() -> argparse.ArgumentParser:
     login = make(auth_sub, "login", help="授权（默认用户令牌）")
     login.add_argument("--mode", choices=list(_config.AUTH_MODES), help="user（默认）/ enterprise")
     login.add_argument("--manual", action="store_true", help="手动贴 code，不起本地监听")
+    login.add_argument("--code", help="直接给授权码（回调收不到时用：从浏览器地址栏复制 code=…）")
     login.add_argument("--timeout", type=int, default=_auth.CALLBACK_TIMEOUT,
                        help="等回调的秒数（默认 %(default)s）")
     login.set_defaults(func=cmd_auth_login)
