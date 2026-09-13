@@ -59,6 +59,7 @@ _resolve = _load_sibling("resolve")
 WORKITEM = "/v1/pjm/workitems"
 PROJECTS = "/v1/pjm/projects"
 COMMENTS = "/v1/comments"
+ATTACHMENTS = "/v1/attachments"
 
 # 工作项编号的形状（`DEMO-80` / `SCR-12`）：带连字符 + 结尾是数字。
 # 用形状先分流，省掉一次注定 400 的直取（官方对编号返回 400 而不是 404）。
@@ -859,6 +860,42 @@ def cmd_workitem_bulk_update(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_workitem_comments(args: argparse.Namespace) -> int:
+    """列评论：GET /v1/comments?principal_type=workitem&principal_id=<id>。"""
+    client = build_client(args)
+    current = fetch_workitem(client, args.ref, include_deleted=bool(args.all))
+    values = client.paginate(COMMENTS, max_items=args.limit,
+                             principal_type="workitem", principal_id=current["id"])
+    if args.full:
+        print(json.dumps(values, ensure_ascii=False, indent=2))
+        return 0
+    if not values:
+        print(f"{current.get('identifier', args.ref)} 还没有评论")
+        return 0
+    emit(_fmt.rows("comment", values), args, "comment", values)
+    return 0
+
+
+def cmd_workitem_attachments(args: argparse.Namespace) -> int:
+    """列附件：GET /v1/attachments?principal_type=workitem&principal_id=<id>。
+
+    只列不传 —— 上传是 multipart/form-data，字段名没法从文档确认，而且列附件才是
+    日常真正要看的那一半（“这个缺陷有没有附日志”）。
+    """
+    client = build_client(args)
+    current = fetch_workitem(client, args.ref, include_deleted=bool(args.all))
+    values = client.paginate(ATTACHMENTS, max_items=args.limit,
+                             principal_type="workitem", principal_id=current["id"])
+    if args.full:
+        print(json.dumps(values, ensure_ascii=False, indent=2))
+        return 0
+    if not values:
+        print(f"{current.get('identifier', args.ref)} 没有附件")
+        return 0
+    emit(_fmt.rows("attachment", values), args, "attachment", values)
+    return 0
+
+
 def cmd_workitem_comment(args: argparse.Namespace) -> int:
     client = build_client(args)
     current = fetch_workitem(client, args.ref)
@@ -1182,6 +1219,16 @@ def build_parser() -> argparse.ArgumentParser:
     wcp.add_argument("--project", help="建到哪个项目（也可写在计划文件的 project 里）")
     wcp.add_argument("--yes", action="store_true", help="确认建（不加则只打印计划）")
     wcp.set_defaults(func=cmd_workitem_create_plan)
+    wcl = make(wsub, "comments", help="列评论")
+    wcl.add_argument("ref")
+    wcl.add_argument("--limit", type=int, default=50)
+    wcl.add_argument("--all", action="store_true", help="按编号找时含已删除的")
+    wcl.set_defaults(func=cmd_workitem_comments)
+    wat = make(wsub, "attachments", help="列附件（上传未实现，见 README 已知限制）")
+    wat.add_argument("ref")
+    wat.add_argument("--limit", type=int, default=50)
+    wat.add_argument("--all", action="store_true", help="按编号找时含已删除的")
+    wat.set_defaults(func=cmd_workitem_attachments)
     wd = make(wsub, "delete", help="删除工作项（不可逆）")
     wd.add_argument("ref")
     wd.add_argument("--yes", action="store_true", help="确认删除")

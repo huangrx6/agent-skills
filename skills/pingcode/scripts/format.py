@@ -38,6 +38,26 @@ STATE = (
     ("id", "ID"),
 )
 
+# 评论与附件（通用域，任何主体都能挂）。
+# `content` 与 `title` 会按显示宽度截断 —— 不截的话一条长评论就把整张表撞歪。
+COMMENT = (
+    ("created_by.display_name", "人"),
+    ("created_at", "时间"),
+    ("content", "内容"),
+)
+
+ATTACHMENT = (
+    ("title", "附件"),
+    ("type", "类型"),
+    ("size", "大小"),
+    ("created_by.display_name", "人"),
+    ("created_at", "时间"),
+    ("download_url", "下载"),
+)
+
+# 这些字段按显示宽度截断（值是该列的最大显示宽度）。
+CLIP_FIELDS = {"content": 64, "title": 48, "download_url": 56}
+
 PROJECT = (
     ("identifier", "标识"),
     ("name", "名称"),
@@ -77,6 +97,8 @@ SCHEMAS: dict[str, tuple[tuple[str, str], ...]] = {
     "sprint": SPRINT,
     "user": USER,
     "state": STATE,
+    "comment": COMMENT,
+    "attachment": ATTACHMENT,
     "simple": SIMPLE,
 }
 
@@ -159,6 +181,34 @@ def type_label(value: Any) -> str:
     return f"{TYPE_NAMES.get(raw, raw)}" if raw in TYPE_NAMES else raw
 
 
+def clip(text: Any, max_width: int) -> str:
+    """按**显示宽度**截断（全角算 2），超出加省略号。表格里不截会把列撞歪。"""
+    raw = str(text)
+    if _width(raw) <= max_width:
+        return raw
+    out = ""
+    used = 0
+    for char in raw:
+        step = 2 if unicodedata.east_asian_width(char) in ("W", "F") else 1
+        if used + step > max_width - 1:
+            break
+        out += char
+        used += step
+    return out + "…"
+
+
+def human_size(value: Any) -> str:
+    """字节数 → 人看的（附件列表里 1024 这种数字没人愿意算）。"""
+    size = _as_int(value, -1)
+    if size < 0:
+        return ""
+    if size < 1024:
+        return f"{size} B"
+    if size < 1024 * 1024:
+        return f"{size / 1024:.1f} KB"
+    return f"{size / 1024 / 1024:.1f} MB"
+
+
 def compact(kind: str, obj: dict[str, Any]) -> dict[str, Any]:
     """按白名单裁剪一条记录。"""
     schema = SCHEMAS.get(kind, SIMPLE)
@@ -174,6 +224,10 @@ def compact(kind: str, obj: dict[str, Any]) -> dict[str, Any]:
             value = show_time(value)
         elif path == "type":
             value = type_label(value)
+        elif path == "size":
+            value = human_size(value)
+        if path in CLIP_FIELDS and value not in (None, ""):
+            value = clip(value, CLIP_FIELDS[path])
         if value not in (None, "", [], {}):
             out[title] = value
     return out

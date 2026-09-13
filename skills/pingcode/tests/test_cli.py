@@ -448,6 +448,50 @@ class CliCase(unittest.TestCase):
         self.assertEqual(["w1"], body["ids"], "要传解析后的真 id，不传编号")
         self.assertIn("已更新", out)
 
+    # ── 评论 / 附件列表 ──
+    def test_列评论用解析后的主体_id(self):
+        comments = [{"id": "c1", "content": "已定位到网关超时", "created_at": 1583290347,
+                     "created_by": {"display_name": "某甲"}}]
+        code, out, _err, router = self.run_cli(
+            ["workitem", "comments", "DOC-1"],
+            {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]},
+             ("GET", "/v1/comments"): {"values": comments, "total": 1}})
+        self.assertEqual(0, code, out)
+        self.assertIn("已定位到网关超时", out)
+        self.assertIn("某甲", out)
+        query = router.find("GET", "/v1/comments")[0][1]
+        self.assertIn("principal_type=workitem", query)
+        self.assertIn("principal_id=w1", query, "要传解析后的真 id，不传编号")
+
+    def test_没有评论时说一句人话(self):
+        code, out, _err, _router = self.run_cli(
+            ["workitem", "comments", "DOC-1"],
+            {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]},
+             ("GET", "/v1/comments"): {"values": [], "total": 0}})
+        self.assertEqual(0, code)
+        self.assertIn("还没有评论", out)
+
+    def test_列附件把大小变人看的(self):
+        files = [{"id": "a1", "title": "控制台日志", "size": 2048, "type": "file",
+                  "download_url": "https://x/a.log", "created_at": 1583290347,
+                  "created_by": {"display_name": "某甲"}}]
+        code, out, _err, router = self.run_cli(
+            ["workitem", "attachments", "DOC-1"],
+            {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]},
+             ("GET", "/v1/attachments"): {"values": files, "total": 1}})
+        self.assertEqual(0, code, out)
+        self.assertIn("控制台日志", out)
+        self.assertIn("2.0 KB", out, "字节数要变成人看的")
+        self.assertIn("principal_id=w1", router.find("GET", "/v1/attachments")[0][1])
+
+    def test_没有附件时说一句人话(self):
+        code, out, _err, _router = self.run_cli(
+            ["workitem", "attachments", "DOC-1"],
+            {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]},
+             ("GET", "/v1/attachments"): {"values": [], "total": 0}})
+        self.assertEqual(0, code)
+        self.assertIn("没有附件", out)
+
     # ── mine 缺 scope 时的替代做法 ──
     def test_mine_缺_scope_时要给不改后台的办法(self):
         """实测：数据范围里没有 pcp:read:account:personal 时 /v1/myself 会 403。

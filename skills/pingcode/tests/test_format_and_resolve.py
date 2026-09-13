@@ -114,6 +114,33 @@ class CompactTest(unittest.TestCase):
     def test_空列表给一句人话(self):
         self.assertEqual("（没有匹配的条目）", fmt.render([]))
 
+    def test_长文本按显示宽度截断(self):
+        """一条长评论不应把整张表撞歪。判据是**不超过**，不是正好等于。"""
+        long_text = "甲" * 100
+        clipped = fmt.clip(long_text, 64)
+        self.assertLessEqual(fmt._width(clipped), 64)
+        self.assertTrue(clipped.endswith("…"))
+        self.assertEqual("短", fmt.clip("短", 64), "没超就不动它")
+        self.assertLessEqual(fmt._width(fmt.clip("ab" * 50, 64)), 64, "半角也一样")
+
+    def test_字节数变人看的(self):
+        self.assertEqual("512 B", fmt.human_size(512))
+        self.assertEqual("1.0 KB", fmt.human_size(1024))
+        self.assertEqual("1.5 MB", fmt.human_size(1024 * 1024 * 3 // 2))
+        self.assertEqual("", fmt.human_size(None))
+
+    def test_评论与附件的紧凑列(self):
+        comment = {"content": "已定位", "created_at": 1583290347,
+                   "created_by": {"display_name": "某甲"}}
+        row = fmt.compact("comment", comment)
+        self.assertEqual("某甲", row["人"])
+        self.assertEqual("已定位", row["内容"])
+        # 时间不写死（跑测试的机器时区不同）—— 只验形状
+        self.assertRegex(row["时间"], r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$")
+        file_row = fmt.compact("attachment", {"title": "日志", "size": 2048, "type": "file"})
+        self.assertEqual("2.0 KB", file_row["大小"])
+        self.assertEqual("日志", file_row["附件"])
+
     def test_每行列顺序一致且取并集(self):
         text = fmt.render([{"a": 1}, {"b": 2}])
         header = text.splitlines()[0]
