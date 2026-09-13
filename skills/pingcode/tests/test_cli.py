@@ -96,6 +96,9 @@ class Router:
                            json.loads(body.decode("utf-8")) if body else None))
         for (method, needle), payload in self.routes:
             if method == request.method and needle in request.full_url:
+                # payload 可以是：响应体 / 异常实例 / 函数（按调用次序造不同响应）
+                if callable(payload):
+                    payload = payload(request)
                 if isinstance(payload, Exception):
                     raise payload
                 return FakeResponse(payload)
@@ -118,7 +121,9 @@ PROJECTS = [
     {"id": "pj1", "identifier": "DEMO", "name": "演示项目"},
     {"id": "pj2", "identifier": "DEMO2", "name": "示例项目 B"},
 ]
-TYPES = [{"id": "bug", "name": "缺陷"}, {"id": "task", "name": "任务"}]
+TYPES = [{"id": "epic", "name": "史诗"}, {"id": "feature", "name": "特性"},
+         {"id": "story", "name": "用户故事"}, {"id": "task", "name": "任务"},
+         {"id": "bug", "name": "缺陷"}]
 STATES = [{"id": "st1", "name": "新建", "type": "pending"},
           {"id": "st2", "name": "已完成", "type": "completed"}]
 SPRINTS = [{"id": "sp1", "name": "Sprint 12"}]
@@ -365,7 +370,104 @@ class CliCase(unittest.TestCase):
         self.assertIn("type_id=bug", url, "中文要翻成枚举 bug")
         self.assertNotIn("%E7%BC%BA%E9%99%B7", url)
 
-    # ── 改状态 ──
+    # ── 计划：一次建一棵树 ──
+    def write_plan(self, payload: dict) -> str:
+        path = os.path.join(self._tmp.name, "plan.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, ensure_ascii=False)
+        return path
+
+    GOOD_PLAN = {
+        "project": "演示项目",
+        "nodes": [
+            {"type": "epic", "title": "商城改版", "children": [
+                {"type": "feature", "title": "下单与支付", "children": [
+                    {"type": "story", "title": "下单流程", "children": [
+                        {"type": "task", "title": "接入支付网关"}]}]}]},
+        ],
+    }
+
+    def created_workitem(self, request_body: dict) -> dict:
+        """把 POST 的 body 回显成一条已创建的工作项（测试用）。"""
+        return dict(WORKITEM, id="w-" + str(len(request_body)), title=request_body.get("title", ""),
+                    type=request_body.get("type_id", ""))
+
+    def test_计划默认只打印不建(self):
+        path = self.write_plan(self.GOOD_PLAN)
+        code, out, _err, router = self.run_cli(["workitem", "create-plan", "--file", path])
+        self.assertEqual(0, code)
+        self.assertIn("建 4 条工作项", out)
+        self.assertIn("- [史诗] 商城改版", out)
+        self.assertIn("- [用户故事] 下单流程", out, "要画出层级（缩进）")
+        self.assertIn("没有建任何东西", out)
+        self.assertEqual([], router.find("POST", "/v1/pjm/workitems"), "不加 --yes 绝不能建")
+
+    def test_计划带_yes_才建且父先子后(self):
+        path = self.write_plan(self.GOOD_PLAN)
+        code, out, _err, router = self.run_cli(
+            ["workitem", "create-plan", "--file", path, "--yes"],
+            {("POST", "/v1/pjm/workitems"): {"id": "w1", "identifier": "DEMO-9",
+                                               "title": "x", "type": "epic"}})
+        self.assertEqual(0, code, out)
+        posts = router.find("POST", "/v1/pjm/workitems")
+        self.assertEqual(4, len(posts))
+        self.assertNotIn("parent_id", posts[0][2], "第一条是根，没有父项")
+        for index, call in enumerate(posts[1:], start=1):
+            self.assertEqual("w1", call[2]["parent_id"], f"第 {index + 1} 条要挂在刚建出来的父项上")
+        self.assertIn("建成的树", out)
+        self.assertIn("→ DEMO-9", out, "建成后要把编号回显在树上")
+
+    def test_计划里写错字段名要当场报错并给候选(self):
+        plan = {"nodes": [{"type": "epic", "titel": "打错了"}]}
+        code, _out, err, router = self.run_cli(
+            ["workitem", "create-plan", "--file", self.write_plan(plan)])
+        self.assertEqual(1, code)
+        self.assertIn("titel", err)
+        self.assertIn("title", err, "要给最接近的候选")
+        self.assertEqual([], router.calls, "校验不过就不能发任何请求")
+
+    def test_计划缺_type_或_title_要报错(self):
+        for node in ({"title": "没类型"}, {"type": "epic"}, {"type": "  ", "title": "  "}):
+            with self.subTest(node=node):
+                code, _out, err, router = self.run_cli(
+                    ["workitem", "create-plan", "--file", self.write_plan({"nodes": [node]})])
+                self.assertEqual(1, code)
+                self.assertEqual([], router.calls)
+
+    def test_计划不是_json_要报错(self):
+        path = os.path.join(self._tmp.name, "bad.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("这不是 json")
+        code, _out, err, _router = self.run_cli(["workitem", "create-plan", "--file", path])
+        self.assertEqual(1, code)
+        self.assertIn("合法 JSON", err)
+
+    def test_计划中途失败要报出已建成的(self):
+        """不能静默半途而废 —— 已建成的编号要报出来，否则用户只能从头猜。"""
+        path = self.write_plan(self.GOOD_PLAN)
+        calls = {"n": 0}
+
+        def route(request) -> dict:  # noqa: ARG001 - Router 会把 request 传进来
+            calls["n"] += 1
+            if calls["n"] >= 3:
+                raise http_error(400, {"code": "100319", "message": "父工作项的类型不正确"})
+            return {"id": f"w{calls['n']}", "identifier": f"DEMO-{calls['n']}"}
+
+        code, _out, err, _router = self.run_cli(
+            ["workitem", "create-plan", "--file", path, "--yes"],
+            {("POST", "/v1/pjm/workitems"): route})
+        self.assertEqual(1, code)
+        self.assertIn("已建成的", err)
+        self.assertIn("DEMO-1", err, "要说清楚已经建成了哪些")
+        self.assertIn("剩下的子树", err, "要给出怎么接着做")
+
+    def test_计划建到一半时根节点就失败_要说已建成的是无(self):
+        path = self.write_plan(self.GOOD_PLAN)
+        code, _out, err, _router = self.run_cli(
+            ["workitem", "create-plan", "--file", path, "--yes"],
+            {("POST", "/v1/pjm/workitems"): http_error(400, {"message": "bad"})})
+        self.assertEqual(1, code)
+        self.assertIn("（无）", err)
     def test_改状态用解析后的_state_id(self):
         updated = dict(WORKITEM, state={"id": "st2", "name": "已完成", "type": "completed"})
         code, out, _err, router = self.run_cli(

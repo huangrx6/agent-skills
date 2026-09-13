@@ -54,7 +54,40 @@ pingcode.py workitem update SCR-12 --description "…" --end 2026-09-30
 pingcode.py workitem set-state SCR-12 已完成
 pingcode.py workitem comment SCR-12 "已定位到网关超时"
 pingcode.py workitem delete SCR-12 --yes            # 不可逆
+
+# 一次建一棵树（史诗 → 特性 → 用户故事 → 任务）：适合把一段需求/一份计划落成工作项
+pingcode.py workitem create-plan --file plan.json             # 默认只打印整棵树，不建
+pingcode.py workitem create-plan --file plan.json --yes       # 确认才建
 ```
+
+`plan.json`：字段集是**封闭的**（写错字段名当场报错并给候选），层次靠 `children` 嵌套：
+
+```json
+{
+  "project": "演示项目",
+  "nodes": [
+    {"type": "epic", "title": "商城改版", "children": [
+      {"type": "feature", "title": "下单与支付", "children": [
+        {"type": "story", "title": "下单流程", "priority": "普通",
+         "children": [{"type": "task", "title": "接入支付网关"}]}
+      ]}
+    ]}
+  ]
+}
+```
+
+节点可用字段：`type` `title`（必填）、`description` `description_file` `assignee` `priority`
+`sprint` `state` `start` `end` `story_points` `estimated_workload` `remaining_workload` `children`。
+
+行为上有三条是刻意的：
+
+- **`--yes` 之前一定不建** —— 「先打印整棵树再建」不靠自觉，靠接口默认值。
+- **深度优先建（父先子后）** —— 子项要父项的 id。
+- **中途失败不静默** —— 报出**已建成的编号**与失败的节点，让你把剩下的子树单独放一个
+  计划文件接着跑（已建成的不会重复建）。
+
+`type` 写中文也行（史诗 / 特性 / 用户故事 / 任务 / 缺陷），本地会翻成枚举；
+自定义类型要写 id。
 
 **写操作会先回显**：`→ 在「演示项目」创建 缺陷：登录页 500`，然后才发。
 不确定就先加 `--dry-run` 看 body。
@@ -92,7 +125,7 @@ pingcode.py api --method POST --path /v1/comments --data '{"principal_type":"wor
 | "有哪些没修的缺陷" | `workitem mine --type bug --open-only` 或 `workitem list --type bug` |
 | "把 SCR-12 关了" | 先 `workitem show SCR-12` 确认是它，再 `workitem set-state SCR-12 已完成`（状态名要真实存在，报错会列出可选项） |
 | "建一个需求 / 任务 / 缺陷" | `workitem create`，`--type story\|task\|bug`；缺的信息（项目、标题）先问，别编。不确定先 `--dry-run` |
-| "建一棵史诗 → 特性 → 故事 → 任务" | 逐层建，`--parent <上一层编号>`。**父项类型有限制**：实测用户故事的父项不能是史诗，得是特性 |
+| "建一棵史诗 → 特性 → 故事 → 任务" | 写一份 `plan.json` 跑 `workitem create-plan --file plan.json`（先看树）→ 确认后 `--yes`。比逐条 create 少一整轮编号传递 |
 | "把这个迭代的任务列出来" | `workitem list --sprint "Sprint 12"`（迭代名有歧义时会列候选） |
 | "这个项目进度怎么样" | `project progress --project X` → 总数 / 待处理 / 进行中 / 已完成 |
 | "帮我建个新项目" | `project create --type scrum --name … --identifier …`（identifier ≤15 位大写字母/数字/`_`/`-`，全企业唯一） |

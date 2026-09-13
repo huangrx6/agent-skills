@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import importlib.util
 import json
 import os
@@ -538,6 +539,170 @@ def cmd_workitem_create(args: argparse.Namespace) -> int:
     return 0
 
 
+# ── 计划：一次建一棵树 ────────────────────────────────────────
+# 字段集是**封闭的** —— 写错字段名（比如 titel）要当场报错并给候选，
+# 而不是默默忽略、建出一棵缺东西的树。
+PLAN_FIELDS = ("type", "title", "description", "description_file", "assignee", "priority",
+               "sprint", "state", "start", "end", "story_points", "estimated_workload",
+               "remaining_workload", "children")
+PLAN_TOP_FIELDS = ("project", "nodes")
+
+
+def load_plan(path: str) -> dict[str, Any]:
+    """读计划文件（JSON）。"""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except OSError as exc:
+        raise CliError(f"读不到计划文件 {path}：{exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise CliError(f"{path} 不是合法 JSON：{exc}") from exc
+    if not isinstance(data, dict):
+        raise CliError('计划文件顶层要是一个对象：{"project": …, "nodes": […]}')
+    unknown = [k for k in data if k not in PLAN_TOP_FIELDS]
+    if unknown:
+        raise CliError(f"计划文件顶层不认识的键：{'、'.join(unknown)}"
+                       f"（只允许 {'、'.join(PLAN_TOP_FIELDS)}）")
+    nodes = data.get("nodes")
+    if not isinstance(nodes, list) or not nodes:
+        raise CliError("计划文件缺 nodes（非空数组）")
+    _check_plan_nodes(nodes, "nodes")
+    return data
+
+
+def _check_plan_nodes(nodes: list[Any], where: str) -> None:
+    for index, node in enumerate(nodes):
+        at = f"{where}[{index}]"
+        if not isinstance(node, dict):
+            raise CliError(f"{at} 不是对象")
+        unknown = [k for k in node if k not in PLAN_FIELDS]
+        if unknown:
+            near = difflib.get_close_matches(str(unknown[0]), PLAN_FIELDS, n=1)
+            hint = f"，是不是想写 {near[0]}？" if near else ""
+            raise CliError(f"{at} 不认识的字段：{'、'.join(unknown)}{hint}"
+                           f"（允许：{'、'.join(PLAN_FIELDS)}）")
+        for required in ("type", "title"):
+            if not str(node.get(required) or "").strip():
+                raise CliError(f"{at} 缺 {required}（每一条都必须有类型和标题）")
+        children = node.get("children")
+        if children is None:
+            continue
+        if not isinstance(children, list):
+            raise CliError(f"{at}.children 要是数组")
+        _check_plan_nodes(children, f"{at}.children")
+
+
+def count_plan_nodes(nodes: list[Any]) -> int:
+    return sum(1 + count_plan_nodes(node.get("children") or []) for node in nodes)
+
+
+def plan_lines(nodes: list[Any], prefix: str = "", depth: int = 0,
+               created: dict[str, str] | None = None) -> list[str]:
+    """把计划画成树。建完了就把编号接在后面。"""
+    out: list[str] = []
+    for index, node in enumerate(nodes, start=1):
+        key = f"{prefix}{index}"
+        ident = (created or {}).get(key, "")
+        tail = f"   → {ident}" if ident else ""
+        out.append("  " * depth + f"- [{_fmt.type_label(node['type'])}] {node['title']}{tail}")
+        out.extend(plan_lines(node.get("children") or [], key + ".", depth + 1, created))
+    return out
+
+
+def _node_namespace(node: dict[str, Any]) -> argparse.Namespace:
+    """把计划里的一个节点伪装成 _workitem_body 认识的那种参数对象。
+
+    这样字段映射（节点字段 → 官方参数字段名）仍然只有一处，不会两句两份。
+    """
+    return argparse.Namespace(
+        title=node.get("title"), description=node.get("description"),
+        description_file=node.get("description_file"),
+        start=node.get("start"), end=node.get("end"), assignee=node.get("assignee"),
+        priority=node.get("priority"), sprint=node.get("sprint"), state=node.get("state"),
+        story_points=node.get("story_points"),
+        estimated_workload=node.get("estimated_workload"),
+        remaining_workload=node.get("remaining_workload"), parent=None,
+    )
+
+
+def _plan_type_id(text: str, client: Any, project_id: str, args: argparse.Namespace) -> str:
+    try:
+        return _resolve.type_id(client, project_id, text, force=args.no_cache)
+    except (_resolve.NotFound, _resolve.Ambiguous):
+        if _looks_like_id(text):
+            return text
+        raise
+
+
+def _plan_key(path: str) -> tuple[int, ...]:
+    """按 1.2.10 这种路径排序 —— 数字段要比数值，不然 10 会排在 2 前面。"""
+    parts: list[int] = []
+    for part in path.split("."):
+        try:
+            parts.append(int(part))
+        except ValueError:
+            parts.append(0)
+    return tuple(parts)
+
+
+def _created_summary(created: dict[str, str]) -> str:
+    """「已建成的」那一段。抽出来是因为 except 块里不许写布尔表达式（本仓库的检查会拦）。"""
+    done = "、".join(created[key] for key in sorted(created, key=_plan_key))
+    return done if done else "（无）"
+
+
+def _create_plan_node(args: argparse.Namespace, client: Any, project_id: str,
+                      node: dict[str, Any], parent_id: str, created: dict[str, str],
+                      path: str) -> None:
+    """深度优先建：**父先子后** —— 子项需要父项的 id。"""
+    type_id = _plan_type_id(str(node["type"]), client, project_id, args)
+    body: dict[str, Any] = {"project_id": project_id, "type_id": type_id,
+                            "title": node["title"]}
+    if parent_id:
+        body["parent_id"] = parent_id
+    body.update(_workitem_body(_node_namespace(node), client, project_id, type_id))
+    try:
+        result = client.request("POST", WORKITEM, body=body)
+    except _client.ApiError as exc:
+        # 不能静默半途而废 —— 把已建成的编号报出来，用户才知道不用从头再来
+        raise CliError(
+            f"建到 {path}（{node['title']}）失败：{exc}\n"
+            f"  已建成的：{_created_summary(created)}\n"
+            "  修好后把**剩下的子树**单独放一个计划文件再跑（已建成的不会重复建）。"
+        ) from exc
+    data = result.data if isinstance(result.data, dict) else {}
+    new_id = str(data.get("id") or "")
+    created[path] = str(data.get("identifier") or new_id or "?")
+    print(f"  ✓ {created[path]:11} {_fmt.type_label(type_id):8} {node['title']}")
+    for index, child in enumerate(node.get("children") or [], start=1):
+        _create_plan_node(args, client, project_id, child, new_id, created, f"{path}.{index}")
+
+
+def cmd_workitem_create_plan(args: argparse.Namespace) -> int:
+    client = build_client(args)
+    plan = load_plan(args.file)
+    ref = args.project or str(plan.get("project") or "") or pick(args, "project", "project")
+    if not ref:
+        raise CliError("没说建到哪个项目：在计划文件里写 \"project\"，或加 --project，"
+                       "或先 `config context --project <名字>`")
+    pid, pname = _resolve.project_id(client, ref, force=args.no_cache)
+    nodes = list(plan["nodes"])
+    print(f"计划：在「{pname}」建 {count_plan_nodes(nodes)} 条工作项")
+    print("\n".join(plan_lines(nodes)))
+    print()
+    if not args.yes:
+        # 「先打印整棵树再建」不靠自觉，靠接口：默认不建，--yes 才建
+        print("以上只是计划 —— **没有建任何东西**。确认要建就加 --yes。")
+        return 0
+    created: dict[str, str] = {}
+    for index, node in enumerate(nodes, start=1):
+        _create_plan_node(args, client, pid, node, "", created, str(index))
+    print()
+    print("建成的树：")
+    print("\n".join(plan_lines(nodes, created=created)))
+    return 0
+
+
 def cmd_workitem_update(args: argparse.Namespace) -> int:
     client = build_client(args)
     current = fetch_workitem(client, args.ref)
@@ -880,6 +1045,11 @@ def build_parser() -> argparse.ArgumentParser:
     wcm.add_argument("ref")
     wcm.add_argument("content")
     wcm.set_defaults(func=cmd_workitem_comment)
+    wcp = make(wsub, "create-plan", help="按计划文件一次建一棵树（默认只打印，--yes 才建）")
+    wcp.add_argument("--file", required=True, help="plan.json（字段集封闭：type/title/…/children）")
+    wcp.add_argument("--project", help="建到哪个项目（也可写在计划文件的 project 里）")
+    wcp.add_argument("--yes", action="store_true", help="确认建（不加则只打印计划）")
+    wcp.set_defaults(func=cmd_workitem_create_plan)
     wd = make(wsub, "delete", help="删除工作项（不可逆）")
     wd.add_argument("ref")
     wd.add_argument("--yes", action="store_true", help="确认删除")
