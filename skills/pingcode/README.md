@@ -86,6 +86,10 @@ SCR-12  登录页 500    缺陷  处理中  高      John    2026-09-30 00:00  h
 | 建项目 | `project create --type --name --identifier` | 三者官方必填；**项目没有删除接口** |
 | 改项目 | `project update --name/--description/--start/--end/--assignee/--state` | 「关闭项目」= 改项目状态 |
 | 建工作项 | `workitem create --type epic\|feature\|story\|task\|bug\|issue …` | 描述、起止、负责人、优先级、父项、迭代、故事点、工时都支持 |
+| 一次建一棵树 | `workitem create-plan --file plan.json [--yes]` | 封闭字段集的 JSON 计划，**默认只打印整棵树**；--yes 才建，且中途失败会报出已建成的编号 |
+| 结构化搜索 | `workitem search --created-after/--title-contains/--filter …` | 类 MongoDB 条件；操作符**不带 `$`**、值必须是对象（实测） |
+| 批量改 | `workitem bulk-update --ids A,B,C --state 已完成` | 官方限制（单属性 + 单值 + ≤100）做进了接口形状 |
+| 评论 / 附件 | `workitem comments <ref>`、`workitem attachments <ref>` | 只列不传（上传是 multipart，字段名没法从文档确认） |
 | 改工作项 | `workitem update <ref> …` | 只发改动的字段；`--description-file` 读长文本 |
 | 改状态 | `workitem set-state <ref> <状态名>` | 先查该类型可用的状态；失败时把可用状态列出来 |
 | 评论 | `workitem comment <ref> "…"` | |
@@ -117,8 +121,7 @@ skills/pingcode/
 │   └── format.py           # 紧凑输出白名单 + 时间转换 + 表格
 ├── dev-tools/
 │   └── gen_endpoints.py    # 从官方 api_data.json 生成 endpoints.py
-├── tests/                  # 4 个测试文件：契约 / 传输 / 解析 / CLI
-└── evals/
+├── tests/                  # 4 个测试文件：契约 / 传输 / 解析 / CLI└── evals/
     └── evals.json          # 触发与行为评估
 ```
 
@@ -135,7 +138,7 @@ skills/pingcode/
 
 ```sh
 cd skills/pingcode
-python3 -m unittest discover -s tests -v     # 139 条：全绿
+python3 -m unittest discover -s tests -v     # 166 条：全绿
 python3 dev-tools/gen_endpoints.py --check   # 端点表与官方文档无漂移（离线时加 --input）
 ```
 
@@ -165,7 +168,8 @@ CLI 层证明了 dry-run 不发写、写操作打到正确端点且 body 里是�
 | 父工作项的类型约束 | ✅ 实测存在：这个项目里用户故事的父项**不能是史诗**，得是特性（400「父工作项的类型不正确」）。错误提示已写进去 |
 | 编号会因失败的创建被消耗 | ✅ 实测：一次失败的创建用掉了 `DEMO-82`，所以编号会有空档 |
 | `assignee_id` 是否接受 `me` 这类占位 | 仍未试；本 skill 一律解析成真实 id，不依赖服务端支持 |
-| `POST /v1/pjm/workitems/search`（复杂过滤：日期、自定义属性） | 未封装，走 `api` 逃生口 |
-| 批量改（`PATCH /v1/pjm/workitems`） | 未封装成子命令（官方只支持单属性 + 单值 + ≤100 个 id），走逃生口 |
-| 附件 / 评论列表 / 关注人 / 关联 / 测试管理 / 需求 / 工单 | 未封装，走逃生口 |
+| `POST /v1/pjm/workitems/search`（复杂过滤：日期、自定义属性） | ✅ 已封：`workitem search`（常用条件做成参数，其余 `--filter` 透传；操作符格式是实测的） |
+| 批量改（`PATCH /v1/pjm/workitems`） | ✅ 已封：`workitem bulk-update`（只允许一个属性、≤100 个） |
+| 附件**上传** | ❌ 未做：multipart/form-data，字段名没法从文档确认；列表已做（`workitem attachments`） |
+| 关注人 / 关联 / 测试管理 / 需求 / 工单 | 未封装，走逃生口 |
 | 成员 / 权限 / 部门 / DevOps 流水线 | 明确不做类型化命令 |

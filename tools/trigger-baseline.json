@@ -1,0 +1,69 @@
+{
+  "note": "补中文触发词之前/之后的第一次基线（ASKILL-12）",
+  "saved_at": "2026-09-14",
+  "sessions_scanned": 9,
+  "skills": {
+    "design-git-workflows": {
+      "auto": 1,
+      "last": "2026-08-25",
+      "manual": 0,
+      "sessions": 1
+    },
+    "developer-readme-design": {
+      "auto": 0,
+      "last": "2026-09-11",
+      "manual": 1,
+      "sessions": 1
+    },
+    "excalidraw-diagram": {
+      "auto": 2,
+      "last": "2026-09-13",
+      "manual": 0,
+      "sessions": 2
+    },
+    "git-dev-workflow": {
+      "auto": 0,
+      "last": "2026-09-13",
+      "manual": 2,
+      "sessions": 2
+    },
+    "obsidian-personal-knowledge-base": {
+      "auto": 0,
+      "last": "2026-09-10",
+      "manual": 1,
+      "sessions": 1
+    },
+    "obsidian-work-log-release-recorder": {
+      "auto": 0,
+      "last": "2026-09-10",
+      "manual": 1,
+      "sessions": 1
+    },
+    "skill-builder": {
+      "auto": 0,
+      "last": "2026-09-13",
+      "manual": 1,
+      "sessions": 1
+    },
+    "visual-image-understanding": {
+      "auto": 0,
+      "last": "2026-08-25",
+      "manual": 1,
+      "sessions": 1
+    }
+  },
+  "summary": {
+    "从未触发的 skill": [
+      "pingcode"
+    ],
+    "已不在仓库里的 skill": [
+      "design-git-workflows",
+      "developer-readme-design",
+      "visual-image-understanding"
+    ],
+    "窗口": [
+      "2026-08-25",
+      "2026-09-13"
+    ]
+  }
+}

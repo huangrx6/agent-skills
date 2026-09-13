@@ -35,6 +35,7 @@ pi 的会话记录里已经写了两类信号（`~/.pi/agent/sessions/**/*.jsonl
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import os
 import re
@@ -181,6 +182,81 @@ def _sorted_rows(data: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     return sorted(data["skills"].items(), key=lambda kv: (-kv[1]["total"], kv[0]))
 
 
+def snapshot_path(root: str) -> str:
+    return os.path.join(root, "tools", "trigger-baseline.json")
+
+
+def save_baseline(root: str, data: dict[str, Any], note: str = "") -> str:
+    """存一份基线快照（带日期）。
+
+    没有它，「三周后再看一次」就只能靠人翻旧终端输出 —— 那就等于不会发生。
+    存下来之后，对比变成一条命令的事。
+    """
+    path = snapshot_path(root)
+    payload = {
+        "saved_at": datetime.date.today().isoformat(),
+        "sessions_scanned": data["sessions_scanned"],
+        "note": note,
+        "skills": {name: {"auto": b["自动触发"], "manual": b["显式加载"],
+                          "sessions": b["sessions"], "last": b["last"]}
+                   for name, b in data["skills"].items()},
+        "summary": summarize(data, root),
+    }
+    directory = os.path.dirname(path)
+    try:
+        os.makedirs(directory, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
+            handle.write("\n")
+    except OSError as exc:
+        print(f"写不了基线 {path}：{exc}", file=sys.stderr)
+        return ""
+    return path
+
+
+def load_baseline(root: str) -> dict[str, Any] | None:
+    path = snapshot_path(root)
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def compare(data: dict[str, Any], base: dict[str, Any]) -> list[str]:
+    """与基线逐 skill 对比。只说**变化**，不重新解释数据。"""
+    out = [f"基线 {base.get('saved_at', '?')}（扫了 {base.get('sessions_scanned', '?')} 个会话）"
+           f" → 现在扫了 {data['sessions_scanned']} 个", ""]
+    before = dict(base.get("skills") or {})
+    after = {name: {"auto": b["自动触发"], "manual": b["显式加载"], "sessions": b["sessions"]}
+             for name, b in data["skills"].items()}
+    head = "%-34s %-14s %-14s" % ("skill", "自动（前→后）", "显式（前→后）")
+    out += [head, "-" * len(head)]
+    changed = 0
+    for name in sorted(set(before) | set(after)):
+        old = before.get(name, {})
+        new = after.get(name, {})
+        old_auto, new_auto = old.get("auto", 0), new.get("auto", 0)
+        old_manual, new_manual = old.get("manual", 0), new.get("manual", 0)
+        mark = ""
+        if (old_auto, old_manual) != (new_auto, new_manual):
+            mark = "  ← 变了"
+            changed += 1
+        out.append("%-34s %-14s %-14s%s" % (
+            name, f"{old_auto} → {new_auto}", f"{old_manual} → {new_manual}", mark))
+    out.append("")
+    # 判定口径写死在这里：改 description 的目的就是让自动触发变多
+    auto_before = sum(b.get("auto", 0) for b in before.values())
+    auto_after = sum(b["自动触发"] for b in data["skills"].values())
+    out.append(f"自动触发总数：{auto_before} → {auto_after}"
+               f"（{'有变化' if auto_after != auto_before else '没有变化'}，共 {changed} 个 skill 的计数变了）")
+    out.append("看结论时带上样本量：会话数太少时这些数字全部不能当回事。")
+    return out
+
+
 def render(data: dict[str, Any], root: str) -> str:
     groups = summarize(data, root)
     lines = ["skill 触发日志（来源：pi 会话记录）", ""]
@@ -223,6 +299,10 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--sessions-dir", default=DEFAULT_SESSIONS, help="会话目录")
     parser.add_argument("--root", default=DEFAULT_ROOT, help="仓库根目录（用来对照有哪些 skill）")
     parser.add_argument("--json", action="store_true", help="输出 JSON")
+    parser.add_argument("--save-baseline", action="store_true",
+                        help="把当前结果存成基线（下次用 --compare 对比）")
+    parser.add_argument("--compare", action="store_true", help="与基线对比")
+    parser.add_argument("--note", default="", help="跟基线一起存的一句说明（改了什么都行）")
     args = parser.parse_args(argv)
 
     sessions_root = os.path.abspath(os.path.expanduser(args.sessions_dir))
@@ -232,13 +312,28 @@ def main(argv: list[str]) -> int:
         return 0
 
     data = collect(sessions_root)
+    root = os.path.abspath(args.root)
+    if args.compare:
+        base = load_baseline(root)
+        if base is None:
+            print(f"还没有基线：先跑一次 --save-baseline（它存在 {snapshot_path(root)}）",
+                  file=sys.stderr)
+            return 0
+        print("\n".join(compare(data, base)))
+        return 0
     if args.json:
         payload = {"sessions_scanned": data["sessions_scanned"],
                    "skills": data["skills"],
-                   "summary": summarize(data, os.path.abspath(args.root))}
+                   "summary": summarize(data, root)}
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
-    print(render(data, os.path.abspath(args.root)))
+    print(render(data, root))
+    if args.save_baseline:
+        path = save_baseline(root, data, args.note)
+        if path:
+            print()
+            print(f"✓ 基线已存：{path}")
+            print("  三周后跑 --compare 就能看到变化（不用翻旧输出）。")
     return 0
 
 

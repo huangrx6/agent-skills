@@ -171,6 +171,66 @@ class SummarizeTest(Case):
         self.assertEqual(("2026-08-01", "2026-09-20"), groups["窗口"])
 
 
+class BaselineTest(Case):
+    """基线快照：没有它，「三周后再看一次」就只能靠人翻旧终端输出 —— 那就等于不会发生。"""
+
+    def repo(self) -> str:
+        repo = os.path.join(self.root, "repo")
+        os.makedirs(os.path.join(repo, "skills", "aaa"), exist_ok=True)
+        os.makedirs(os.path.join(repo, "tools"), exist_ok=True)
+        return repo
+
+    def test_存基线带上日期与计数(self):
+        repo = self.repo()
+        self.write_session("--proj-a--", "s1.jsonl", [inline("aaa"), loaded("aaa")])
+        path = log.save_baseline(repo, log.collect(self.sessions), "补了中文触发词")
+        self.assertTrue(path.endswith("trigger-baseline.json"))
+        with open(path, encoding="utf-8") as fh:
+            payload = json.load(fh)
+        self.assertEqual(1, payload["skills"]["aaa"]["auto"])
+        self.assertEqual(1, payload["skills"]["aaa"]["manual"])
+        self.assertRegex(payload["saved_at"], r"^\d{4}-\d{2}-\d{2}$")
+        self.assertEqual("补了中文触发词", payload["note"])
+
+    def test_没有基线时读回_None(self):
+        self.assertIsNone(log.load_baseline(self.repo()))
+
+    def test_对比只说变化(self):
+        base = {"saved_at": "2026-09-01", "sessions_scanned": 9,
+                "skills": {"aaa": {"auto": 0, "manual": 2}, "bbb": {"auto": 0, "manual": 1}}}
+        self.write_session("--proj-a--", "s1.jsonl", [inline("aaa"), loaded("bbb")])
+        lines = "\n".join(log.compare(log.collect(self.sessions), base))
+        self.assertIn("0 → 1", lines, "自动触发从 0 变 1 要标出来")
+        self.assertIn("← 变了", lines)
+        self.assertIn("自动触发总数：0 → 1", lines)
+        self.assertIn("样本量", lines, "结论要带样本量提醒")
+
+    def test_对比没变化时要说没变化(self):
+        data = log.collect(self.sessions)
+        base = {"saved_at": "2026-09-01", "sessions_scanned": 0, "skills": {}}
+        lines = "\n".join(log.compare(data, base))
+        self.assertIn("没有变化", lines)
+
+    def test_compare_在没有基线时给提示且不报失败(self):
+        repo = self.repo()
+        self.write_session("--proj-a--", "s1.jsonl", [inline("aaa")])
+        buf, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(err):
+            code = log.main(["--sessions-dir", self.sessions, "--root", repo, "--compare"])
+        self.assertEqual(0, code)
+        self.assertIn("--save-baseline", err.getvalue())
+
+    def test_save_baseline_写到仓库的_tools_下(self):
+        repo = self.repo()
+        self.write_session("--proj-a--", "s1.jsonl", [inline("aaa")])
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = log.main(["--sessions-dir", self.sessions, "--root", repo, "--save-baseline"])
+        self.assertEqual(0, code)
+        self.assertIn("基线已存", buf.getvalue())
+        self.assertIsNotNone(log.load_baseline(repo))
+
+
 class RenderTest(Case):
     def test_表格含两类信号与口径说明(self):
         repo = os.path.join(self.root, "repo")
