@@ -630,6 +630,9 @@ def cmd_project_create(args: argparse.Namespace) -> int:
     summary = f"创建项目「{args.name}」（标识 {args.identifier}，类型 {args.type}）"
     result = perform(args, client, "POST", PROJECTS, body=body, summary=summary)
     if result is not None:
+        # 新建项目会让「项目列表」这份字典当场过期 —— 不清的话，紧接着建工作项
+        # 会报「没有叫 X 的项目」（实测踩到）。
+        _resolve.invalidate("projects")
         data = result.data if isinstance(result.data, dict) else {}
         emit([_fmt.compact("project", data)], args, "project", [data])
     return 0
@@ -660,6 +663,9 @@ def cmd_project_update(args: argparse.Namespace) -> int:
     path = _api.build("/v1/pjm/projects/{project_id}", project_id=pid)
     summary = f"更新项目「{pname}」：{'、'.join(sorted(body))}"
     perform(args, client, "PATCH", path, body=body, summary=summary)
+    if not args.dry_run:
+        # 名字 / 标识改了就缓存里的旧名字就错了
+        _resolve.invalidate("projects")
     return 0
 
 

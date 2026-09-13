@@ -175,6 +175,21 @@ def clear() -> None:
     _config.save_cache({"format": CACHE_FORMAT, "entries": {}})
 
 
+def invalidate(kind: str) -> None:
+    """丢掉某类字典的**全部**缓存。新建 / 改名之后必须调。
+
+    实测踩到：刚建完项目，紧接着建工作项就报「没有叫 X 的项目」——
+    `projects` 缓存还是 6 小时前那份，里面根本没有新项目。
+    新建 / 改名会让整张字典失效，所以是整类清，而不是只清某一条。
+    """
+    entries = _read_cache()
+    prefix = kind + "|"
+    kept = {key: value for key, value in entries.items()
+            if key != kind and not key.startswith(prefix)}
+    if len(kept) != len(entries):
+        _config.save_cache({"format": CACHE_FORMAT, "entries": kept})
+
+
 def items(kind: str, client: Any, force: bool = False, **keys: Any) -> list[dict[str, Any]]:
     """拉一种字典（默认先读缓存）。`force=True` 跳过缓存。"""
     spec = SOURCES.get(kind)

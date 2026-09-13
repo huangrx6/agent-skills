@@ -157,7 +157,34 @@
 
 ---
 
-## 五、当前的执行顺序
+## 五、PingCode 镜像
+
+这份 roadmap 同时镜像在 PingCode 的项目里，方便当待办跟：
+
+```sh
+P=skills/pingcode/scripts/pingcode.py
+python3 $P workitem list --project ASKILL --limit 50    # 看全部（当前 32 条：4 史诗 / 7 特性 / 11 故事 / 3 任务 / 7 缺陷）
+python3 $P project progress --project ASKILL            # 看进度
+```
+
+四个史诗与本文档的章节一一对应：
+
+| PingCode | 对应本文档 |
+| --- | --- |
+| `ASKILL-1` 触发质量：让 skill 真的会被触发 | 第二节 + P1 #9 |
+| `ASKILL-2` 仓库机械化：把已知的检查接上 | P1 #7、#8 |
+| `ASKILL-3` pingcode skill 收尾 | P2 #9 |
+| `ASKILL-4` 候选新 skill（等数据） | 第三节的候选 |
+
+**更细的层级不在本文档里拄一份** —— 工作项会被改标题、改状态、拆任务，拄一份必然漂移。
+要看现状就跑上面那条命令。
+
+> 建这个镜像时本身又抓到一个缺陷（`ASKILL-27`）：新建项目后字典缓存未失效，
+> 紧接着建工作项会报「没有叫 X 的项目」—— 已修（`resolve.invalidate()`）。
+
+---
+
+## 六、当前的执行顺序
 
 ```text
 已完成：回填 6 份 README ・ 清死文件 ・ 补 2 个 evals ・ 触发日志 ・ pingcode 建项目实测

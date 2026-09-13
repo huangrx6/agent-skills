@@ -288,6 +288,20 @@ class ResolveTest(unittest.TestCase):
         resolve.clear()
         self.assertIsNone(resolve.cached("projects", {}))
 
+    def test_invalidate_只清某一类且只清该类的全部键(self):
+        """实测踩到：刚建完项目，紧接着建工作项报「没有叫 X 的项目」。"""
+        self.seed("projects", self.PROJECTS)
+        self.seed("types", [{"id": "bug", "name": "缺陷"}], project_id="pj1")
+        resolve.invalidate("projects")
+        self.assertIsNone(resolve.cached("projects", {}), "项目的所有键都要清")
+        self.assertIsNotNone(resolve.cached("types", {"project_id": "pj1"}), "别的类不受影响")
+
+    def test_invalidate_没命中时不写盘(self):
+        self.seed("projects", self.PROJECTS)
+        before = cfg.load_cache()["entries"]["projects"]
+        resolve.invalidate("sprints")
+        self.assertEqual(before, cfg.load_cache()["entries"]["projects"])
+
     def test_dry_run_不该把空字典写进缓存(self):
         """实测撞到过：dry-run 下字典被解析成空列表并落盘，之后正常命令也拿不到可选项。"""
         client = _resolve_client(self.FakeClient({"/v1/pjm/projects": []}), dry_run=True)
