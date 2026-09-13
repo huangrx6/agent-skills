@@ -1,23 +1,41 @@
 {
-  "version": 1,
   "skills": {
-    "obsidian-personal-knowledge-base": {
+    "excalidraw-diagram": {
+      "computedHash": "efc9f7c76523b712cf7dafb32f1a0eae8800f265ac5b8ea156ac1d97b2653600",
+      "skillPath": "skills/excalidraw-diagram/SKILL.md",
       "source": "huangrx6/agent-skills",
-      "sourceType": "github",
+      "sourceType": "github"
+    },
+    "git-dev-workflow": {
+      "computedHash": "ed21dfc55687061ec8d5b390e910b9b3ae3bd6019c583cb8cf266383ff318d66",
+      "skillPath": "skills/git-dev-workflow/SKILL.md",
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github"
+    },
+    "obsidian-personal-knowledge-base": {
+      "computedHash": "c5f555dd3431d82deb85266b26b3342808af88dcc980f45e86cbb17b339dac0a",
       "skillPath": "skills/obsidian-personal-knowledge-base/SKILL.md",
-      "computedHash": "c5f555dd3431d82deb85266b26b3342808af88dcc980f45e86cbb17b339dac0a"
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github"
     },
     "obsidian-work-log-release-recorder": {
-      "source": "huangrx6/agent-skills",
-      "sourceType": "github",
+      "computedHash": "025f833807a2ac4bdb891c90b2c9bc71af6f2479c61d8eea5ae0c85418e15c35",
       "skillPath": "skills/obsidian-work-log-release-recorder/SKILL.md",
-      "computedHash": "ff6cef62caa6debae88259919f1763f71d7daf68f19d68ab9dfb28f985cd2ba8"
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github"
+    },
+    "pingcode": {
+      "computedHash": "6d2601fb2118a8757dead162de9cada4eff16d5ff39fee252725fe59215a6772",
+      "skillPath": "skills/pingcode/SKILL.md",
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github"
     },
     "skill-builder": {
-      "source": "huangrx6/agent-skills",
-      "sourceType": "github",
+      "computedHash": "96761c44b20bd7697650578c5353e00deaab34bb13effe11076b4dd6d13db542",
       "skillPath": "skills/skill-builder/SKILL.md",
-      "computedHash": "82cd1495d2d333a51929d402800f0fbef78d997d31ac6dde5a70f947571e3c53"
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github"
     }
-  }
+  },
+  "version": 1
 }

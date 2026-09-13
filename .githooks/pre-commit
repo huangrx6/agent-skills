@@ -122,4 +122,24 @@ if [ -f "$HEALTH" ]; then
   fi
 fi
 
+# ── 6. 同步 skills-lock.json（**派生文件：自动更新并重新暂存**）──
+# 它的 computedHash 就是 sha256(SKILL.md)，本该由脚本生成，却一直被手工维护 ——
+# 实测漂成「6 个 skill 里 3 个没登记、2 个哈希过期」。
+# **刻意不做成阻塞**：每次改 SKILL.md 都要手跑一次的话，人会开始用 --no-verify，
+# 而那正是本文件存在的意义所在（前面四道真防线会一起失效）。
+LOCK_SYNC="$ROOT/tools/skills_lock.py"
+if [ -f "$LOCK_SYNC" ]; then
+  LOCK_OUT=$(python3 "$LOCK_SYNC" --root "$ROOT" --check 2>&1)
+  if [ $? -ne 0 ]; then
+    python3 "$LOCK_SYNC" --root "$ROOT" --update >/dev/null 2>&1
+    if [ $? -eq 0 ]; then
+      git -C "$ROOT" add skills-lock.json
+      echo ""
+      echo "── 已自动更新 skills-lock.json（派生文件）──"
+      printf '%s\n' "$LOCK_OUT" | sed -n '1,4p'
+      echo "（已重新暂存；不想让它进这次提交：git reset -- skills-lock.json）"
+    fi
+  fi
+fi
+
 exit 0

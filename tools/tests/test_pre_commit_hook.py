@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+import json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
@@ -53,10 +54,10 @@ class HookCase(unittest.TestCase):
         os.makedirs(hooks)
         shutil.copy(HOOK, os.path.join(hooks, "pre-commit"))
         self.hook = os.path.join(hooks, "pre-commit")
-        # 文档数字检查也是 hook 的一环，得把真脚本一并拷进假仓库
+        # 文档数字检查与锁文件同步都是 hook 的一环，得把真脚本一并拷进假仓库
         os.makedirs(os.path.join(self.root, "tools"), exist_ok=True)
-        shutil.copy(os.path.join(TOOLS, "check_doc_numbers.py"),
-                    os.path.join(self.root, "tools", "check_doc_numbers.py"))
+        for name in ("check_doc_numbers.py", "skills_lock.py"):
+            shutil.copy(os.path.join(TOOLS, name), os.path.join(self.root, "tools", name))
 
     def _git(self, *args: str) -> subprocess.CompletedProcess:
         return subprocess.run(["git", *args], cwd=self.root, capture_output=True, text=True)
@@ -100,6 +101,27 @@ class HookCase(unittest.TestCase):
         self.write("skills/foo/README.md", "# foo\n\n只写「全绿」，不写数字。\n")
         result = self.run_hook()
         self.assertEqual(0, result.returncode)
+
+    def test_锁文件漂了会自动更新并重新暂存(self):
+        """派生文件：不阻塞提交，而是自动修 —— 阻塞会把人逼到 --no-verify。"""
+        self.write("skills/foo/SKILL.md", "---\nname: foo\n---\n正文\n")
+        self.write("skills-lock.json", '{"version": 1, "skills": {}}')
+        result = self.run_hook()
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn("已自动更新 skills-lock.json", result.stdout)
+        # 已经重新暂存进 index（不出现在“未暂存”里）
+        staged = self._git("diff", "--cached", "--name-only").stdout
+        self.assertIn("skills-lock.json", staged)
+        with open(os.path.join(self.root, "skills-lock.json"), encoding="utf-8") as fh:
+            payload = json.load(fh)
+        self.assertIn("foo", payload["skills"])
+
+    def test_锁文件本来就对时不插话(self):
+        self.write("skills/foo/SKILL.md", "---\nname: foo\n---\n正文\n")
+        self.run_hook()          # 第一遍会生成并同步（夹具里本来没有锁文件）
+        result = self.run_hook()  # 第二遍已经一致 → 不该再插话
+        self.assertEqual(0, result.returncode)
+        self.assertNotIn("已自动更新", result.stdout)
 
     def test_体检提示出现但提交不被挡(self):
         self.write("tools/skill_health.py", HEALTH_OK, stage=False)
