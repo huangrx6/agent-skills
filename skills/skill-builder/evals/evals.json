@@ -1,0 +1,38 @@
+{
+  "skill_name": "skill-builder",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我建一个 skill，把每天的 CI 失败情况总结成一段话。",
+      "expected_output": "先过 Q1：**要频率证据**，去查会话日志 / git log / 笔记，数出最近 30 天这个动作出现过几次。**数不出来就明说「数不出来」**，不许用「感觉经常」充当证据。次数不足（<3）或数不出来 → 结论是「先别建」，并给出替代（写个一次性 prompt / alias 就够）。不允许跳过 Q1 直接开始写 SKILL.md 一稿。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "我这个 skill 老是不触发，帮我看看怎么回事。",
+      "expected_output": "先指出**触发决策只看 description**：边界与场景没写进 description 就等于没有（写在正文要等触发后才被读到）。然后按六条规则逐条检查并指名具体问题：第一句有没有说清触发场景、动词够不够具体（不能是「处理」「搞定」）、有没有 Do NOT 边界、长度有没有超 800 字符。给修改后的 description 草稿，**而不是**改正文里的规则。",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "帮我给 skill-builder 的正文加一条规则：报告里不许出现参数名。",
+      "expected_output": "**不该触发本 skill** —— 它的 Do NOT 明确排除了「编辑现有 skill 的正文内容」。改正文应当直接改 SKILL.md（并先看余量：体检脚本会报「正文余量偏紧」，余量 < 10 行时先做 references 瘦身再加）。正确行为是直接做这件事或指出该直接做，而不是走一遍「该不该建 skill」的决策流程。"
+    },
+    {
+      "id": 4,
+      "prompt": "skill-builder 现在的正文多少行？离上限还有多少？",
+      "expected_output": "**必须测量，不能凭记忆答**：跑 `python3 scripts/preflight.py`（或 validate_skill.py），从输出里抄行数与余量，并把那段原始输出贴出来。仓库里有三次「工具报了但仍抄错」的实测，所以判据是「数字来自测量 + 原始输出贴在旁边」，而不是「我记得是 147」。拿不到输出就说拿不到。",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "帮我给这个 skill 补一个图标素材和一个 references 文件。",
+      "expected_output": "**不该触发本 skill** —— Do NOT 里写着「维护 references / assets / scripts」不属于它（那是直接补文件的事，不需要重做「该不该建 skill」的决策）。而且要指出：仓库已经**去掉了 assets 约定**（`tools/skill_health.py` 会报死文件），新 skill 不需要补素材。正确行为是直接补 references，或说明这个约定已取消。"
+    },
+    {
+      "id": 6,
+      "prompt": "我想建一个新 skill 负责把工作项整理成周报，你评审一下。",
+      "expected_output": "过 Q3 时必须**列出现有 skill 的 description 逐个对照**：把它和 obsidian-work-log-release-recorder（管「已完成事实的沉淀」）、pingcode（管工作项的读写）摆在一起看，指出重叠在哪。若边界说不清（「周报」和「发版记录」的差异在哪），结论是**不要建**，而是扩展现有 skill。若确实要建，排他边界必须**同时**写进双方 description —— 只写一边等于没写。"
+    }
+  ]
+}
