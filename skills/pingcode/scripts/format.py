@@ -43,6 +43,8 @@ PROJECT = (
     ("name", "名称"),
     ("type", "类型"),
     ("state.name", "状态"),
+    ("is_deleted", "已删除"),
+    ("is_archived", "已归档"),
     ("assignee.display_name", "负责人"),
     ("start_at", "开始"),
     ("end_at", "结束"),
@@ -83,6 +85,11 @@ TYPE_NAMES = {
     "epic": "史诗", "feature": "特性", "story": "用户故事", "stage": "阶段",
     "milestone": "里程碑", "requirement": "需求", "task": "任务", "bug": "缺陷", "issue": "事务",
 }
+
+# 0/1 的标记位：为真时显示成「是」，为假时整列不出。
+# 实测：《project list --all》把已删项目也列出来，但每行看起来都是「正常」——
+# 分不出哪个是删掉的，等于列了白列。
+FLAG_FIELDS = ("is_deleted", "is_archived")
 
 
 class TimeParseError(Exception):
@@ -158,7 +165,12 @@ def compact(kind: str, obj: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for path, title in schema:
         value = dig(obj, path)
-        if path in ("start_at", "end_at", "completed_at", "created_at"):
+        if path in FLAG_FIELDS:
+            # 标记位：真 → 「是」，假 → 整列不出（否则会显示成一串 0）
+            if not value:
+                continue
+            value = "是"
+        elif path in ("start_at", "end_at", "completed_at", "created_at"):
             value = show_time(value)
         elif path == "type":
             value = type_label(value)

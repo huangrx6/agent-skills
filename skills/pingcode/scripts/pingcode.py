@@ -332,7 +332,13 @@ def cmd_config_refresh(args: argparse.Namespace) -> int:
 # ── 只读 ──────────────────────────────────────────────────────
 def cmd_project_list(args: argparse.Namespace) -> int:
     client = build_client(args)
-    result = client.get(PROJECTS, keywords=args.keywords, type=args.type)
+    params: dict[str, Any] = {"keywords": args.keywords, "type": args.type}
+    if args.all:
+        # 实测：项目被删/归档后从默认列表里消失，不看这两个开关会以为“项目没了”。
+        # 当初查 DEMO 去哪了，就是靠逃生口手动加这两个参数才看出来的。
+        params["include_archived"] = BOOLEAN_TRUE
+        params["include_deleted"] = BOOLEAN_TRUE
+    result = client.get(PROJECTS, **params)
     values = result.values
     emit(_fmt.rows("project", values), args, "project", values)
     total = result.total
@@ -772,6 +778,8 @@ def build_parser() -> argparse.ArgumentParser:
     pl = make(pj, "list", help="项目列表")
     pl.add_argument("--keywords")
     pl.add_argument("--type", help="scrum / kanban / waterfall / hybrid")
+    pl.add_argument("--all", action="store_true",
+                     help="连已归档 / 已删除的项目一起列（默认看不到）")
     pl.set_defaults(func=cmd_project_list)
     ps = make(pj, "show", help="一个项目")
     ps.add_argument("project")

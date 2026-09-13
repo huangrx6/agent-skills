@@ -184,6 +184,23 @@ class CliCase(unittest.TestCase):
         self.assertIn("演示项目", out)
         self.assertIn("示例项目 B", out)
 
+    def test_项目列表默认看不到已_归档_删除的(self):
+        """实测：项目被删后从默认列表里消失，会让人以为“项目没了”。"""
+        code, _out, _err, router = self.run_cli(
+            ["project", "list"],
+            {("GET", "/v1/pjm/projects"): {"values": PROJECTS, "total": 1}})
+        self.assertEqual(0, code)
+        url = router.find("GET", "/v1/pjm/projects")[0][1]
+        self.assertNotIn("include_deleted", url)
+
+        code, _out, _err, router = self.run_cli(
+            ["project", "list", "--all"],
+            {("GET", "/v1/pjm/projects"): {"values": PROJECTS, "total": 3}})
+        self.assertEqual(0, code)
+        url = router.find("GET", "/v1/pjm/projects")[0][1]
+        self.assertIn("include_archived=true", url)
+        self.assertIn("include_deleted=true", url)
+
     def test_列出某项目的类型(self):
         code, out, _err, _router = self.run_cli(["list", "types", "--project", "演示项目"])
         self.assertEqual(0, code)
