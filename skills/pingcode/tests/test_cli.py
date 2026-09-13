@@ -334,6 +334,20 @@ class CliCase(unittest.TestCase):
         self.assertIn("pcp:read:account:personal", err)
         self.assertIn("--assignee", err)
 
+    def test_mine_的中文类型名要翻译成枚举(self):
+        """实测：`mine --type 缺陷` 把中文原样发出去会 400（类型字典是按项目的，
+        mine 没有项目上下文），但 9 种系统类型的枚举是全局固定的。
+        """
+        items = [{"id": "1", "identifier": "D-1", "state": {"type": "pending"}}]
+        code, _out, _err, router = self.run_cli(
+            ["workitem", "mine", "--type", "缺陷"],
+            {("GET", "/v1/myself"): {"id": "u1", "name": "john"},
+             ("GET", "/v1/pjm/workitems"): {"values": items, "total": 1}})
+        self.assertEqual(0, code)
+        url = router.find("GET", "/v1/pjm/workitems")[0][1]
+        self.assertIn("type_id=bug", url, "中文要翻成枚举 bug")
+        self.assertNotIn("%E7%BC%BA%E9%99%B7", url)
+
     # ── 改状态 ──
     def test_改状态用解析后的_state_id(self):
         updated = dict(WORKITEM, state={"id": "st2", "name": "已完成", "type": "completed"})

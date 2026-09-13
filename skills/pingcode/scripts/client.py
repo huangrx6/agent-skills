@@ -295,7 +295,7 @@ class Client:
         try:
             response = self._opener(request, timeout=self.timeout)
         except urllib.error.HTTPError as exc:
-            raise self._error_from(method, url, exc) from exc
+            raise self._error_from(method, url, exc, payload) from exc
         except urllib.error.URLError as exc:
             raise ApiError(0, f"连不上 {url}：{exc.reason}", method, url,
                            hints=["检查网络 / 代理，或确认 host 写对了（私有部署形如 your.domain/open）"]) from exc
@@ -308,7 +308,8 @@ class Client:
             headers = getattr(response, "headers", None)
         return Result(status, data, method, url, quota_of(headers))
 
-    def _error_from(self, method: str, url: str, exc: urllib.error.HTTPError) -> ApiError:
+    def _error_from(self, method: str, url: str, exc: urllib.error.HTTPError,
+                    payload: bytes | None = None) -> ApiError:
         try:
             raw = exc.read()
         except (OSError, ValueError):
@@ -324,7 +325,7 @@ class Client:
         elif isinstance(data, str) and data.strip():
             message = data.strip()[:200]
 
-        kwargs = {"code": code, "hints": self._hints_for(method, url, exc.code)}
+        kwargs = {"code": code, "hints": self._hints_for(method, url, exc.code, payload)}
         if exc.code == 429:
             retry_after, reason, header = parse_retry_after(exc.headers)
             hints = kwargs["hints"]
@@ -335,7 +336,8 @@ class Client:
                                method=method, url=url, **kwargs)
         return ApiError(exc.code, message, method, url, **kwargs)
 
-    def _hints_for(self, method: str, url: str, status: int) -> list[str]:
+    def _hints_for(self, method: str, url: str, status: int,
+                   payload: bytes | None = None) -> list[str]:
         """把状态码翻译成「下一步做什么」。403 能直接点出缺哪个 scope。"""
         if status == 401:
             return ["令牌无效或已过期：跑 `pingcode.py auth login` 重新授权"]
@@ -350,11 +352,15 @@ class Client:
         if status == 404:
             return ["对象不存在，或路径不对；路径必须以官方文档为准"]
         if status == 400:
-            return [
-                "参数不合法：检查必填项、ID 是否属于该项目、状态是否在该类型的可用范围内",
-                "如果带的是父工作项：父的**类型**要允许做它的父（官方报 400「父工作项的类型不正确」；"
-                "实测：这个项目里用户故事的父项不能是史诗，得是特性）",
-            ]
+            hints = ["参数不合法：检查必填项、ID 是否属于该项目、状态是否在该类型的可用范围内"]
+            # 只在**真的带了父项**时才提父项类型约束 —— 否则每条 400 都挂着一句
+            # 无关的提示，反而把真正的错因冲淡了（实测撞到过）。
+            if payload and b'"parent_id"' in payload:
+                hints.append(
+                    "父工作项的**类型**要允许做它的父（官方报 400「父工作项的类型不正确」；"
+                    "实测：这个项目里用户故事的父项不能是史诗，得是特性）"
+                )
+            return hints
         if status >= 500:
             return ["服务端错误，稍后重试"]
         return []

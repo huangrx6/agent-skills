@@ -154,7 +154,8 @@ CLI 层证明了 dry-run 不发写、写操作打到正确端点且 body 里是�
 | 真实租户只读 + 写全链路（企业令牌） | ✅ 已实测 |
 | **用户令牌模式**（浏览器授权） | ✅ 已实测：授权 → 本机回调收到 code → 换令牌落盘（30 天） |
 | `refresh_token` 自动续期 | ✅ 已实测：换到新令牌，到期日顺延 30 天，`refresh_token` 保留 |
-| `whoami` / `--assignee @me` 的前提 | ✅ 实测：应用数据范围里要有 `pcp:read:account:personal`，否则 `/v1/myself` 返回 **403**。错误会点名 scope，并给出 `--assignee <真名>` 这个不改后台的替代做法 |
+| `whoami` / `--assignee @me` 的前提 | ✅ 实测：应用数据范围里要有 `pcp:read:account:personal`；缺了 `/v1/myself` 返回 **403**（报错点名 scope，并给 `--assignee <真名>` 替代）。**加上之后现有令牌直接就能用**，`whoami` 与 `workitem mine --open-only` 均通 |
+| `mine --type` 的类型名 | ✅ 实测：中文名（缺陷 / 任务 …）会被本地翻成枚举，不用先查项目字典；自定义类型仍要带项目上下文 |
 | `state.type` 的完整取值集合 | ✅ 实测 **4 个**：`pending` / `in_progress` / `completed` / **`closed`**（已拒绝）。所以「已修复」仍算未完成，判据用黑名单 |
 | 令牌响应里的 `expires_in` 是绝对时间戳还是秒数 | ✅ 实测是**绝对时间戳**（真实值 `1791902383`），不是常规 OAuth 的秒数。代码两种都接 |
 | 成员名字段 | ✅ 实测成员的 `name` 是**手机号**，真名在 `display_name`。已按真名/邮箱/手机号都能匹配 |

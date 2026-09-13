@@ -369,6 +369,19 @@ class ClientTest(TransportCase):
             cli.get("/v1/myself")
         self.assertIn("auth login", str(ctx.exception))
 
+    def test_400的父项提示只在带了父项时出现(self):
+        """实测：每条 400 都挂一句无关的父项提示，会把真正的错因冲淡。"""
+        cli, _calls = self.make_client(http_error(400, {"code": "100006", "message": "bad"}))
+        with self.assertRaises(client.ApiError) as ctx:
+            cli.get("/v1/pjm/workitems", type_id="缺陷")
+        self.assertNotIn("父工作项", str(ctx.exception))
+
+        cli, _calls = self.make_client(http_error(400, {"code": "100319",
+                                                     "message": "父工作项的类型不正确"}))
+        with self.assertRaises(client.ApiError) as ctx:
+            cli.post("/v1/pjm/workitems", {"title": "x", "parent_id": "w1"})
+        self.assertIn("父工作项", str(ctx.exception))
+
     def test_错误体里的_code_与_message_要带出来(self):
         cli, _calls = self.make_client(http_error(400, {"code": "100014", "message": "参数不合法"}))
         with self.assertRaises(client.ApiError) as ctx:

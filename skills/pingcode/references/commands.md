@@ -15,8 +15,9 @@
 ## 只读
 
 ```sh
-# 我名下（--open-only 排除 state.type 为 completed 的）
-pingcode.py workitem mine [--type bug] [--open-only] [--limit 100]
+# 我名下（--open-only 排除 state.type 为 completed / closed 的）
+# --type 可以用中文（缺陷 / 任务 …），本地会翻成枚举；自定义类型要带 --project
+pingcode.py workitem mine [--type bug|缺陷] [--open-only] [--limit 100]
 
 # 按条件查（--project 不给就用上下文里的当前项目）
 pingcode.py workitem list [--project X] [--type bug|缺陷] [--state 新建] \

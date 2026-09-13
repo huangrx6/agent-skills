@@ -151,6 +151,23 @@ def _looks_like_id(text: str) -> bool:
     return len(text) == 24 and all(ch in "0123456789abcdef" for ch in text.lower())
 
 
+def system_type_or_raw(text: str) -> str:
+    """把系统类型的中文名/枚举统一成枚举值。
+
+    `mine` 没有项目上下文，查不了类型字典（类型是**按项目**配的），但 9 种系统类型的
+    枚举是全局固定的，本地就能翻译。实测：`mine --type 缺陷` 把中文原样发出去会
+    400「'type_id'不是有效的字符串」。自定义类型仍然只能靠项目上下文，交给服务端报错。
+    """
+    raw = str(text or "").strip()
+    lower = raw.lower()
+    if lower in _fmt.TYPE_NAMES:
+        return lower
+    for enum, label in _fmt.TYPE_NAMES.items():
+        if label == raw:
+            return enum
+    return raw
+
+
 def fetch_workitem(client: Any, ref: str, include_deleted: bool = False) -> dict[str, Any]:
     """按 id / short_id / 编号（SCR-12）取一个工作项。
 
@@ -420,7 +437,7 @@ def cmd_workitem_mine(args: argparse.Namespace) -> int:
         ) from exc
     params: dict[str, Any] = {"assignee_id": me}
     if args.type:
-        params["type_id"] = args.type
+        params["type_id"] = system_type_or_raw(args.type)
     values = client.paginate(WORKITEM, max_items=args.limit, **params)
     open_items = [v for v in values
                   if str(_fmt.dig(v, "state.type") or "") not in DONE_STATE_TYPES]
