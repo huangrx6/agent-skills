@@ -109,7 +109,16 @@ Codex        全局级  →  ~/.codex/skills/<name>
 
 ## Roadmap
 
-按价值频率排序：
+**详细方向与判据看 [`ROADMAP.md`](ROADMAP.md)** —— 这里不抄一份（手抄的表必然过期，实际上已经过期过一次：上一次写「P1 待开工」时 pingcode 已经做完了）。
+
+现状数字现算：
+
+```sh
+python3 tools/skill_health.py                            # 规模 / 余量 / 缺 README / 缺 evals / 死文件
+python3 skills/skill-builder/scripts/validate_skill.py   # 结构硬错误
+```
+
+已完成的部分：
 
 | 优先级 | 方向 | 状态 |
 | --- | --- | --- |
@@ -117,9 +126,7 @@ Codex        全局级  →  ~/.codex/skills/<name>
 | P0 | `skill-builder`（建 skill 的元能力） | ✅ 2026-09 |
 | P0 | `excalidraw-diagram`（技术图） | ✅ 2026-09 |
 | P0 | `git-dev-workflow`（git 写操作） | ✅ 2026-09 |
-| P1 | `pingcode`（PingCode 项目 / 工作项） | ✅ 2026-09（真实租户全链路待实测） |
-| P1 | Obsidian 工作流闭环补齐 | ⏳ 待开工 |
-| P2 | 日常高频触发类 | ⏳ 等 P1 落地后，根据真实触发日志再定 |
+| P1 | `pingcode`（PingCode 项目 / 工作项） | ✅ 2026-09，已在真实租户跑通只读 + 写全链路 |
 
 每个新 skill 都要通过 skill-builder 的设计评审才会被加进来 —— 避免重蹈「11 个 skill 只用 2 个」的覆辙。
 
