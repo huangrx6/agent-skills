@@ -157,14 +157,18 @@ python3 skills/skill-builder/scripts/validate_skill.py   # 结构硬错误
 
 ### 自动校验（git hook）
 
-`.githooks/pre-commit` 在提交触及 `skills/` 或 `tools/` 时跑**四道检查**，任一失败就挡住提交：
+`.githooks/pre-commit` 在提交触及 `skills/` 或 `tools/` 时跑**四道检查 + 一道提示**，任一失败就挡住提交：
 
 | 检查 | 抓什么 |
 | --- | --- |
 | `validate_skill.py` | 结构硬错误：YAML 不可解析、`name` 与目录名不一致、description 超 800 字符、正文超 150 行 |
 | `check_leakage.py` | 外发内容里的真实名称（真实客户名 / 内部系统名 / 内网主机路径 / 内部接口名） |
 | `skills/*/tests` 与 `tools/tests` | 脚本回归：校验器自己的边界、含空格的路径不被截断、扫描范围不扩散…… 这些测试守的正是上面几道的防线，不跑就等于没写 |
+| → 跟在同一段里的 `check_doc_numbers.py` | 文档里写的**测试条数**是不是真的。真实条数刚跑出来就在手上，比一下不要钱 —— 这类错已经出现过四次（见下） |
 | `check_pointers.py` | 指针指向一个不存在的文件（客观错误）；「内容有没有真的搬过去」是语义判断，留给人工核对 |
+
+**第 5 段只提示不阻塞**：`tools/skill_health.py` 报的是「该优化什么」（正文余量、缺 README、缺 evals、死文件），
+不是「代码错了」。拿它挡提交会把人逼到 `--no-verify`，而一旦养成那个习惯，前面四道真防线也一起失效。
 
 `check_leakage.py` 的 blocklist 放在仓库**之外**（`~/.config/skill-name-blocklist.txt`，一行一个词）—— 放进仓库它自己就泄露了。未配置时跳过、不阻塞。
 
@@ -177,6 +181,8 @@ git config core.hooksPath .githooks
 跳过单次检查用 `git commit --no-verify`。
 
 > 为什么用 hook 而不是靠自觉：2026-09-12 一次会话里「正文 ≤ 150 行」被连续违反两次（WLRR 256 行、PKB 174 行），两次都是脚本抓出来的，肉眼没发现。同一会话里还发生过一次真实名称被推送到本仓库（当时 public），清除它需要重写 35/38 个 commit 并 force push。
+>
+> **文档里的测试条数**也是同一类问题：`pingcode` 的 README 写过「120 条」「134 条」（实际早已 139/166）、WLRR 的「0 脚本 0 测试」在补上脚本后还留着、`git-dev-workflow` 的 README 初稿把仓库**实时状态**（「未提交 13 项」）抄进了文档。共同点是**数字手写、事实会变**，而人眼读文档看不出哪个过期了 —— 一个对不上的数字会让人开始怀疑整份文档。所以它现在也由 hook 守：只认测试命令那一行上的数字（「470 条接口」「8 条 eval」不是同一个东西，硬比就是制造误报）。
 
 ## 参考
 

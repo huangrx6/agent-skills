@@ -74,6 +74,18 @@ for d in "$ROOT"/skills/*/tests "$ROOT"/tools/tests; do
   if [ "$STATUS" -ne 0 ]; then
     fail "$OUT" "$(basename "$(dirname "$d")") 的回归测试失败"
   fi
+
+  # 文档里写的测试条数不能过期。这一类错在本仓库出现过四次（pingcode 的 README 两次、
+  # WLRR 的「0 脚本 0 测试」、git-dev-workflow 抄了实时状态），而**真实条数此刻就在手上** ——
+  # 比一下不要钱，所以它是阻塞的：改一个数字而已，但放着不管会让读者开始怀疑整份文档。
+  COUNT=$(printf '%s\n' "$OUT" | sed -n 's/^Ran \([0-9][0-9]*\) test.*/\1/p' | head -1)
+  DOCS=$(dirname "$d")
+  if [ -n "$COUNT" ] && [ -f "$ROOT/tools/check_doc_numbers.py" ]; then
+    DOC_OUT=$(python3 "$ROOT/tools/check_doc_numbers.py" "$DOCS" --actual "$COUNT" 2>&1)
+    if [ $? -ne 0 ]; then
+      fail "$DOC_OUT" "$(basename "$DOCS") 的文档里测试条数过期了"
+    fi
+  fi
 done
 
 # ── 4. 指针目标存在性 ──
@@ -90,7 +102,7 @@ if [ -f "$POINTERS" ]; then
   fi
 fi
 
-echo "✓ pre-commit: 结构、泄露、指针与回归测试通过"
+echo "✓ pre-commit: 结构、泄露、指针、回归测试与文档数字通过"
 
 # ── 5. 仓库体检（**只提示，不阻塞**）──
 # 体检脚本报的是「该优化什么」：正文余量、缺 README、缺 evals、死文件。

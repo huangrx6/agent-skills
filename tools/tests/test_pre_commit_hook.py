@@ -23,7 +23,8 @@ import tempfile
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(os.path.dirname(HERE))
+TOOLS = os.path.dirname(HERE)
+REPO = os.path.dirname(TOOLS)
 HOOK = os.path.join(REPO, ".githooks", "pre-commit")
 HEALTH_OK = (
     "#!/usr/bin/env python3\n"
@@ -52,6 +53,10 @@ class HookCase(unittest.TestCase):
         os.makedirs(hooks)
         shutil.copy(HOOK, os.path.join(hooks, "pre-commit"))
         self.hook = os.path.join(hooks, "pre-commit")
+        # 文档数字检查也是 hook 的一环，得把真脚本一并拷进假仓库
+        os.makedirs(os.path.join(self.root, "tools"), exist_ok=True)
+        shutil.copy(os.path.join(TOOLS, "check_doc_numbers.py"),
+                    os.path.join(self.root, "tools", "check_doc_numbers.py"))
 
     def _git(self, *args: str) -> subprocess.CompletedProcess:
         return subprocess.run(["git", *args], cwd=self.root, capture_output=True, text=True)
@@ -67,6 +72,35 @@ class HookCase(unittest.TestCase):
     def run_hook(self) -> subprocess.CompletedProcess:
         return subprocess.run(["sh", self.hook], cwd=self.root, capture_output=True, text=True)
 
+    def test_文档里的测试条数过期要挡住提交(self):
+        """这一类错在本仓库出现过四次；真实条数在跑完测试时就在手上，比一下不要钱。"""
+        self.write("skills/foo/tests/test_one.py",
+                   "import unittest\n\nclass T(unittest.TestCase):\n"
+                   "    def test_ok(self):\n        self.assertTrue(True)\n")
+        self.write("skills/foo/README.md",
+                   "```sh\npython3 -m unittest discover -s tests   # 99 条\n```\n")
+        result = self.run_hook()
+        self.assertEqual(1, result.returncode, "写错了数字就该挡住")
+        self.assertIn("99", result.stdout + result.stderr)
+        self.assertIn("1 条", result.stdout + result.stderr, "要给实际值")
+
+    def test_文档里的测试条数对得上就放过(self):
+        self.write("skills/foo/tests/test_one.py",
+                   "import unittest\n\nclass T(unittest.TestCase):\n"
+                   "    def test_ok(self):\n        self.assertTrue(True)\n")
+        self.write("skills/foo/README.md",
+                   "```sh\npython3 -m unittest discover -s tests   # 1 条\n```\n")
+        result = self.run_hook()
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def test_文档里没有数字就不管(self):
+        self.write("skills/foo/tests/test_one.py",
+                   "import unittest\n\nclass T(unittest.TestCase):\n"
+                   "    def test_ok(self):\n        self.assertTrue(True)\n")
+        self.write("skills/foo/README.md", "# foo\n\n只写「全绿」，不写数字。\n")
+        result = self.run_hook()
+        self.assertEqual(0, result.returncode)
+
     def test_体检提示出现但提交不被挡(self):
         self.write("tools/skill_health.py", HEALTH_OK, stage=False)
         self.write("skills/some/SKILL.md", "---\nname: some\n---\n")
@@ -74,7 +108,7 @@ class HookCase(unittest.TestCase):
         self.assertEqual(0, result.returncode, "体检只提示，不许挡提交")
         self.assertIn("缺 README.md", result.stdout, "提示要真的打出来")
         self.assertIn("不阻塞提交", result.stdout, "要写清它不挡")
-        self.assertIn("pre-commit: 结构、泄露、指针与回归测试通过", result.stdout)
+        self.assertIn("pre-commit: 结构、泄露、指针、回归测试与文档数字通过", result.stdout)
 
     def test_体检脚本自己崩了也不许挡(self):
         """它是个报告工具 —— 崩了也不该把一次正常提交卡住。"""
