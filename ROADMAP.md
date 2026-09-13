@@ -36,7 +36,7 @@
 
 | # | 做什么 | 判据（怎么知道还没做） | 怎么做 |
 | --- | --- | --- | --- |
-| 2 | **给余量不足的 skill 做 references 瘦身** | 「正文余量偏紧」非空。余量只剩个位数意味着下一条真规则没地方放，到时会被迫先瘦身 | 把正文里的「为什么」搬进 references，正文只留规则与索引 |
+| 2 | **给余量不足的 skill 做 references 瘦身** | 「正文余量偏紧」非空（具体哪些跑命令看）。**已按真实需求做过一次**：往 `skill-builder` 加第 7 条规则后只剩 2 行，于是把报告纪律的「为什么」搬进 `references/reporting.md`（正文 148 → 137，余量 2 → 13）。其余三个（excalidraw 3 / PKB 4 / WLRR 5）**等各自的真实规则到来再搬** | 搬法见 `skills/skill-builder/references/slimming.md`；核心判断是「搬为什么，不搬什么」 |
 
 > 体检里现在只剩「正文余量偏紧」一行。**它是刻意不清零的**：瘦身由下一次真实的「要往正文加规则」
 > 逼出来，而不是现在硬搬一批（硬搬的结果是正文与 references 都变得零碎）。
@@ -139,11 +139,15 @@
   两者没有同现的迹象。这条要成立，得先看到「同一件事里先笔记后图」的真实序列。
 - **为什么可能不该建**：`excalidraw-diagram` 已经接受「一段说明」作为输入；桥的价值只在「笔记结构比口述更完整」时才存在。
 
-### ⑤ `skill-doctor`（把体检结论变成动作清单）
+### ⑤ `skill-doctor` · ✅ **已做，而且确实是「加 references 而不是新建 skill」**
 
-- **想解决什么**：`skill_health.py` 只给数字，不给「先做哪个、怎么做」。余量不足时要动哪几段、哪些段落该搬进 references，现在全凭人看。
-- **证据**：体检脚本里「余量偏紧 / 缺 evals / 缺 README」三行都不为空 —— 这些事已经积了一层（具体数字跑命令看，别抄）。
-- **为什么可能不该建**：`skill-builder` 本来就是「建 skill / 评审 skill」的元能力，再建一个容易职责重叠。**更可能的结果是给 `skill-builder` 加一个 references**，而不是新建 skill。
+当初的预测是「更可能的结果是给 `skill-builder` 加一个 references，而不是新建 skill」。
+实测下来就是这个结论：
+
+- **加的是** `skills/skill-builder/references/slimming.md`（怎么搬、搬什么、留什么、搬完怎么机械核对）
+- 没建新 skill —— 因为「读体检输出并行动」就是 `skill-builder` 已有的职责（评审现有 skill）
+- 顺带把 `skill-builder` 自己搬了一次（报告纪律的「为什么」→ `references/reporting.md`，
+  正文 148 → 137），因为它的真实需求已经发生了
 
 ### 明确不建议
 
