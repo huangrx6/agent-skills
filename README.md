@@ -157,18 +157,17 @@ python3 skills/skill-builder/scripts/validate_skill.py   # 结构硬错误
 
 ### 自动校验（git hook）
 
-`.githooks/pre-commit` 在提交触及 `skills/` 或 `tools/` 时跑**四道检查 + 一道提示**，任一失败就挡住提交：
+`.githooks/pre-commit` 在提交触及 `skills/` 或 `tools/` 时跑**五道检查 + 一道提示 + 一步自动同步**：
 
-| 检查 | 抓什么 |
+| 工序 | 抓什么 |
 | --- | --- |
 | `validate_skill.py` | 结构硬错误：YAML 不可解析、`name` 与目录名不一致、description 超 800 字符、正文超 150 行 |
 | `check_leakage.py` | 外发内容里的真实名称（真实客户名 / 内部系统名 / 内网主机路径 / 内部接口名） |
 | `skills/*/tests` 与 `tools/tests` | 脚本回归：校验器自己的边界、含空格的路径不被截断、扫描范围不扩散…… 这些测试守的正是上面几道的防线，不跑就等于没写 |
-| → 跟在同一段里的 `check_doc_numbers.py` | 文档里写的**测试条数**是不是真的。真实条数刚跑出来就在手上，比一下不要钱 —— 这类错已经出现过四次（见下） |
+| → 跟在同一段里的 `check_doc_numbers.py` | 文档里写的**测试条数**是不是真的。真实条数刚跑出来就在手上，比一下不要钱 |
 | `check_pointers.py` | 指针指向一个不存在的文件（客观错误）；「内容有没有真的搬过去」是语义判断，留给人工核对 |
-
-**第 5 段只提示不阻塞**：`tools/skill_health.py` 报的是「该优化什么」（正文余量、缺 README、缺 evals、死文件），
-不是「代码错了」。拿它挡提交会把人逼到 `--no-verify`，而一旦养成那个习惯，前面四道真防线也一起失效。
+| 提示：`tools/skill_health.py` | **只提示不阻塞** —— 它报的是「该优化什么」（正文余量、缺 README、缺 evals、死文件），不是「代码错了」。拿它挡提交会把人逼到 `--no-verify`，而一旦养成那个习惯，前面四道真防线也一起失效 |
+| 同步：`tools/skills_lock.py` | **自动更新并重新暂存** `skills-lock.json`。它是派生文件（`computedHash` = `sha256(SKILL.md)`），却被手工维护过 —— 实测漂成「6 个 skill 里 3 个没登记、2 个哈希过期」。自动而不阻塞的理由同上 |
 
 `check_leakage.py` 的 blocklist 放在仓库**之外**（`~/.config/skill-name-blocklist.txt`，一行一个词）—— 放进仓库它自己就泄露了。未配置时跳过、不阻塞。
 
