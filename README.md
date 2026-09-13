@@ -4,7 +4,7 @@
 
 ## 这是什么
 
-每个 skill 是一个独立目录，含 `SKILL.md`（YAML frontmatter + Markdown 正文），以及按需展开的 `references/`（细节）、`assets/`（图标等）、`scripts/`（确定性脚本）、`tests/`（脚本回归）、`evals/`（触发与行为的评估集）。Agent 靠 `SKILL.md` 的 `description` 判断该不该触发。
+每个 skill 是一个独立目录，含 `SKILL.md`（YAML frontmatter + Markdown 正文，**给 Agent 看的规则**）与 `README.md`（**给人看的详解**），以及按需展开的 `references/`（细节手册）、`scripts/`（确定性脚本）、`tests/`（脚本回归）、`evals/`（触发与行为的评估集）。Agent 靠 `SKILL.md` 的 `description` 判断该不该触发。
 
 **跨 Agent 通用**：兼容 Claude Code / pi / OpenCode / Cursor / Codex 等任意支持 `SKILL.md` frontmatter 约定的 Agent。
 
@@ -125,6 +125,8 @@ Codex        全局级  →  ~/.codex/skills/<name>
 ## 维护约定
 
 - **目录名 = frontmatter `name` 字段**，保持一致。
+- 每个 skill 都要有 `README.md`（详解），模版与硬约束见 `skills/skill-builder/references/skill-readme-template.md`。**`SKILL.md` 管规则、`README.md` 管怎么用与为什么**，两份不要互相复制；README 里不能出现还没实现的能力（没做的归到「已知限制」）。
+- **不再要求 `assets/`**：skill 目录不再约定放图标之类的素材。存量 skill 里已有的 `assets/icons/` 保留（根 README 的索引表还在引用），但新 skill 不用补。
 - 改完 skill 跑 `python3 skills/skill-builder/scripts/validate_skill.py` —— 机械检查结构硬错误（YAML 可解析、`name` 匹配目录名、description < 800 字符、含 Do NOT 边界、正文 ≤ 150 行、无绑定声明矛盾等），退出码 `0` 通过 / `1` 失败。**完整清单以脚本输出为准，不在这里抄一份** —— 抄了就会和脚本漂移。
 - 正文余量不足 10 行时脚本会另提示一行（`!` 前缀，不影响退出码）：**下次要往正文加规则前，先做 references 瘦身**。瘦身由下一次真实需求触发，不靠「等哪天有空」 —— 一直没空就一直不做。
 - **Obsidian 类**的 vault 路径从配置解析（见上方 Skills 索引），换机器或 vault 搬家只改一处，不要在文档或脚本里写死。某个 skill 真的不可移植时才显式声明 —— 而**把它改造成可移植之后，必须在同一次里删掉那条声明**，否则就成了自相矛盾（`validate_skill.py` 会把这种情况判为失败）。
