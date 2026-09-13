@@ -344,6 +344,111 @@ class CliCase(unittest.TestCase):
             self.assertNotIn(dropped, out, f"{dropped} 不该出现在未完成里")
         self.assertIn("其中未完成 3 条", out, "未知语义值算未完成（宁可多列）")
 
+    # ── 搜索 ──
+    SEARCH_ROUTE = {("POST", "/v1/pjm/workitems/search"): {"values": [], "total": 0}}
+
+    def test_搜索的操作符写法与实测一致(self):
+        """官方文档只列了操作符名字，没写格式 —— 这几条是实测出来的。"""
+        code, _out, _err, router = self.run_cli(
+            ["workitem", "search", "--project", "演示项目", "--type", "bug",
+             "--title-contains", "登录"], dict(self.SEARCH_ROUTE))
+        self.assertEqual(0, code)
+        body = router.find("POST", "/v1/pjm/workitems/search")[0][2]
+        self.assertEqual("query", body["mode"])
+        flt = body["payload"]["filter"]
+        self.assertEqual({"in": ["pj1"]}, flt["project.id"])
+        self.assertEqual({"in": ["bug"]}, flt["type"])
+        self.assertNotIn("$in", str(flt), "实测：操作符**不带** $ 前缀")
+        self.assertEqual({"contains": "登录"}, flt["title"])
+        self.assertIsInstance(flt["type"], dict, "实测：值必须是对象，标量会 400")
+
+    def test_搜索按状态要同时给项目与类型(self):
+        code, _out, err, router = self.run_cli(["workitem", "search", "--state", "已完成"])
+        self.assertEqual(1, code)
+        self.assertIn("--type", err, "状态 id 是按「项目 + 类型」配的")
+        self.assertEqual([], router.calls)
+
+    def test_搜索状态也可以直接给_id(self):
+        code, _out, _err, router = self.run_cli(
+            ["workitem", "search", "--state", "5c9b35de90ad7153c2062f18"],
+            dict(self.SEARCH_ROUTE))
+        self.assertEqual(0, code)
+        flt = router.find("POST", "/v1/pjm/workitems/search")[0][2]["payload"]["filter"]
+        self.assertEqual({"in": ["5c9b35de90ad7153c2062f18"]}, flt["state.id"])
+
+    def test_搜索_created_after_转成时间戳(self):
+        code, _out, _err, router = self.run_cli(
+            ["workitem", "search", "--created-after", "2026-09-01"], dict(self.SEARCH_ROUTE))
+        self.assertEqual(0, code)
+        flt = router.find("POST", "/v1/pjm/workitems/search")[0][2]["payload"]["filter"]
+        self.assertIn("gte", flt["created_at"])
+        self.assertGreater(flt["created_at"]["gte"], 1_700_000_000)
+
+    def test_搜索_filter_写错要报错(self):
+        for bad in ("{不是 json", "[1,2,3]"):
+            with self.subTest(value=bad):
+                code, _out, err, router = self.run_cli(["workitem", "search", "--filter", bad])
+                self.assertEqual(1, code)
+                self.assertEqual([], router.calls)
+
+    def test_搜索_all_带上已删除与已归档(self):
+        code, _out, _err, router = self.run_cli(["workitem", "search", "--all"],
+                                                dict(self.SEARCH_ROUTE))
+        self.assertEqual(0, code)
+        payload = router.find("POST", "/v1/pjm/workitems/search")[0][2]["payload"]
+        self.assertTrue(payload["include_deleted"])
+        self.assertTrue(payload["include_archived"])
+
+    def test_搜索默认不带已删除的(self):
+        code, _out, _err, router = self.run_cli(["workitem", "search"], dict(self.SEARCH_ROUTE))
+        self.assertEqual(0, code)
+        payload = router.find("POST", "/v1/pjm/workitems/search")[0][2]["payload"]
+        self.assertNotIn("include_deleted", payload)
+
+    # ── 批量改 ──
+    def test_批量改一次只能一个属性(self):
+        code, _out, err, router = self.run_cli(
+            ["workitem", "bulk-update", "--ids", "DOC-1,DOC-2",
+             "--state", "已完成", "--priority", "高"],
+            {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]}})
+        self.assertEqual(1, code)
+        self.assertIn("只能改", err)
+        self.assertIn("state_id", err)
+        self.assertEqual([], router.find("PATCH", "/v1/pjm/workitems"))
+
+    def test_批量改超过_100_个要拒绝(self):
+        ids = ",".join(f"DOC-{i}" for i in range(101))
+        code, _out, err, router = self.run_cli(
+            ["workitem", "bulk-update", "--ids", ids, "--title", "x"])
+        self.assertEqual(1, code)
+        self.assertIn("100", err)
+        self.assertEqual([], router.calls)
+
+    def test_批量改混类型加状态要说清原因(self):
+        # 用不像编号的 ref（w1/w2）→ 走直取，这样两条能各自拿到不同的类型；
+        # 若用 DOC-1/DOC-2 走 identifier 查询，假路由会两条都返回 values[0]。
+        task = dict(WORKITEM, id="w2", identifier="DOC-2", type="task")
+        code, _out, err, router = self.run_cli(
+            ["workitem", "bulk-update", "--ids", "w1,w2", "--state", "已完成"],
+            {("GET", "/v1/pjm/workitems/w1"): WORKITEM,
+             ("GET", "/v1/pjm/workitems/w2"): task})
+        self.assertEqual(1, code)
+        self.assertIn("类型不一样", err)
+        self.assertEqual([], router.find("PATCH", "/v1/pjm/workitems"))
+
+    def test_批量改正常路径(self):
+        code, out, _err, router = self.run_cli(
+            ["workitem", "bulk-update", "--ids", "DOC-1", "--title", "统一标题"],
+            {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]},
+             ("PATCH", "/v1/pjm/workitems"): {"updated": 1}})
+        self.assertEqual(0, code)
+        body = router.find("PATCH", "/v1/pjm/workitems")[0][2]
+        self.assertEqual("title", body["property_name"])
+        self.assertEqual("统一标题", body["property_value"])
+        self.assertEqual(["w1"], body["ids"], "要传解析后的真 id，不传编号")
+        self.assertIn("已更新", out)
+
+    # ── mine 缺 scope 时的替代做法 ──
     def test_mine_缺_scope_时要给不改后台的办法(self):
         """实测：数据范围里没有 pcp:read:account:personal 时 /v1/myself 会 403。
         报错要点名 scope，并给出不用改后台的替代做法，否则「我的任务」是死胡同。

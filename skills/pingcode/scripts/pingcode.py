@@ -754,6 +754,111 @@ def cmd_workitem_set_state(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_workitem_search(args: argparse.Namespace) -> int:
+    """POST /v1/pjm/workitems/search —— 结构化条件查询（GET 那套盖不住的场景）。
+
+    操作符写法是**实测**出来的（官方文档只列了名字，没说格式）：
+      · 不带 `$` 前缀：`{"in": [...]}` 可以，`{"$in": [...]}` 报 400「缺少有效的操作符」
+      · 值必须是**对象**：`{"type": "epic"}` 报 400「值必须是对象」
+      · 引用类型用 `属性名.id`；每个属性只能带**一个**操作符；不支持逻辑运算符
+      · `identifier` 这类内置属性**不支持**过滤（实测 400）
+    """
+    client = build_client(args)
+    flt: dict[str, Any] = {}
+    pid = ""
+    if pick(args, "project", "project"):
+        pid, _name = need_project(args, client)
+        flt["project.id"] = {"in": [pid]}
+    if args.type:
+        if not pid:
+            raise CliError("按类型搜要指定项目：--project（类型是**按项目**配的）")
+        flt["type"] = {"in": [resolve_type(args, client, pid)]}
+    if args.state:
+        if _looks_like_id(args.state):
+            flt["state.id"] = {"in": [args.state]}
+        else:
+            if not (pid and args.type):
+                raise CliError("按状态搜要同时给 --project 与 --type"
+                               "（状态 id 是按「项目 + 类型」配的），或者直接给状态 id")
+            type_id = resolve_type(args, client, pid)
+            flt["state.id"] = {"in": [_resolve.state_id_for(client, pid, type_id, args.state,
+                                                            force=args.no_cache)]}
+    if args.assignee:
+        flt["assignee.id"] = {"in": [_resolve.user_id(client, args.assignee, force=args.no_cache)]}
+    if args.sprint:
+        if not pid:
+            raise CliError("按迭代搜要指定项目：--project")
+        flt["sprint.id"] = {"in": [_resolve.find("sprints", client, args.sprint,
+                                                 force=args.no_cache, project_id=pid)["id"]]}
+    if args.title_contains:
+        flt["title"] = {"contains": args.title_contains}
+    if args.created_after:
+        flt["created_at"] = {"gte": _fmt.parse_time(args.created_after)}
+    if args.created_before:
+        flt.setdefault("created_at", {})["lte"] = _fmt.parse_time(args.created_before)
+    if args.filter:
+        try:
+            extra = json.loads(args.filter)
+        except json.JSONDecodeError as exc:
+            raise CliError(f"--filter 不是合法 JSON：{exc}") from exc
+        if not isinstance(extra, dict):
+            raise CliError("--filter 要是一个 JSON 对象，例如 '{\"priority.id\": {\"in\": [\"…\"]}}'")
+        flt.update(extra)
+
+    payload: dict[str, Any] = {"filter": flt, "page_size": min(max(1, args.limit), 100),
+                               "page_index": 0, "keywords": args.keywords}
+    if args.all:
+        payload["include_deleted"] = True
+        payload["include_archived"] = True
+    result = client.request("POST", "/v1/pjm/workitems/search",
+                            body={"mode": "query", "payload": payload})
+    values = result.values
+    if args.full:
+        print(json.dumps(result.data, ensure_ascii=False, indent=2))
+        return 0
+    emit(_fmt.rows("workitem", values), args, "workitem", values)
+    if result.total is not None:
+        print(f"（命中 {result.total} 条，列了前 {len(values)} 条）")
+    return 0
+
+
+def cmd_workitem_bulk_update(args: argparse.Namespace) -> int:
+    """PATCH /v1/pjm/workitems —— 官方限制：**一个属性 + 一个相同值 + ≤100 个 id**。
+
+    所以参数面故意做成「与单条 update 同一套 flag」，但只允许给**一个**：
+    给了两个就报错，而不是默默取一个（那样用户以为都改了）。
+    """
+    client = build_client(args)
+    refs = [r.strip() for r in str(args.ids).split(",") if r.strip()]
+    if not refs:
+        raise CliError("--ids 是空的（用逗号分隔：SCR-1,SCR-2）")
+    if len(refs) > 100:
+        raise CliError(f"官方限制单次最多 100 个，你给了 {len(refs)} 个 —— 分批跑")
+    items = [fetch_workitem(client, ref, include_deleted=bool(args.all)) for ref in refs]
+    types = {str(item.get("type", "")) for item in items}
+    pid = str(_fmt.dig(items[0], "project.id") or "")
+    if args.state and len(types) > 1:
+        raise CliError(
+            f"这批工作项的类型不一样（{'、'.join(sorted(_fmt.type_label(t) for t in types))}），"
+            "而状态 id 是按类型配的 —— 分成几批改，或换成别的属性"
+        )
+    body = _workitem_body(args, client, pid, sorted(types)[0] if len(types) == 1 else "")
+    if len(body) != 1:
+        raise CliError(
+            f"批量接口一次只能改**一个**属性，你给了 {len(body)} 个：{'、'.join(sorted(body)) or '（一个都没给）'}\n"
+            "  分开跑，或者用 create-plan / 逐条 update。"
+        )
+    name, value = next(iter(body.items()))
+    summary = f"把 {len(items)} 条改成 {name}={args.state or args.assignee or args.priority or args.sprint or args.title or value}"
+    result = perform(args, client, "PATCH", WORKITEM,
+                     body={"ids": [str(i.get("id", "")) for i in items],
+                           "property_name": name, "property_value": value}, summary=summary)
+    if result is not None:
+        data = result.data if isinstance(result.data, dict) else {}
+        print(f"✓ 已更新 {data.get('updated', len(items))} 条")
+    return 0
+
+
 def cmd_workitem_comment(args: argparse.Namespace) -> int:
     client = build_client(args)
     current = fetch_workitem(client, args.ref)
@@ -1041,6 +1146,33 @@ def build_parser() -> argparse.ArgumentParser:
     wst.add_argument("ref")
     wst.add_argument("state", help="状态名，如 已完成 / 处理中")
     wst.set_defaults(func=cmd_workitem_set_state)
+    ws2 = make(wsub, "search", help="结构化搜索（类 MongoDB 条件，GET 那套盖不住的场景）")
+    ws2.add_argument("--project")
+    ws2.add_argument("--type", help="bug / task / 缺陷 …（按项目配的）")
+    ws2.add_argument("--state", help="状态名（需同时给 --project 与 --type）或状态 id")
+    ws2.add_argument("--assignee")
+    ws2.add_argument("--sprint")
+    ws2.add_argument("--keywords", help="编号或标题关键字")
+    ws2.add_argument("--title-contains", help="标题包含（官方 contains 操作符）")
+    ws2.add_argument("--created-after", help="创建时间不早于：2026-09-01")
+    ws2.add_argument("--created-before", help="创建时间不晚于")
+    ws2.add_argument("--filter", help="原始过滤条件 JSON（操作符不带 $ 前缀，值必须是对象）")
+    ws2.add_argument("--all", action="store_true", help="含已删除 / 已归档")
+    ws2.add_argument("--limit", type=int, default=30)
+    ws2.set_defaults(func=cmd_workitem_search)
+    wbu = make(wsub, "bulk-update", help="批量改一个属性（官方限制：单属性 + 单值 + ≤100 个）")
+    wbu.add_argument("--ids", required=True, help="逗号分隔的编号 / id，最多 100 个")
+    wbu.add_argument("--state")
+    wbu.add_argument("--assignee")
+    wbu.add_argument("--priority")
+    wbu.add_argument("--sprint")
+    wbu.add_argument("--title")
+    wbu.add_argument("--description")
+    wbu.add_argument("--start")
+    wbu.add_argument("--end")
+    wbu.add_argument("--story-points", type=float)
+    wbu.add_argument("--all", action="store_true", help="按编号找时含已删除的")
+    wbu.set_defaults(func=cmd_workitem_bulk_update)
     wcm = make(wsub, "comment", help="加评论")
     wcm.add_argument("ref")
     wcm.add_argument("content")

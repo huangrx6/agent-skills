@@ -24,6 +24,11 @@ pingcode.py workitem list [--project X] [--type bug|缺陷] [--state 新建] \
                           [--assignee 张三|@me] [--sprint "Sprint 12"] \
                           [--keywords 登录] [--identifier SCR-12] [--limit 50] [--all]
 
+# 结构化搜索：GET 那套盖不住的场景（按创建时间、标题包含、组合条件…）
+pingcode.py workitem search --project X --type bug --created-after 2026-09-01
+pingcode.py workitem search --project X --type bug --title-contains 登录
+pingcode.py workitem search --filter '{"priority.id":{"in":["…"]}}'
+
 pingcode.py workitem show SCR-12            # 编号 / short_id / id 都收；带描述与链接
 pingcode.py workitem show SCR-12 --all      # 连已删除的一起看（DELETE 是软删除）
 pingcode.py project list [--keywords X] [--type scrum]
@@ -33,6 +38,25 @@ pingcode.py list projects|sprints|types|states|priorities|tags|users [--project 
 ```
 
 `--assignee @me`（或 `我` / `me`）需要**用户令牌**；企业令牌下请给人名或用户 ID。
+
+## 搜索的过滤语法（实测出来的，与文档描述不完全一致）
+
+`workitem search` 走的是 `POST /v1/pjm/workitems/search`（类 MongoDB 语法）。官方文档
+列出了操作符**名字**，但没说格式 —— 下面几条是拿真实接口试出来的：
+
+| 实测结论 | 证据 |
+| --- | --- |
+| 操作符**不带 `$` 前缀** | `{"in":[…]}` → 200；`{"$in":[…]}` → 400「缺少有效的操作符」 |
+| 值**必须是对象**，不能直接给标量 | `{"type":"epic"}` → 400「值必须是对象」 |
+| 引用类型用 `属性名.id` | `project.id` / `state.id` / `assignee.id` / `sprint.id` |
+| `identifier` 这类内置属性**不能**过滤 | 400「不支持使用过滤条件 filter.identifier」 |
+| 每个属性只能带一个操作符、不支持逻辑运算符 | 官方文档明说 |
+
+各类型的可用操作符（官方文档）：文本 `exists`/`contains`；枚举与选项 `exists`/`in`/`nin`；
+数字 `exists`/`eq`/`ne`/`gt`/`lt`/`gte`/`lte`；时间 `exists`/`gt`/`lt`/`gte`/`lte`/`between`。
+
+CLI 把常用条件做成了参数（`--type` / `--state` / `--assignee` / `--sprint` / `--title-contains` /
+`--created-after`），其余用 `--filter` 直接给原始条件（不另发明语法）。
 
 ## 写
 
@@ -54,6 +78,10 @@ pingcode.py workitem update SCR-12 --description "…" --end 2026-09-30
 pingcode.py workitem set-state SCR-12 已完成
 pingcode.py workitem comment SCR-12 "已定位到网关超时"
 pingcode.py workitem delete SCR-12 --yes            # 不可逆
+
+# 批量改**一个**属性（官方限制：单属性 + 单值 + ≤100 个 id）
+pingcode.py workitem bulk-update --ids SCR-1,SCR-2,SCR-3 --state 已完成
+pingcode.py workitem bulk-update --ids SCR-1,SCR-2 --assignee @me --dry-run
 
 # 一次建一棵树（史诗 → 特性 → 用户故事 → 任务）：适合把一段需求/一份计划落成工作项
 pingcode.py workitem create-plan --file plan.json             # 默认只打印整棵树，不建
