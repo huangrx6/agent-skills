@@ -21,6 +21,7 @@ import argparse
 import importlib.util
 import json
 import os
+import re
 import sys
 import urllib.parse
 from typing import Any
@@ -58,8 +59,16 @@ WORKITEM = "/v1/pjm/workitems"
 PROJECTS = "/v1/pjm/projects"
 COMMENTS = "/v1/comments"
 
-# 工作项的 state.type 语义值（官方响应示例里是 pending；completed 表示已完成）。
-DONE_STATE_TYPES = ("completed",)
+# 工作项编号的形状（`DEMO-80` / `SCR-12`）：带连字符 + 结尾是数字。
+# 用形状先分流，省掉一次注定 400 的直取（官方对编号返回 400 而不是 404）。
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*-\d+$")
+
+# 工作项 state.type 的语义值。**实测（真实租户）得到 4 个**：
+#   pending 新提交 / in_progress 处理中·已修复·重新打开·挂起 / completed 已发布 / closed 已拒绝
+# 官方文档的响应示例只给了 pending，所以这里只能实测。
+# 判据用**黑名单**（不等于这几个就算未完成）：以后出现新的语义值时，
+# 会被算进「未完成」—— 宁可多列，也不要把活藏起来。
+DONE_STATE_TYPES = ("completed", "closed")
 BOOLEAN_TRUE = "true"
 
 
@@ -142,28 +151,38 @@ def _looks_like_id(text: str) -> bool:
     return len(text) == 24 and all(ch in "0123456789abcdef" for ch in text.lower())
 
 
-def fetch_workitem(client: Any, ref: str) -> dict[str, Any]:
+def fetch_workitem(client: Any, ref: str, include_deleted: bool = False) -> dict[str, Any]:
     """按 id / short_id / 编号（SCR-12）取一个工作项。
 
-    官方：`GET /v1/pjm/workitems/{id}` 收 id **或 short_id**，但**不收编号**；
-    编号要走列表接口的 `identifier` 查询参数。两种都试，先严后宽。
+    官方：`GET /v1/pjm/workitems/{id}` 收 id **或 short_id**，但**不收编号**，而且给编号时
+    返回的是 **400 + code=100317「工作项资源不存在」**（不是 404，实测得到）。所以：
+    形状像编号的（`DEMO-80`）直接走列表接口的 `identifier` 查询；其它先直取，
+    400/404 再兜底。
+
+    归档的默认找得到（引用旧条目是常事）；**已删除的默认不找** —— 实测：DELETE 是软删除，
+    若把 `include_deleted` 也打开，刚删掉的工作项会像没删一样接着显示出来。
     """
+    ref = str(ref or "").strip()
     if not ref:
         raise CliError("没给工作项：可以是编号（SCR-12）、short_id 或 id")
-    path = _api.build("/v1/pjm/workitems/{workitem_id}", workitem_id=ref)
-    try:
-        data = client.get(path).data
-        if isinstance(data, dict) and data.get("id"):
-            return data
-    except _client.ApiError as exc:
-        if exc.status != 404:
-            raise
+
+    if not _IDENTIFIER_RE.match(ref):
+        path = _api.build("/v1/pjm/workitems/{workitem_id}", workitem_id=ref)
+        try:
+            data = client.get(path).data
+            if isinstance(data, dict) and data.get("id"):
+                return dict(data)
+        except _client.ApiError as exc:
+            if exc.status not in (400, 404):
+                raise
+
     result = client.get(WORKITEM, identifier=ref, include_archived=BOOLEAN_TRUE,
-                        include_deleted=BOOLEAN_TRUE)
+                        include_deleted=BOOLEAN_TRUE if include_deleted else None)
     values = result.values
     if not values:
-        raise CliError(f"找不到工作项 {ref!r}（编号 / short_id / id 都试过了）")
-    return values[0]
+        hint = "" if include_deleted else "（它可能已被删除，加 --all 看已删除的）"
+        raise CliError(f"找不到工作项 {ref!r}（编号 / short_id / id 都试过了）{hint}")
+    return dict(values[0])
 
 
 def perform(args: argparse.Namespace, client: Any, method: str, path: str,
@@ -176,7 +195,9 @@ def perform(args: argparse.Namespace, client: Any, method: str, path: str,
         print(json.dumps(plan, ensure_ascii=False, indent=2))
         return None
     if summary:
-        print(f"→ {summary}")
+        # flush=True：管道里 stdout 会被缓冲，stderr 不会 —— 不刷的话错误信息会
+        # 出现在这句「将要做什么」的**前面**（Agent 抓输出时看着就像先报错后动手）。
+        print(f"→ {summary}", flush=True)
     result = client.request(method, path, params=params, body=body)
     if result.quota.have_any:
         print(f"  配额：{result.quota.line()}")
@@ -291,8 +312,9 @@ def cmd_project_list(args: argparse.Namespace) -> int:
     result = client.get(PROJECTS, keywords=args.keywords, type=args.type)
     values = result.values
     emit(_fmt.rows("project", values), args, "project", values)
-    if result.total is not None and not args.full:
-        print(f"（共 {result.total} 个，未指定 --limit 时只取第一页）")
+    total = result.total
+    if total is not None and not args.full and total > len(values):
+        print(f"（共 {total} 个，这里只列了第一页 {len(values)} 个；想看全部加 --limit）")
     return 0
 
 
@@ -307,6 +329,11 @@ def cmd_project_show(args: argparse.Namespace) -> int:
     return 0
 
 
+PROGRESS_LABELS = {"workitem": "工作项"}
+PROGRESS_FIELDS = (("total", "总数"), ("pending_count", "待处理"),
+                   ("in_progress_count", "进行中"), ("completed_count", "已完成"))
+
+
 def cmd_project_progress(args: argparse.Namespace) -> int:
     client = build_client(args)
     pid, name = _resolve.project_id(client, args.project, force=args.no_cache)
@@ -315,7 +342,22 @@ def cmd_project_progress(args: argparse.Namespace) -> int:
         print(json.dumps(data, ensure_ascii=False, indent=2))
         return 0
     print(f"{name} 的进度：")
-    print(_fmt.render([data] if isinstance(data, dict) else []))
+    # 返回结构是 {工作项: {total, pending_count, …}}（见官方响应示例），
+    # 直接当一行记录渲染会把整个 dict 打印成一列，很难看。按子项铺成表。
+    rows: list[dict[str, Any]] = []
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if not isinstance(value, dict):
+                continue
+            row: dict[str, Any] = {"统计项": PROGRESS_LABELS.get(key, str(key))}
+            for field, label in PROGRESS_FIELDS:
+                if field in value:
+                    row[label] = value[field]
+            rows.append(row)
+    if rows:
+        emit(rows, args, "simple")
+    else:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
     return 0
 
 
@@ -344,11 +386,13 @@ def cmd_workitem_list(args: argparse.Namespace) -> int:
 
 def cmd_workitem_show(args: argparse.Namespace) -> int:
     client = build_client(args)
-    data = fetch_workitem(client, args.ref)
+    data = fetch_workitem(client, args.ref, include_deleted=bool(args.all))
     if args.full:
         print(json.dumps(data, ensure_ascii=False, indent=2))
         return 0
     print(_fmt.render([_fmt.compact("workitem", data)]))
+    if args.all and data.get("is_deleted"):
+        print("（注意：这条已被删除）")
     if data.get("description"):
         print("\n描述：\n" + str(data["description"]))
     return 0
@@ -385,7 +429,11 @@ def cmd_dict_list(args: argparse.Namespace) -> int:
     if kind == "states":
         keys["workitem_type_id"] = resolve_type(args, client, keys["project_id"])
     values = _resolve.items(kind, client, force=args.no_cache, **keys)
-    emit(_fmt.rows("simple", values), args, "simple", values)
+    # 字典各有自己的看头：成员要看**真名**（name 是手机号）、项目要看标识与类型、
+    # 状态要看语义值。统一用 simple 会把有用的列全滤掉。
+    schema = {"states": "state", "users": "user", "sprints": "sprint",
+              "projects": "project"}.get(kind, "simple")
+    emit(_fmt.rows(schema, values), args, "simple", values)
     return 0
 
 
@@ -484,8 +532,14 @@ def cmd_workitem_set_state(args: argparse.Namespace) -> int:
             names = "、".join(str(s.get("name", "")) for s in available)
         except (_resolve.NotFound, _client.ApiError):
             names = ""
-        hint = f"\n  这个类型（{_fmt.type_label(tid)}）可用状态：{names}" if names else ""
-        raise CliError(f"{exc}{hint}") from exc
+        if not names:
+            raise CliError(str(exc)) from exc
+        # 只在**这里**报一次可用状态 —— 把 find 那句已经带列表的消息盖掉，
+        # 否则同一串状态名会在输出里出现两遍（实测看着很吵）。
+        raise CliError(
+            f"{_fmt.type_label(tid)}没有叫「{args.state}」的状态。"
+            f"这个类型可用：{names}"
+        ) from exc
     path = _api.build("/v1/pjm/workitems/{workitem_id}", workitem_id=current["id"])
     summary = f"{current.get('identifier', args.ref)} 状态改为「{args.state}」"
     result = perform(args, client, "PATCH", path, body={"state_id": sid}, summary=summary)
@@ -725,6 +779,7 @@ def build_parser() -> argparse.ArgumentParser:
     wl.set_defaults(func=cmd_workitem_list)
     ws = make(wsub, "show", help="一个工作项")
     ws.add_argument("ref", help="编号 / short_id / id")
+    ws.add_argument("--all", action="store_true", help="连已删除的一起看（默认看不到已删除的）")
     ws.set_defaults(func=cmd_workitem_show)
     wm = make(wsub, "mine", help="我名下的工作项")
     wm.add_argument("--type")

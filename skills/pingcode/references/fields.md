@@ -7,7 +7,7 @@
 
 | 紧凑列 | 字段路径 | 说明 |
 | --- | --- | --- |
-| 编号 | `identifier` | 形如 `SCR-12`。**注意：只有 `GET` 收它**，`DELETE` 只收 `id` —— CLI 会先解析 |
+| 编号 | `identifier` | 形如 `SCR-12`。**实测：它不是 id** —— `GET /{ref}` 与 `DELETE` 都不收编号（给编号返回 400），所以 CLI 会先解析成 id（见下面「编号不是 id」） |
 | 标题 | `title` | |
 | 类型 | `type` | 系统类型枚举：`epic` 史诗 / `feature` 特性 / `story` 用户故事 / `stage` 阶段 / `milestone` 里程碑 / `requirement` 需求 / `task` 任务 / `bug` 缺陷 / `issue` 事务；自定义类型是 24 位 id |
 | 状态 | `state.name` / `state.type` | `state.type` 是语义值（见下），**判断完没完用它，不要用中文名** |
@@ -39,18 +39,23 @@
 
 ## `state.type`：判断「完没完」用这个
 
-官方状态对象是 `{id, name, type, color}`，其中 `type` 是语义值：
+官方状态对象是 `{id, name, type, color}`。`type` 是语义值，**实测（真实租户）有 4 个**：
 
-| `state.type` | 意思 |
-| --- | --- |
-| `pending` | 待处理 |
-| `in_progress` | 处理中 |
-| `completed` | 已完成 |
+| `state.type` | 实测对应哪些状态名 | 算不算未完成 |
+| --- | --- | --- |
+| `pending` | 新提交 | ✅ 未完成 |
+| `in_progress` | 处理中、**已修复**、重新打开、挂起 | ✅ 未完成 |
+| `completed` | 已发布 | ❌ 已完成 |
+| `closed` | 已拒绝 | ❌ 已完成（不再需要跟） |
 
-`workitem mine --open-only` 的判据就是 `state.type != completed`。
+两件事容易踩：
 
-> **未实测**：完整取值集合以真实租户返回为准（官方示例只给了 `pending`）。
-> 判据写的是「不等于 completed 就算未完成」—— 宁可多列，不要把活藏起来。
+1. **`closed` 是第四个值**（已拒绝）。只看 `completed` 会把已拒绝的条目录进「未完成」。
+2. **「已修复」的语义是 `in_progress`**，不是 `completed` —— 因为还没发布/验收。这是
+   PingCode 自己的定义，别按字面理解。
+
+`workitem mine --open-only` 的判据是 `state.type ∉ {completed, closed}`（**黑名单**）：
+以后官方再加语义值时，新值会被算进「未完成」—— 宁可多列，也不要把活藏起来。
 
 状态名每个项目、每种类型都不一样（`GET /v1/pjm/workitem/states?project_id=&workitem_type_id=`），
 所以 `set-state` 一定先查表；名字对不上时会把该类型的可用状态列出来。
@@ -90,6 +95,34 @@
 | 项目状态 | `GET /v1/pjm/project/states?project_id=` | 项目 |
 
 这些进 6 小时的本地缓存；`--no-cache` 或 `config refresh` 可以强制重拉。
+
+**成员的名字不在 `name` 里** —— 实测 `name` 是手机号，真名在 `display_name`。
+所以 `--assignee` 支持真名 / 用户名（手机号）/ 邮箱 / id 四种写法。
+
+## 编号不是 id
+
+实测三条关于编号的硬事实（都会影响怎么写调用）：
+
+1. `GET /v1/pjm/workitems/{ref}` **只收 id 或 short_id，不收编号**；给编号返回的是
+   **400 + code=100317「工作项资源不存在」**，不是 404。
+2. `DELETE /v1/pjm/workitems/{id}` 只收 id。
+3. **失败也会消耗编号**：一次父项类型不对的创建用掉了 `DEMO-82`，所以编号有空档。
+
+CLI 的做法：形状像编号的（`DEMO-80`）直接走列表接口的 `identifier` 查询；其它先直取，
+400/404 再兜底；删除前先把编号解析成 id。
+
+## 删除是软删除
+
+`DELETE` 之后条目还在（官方把它标为已删除）：
+
+- `workitem show <编号>` 默认**看不到**，并提示「它可能已被删除，加 `--all` 看已删除的」；
+- `workitem show <编号> --all` 能看到，并标一句「（注意：这条已被删除）」。
+
+## 父工作项的**类型**有约束
+
+实测：这个项目里用户故事的父项**不能是史诗**，得是特性（史诗 → 特性 → 用户故事 → 任务）。
+越级挂会返回 **400「父工作项的类型不正确」**。这是项目的类型配置，CLI 不替你猜 ——
+报错提示里已写明这一条。
 
 ## 分页
 

@@ -193,8 +193,21 @@ def items(kind: str, client: Any, force: bool = False, **keys: Any) -> list[dict
     # 上下文参数已经填进 url 模板了，**不要再传给 paginate** —— 否则会拼出
     # `?project_id=pj1&…&project_id=pj1` 这种重复参数（真发出去服务端行为未知）。
     values = client.paginate(url)
-    store(kind, keys, values)
+    # dry-run 下不能写缓存：那种“空结果”不是真实数据，存进去会把后面的命令也带歪
+    # （实测撞到过：dry-run 建工作项后，优先级缓存被写成空表，之后一直说“没有可选项”）。
+    if not getattr(client, "dry_run", False):
+        store(kind, keys, values)
     return values
+
+
+def _aliases(item: dict[str, Any]) -> list[str]:
+    """一条记录上所有可用来匹配的写法。
+
+    实测：PingCode 成员的 `name` 是**手机号**，真名在 `display_name`；只匹配 name 的话，
+    用户写「黄任翔」会被告诉「没有这个成员」。邮箱/手机号也一并收进来，方便按邮箱指派。
+    """
+    return [str(item.get(key) or "") for key in
+            ("name", "display_name", "identifier", "email", "mobile")]
 
 
 def _name_of(item: dict[str, Any], kind: str) -> str:
@@ -202,6 +215,9 @@ def _name_of(item: dict[str, Any], kind: str) -> str:
         ident = str(item.get("identifier", "") or "")
         name = str(item.get("name", "") or "")
         return f"{name}（{ident}）" if ident else name
+    if kind == "users":
+        # 优先给人看得懂的那一个（display_name 才是真名）
+        return str(item.get("display_name") or item.get("name") or "")
     return str(item.get("name", "") or "")
 
 
@@ -223,8 +239,8 @@ def find(kind: str, client: Any, text: str, force: bool = False,
     for item in values:                       # 1. ID
         if str(item.get("id", "")).lower() == want:
             return item
-    for item in values:                       # 2. 名字 / 标识
-        if str(item.get("name", "")).lower() == want or str(item.get("identifier", "")).lower() == want:
+    for item in values:                       # 2. 名字 / 标识 / 真名 / 邮箱 / 手机
+        if any(alias.lower() == want for alias in _aliases(item)):
             return item
     if kind == "types" and want in SYSTEM_TYPES:   # 系统类型枚举别名
         for item in values:
@@ -234,7 +250,8 @@ def find(kind: str, client: Any, text: str, force: bool = False,
         if kind == "types" and SYSTEM_TYPES.get(want) == str(item.get("name", "")):
             return item
 
-    hits = [i for i in values if want in _name_of(i, kind).lower() or want in str(i.get("name", "")).lower()]
+    hits = [i for i in values
+            if any(want in alias.lower() for alias in _aliases(i))]
     if len(hits) == 1:                        # 4. 唯一子串
         return hits[0]
     if len(hits) > 1:

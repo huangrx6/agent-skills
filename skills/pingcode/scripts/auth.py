@@ -253,7 +253,12 @@ def status() -> dict[str, Any]:
 
     try:
         cr = _config.load_credentials()
-        info.update({k: v for k, v in _config.describe_credentials(cr).items()})
+        described = _config.describe_credentials(cr)
+        # describe_credentials 里的「授权模式」指的是**配置里**想要的模式，
+        # 不能盖掉上面从**当前令牌**读出来的那个 —— 实测就撞到过：配置写 user、
+        # 实际存的是企业令牌，这一列会显示 user（谎报）。两个分开列。
+        described["配置里的模式"] = described.pop("授权模式")
+        info.update(described)
     except _config.ConfigError as exc:
         info["凭据"] = str(exc).splitlines()[0]
     return info

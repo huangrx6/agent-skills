@@ -69,6 +69,12 @@ DEFAULT_TIMEOUT = 30
 DEFAULT_RETRIES = 3
 MAX_RETRY_SLEEP = 60
 
+# `--dry-run` 只拦**写**。实测撞到过：如果连 GET 也拦，字典解析（项目/类型/状态/
+# 优先级/成员）会拿到空列表，**而空列表会被写进缓存** —— 之后正常命令会一直说
+# 「这个范围里没有优先级可选项」。而 dry-run 的用处正是「把解析后的真 body 给人看一眼」，
+# 那本来就必须要能读。
+WRITE_METHODS = ("POST", "PUT", "PATCH", "DELETE")
+
 RETRY_HEADERS = ("X-RateLimit-Retry-After", "X-PC-Retry-After")
 REASON_HEADER = "X-RateLimit-Reason"
 QUOTA_HEADERS = (
@@ -264,7 +270,7 @@ class Client:
                 authenticate: bool = True) -> Result:
         method = method.upper()
         plan = self.describe(method, path, params, body, authenticate)
-        if self.dry_run:
+        if self.dry_run and method in WRITE_METHODS:
             return Result(0, plan, method, plan["url"], Quota({}))
 
         payload = None
@@ -344,7 +350,11 @@ class Client:
         if status == 404:
             return ["对象不存在，或路径不对；路径必须以官方文档为准"]
         if status == 400:
-            return ["参数不合法：检查必填项、ID 是否属于该项目、状态是否在该类型的可用范围内"]
+            return [
+                "参数不合法：检查必填项、ID 是否属于该项目、状态是否在该类型的可用范围内",
+                "如果带的是父工作项：父的**类型**要允许做它的父（官方报 400「父工作项的类型不正确」；"
+                "实测：这个项目里用户故事的父项不能是史诗，得是特性）",
+            ]
         if status >= 500:
             return ["服务端错误，稍后重试"]
         return []

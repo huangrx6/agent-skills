@@ -120,6 +120,30 @@ class CompactTest(unittest.TestCase):
         self.assertIn("a", header)
         self.assertIn("b", header)
 
+    def test_列顺序按_schema_而不是首次出现(self):
+        """实测撞到过：第一条缺迭代时，「迭代」「负责人」会跑到表尾。"""
+        items = [
+            dict(self.WORKITEM, sprint=None, assignee=None),
+            self.WORKITEM,
+        ]
+        header = fmt.render(fmt.rows("workitem", items)).splitlines()[0]
+        positions = [header.index(col) for col in ("负责人", "迭代", "项目", "链接")]
+        self.assertEqual(sorted(positions), positions,
+                         f"列序应当跟 schema 走（负责人 → 迭代 → 项目 → 链接），实际 {header}")
+
+    def test_列顺序与是否有值无关(self):
+        """只出现一次的列也不该把后面的列序弄乱。"""
+        items = [{"编号": "A-1", "标题": "只条 1"},
+                 {"编号": "A-2", "标题": "只条 2", "负责人": "某甲"}]
+        header = fmt.render(items).splitlines()[0]
+        self.assertEqual(["编号", "标题"], [c for c in ("编号", "标题") if c in header])
+
+
+def _resolve_client(inner, dry_run: bool = False):
+    """给假客户端标上 dry_run —— 解析层就靠这个标记判断要不要写缓存。"""
+    inner.dry_run = dry_run
+    return inner
+
 
 class ResolveTest(unittest.TestCase):
     PROJECTS = [
@@ -213,6 +237,22 @@ class ResolveTest(unittest.TestCase):
         self.assertEqual("bug", resolve.find("types", client, "缺陷", project_id="pj1")["id"])
         self.assertEqual("task", resolve.find("types", client, "任务", project_id="pj1")["id"])
 
+    def test_成员按真名也能找到(self):
+        """实测：PingCode 成员的 `name` 是手机号，真名在 `display_name` ——
+        只匹配 name 的话，用户写「黄任翔」会被告诉「没有这个成员」。
+        """
+        users = [{"id": "u1", "name": "15236325327", "display_name": "黄任翔",
+                  "email": "a@b.c"}]
+        self.seed("users", users)
+        client = self.FakeClient({})
+        for query in ("黄任翔", "15236325327", "a@b.c", "u1", "黄"):
+            with self.subTest(query=query):
+                self.assertEqual("u1", resolve.find("users", client, query)["id"])
+
+    def test_成员列表显示真名(self):
+        users = [{"id": "u1", "name": "15236325327", "display_name": "黄任翔"}]
+        self.assertEqual(["黄任翔"], resolve.labels("users", users))
+
     # ── 缓存 ──
     def test_缓存命中就不打网络(self):
         self.seed("projects", self.PROJECTS)
@@ -247,6 +287,18 @@ class ResolveTest(unittest.TestCase):
         self.seed("projects", self.PROJECTS)
         resolve.clear()
         self.assertIsNone(resolve.cached("projects", {}))
+
+    def test_dry_run_不该把空字典写进缓存(self):
+        """实测撞到过：dry-run 下字典被解析成空列表并落盘，之后正常命令也拿不到可选项。"""
+        client = _resolve_client(self.FakeClient({"/v1/pjm/projects": []}), dry_run=True)
+        self.assertIsNone(resolve.cached("projects", {}))
+        resolve.items("projects", client)
+        self.assertIsNone(resolve.cached("projects", {}), "dry-run 的结果不能进缓存")
+
+    def test_正常客户端照样写缓存(self):
+        client = _resolve_client(self.FakeClient({"/v1/pjm/projects": self.PROJECTS}))
+        resolve.items("projects", client)
+        self.assertEqual(len(self.PROJECTS), len(resolve.cached("projects", {})))
 
     def test_缺上下文参数要说缺哪个(self):
         with self.assertRaises(resolve.NotFound) as ctx:

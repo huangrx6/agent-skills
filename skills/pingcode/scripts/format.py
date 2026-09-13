@@ -30,6 +30,14 @@ WORKITEM = (
     ("html_url", "链接"),
 )
 
+# 状态字典：`type` 是语义值（pending/in_progress/completed），判断「完没完」靠它 ——
+# 实测里「已修复 / 已发布」都叫 completed 语义，光看中文名看不出来。
+STATE = (
+    ("name", "状态"),
+    ("type", "语义"),
+    ("id", "ID"),
+)
+
 PROJECT = (
     ("identifier", "标识"),
     ("name", "名称"),
@@ -50,8 +58,8 @@ SPRINT = (
 )
 
 USER = (
-    ("name", "用户名"),
     ("display_name", "显示名"),
+    ("name", "用户名"),
     ("email", "邮箱"),
     ("id", "ID"),
 )
@@ -66,6 +74,7 @@ SCHEMAS: dict[str, tuple[tuple[str, str], ...]] = {
     "project": PROJECT,
     "sprint": SPRINT,
     "user": USER,
+    "state": STATE,
     "simple": SIMPLE,
 }
 
@@ -159,7 +168,18 @@ def compact(kind: str, obj: dict[str, Any]) -> dict[str, Any]:
 
 
 def rows(kind: str, values: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [compact(kind, v) for v in values]
+    """批量裁剪，**列顺序按 schema 而不是「首次出现」**。
+
+    实测撞到过：第一条记录恰好没有迭代时，「迭代」「负责人」两列会跑到表尾，
+    与 schema 顺序不一致 —— 同一张表在不同数据下长得不一样，看着很难受。
+    """
+    schema = SCHEMAS.get(kind, SIMPLE)
+    compacted = [compact(kind, value) for value in values]
+    columns = [title for _path, title in schema
+               if any(title in record for record in compacted)]
+    # 每行都铺成**同一套列**（缺的填空串）：render 是按「首次出现」收集列的，
+    # 只重排每行的键还不够 —— 第一行恰好缺迭代时，迭代还是会被挤到表尾。
+    return [{column: record.get(column, "") for column in columns} for record in compacted]
 
 
 def _width(text: str) -> int:

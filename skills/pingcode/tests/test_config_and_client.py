@@ -260,6 +260,22 @@ class ClientTest(TransportCase):
         self.assertEqual([], calls)
         self.assertEqual("t", result.data["body"]["title"])
 
+    def test_dry_run_只拦写不拦读(self):
+        """实测撞到过：连 GET 也拦时，字典解析拿到空列表**并写进缓存**，
+        之后正常命令会一直说「没有可选项」。dry-run 的本意是把解析后的真 body 给人看，
+        那本来就必须要能读。
+        """
+        cli, calls = self.make_client(FakeResponse({"values": [{"id": "x"}]}), dry_run=True)
+        result = cli.get("/v1/pjm/workitems")
+        self.assertEqual(1, len(calls), "dry-run 下 GET 要真发")
+        self.assertEqual("x", result.values[0]["id"])
+        for method in ("POST", "PATCH", "PUT", "DELETE"):
+            with self.subTest(method=method):
+                before = len(calls)
+                blocked = cli.request(method, "/v1/pjm/workitems", body={"a": 1})
+                self.assertEqual(0, blocked.status)
+                self.assertEqual(before, len(calls), f"dry-run 下 {method} 不能发")
+
     def test_查询参数只带非空值(self):
         cli, calls = self.make_client(FakeResponse({"values": []}))
         cli.get("/v1/pjm/workitems", project_id="p", keywords=None, state_id="")
@@ -480,6 +496,24 @@ class AuthTest(TempConfigCase):
         self.assertNotIn("机密值", text)
         self.assertNotIn("tok-value", text)
         self.assertIn("已配置", text)
+
+    def test_授权模式看的是当前令牌而不是配置(self):
+        """实测撞到过：配置写 user、实际存的是企业令牌，状态里却显示 user。"""
+        self.write_credentials(auth_mode="user")
+        cfg.save_token({"access_token": "a", "expires_in": 2592000}, "enterprise")
+        info = auth.status()
+        self.assertEqual("enterprise", info["授权模式"], "这一列要说当前令牌的模式")
+        self.assertEqual("user", info["配置里的模式"], "配置里的模式单独一列")
+        self.assertEqual("enterprise", auth.current_mode())
+
+    def test_实测_expires_in_是绝对时间戳(self):
+        """官方线上返回的 expires_in = 1791902383（>10^9）—— 是**绝对时间戳**，
+        不是常规 OAuth 的秒数。官方文档示例里的 1577808000 也不是占位符。
+        """
+        absolute = 1791902383
+        self.assertEqual(absolute, cfg.expire_at({"expires_in": absolute}, 0))
+        record = cfg.save_token({"access_token": "a", "expires_in": absolute}, "user")
+        self.assertEqual(absolute, record["expires_at"], "不能算成 现在 + 1791902383 秒")
 
 
 if __name__ == "__main__":

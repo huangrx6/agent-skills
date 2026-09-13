@@ -24,6 +24,7 @@ pingcode.py workitem list [--project X] [--type bug|缺陷] [--state 新建] \
                           [--keywords 登录] [--identifier SCR-12] [--limit 50] [--all]
 
 pingcode.py workitem show SCR-12            # 编号 / short_id / id 都收；带描述与链接
+pingcode.py workitem show SCR-12 --all      # 连已删除的一起看（DELETE 是软删除）
 pingcode.py project list [--keywords X] [--type scrum]
 pingcode.py project show X
 pingcode.py project progress [--project X]
@@ -86,12 +87,13 @@ pingcode.py api --method POST --path /v1/comments --data '{"principal_type":"wor
 
 | 用户这么说 | 这样做 |
 | --- | --- |
-| "我今天要做哪些事" | `workitem mine --open-only` → 按状态/优先级挑；给结论时带上编号与链接 |
-| "有哪些没修的缺陷" | `workitem mine --type bug --open-only` 或 `workitem list --type bug --state 新建` |
-| "把 SCR-12 关了" | 先 `workitem show SCR-12` 确认是它，再 `workitem set-state SCR-12 已完成` |
-| "建一个需求/任务/缺陷" | `workitem create`，`--type story | task | bug`；缺的信息（项目、标题）先问，别编 |
+| "我今天要做哪些事" | `workitem mine --open-only` ；企业令牌下用不了「我」，改 `workitem list --assignee <真名>` |
+| "有哪些没修的缺陷" | `workitem mine --type bug --open-only` 或 `workitem list --type bug` |
+| "把 SCR-12 关了" | 先 `workitem show SCR-12` 确认是它，再 `workitem set-state SCR-12 已完成`（状态名要真实存在，报错会列出可选项） |
+| "建一个需求 / 任务 / 缺陷" | `workitem create`，`--type story\|task\|bug`；缺的信息（项目、标题）先问，别编。不确定先 `--dry-run` |
+| "建一棵史诗 → 特性 → 故事 → 任务" | 逐层建，`--parent <上一层编号>`。**父项类型有限制**：实测用户故事的父项不能是史诗，得是特性 |
 | "把这个迭代的任务列出来" | `workitem list --sprint "Sprint 12"`（迭代名有歧义时会列候选） |
-| "这个项目进度怎么样" | `project progress --project X` |
+| "这个项目进度怎么样" | `project progress --project X` → 总数 / 待处理 / 进行中 / 已完成 |
 | "帮我建个新项目" | `project create --type scrum --name … --identifier …`（identifier ≤15 位大写字母/数字/`_`/`-`，全企业唯一） |
 | "把一批任务都标完成" | 用 `api --method PATCH --path /v1/pjm/workitems` 批量（官方限制：**单属性、单值、≤100 个 id**） |
 

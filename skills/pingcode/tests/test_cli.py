@@ -193,15 +193,63 @@ class CliCase(unittest.TestCase):
     def test_看一个工作项_带描述(self):
         item = dict(WORKITEM, description="详细的复现步骤")
         code, out, _err, _router = self.run_cli(["workitem", "show", "DOC-1"],
-                                                {("GET", "/v1/pjm/workitems/"): item})
+                                                {("GET", "/v1/pjm/workitems"): {"values": [item]}})
         self.assertEqual(0, code)
         self.assertIn("DOC-1", out)
         self.assertIn("缺陷", out)
         self.assertIn("详细的复现步骤", out)
+        # 编号形状（DOC-1）应当**直接**走 identifier 查询，不去撞那个注定 400 的直取
+        self.assertEqual([], [c for c in _router.calls if "/v1/pjm/workitems/DOC-1" in c[1]])
+
+    def test_按_id_看工作项走直取(self):
+        code, out, _err, router = self.run_cli(
+            ["workitem", "show", "w1"], {("GET", "/v1/pjm/workitems/w1"): WORKITEM})
+        self.assertEqual(0, code)
+        self.assertIn("DOC-1", out)
+        self.assertEqual(1, len(router.find("GET", "/v1/pjm/workitems/w1")))
+
+    def test_直取撞上_400_也要兜底到编号查询(self):
+        """实测得到：给编号时官方返回 400 + code=100317，不是 404。
+
+        这里用一个**不像编号**的 ref（`w9abc`），所以会先直取，再兜底。
+        """
+        item = dict(WORKITEM, title="兜底找到的")
+        code, out, _err, router = self.run_cli(
+            ["workitem", "show", "w9abc"],
+            {("GET", "/v1/pjm/workitems/w9abc"): http_error(400, {"code": "100317",
+                                                                  "message": "工作项资源不存在"}),
+             ("GET", "/v1/pjm/workitems"): {"values": [item]}})
+        self.assertEqual(0, code)
+        self.assertIn("兜底找到的", out)
+        self.assertEqual(1, len(router.find("GET", "/v1/pjm/workitems/w9abc")))
+
+    def test_编号也找不到时要说清楚(self):
+        code, _out, err, _router = self.run_cli(
+            ["workitem", "show", "DOC-404"],
+            {("GET", "/v1/pjm/workitems"): {"values": []}})
+        self.assertEqual(1, code)
+        self.assertIn("DOC-404", err)
+
+    def test_删掉之后默认看不到_加_all_才看得到(self):
+        """实测：DELETE 是**软删除**，若默认带上 include_deleted，刚删的会像没删一样又显示出来。"""
+        code, _out, err, router = self.run_cli(
+            ["workitem", "show", "DOC-1"],
+            {("GET", "/v1/pjm/workitems"): {"values": []}})
+        self.assertEqual(1, code)
+        self.assertIn("--all", err, "要告诉用户可能是被删了以及怎么看")
+        querystring = router.find("GET", "/v1/pjm/workitems")[0][1]
+        self.assertNotIn("include_deleted=true", querystring, "默认不能查已删除的")
+
+        code, out, _err, router = self.run_cli(
+            ["workitem", "show", "DOC-1", "--all"],
+            {("GET", "/v1/pjm/workitems"): {"values": [dict(WORKITEM, is_deleted=1)]}})
+        self.assertEqual(0, code)
+        self.assertIn("已被删除", out)
+        self.assertIn("include_deleted=true", router.find("GET", "/v1/pjm/workitems")[0][1])
 
     def test_full_出原始_json(self):
         code, out, _err, _router = self.run_cli(["workitem", "show", "DOC-1", "--full"],
-                                                {("GET", "/v1/pjm/workitems/"): WORKITEM})
+                                                {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]}})
         self.assertEqual(0, code)
         self.assertIn('"identifier": "DOC-1"', out)
 
@@ -251,12 +299,36 @@ class CliCase(unittest.TestCase):
             self.run_cli(["workitem", "create", "--project", "演示项目", "--type", "bug"])
         self.assertEqual(2, ctx.exception.code, "缺必填参数时 argparse 直接退 2")
 
+    def test_mine_把_closed_也算已完成(self):
+        """实测得到：已拒绝的 state.type 是 closed（第四个语义值）。
+
+        只把 completed 当完成，会把已拒绝的条目录进「未完成」。
+        """
+        items = [
+            {"id": "1", "identifier": "D-1", "state": {"type": "pending"}},
+            {"id": "2", "identifier": "D-2", "state": {"type": "in_progress"}},
+            {"id": "3", "identifier": "D-3", "state": {"type": "completed"}},
+            {"id": "4", "identifier": "D-4", "state": {"type": "closed"}},
+            {"id": "5", "identifier": "D-5", "state": {"type": "将来才有的值"}},
+        ]
+        code, out, _err, _router = self.run_cli(
+            ["workitem", "mine", "--open-only"],
+            {("GET", "/v1/myself"): {"id": "u1", "name": "john", "display_name": "John"},
+             ("GET", "/v1/pjm/workitems"): {"values": items, "total": 5}})
+        self.assertEqual(0, code)
+        for kept in ("D-1", "D-2", "D-5"):
+            self.assertIn(kept, out, f"{kept} 应当算未完成")
+        for dropped in ("D-3", "D-4"):
+            self.assertNotIn(dropped, out, f"{dropped} 不该出现在未完成里")
+        self.assertIn("其中未完成 3 条", out, "未知语义值算未完成（宁可多列）")
+
     # ── 改状态 ──
     def test_改状态用解析后的_state_id(self):
         updated = dict(WORKITEM, state={"id": "st2", "name": "已完成", "type": "completed"})
         code, out, _err, router = self.run_cli(
             ["workitem", "set-state", "DOC-1", "已完成"],
-            {("GET", "/v1/pjm/workitems/"): WORKITEM, ("PATCH", "/v1/pjm/workitems/w1"): updated})
+            {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]},
+             ("PATCH", "/v1/pjm/workitems/w1"): updated})
         self.assertEqual(0, code)
         patches = router.find("PATCH", "/v1/pjm/workitems/w1")
         self.assertEqual([{"state_id": "st2"}], [p[2] for p in patches])
@@ -265,7 +337,7 @@ class CliCase(unittest.TestCase):
     def test_改状态时名字不存在要列出可用状态(self):
         code, _out, err, router = self.run_cli(
             ["workitem", "set-state", "DOC-1", "随便写的状态"],
-            {("GET", "/v1/pjm/workitems/"): WORKITEM})
+            {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]}})
         self.assertEqual(1, code)
         self.assertIn("新建", err)
         self.assertIn("已完成", err)
@@ -274,7 +346,7 @@ class CliCase(unittest.TestCase):
     # ── 删除 ──
     def test_删除缺_yes_要拒绝(self):
         code, _out, err, router = self.run_cli(
-            ["workitem", "delete", "DOC-1"], {("GET", "/v1/pjm/workitems/"): WORKITEM})
+            ["workitem", "delete", "DOC-1"], {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]}})
         self.assertEqual(1, code)
         self.assertIn("--yes", err)
         self.assertEqual([], router.find("DELETE", "/v1/pjm/workitems/w1"))
@@ -282,7 +354,8 @@ class CliCase(unittest.TestCase):
     def test_删除带_yes_会打_DELETE(self):
         code, out, _err, router = self.run_cli(
             ["workitem", "delete", "DOC-1", "--yes"],
-            {("GET", "/v1/pjm/workitems/"): WORKITEM, ("DELETE", "/v1/pjm/workitems/w1"): {}})
+            {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]},
+             ("DELETE", "/v1/pjm/workitems/w1"): {}})
         self.assertEqual(0, code)
         self.assertIn("已删除", out)
         self.assertEqual(1, len(router.find("DELETE", "/v1/pjm/workitems/w1")))
