@@ -126,6 +126,8 @@ TYPES = [{"id": "epic", "name": "史诗"}, {"id": "feature", "name": "特性"},
          {"id": "bug", "name": "缺陷"}]
 STATES = [{"id": "st1", "name": "新建", "type": "pending"},
           {"id": "st2", "name": "已完成", "type": "completed"}]
+# 项目状态是**另一张表**（/v1/pjm/project/states），与工作项状态不同
+PROJECT_STATES = [{"id": "ps1", "name": "未开始"}, {"id": "ps2", "name": "正常"}]
 SPRINTS = [{"id": "sp1", "name": "Sprint 12"}]
 PRIORITIES = [{"id": "pr1", "name": "高"}]
 
@@ -636,6 +638,44 @@ class CliCase(unittest.TestCase):
         self.assertIn("新建", err)
         self.assertIn("已完成", err)
         self.assertEqual([], router.find("PATCH", "/v1/pjm/workitems/w1"), "不能瞎改")
+
+    # ── 按状态名过滤（实测踩过：中文名被当 id 发出去，服务端 400 code=100003）──
+    def test_按状态过滤要用解析后的_id_不是名字(self):
+        code, _out, _err, router = self.run_cli(
+            ["workitem", "list", "--project", "演示项目", "--type", "bug", "--state", "新建"],
+            {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]}})
+        self.assertEqual(0, code)
+        urls = [call[1] for call in router.find("GET", "/v1/pjm/workitems")]
+        self.assertTrue(urls, "应该真的发了查询")
+        self.assertIn("state_id=st1", urls[0])
+        self.assertNotIn("%E6%96%B0%E5%BB%BA", urls[0], "不能把状态名当 id 发出去")
+
+    def test_按状态过滤缺_type_要拒绝而不是发一个必错的请求(self):
+        code, _out, err, router = self.run_cli(
+            ["workitem", "list", "--project", "演示项目", "--state", "新建"])
+        self.assertEqual(1, code)
+        self.assertIn("--type", err)
+        self.assertEqual([], router.calls, "缺上下文时不该发请求（状态是项目+类型独有的表）")
+
+    # ── 项目状态是另一张表（实测踩过：拿工作项状态表去改项目状态）──
+    def test_改项目状态走项目状态表(self):
+        project = {"id": "pj1", "identifier": "DEMO", "name": "演示项目"}
+        code, _out, _err, router = self.run_cli(
+            ["project", "update", "--project", "演示项目", "--state", "正常"],
+            {("GET", "/v1/pjm/project/states"): {"values": PROJECT_STATES},
+             ("PATCH", "/v1/pjm/projects/pj1"): project})
+        self.assertEqual(0, code)
+        patches = router.find("PATCH", "/v1/pjm/projects/pj1")
+        self.assertEqual([{"state_id": "ps2"}], [p[2] for p in patches])
+
+    def test_改项目状态时名字不存在要列出项目状态(self):
+        code, _out, err, router = self.run_cli(
+            ["project", "update", "--project", "演示项目", "--state", "随便写的"],
+            {("GET", "/v1/pjm/project/states"): {"values": PROJECT_STATES}})
+        self.assertEqual(1, code)
+        self.assertIn("未开始", err)
+        self.assertIn("正常", err)
+        self.assertEqual([], router.find("PATCH", "/v1/pjm/projects/pj1"), "不能瞎改")
 
     # ── 删除 ──
     def test_删除缺_yes_要拒绝(self):

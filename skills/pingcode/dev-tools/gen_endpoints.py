@@ -150,6 +150,18 @@ def render(entries: list[tuple], total: int, docpages: int, digest: str, fetched
     return "\n".join(lines) + "\n"
 
 
+def fetch_date_for_check(old_text: str, today: str) -> str:
+    """--check 时用文件里**已有的**抓取日期。
+
+    否则每次跑都因为「今天是新的一天」而报「模版或元信息有变化」—— 天天虚报的检查
+    会被无视，而它只该报官方文档的漂移。（实测：抓取日的次日跑 --check 就报了。）
+    """
+    for line in old_text.splitlines():
+        if line.startswith("FETCHED_AT = ") and "'" in line:
+            return line.split("'")[1]
+    return today
+
+
 def existing_entries(path: str):
     """读回已生成文件里的 ENTRIES（查不到就返回 None）。"""
     if not os.path.isfile(path):
@@ -206,9 +218,6 @@ def main(argv: list[str]) -> int:
         print(str(exc), file=sys.stderr)
         return 1
 
-    fetched_at = datetime.date.today().isoformat()
-    text = render(entries, total, docpages, digest, fetched_at)
-
     old_text = ""
     if os.path.isfile(args.out):
         try:
@@ -217,6 +226,10 @@ def main(argv: list[str]) -> int:
         except OSError as exc:
             print("读取 %s 失败：%s" % (args.out, exc), file=sys.stderr)
             return 1
+
+    today = datetime.date.today().isoformat()
+    fetched_at = fetch_date_for_check(old_text, today) if args.check else today
+    text = render(entries, total, docpages, digest, fetched_at)
 
     # 判据是**整份文件文本是否一致**，不是只比端点集合 —— 否则改了生成模版
     # （表头、注释、元信息）会因为端点没变而永远不落地。

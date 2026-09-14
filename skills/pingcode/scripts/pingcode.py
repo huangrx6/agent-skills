@@ -400,7 +400,16 @@ def cmd_workitem_list(args: argparse.Namespace) -> int:
     if args.type:
         params["type_id"] = resolve_type(args, client, params.get("project_id", ""))
     if args.state:
-        params["state_id"] = args.state
+        # 状态名必须解析成 state_id：状态是「项目 + 类型」独有的表，把中文名当 id 发出去
+        # 服务端会回 400 code=100003（实测过）。缺上下文时给可执行的提示，不要发一个必错的请求。
+        missing = [flag for flag, key in (("--project", "project_id"), ("--type", "type_id"))
+                   if not params.get(key)]
+        if missing:
+            raise CliError(f"用 --state 过滤时要同时给 {' 和 '.join(missing)}："
+                           "工作项状态是「项目 + 类型」独有的表，光有状态名定位不了")
+        params["state_id"] = _resolve.state_id_for(client, params["project_id"],
+                                                   params["type_id"], args.state,
+                                                   force=args.no_cache)
     if args.assignee:
         params["assignee_id"] = _resolve.user_id(client, args.assignee, force=args.no_cache)
     if args.sprint and params.get("project_id"):
@@ -962,8 +971,9 @@ def cmd_project_update(args: argparse.Namespace) -> int:
     if args.assignee:
         body["assignee_id"] = _resolve.user_id(client, args.assignee, force=args.no_cache)
     if args.state:
-        body["state_id"] = _resolve.state_id_for(client, pid, "", args.state,
-                                                 force=args.no_cache)
+        # 项目状态走 project_states（/v1/pjm/project/states），不是工作项状态表
+        body["state_id"] = str(_resolve.find("project_states", client, args.state,
+                                            force=args.no_cache, project_id=pid)["id"])
     if not body:
         raise CliError("没有要改的字段（--name / --identifier / --description / --start / "
                        "--end / --assignee / --state）")

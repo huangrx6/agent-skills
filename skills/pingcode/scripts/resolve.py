@@ -82,6 +82,14 @@ SOURCES: dict[str, dict[str, Any]] = {
         "needs": ("project_id", "workitem_type_id"),
         "scopes": ("pcp:read:pjm:workitem",),
     },
+    "project_states": {
+        # 项目状态和工作项状态是**两张不同的表**（端点也不同）。曾经用 states
+        # 去改项目状态，报「工作项状态 需要这些上下文参数：workitem_type_id」。
+        "label": "项目状态",
+        "url": "/v1/pjm/project/states?project_id={project_id}",
+        "needs": ("project_id",),
+        "scopes": ("pcp:read:pjm:project",),
+    },
     "priorities": {
         "label": "优先级",
         "url": "/v1/pjm/workitem/priorities?project_id={project_id}",

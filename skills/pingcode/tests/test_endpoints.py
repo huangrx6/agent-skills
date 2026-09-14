@@ -303,6 +303,39 @@ class GeneratorTest(unittest.TestCase):
                 self.assertEqual(1, gen.main(["--input", src, "--out", out, "--check"]),
                                  "文件被手改过，--check 必须报漂移")
 
+    def test_check_只差抓取日期不算漂移(self):
+        """--check 是**跨天**跑的：文件里记的是抓取那天，而今天是新的一天。
+
+        实测：生成日的次日跑 --check 会报「模版或元信息有变化」—— 天天虚报的检查
+        会被无视，而它只该报官方文档的漂移。
+        """
+        raw = json.dumps(FIXTURE_SOURCE).encode("utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            src = os.path.join(tmp, "api.json")
+            out = os.path.join(tmp, "endpoints.py")
+            with open(src, "wb") as fh:
+                fh.write(raw)
+            with redirect_stdout(io.StringIO()):
+                gen.main(["--input", src, "--out", out])
+            with open(out, encoding="utf-8") as fh:
+                text = fh.read()
+            real_at = gen.fetch_date_for_check(text, "2099-01-01")
+            self.assertIn(real_at, text)
+            # 日期在生成物里出现两处（人类可读的「抓取时间」行 + FETCHED_AT），两处都要改：
+            # 只改一处会留下真实的不一致，而检查把它当漂移是对的。
+            with open(out, "w", encoding="utf-8") as fh:      # 假装它是 2020 年抓的
+                fh.write(text.replace(real_at, "2020-01-01"))
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                rc = gen.main(["--input", src, "--out", out, "--check"])
+            self.assertEqual(0, rc, "只差抓取日期不算漂移：" + buf.getvalue())
+            self.assertIn("无漂移", buf.getvalue())
+
+    def test_取抓取日期_读不到就退回今天(self):
+        self.assertEqual("2026-05-06",
+                         gen.fetch_date_for_check("FETCHED_AT = '2026-05-06'\n", "2099-01-01"))
+        self.assertEqual("2099-01-01", gen.fetch_date_for_check("没有这一行\n", "2099-01-01"))
+
     def test_读不到输入文件返回1(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = os.path.join(tmp, "o.py")
