@@ -171,15 +171,31 @@
   以及一个共享 layout 的假阻塞 bug（`check_text_fit` 与落笔对 `detail` 的判据不一致，
   `detail: executive` + 非重点节点带 `detail` 会让**整张图出不来**）。
 
-### ⑦ Inkscape（SVG / 矢量）· 独立 skill，**下一个候选**
+### ⑦ Inkscape（SVG / 矢量）· ⛔ **立项结论：先放着**（2026-09-14 按 Q1 量过，数不出来）
 
-- **范围分两层**：机械层（SVG → PNG/PDF/EMF、DPI 与尺寸控制、`--query-all` 几何自检、
-  文字转路径、批量）+ 执行层（按给定的 spec 实现并自检可校验项）。
-  `--query-all` 是「SVG 层的 `check_layout`」。
-- **明确不承诺审美** —— 审美是不可机械校验项，写进能力范围就是给自己挖坑
-  （与 `visual-design.md` 的「可校验 / 不可校验分界」同源）。
-- **关系**：与 `diagram-authoring` 是**单向可选依赖** —— diagram 可以调它来导图，
-  但它不依赖 diagram，也不要求对方存在。
+- **Q1 的实测**（只数 **user 角色**的消息，排除当前会话与 `forks/`，覆盖
+  `~/.pi/agent/sessions` 里还在的会话）：最近 30 天 **108 个会话**中，
+  「要求在 SVG 上做点什么（导出/编辑/转格式）」**0 次**、「要求把图导出成 png/pdf」**0 次**、
+  「提到 Inkscape」**0 次**、「提到矢量」**0 次**。
+  唯一出现过 Inkscape 的那次会话，**就是提出要建这个 skill 的那次本身** ——
+  也就是说目前唯一的“需求”就是这个请求，没有独立信号。
+- **口径本身也拓出一条教训**：第一版用宽正则、全角色数，得出「inkscape/rsvg 命令 300+ 次、
+  44 个会话要导出图」—— 全是假象：把**我自己写的规划文本**和工具输出都算进去了，
+  还把当前会话算了两遍。**数频率的口径不写清楚，数字就是自己骗自己。**
+- **两个反向确认**：仓库里现在只剩 2 个 SVG（README 的两个图标，GitHub 原生渲染，不需要转）；
+  图标素材那条线已经在 `diagram-authoring` 里**主动砍掉**了（删了 10 个没人引用的 icon SVG）——
+  也就是说连“潜在消费者”都没有。
+- **零安装的替代路径已实测**：`qlmanage -t -s 600 -o /tmp/x file.svg` 能出 PNG，
+  但它是**缩略图**工具：实测一个宽幅 SVG 出来是 600×600 的方框，无 DPI 控制、无 PDF/EMF
+  —— 只够“看一眼”，不够交付。（`sips` 直接不认：实测报 `not a valid file`。）
+- **什么信号出现才动手**（把判据写死，免得下次又从“应该有个 skill”开始）：连续 ≤30 天内
+  ≥3 次「把某张图导出成指定 DPI 的 PNG/PDF」，或 ≥3 次「要改既有 SVG 文件」。
+  到那时它的价值也**只在机械层**：DPI 导出、`--query-all` 几何自检（“SVG 层的 `check_layout`”）、
+  文字转路径、批量 —— **明确不承诺审美**（审美是不可机械校验项，
+  与 `visual-design.md` 的「可校验 / 不可校验分界」同源）。若真做，与 `diagram-authoring`
+  是**单向可选依赖**（diagram 可以调它导图，它不依赖 diagram）。
+- **不装 Inkscape**：本机没装（PATH 与 `/Applications` 都没有），本项目规矩是装软件要先问；
+  而既然结论是“先放着”，这一轮不该装。
 
 ### 明确不建议
 
@@ -243,7 +259,7 @@ python3 $P project progress --project ASKILL            # 看进度
            excalidraw groups[].style 静默失效）、4 处规则表述缺口、2 处 eval 自身的设计缺口
          ・ draw.io 第二后端（同一份规格出 .drawio、结构自检、跨后端一致性测试）+ 修掉一个假阻塞
          ↓
-1. Inkscape skill 立项（先跑 skill-builder 的 Q1/Q3；装软件要先问）
+1. Inkscape：**Q1 已量 = 数不出来**（30 天 108 个会话里 0 次真实需求）→ 先放着，判据见 §三⑦
 2. 三周后跑 skill_trigger_log.py --compare   ← 基线已存，只需等时间
 3. 其余候选（pingcode-plan 已做；weekly-plan / 桥等数据）
 4. references 瘦身    ← 不主动做；下次加规则时会先被迫瘦身
