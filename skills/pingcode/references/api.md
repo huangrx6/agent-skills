@@ -78,7 +78,25 @@ pingcode.py api --method POST --path /v1/comments --data '{...}'
 ## 已知边界
 
 - 生成表只收「接口」条目：官方 JSON 里那 124 条纯文档页（没有 method/url）不进表。
+- **生成表不带请求体 schema**：`normalize()` 只取 `type/url/scopes/permission/group/name`，
+  把 `header` 与 `parameter` 两节整块丢了。后果不是“没信息”，而是**误判成“没信息”** ——
+  曾经据此把附件上传写成「multipart 字段名没法从文档确认」，而官方文档里一直写着。
+  要字段名时直接查快照的 `parameter.fields`（分「查询参数」「请求参数」「请求参数 form-data」）。
 - 同一路径不同变体的接口（`/v1/auth/token` 的三个 `grant_type`）靠 `query=` 消歧，
   `require` 在没给 query 时会报歧义并列出变体。
 - 官方文档**不保证**等于线上行为。文档里有示例的字段以示例为准；没有示例的一律当未实测，
   真实调用前不要当成已知（见 README 的「已知限制」）。
+
+## 附件上传的契约（从官方文档抄出来的，不是猜的）
+
+两个端点名字很像，但**一个是 multipart、一个是 JSON**：
+
+| | `POST /v1/attachments`（代码段） | `POST /v1/attachments?principal_type=&principal_id=[&comment_id=]`（文件） |
+| --- | --- | --- |
+| Content-Type | `application/json` | **`multipart/form-data`**（文档写成必填 header） |
+| 正文 | `principal_type` `principal_id` `title` `format` `content`（均必填）+ `comment_id`（选） | **form-data：`title` + `file`**（均必填） |
+| `principal_type` 取值 | `workitem` / `workitem_review` / `workitem_deliverable` / `testcase` / `testcase_review` / `testrun` / `idea` / `idea_review` / `ticket` / `page` | 同左 |
+| 作用域 | 随主体（如 `workitem` 要 `pcp:write:pjm:workitem`） | 同左 |
+
+响应两边一样：`{id, url, title, size, type, file_type, ext, download_url, created_at, created_by}`。
+往某条评论的附件上传时多传一个 `comment_id`（两种都适用）。

@@ -718,6 +718,38 @@ class CliCase(unittest.TestCase):
         self.assertIn("ok", out)
         self.assertEqual(1, len(router.find("GET", "/v1/whatever")))
 
+    # ── 同一路径多个变体：query 必须能消歧（实测就翻在这上面）──
+    def test_逃生口用_param_选多变体里的那个(self):
+        """/v1/attachments 有两个 POST 变体：「代码段」无查询参数、「文件」要
+        principal_type + principal_id。以前 cmd_api 把 query 从路径里切掉就不管了，
+        于是**给了 --param 也照样报歧义**，唯一出路是 --force（而 --force 是
+        「我知道路径存在」的确认，不是「选哪个变体」）。
+        """
+        code, out, _err, router = self.run_cli(
+            ["api", "--method", "POST", "--path", "/v1/attachments",
+             "--param", "principal_type=workitem", "--param", "principal_id=w1", "--dry-run"])
+        self.assertEqual(0, code)
+        self.assertIn("principal_type=workitem", out)
+        self.assertIn("principal_id=w1", out)
+        self.assertEqual([], router.calls, "dry-run 不能真发")
+
+    def test_逃生口没给参数时走无查询参数的那个变体且说出来(self):
+        code, out, err, _router = self.run_cli(
+            ["api", "--method", "POST", "--path", "/v1/attachments",
+             "--data", "{}", "--dry-run"])
+        self.assertEqual(0, code)
+        self.assertIn("变体", err, "默默挑一个是不要的行为，得说出选了哪个")
+        self.assertIn("按不需要查询参数的那个走", err)
+        self.assertIn("https://open.pingcode.com/v1/attachments", out)
+
+    def test_单变体端点多给一个参数不能被判成路径不存在(self):
+        """列表端点的 page_size 之类不在文档模板里，不该影响路径判定。"""
+        code, _out, err, _router = self.run_cli(
+            ["api", "--method", "GET", "--path", "/v1/pjm/workitems", "--param", "page_size=5"],
+            {("GET", "/v1/pjm/workitems"): {"values": []}})
+        self.assertEqual(0, code)
+        self.assertNotIn("官方文档里没有", err)
+
     def test_401_要说去重新授权(self):
         code, _out, err, _router = self.run_cli(
             ["project", "list"], {("GET", "/v1/pjm/projects"): http_error(401, {"message": "invalid"})})

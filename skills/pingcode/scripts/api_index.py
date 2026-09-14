@@ -160,7 +160,14 @@ def require(method: str, path: str,
         narrowed = []
         for e in hits:
             template = dict(e.query_template)
-            if set(want) <= set(template) and all(template[k] == v for k, v in want.items()):
+            if not set(want) <= set(template):
+                continue
+            # 两种模板都要能对上：
+            #   字面值型（grant_type=refresh_token）→ 用户给的枚举值要相等
+            #   占位符型（principal_type={principal_type}）→ 用户给的是**真值**，
+            #     拿它跟占位符文本比永远不等，于是变体永远选不中
+            if all(template[k] == v or template[k] == "{%s}" % k
+                   for k, v in want.items()):
                 narrowed.append(e)
         hits = narrowed
     if not hits:

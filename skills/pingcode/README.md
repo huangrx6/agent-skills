@@ -89,7 +89,7 @@ SCR-12  登录页 500    缺陷  处理中  高      John    2026-09-30 00:00  h
 | 一次建一棵树 | `workitem create-plan --file plan.json [--yes]` | 封闭字段集的 JSON 计划，**默认只打印整棵树**；--yes 才建，且中途失败会报出已建成的编号 |
 | 结构化搜索 | `workitem search --created-after/--title-contains/--filter …` | 类 MongoDB 条件；操作符**不带 `$`**、值必须是对象（实测） |
 | 批量改 | `workitem bulk-update --ids A,B,C --state 已完成` | 官方限制（单属性 + 单值 + ≤100）做进了接口形状 |
-| 评论 / 附件 | `workitem comments <ref>`、`workitem attachments <ref>` | 只列不传（上传是 multipart，字段名没法从文档确认） |
+| 评论 / 附件 | `workitem comments <ref>`、`workitem attachments <ref>` | 只列不传；**上传的契约已从文档挖出**（文件走 multipart，字段 `title` + `file`；代码段走 JSON，字段 `title`/`format`/`content`），见 `references/api.md` |
 | 改工作项 | `workitem update <ref> …` | 只发改动的字段；`--description-file` 读长文本 |
 | 改状态 | `workitem set-state <ref> <状态名>` | 先查该类型可用的状态；失败时把可用状态列出来 |
 | 评论 | `workitem comment <ref> "…"` | |
@@ -138,7 +138,7 @@ skills/pingcode/
 
 ```sh
 cd skills/pingcode
-python3 -m unittest discover -s tests -v     # 172 条：全绿
+python3 -m unittest discover -s tests -v     # 175 条：全绿
 python3 dev-tools/gen_endpoints.py --check   # 端点表与官方文档无漂移（离线时加 --input）
 ```
 
@@ -155,7 +155,7 @@ CLI 层证明了 dry-run 不发写、写操作打到正确端点且 body 里是�
 | 项 | 状态 |
 | --- | --- |
 | 真实租户只读 + 写全链路（企业令牌） | ✅ 已实测 |
-| **建项目 / 改项目**（`project create` / `project update`） | ⚠️ **未在真实租户跑过** —— 代码与离线测试具备（必填项 type/name/identifier、日期转换、负责人解析都覆盖），但本轮实测只在**已有项目**里建了工作项，没动项目本身。首次真用前建议先 `--dry-run` 看一眼 body |
+| **建项目 / 改项目**（`project create` / `project update`） | ✅ 已实测 —— 镜像项目 ASKILL 就是 `project create` 建的（`project show --full`：`created_by` 是本人账号、`created_at` 2026-09-14 00:22），建完立刻踩出字典缓存失效才有 `1a2827c`；`project update` 也真跑过一次（`--end` 2027-03-31 → 04-30，`project show` 核实后改回原值） |
 | **用户令牌模式**（浏览器授权） | ✅ 已实测：授权 → 本机回调收到 code → 换令牌落盘（30 天） |
 | `refresh_token` 自动续期 | ✅ 已实测：换到新令牌，到期日顺延 30 天，`refresh_token` 保留 |
 | `whoami` / `--assignee @me` 的前提 | ✅ 实测：应用数据范围里要有 `pcp:read:account:personal`；缺了 `/v1/myself` 返回 **403**（报错点名 scope，并给 `--assignee <真名>` 替代）。**加上之后现有令牌直接就能用**，`whoami` 与 `workitem mine --open-only` 均通 |
@@ -170,6 +170,6 @@ CLI 层证明了 dry-run 不发写、写操作打到正确端点且 body 里是�
 | `assignee_id` 是否接受 `me` 这类占位 | 仍未试；本 skill 一律解析成真实 id，不依赖服务端支持 |
 | `POST /v1/pjm/workitems/search`（复杂过滤：日期、自定义属性） | ✅ 已封：`workitem search`（常用条件做成参数，其余 `--filter` 透传；操作符格式是实测的） |
 | 批量改（`PATCH /v1/pjm/workitems`） | ✅ 已封：`workitem bulk-update`（只允许一个属性、≤100 个） |
-| 附件**上传** | ❌ 未做：multipart/form-data，字段名没法从文档确认；列表已做（`workitem attachments`） |
+| 附件**上传** | ⏳ **契约已从文档确认**（之前写的“字段名没法从文档确认”是错的，根因在我自己的生成器：它把 `parameter`/`header` 两节丢了，见 `references/api.md`）。文件 = `multipart/form-data`，字段 `title` + `file`；代码段 = JSON，字段 `title`/`format`/`content`。两个端点都能解析，尚未封装成类型化命令 |
 | 关注人 / 关联 / 测试管理 / 需求 / 工单 | 未封装，走逃生口 |
 | 成员 / 权限 / 部门 / DevOps 流水线 | 明确不做类型化命令 |

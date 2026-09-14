@@ -1003,20 +1003,36 @@ def cmd_api(args: argparse.Namespace) -> int:
         raise CliError("要一个路径：--path /v1/pjm/workitems（先用 --list 关键词 找）")
     method = args.method.upper()
     path = args.path.split("?")[0]
-    try:
-        _api.require(method, path)
-    except _api.EndpointError as exc:
-        if not args.force:
-            raise CliError(f"{exc}\n  确认要用就加 --force") from exc
-        print(f"⚠ {exc}", file=sys.stderr)
 
     params: dict[str, Any] = {}
     for pair in args.param or []:
         key, _, value = pair.partition("=")
         params[key] = value
-    query = urllib.parse.urlparse(args.path).query
-    for key, value in urllib.parse.parse_qsl(query):
+    for key, value in urllib.parse.parse_qsl(urllib.parse.urlparse(args.path).query):
         params[key] = value
+
+    chosen: Any = None
+    variants = _api.find(method=method, path=path)
+    if len(variants) > 1 and not params:
+        # 没给任何查询参数时，若恰好只有一个「不需要查询参数」的变体，那就是它。
+        # 但**必须说出来** —— 默默从多个同名端点里挑一个是本仓库明确不要的行为。
+        empty = [e for e in variants if not e.query_template]
+        if len(empty) == 1:
+            chosen = empty[0]
+            others = "、".join("?" + "&".join(f"{k}={v}" for k, v in e.query_template)
+                               for e in variants if e is not empty[0])
+            print(f"· {method} {path} 有 {len(variants)} 个变体；没给查询参数 → "
+                  f"按不需要查询参数的那个走（另一个：{others}）", file=sys.stderr)
+    if chosen is None:
+        # 只有真的存在多个变体时才把 query 交给 require 消歧（如 /v1/attachments 的
+        # 「代码段」变体无查询参数、「文件」变体要 principal_type + principal_id）。
+        # 单变体端点**不能**这么干：多给个 page_size 就会被判成「路径不存在」。
+        try:
+            chosen = _api.require(method, path, params if len(variants) > 1 else None)
+        except _api.EndpointError as exc:
+            if not args.force:
+                raise CliError(f"{exc}\n  确认要用就加 --force") from exc
+            print(f"⚠ {exc}", file=sys.stderr)
     body = None
     if args.data:
         try:
