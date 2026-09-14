@@ -37,7 +37,7 @@ ls ~/.agents/skills | grep obsidian      # 两个 obsidian-* 都要在
 
 | 配置项 | 从哪里读 | 说明 |
 | --- | --- | --- |
-| vault 路径 | `$OBSIDIAN_VAULT_PATH` → `~/.config/obsidian-vault-path` | 全仓库唯一来源（只在 PKB 的 `vault_path.py` 里解析一次），**任何文档都不写死路径** |
+| vault 路径 | `$OBSIDIAN_VAULT_PATH` → `~/.config/agent-skills/obsidian-vault-path` | 全仓库唯一来源（只在 PKB 的 `vault_path.py` 里解析一次），**任何文档都不写死路径** |
 | 目录结构约定 | PKB 的 `references/vault-map.md` | 启动清单必读，但它是**快照**；与文件系统冲突时以 `ls` 为准 |
 | 命名 / frontmatter / 链接约定 | PKB 的 `references/writing-conventions.md` | 同上，本 skill 不另立一套 |
 | 发版笔记结构 | `references/release-note-template.md` | 附近已有发版笔记有更强的本地约定时，沿用它的 |

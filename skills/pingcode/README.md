@@ -31,12 +31,12 @@ npx skills add <repo> --skill pingcode --agent claude-code --global   # 副本�
 
 | 配置项 | 从哪里读 | 说明 |
 | --- | --- | --- |
-| `client_id` / `client_secret` | `$PINGCODE_CLIENT_ID` / `$PINGCODE_CLIENT_SECRET` → `~/.config/pingcode/credentials.json` | 在 PingCode 企业后台的凭据管理里建应用后获得 |
+| `client_id` / `client_secret` | `$PINGCODE_CLIENT_ID` / `$PINGCODE_CLIENT_SECRET` → `~/.config/agent-skills/pingcode/credentials.json` | 在 PingCode 企业后台的凭据管理里建应用后获得 |
 | `host` | `$PINGCODE_HOST` → 同一文件 | 公有云 `open.pingcode.com`；私有部署 `你的域名/open` |
 | `auth_mode` | `$PINGCODE_AUTH_MODE` → 同一文件 | 默认 `user`（用户令牌，能识别「我」） |
-| 访问令牌 | `$PINGCODE_ACCESS_TOKEN` → `~/.config/pingcode/token.json` | 环境变量给了就跳过登录（临时/只读场景） |
-| 当前项目 / 迭代 | `~/.config/pingcode/context.json` | `config context --project …` 设置 |
-| 字典缓存 | `~/.config/pingcode/cache.json` | 项目/迭代/类型/状态/优先级/标签/成员，6 小时 |
+| 访问令牌 | `$PINGCODE_ACCESS_TOKEN` → `~/.config/agent-skills/pingcode/token.json` | 环境变量给了就跳过登录（临时/只读场景） |
+| 当前项目 / 迭代 | `~/.config/agent-skills/pingcode/context.json` | `config context --project …` 设置 |
+| 字典缓存 | `~/.config/agent-skills/pingcode/cache.json` | 项目/迭代/类型/状态/优先级/标签/成员，6 小时 |
 
 **全局一套，不放进仓库**（`$PINGCODE_CONFIG_DIR` 可换目录）。凭据与令牌一律 0600 + 原子写，
 `auth status` / `config show` 不回显 secret。
@@ -46,7 +46,7 @@ npx skills add <repo> --skill pingcode --agent claude-code --global   # 副本�
 ```sh
 # 1. 在后台建应用，拿 client_id / secret，登记回调 http://localhost:8765/callback
 #    并按 references/auth.md 的表勾上 scope（最容易漏 pcp:read:pjm:configuration）
-# 2. 写 ~/.config/pingcode/credentials.json（格式见上面的 reference），chmod 600
+# 2. 写 ~/.config/agent-skills/pingcode/credentials.json（格式见上面的 reference），chmod 600
 # 3. 授权
 python3 scripts/pingcode.py auth login      # 打印授权链接，本机自动收 code
 python3 scripts/pingcode.py whoami          # 确认「我」是谁
@@ -138,7 +138,7 @@ skills/pingcode/
 
 ```sh
 cd skills/pingcode
-python3 -m unittest discover -s tests -v     # 187 条：全绿
+python3 -m unittest discover -s tests -v     # 188 条：全绿
 python3 dev-tools/gen_endpoints.py --check   # 端点表与官方文档无漂移（离线时加 --input）
 ```
 

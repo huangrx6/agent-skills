@@ -11,7 +11,7 @@ This skill turns completed work into durable Obsidian notes. It is intentionally
 
 路径从配置解析，**不绑定本机**（与 PKB 的 Prerequisites 一致；这里不要写任何机器专属路径）：
 
-- vault path resolves from `$OBSIDIAN_VAULT_PATH` or `~/.config/obsidian-vault-path` — never hardcode it
+- vault path resolves from `$OBSIDIAN_VAULT_PATH` or `~/.config/agent-skills/obsidian-vault-path` — never hardcode it
 - 取路径的规范方式：`python3 ../obsidian-personal-knowledge-base/scripts/vault_path.py --explain`
 - 换机器或 vault 搬家只需改上面两项配置，本 skill 与 PKB 都跟着走
 

@@ -3,7 +3,7 @@
 
 设计取舍
 --------
-**全局一套，不放进仓库。** 配置目录默认 `~/.config/pingcode/`（`PINGCODE_CONFIG_DIR`
+**全局一套，不放进仓库。** 配置目录默认 `~/.config/agent-skills/pingcode/`（`PINGCODE_CONFIG_DIR`
 可换），三个文件职责分开 —— 它们的**生命周期不同**，混在一起就会互相覆盖：
 
 | 文件 | 内容 | 谁写 | 生命周期 |
@@ -91,12 +91,35 @@ def _as_int(value: object, default: int = 0) -> int:
         return default
 
 
+def shared_config_dir() -> str:
+    """**统一配置根**：所有 skill 的配置都在这儿，跨平台同一个路径。
+
+    `AGENT_SKILLS_CONFIG_DIR` 可以把它整体搬走（换机器、放加密盘都行）。
+    """
+    override = os.environ.get("AGENT_SKILLS_CONFIG_DIR", "").strip()
+    if override:
+        return os.path.abspath(os.path.expanduser(override))
+    return os.path.expanduser(os.path.join("~", ".config", "agent-skills"))
+
+
+def legacy_config_dir() -> str:
+    """旧位置 `~/.config/agent-skills/pingcode`（只兼容读取，不再首选）。"""
+    return os.path.join(os.path.expanduser("~"), ".config", "pingcode")
+
+
 def config_dir() -> str:
-    """配置目录（`PINGCODE_CONFIG_DIR` 优先）。"""
+    """配置目录（`PINGCODE_CONFIG_DIR` 优先，其次统一配置根）。
+
+    旧目录里有配置、新目录里没有时，**继续读旧的** —— 老机器不用搬也能跑；
+    一旦新目录存在就用新的（搬迁是一次性的，不是必须的）。
+    """
     override = os.environ.get(ENV_DIR, "").strip()
     if override:
         return os.path.abspath(os.path.expanduser(override))
-    return os.path.join(os.path.expanduser("~"), ".config", "pingcode")
+    new = os.path.join(shared_config_dir(), "pingcode")
+    if not os.path.isdir(new) and os.path.isdir(legacy_config_dir()):
+        return legacy_config_dir()
+    return new
 
 
 def path_of(name: str) -> str:

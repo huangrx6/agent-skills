@@ -1,7 +1,7 @@
 {
   "skills": {
     "diagram-authoring": {
-      "computedHash": "5db50c8f02f4fe29c1dd1f56fc1eefab2557054ba158d049191133ca77d9bf53",
+      "computedHash": "2f59e66cba32480dc6cf600bbeb8400ebc4e5f2f217f12083d52ef4ab5de63e4",
       "skillPath": "skills/diagram-authoring/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
@@ -13,19 +13,19 @@
       "sourceType": "github"
     },
     "obsidian-personal-knowledge-base": {
-      "computedHash": "c9f4d5865001a63baee66dfdf6b1c60a8329615c5fe5a2e9f0e2e77bcb69bae8",
+      "computedHash": "de6bc0a3a84110fb645b0ca5fb04208311723464f38c91245f5e2ebc8dfdf95f",
       "skillPath": "skills/obsidian-personal-knowledge-base/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
     "obsidian-work-log-release-recorder": {
-      "computedHash": "00397395b215e6aaa1c343c484a3c36b4a657006ea3af064ff1b3ea8d83e36af",
+      "computedHash": "44fa23006a9d149cae91d69364d00b2c882d7a00b33439050fe5acfc930251e5",
       "skillPath": "skills/obsidian-work-log-release-recorder/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
     "pingcode": {
-      "computedHash": "dafaef2745fe57e399d0428746832f152f5ad3acdc8843c597a7e45ceb85f526",
+      "computedHash": "088ada536de92ae22d5b2709fc4f322df684ca0720c91164bf26ac61922f6202",
       "skillPath": "skills/pingcode/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"

@@ -38,7 +38,7 @@ vault.adapter），相对路径会相对进程 cwd 解析、不可靠。所以�
     python3 check_paths.py --quiet          # 只输出统计
 
 vault 路径不在本文件硬编码，由同目录的 vault_path.py 按
-「环境变量 OBSIDIAN_VAULT_PATH → ~/.config/obsidian-vault-path」解析。
+「环境变量 OBSIDIAN_VAULT_PATH → ~/.config/agent-skills/obsidian-vault-path」解析。
 
 退出码：0 = 未发现失效的**文件**路径，1 = 有，2 = vault 路径解析失败或不存在。
        目录类路径不存在只提示，不影响退出码。
@@ -174,7 +174,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--vault",
         default=DEFAULT_VAULT,
-        help="vault 路径；省略时从 $OBSIDIAN_VAULT_PATH 或 ~/.config/obsidian-vault-path 解析",
+        help="vault 路径；省略时从 $OBSIDIAN_VAULT_PATH 或 ~/.config/agent-skills/obsidian-vault-path 解析",
     )
     ap.add_argument("--json", action="store_true", help="输出 JSON")
     ap.add_argument("--quiet", action="store_true", help="只输出统计")

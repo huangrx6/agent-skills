@@ -31,7 +31,7 @@ npx skills add <repo> --skill skill-builder --agent claude-code --global   # 副
 
 | 配置项 | 从哪里读 | 说明 |
 | --- | --- | --- |
-| 泄露词表 | `--blocklist PATH` → `$SKILL_NAME_BLOCKLIST` → `~/.config/skill-name-blocklist.txt` | **刻意不放在仓库里** —— 放进去它自己就泄露了。未配置时扫描跳过、不阻塞提交 |
+| 泄露词表 | `--blocklist PATH` → `$SKILL_NAME_BLOCKLIST` → `~/.config/agent-skills/skill-name-blocklist.txt` | **刻意不放在仓库里** —— 放进去它自己就泄露了。未配置时扫描跳过、不阻塞提交 |
 | git hook | `git config core.hooksPath .githooks` | 每个 clone 做一次。之后提交触及 `skills/` 或 `tools/` 时会自动跑四道检查 |
 
 > `check_leakage.py --show-blocklist` 会**打出真实词条** —— 别把它的输出贴进任何要外发的地方。

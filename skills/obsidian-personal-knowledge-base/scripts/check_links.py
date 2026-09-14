@@ -19,7 +19,7 @@
     python3 check_links.py --ignore-template  # 跳过模板占位符（模板有意为之）
 
 vault 路径不在本文件硬编码，由同目录的 vault_path.py 按
-「环境变量 OBSIDIAN_VAULT_PATH → ~/.config/obsidian-vault-path」解析。
+「环境变量 OBSIDIAN_VAULT_PATH → ~/.config/agent-skills/obsidian-vault-path」解析。
 原因：这个路径以前散在 10 处，vault 搬家时漏改一处就会静默用错路径。
 
 退出码：0 = 无失效链接，1 = 有失效链接，2 = vault 路径解析失败或不存在。
@@ -194,7 +194,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--vault",
         default=DEFAULT_VAULT,
-        help="vault 路径；省略时从 $OBSIDIAN_VAULT_PATH 或 ~/.config/obsidian-vault-path 解析",
+        help="vault 路径；省略时从 $OBSIDIAN_VAULT_PATH 或 ~/.config/agent-skills/obsidian-vault-path 解析",
     )
     ap.add_argument("--json", action="store_true", help="输出 JSON")
     ap.add_argument("--quiet", action="store_true", help="只输出统计")

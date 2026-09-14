@@ -29,7 +29,7 @@ npx skills add <repo> --skill diagram-authoring --global
 
 | 配置项 | 从哪里读 | 说明 |
 | --- | --- | --- |
-| vault 路径 | `$OBSIDIAN_VAULT_PATH` → `~/.config/obsidian-vault-path` | 只在往 vault 里放图时需要；路径不写死，换机器只改一处 |
+| vault 路径 | `$OBSIDIAN_VAULT_PATH` → `~/.config/agent-skills/obsidian-vault-path` | 只在往 vault 里放图时需要；路径不写死，换机器只改一处 |
 | 图标素材库 | `--library` 参数；默认走素材库约定路径 | 库里的项自带固有宽高，是第一个**外部尺寸来源**，见 `references/icons.md` |
 
 ## 快速开始

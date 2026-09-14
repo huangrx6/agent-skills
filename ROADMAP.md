@@ -294,7 +294,7 @@ cp -cR "$VAULT" /tmp/eval-vault/<name>      # macOS/APFS 写时复制克隆
 不必为了省空间而串行化或删内容。
 
 > ⚠️ **一个真的泄漏点**：`vault_path.py` 在没设 `$OBSIDIAN_VAULT_PATH` 时，会回退到
-> `~/.config/obsidian-vault-path` —— 那是**真库**。本轮就有一个子 agent 这么解析到了真库
+> `~/.config/agent-skills/obsidian-vault-path` —— 那是**真库**。本轮就有一个子 agent 这么解析到了真库
 > （它如实报告了，且只读没写）。所以：每条任务的**每一个命令**都要带 env，
 > 并且要把「绝对不要碰 <真库路径>」写成硬禁止，而不是只靠 env。
 

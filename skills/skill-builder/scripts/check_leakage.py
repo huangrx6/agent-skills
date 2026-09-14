@@ -10,7 +10,8 @@
 blocklist 不放在本仓库里（放进去它自己就泄露了），按序解析：
   1. --blocklist PATH
   2. 环境变量 SKILL_NAME_BLOCKLIST
-  3. ~/.config/skill-name-blocklist.txt   （一行一个词，# 开头为注释）
+  3. ~/.config/agent-skills/skill-name-blocklist.txt
+     （一行一个词，# 开头为注释；所有 skill 的配置统一放在这个目录里）
 
 用法：
     python3 check_leakage.py                    # 扫 skills/ 工作区
@@ -29,7 +30,9 @@ import subprocess
 import sys
 
 ENV_VAR = "SKILL_NAME_BLOCKLIST"
-CONFIG_PATH = os.path.expanduser("~/.config/skill-name-blocklist.txt")
+CONFIG_PATH = os.path.expanduser("~/.config/agent-skills/skill-name-blocklist.txt")
+# 旧位置（只兼容读取）
+LEGACY_CONFIG_PATH = os.path.expanduser("~/.config/skill-name-blocklist.txt")
 DEFAULT_TARGET = "skills"
 
 # 扫哪些文本文件
@@ -46,6 +49,8 @@ def load_blocklist(explicit: str | None = None) -> tuple[list[str], str]:
         path, source = os.environ[ENV_VAR].strip(), f"环境变量 {ENV_VAR}"
     elif os.path.isfile(CONFIG_PATH):
         path, source = CONFIG_PATH, f"配置文件 {CONFIG_PATH}"
+    elif os.path.isfile(LEGACY_CONFIG_PATH):
+        path, source = LEGACY_CONFIG_PATH, f"配置文件（旧位置）{LEGACY_CONFIG_PATH}"
 
     if not path or not os.path.isfile(path):
         return [], "未配置"
@@ -137,7 +142,9 @@ def main(argv: list[str] | None = None) -> int:
     if not terms:
         print("⚠ 未配置 blocklist，跳过检查。配置方式（三选一）:")
         print(f"    export {ENV_VAR}='/path/to/blocklist.txt'")
-        print(f"    mkdir -p ~/.config && $EDITOR {CONFIG_PATH}")
+        # 创建命令用 `python3 -c`：macOS / Linux / Windows 通用。
+        print("    python3 -c \"from pathlib import Path; p=Path('" + CONFIG_PATH
+              + "'); p.parent.mkdir(parents=True, exist_ok=True); p.touch()\"")
         print("    python3 check_leakage.py --blocklist /path/to/blocklist.txt")
         print("  一行一个词，# 开头为注释。blocklist 不要放进本仓库。")
         return 0

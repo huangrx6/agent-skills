@@ -69,7 +69,7 @@ Codex        全局级  →  ~/.codex/skills/<name>
 
 ### Obsidian 工作流（2 个）
 
-围绕 Huangrx6 的 Obsidian vault 构建的工作流。**vault 路径不写死在文档里** —— 按 `$OBSIDIAN_VAULT_PATH` → `~/.config/obsidian-vault-path` 的顺序解析，换机器或 vault 搬家只改一处。
+围绕 Huangrx6 的 Obsidian vault 构建的工作流。**vault 路径不写死在文档里** —— 按 `$OBSIDIAN_VAULT_PATH` → `~/.config/agent-skills/obsidian-vault-path` 的顺序解析，换机器或 vault 搬家只改一处。
 
 | Skill | 覆盖 |
 | --- | --- |
@@ -169,7 +169,7 @@ python3 skills/skill-builder/scripts/validate_skill.py   # 结构硬错误
 | 提示：`tools/skill_health.py` | **只提示不阻塞** —— 它报的是「该优化什么」（正文余量、缺 README、缺 evals、死文件），不是「代码错了」。拿它挡提交会把人逼到 `--no-verify`，而一旦养成那个习惯，前面四道真防线也一起失效 |
 | 同步：`tools/skills_lock.py` | **自动更新并重新暂存** `skills-lock.json`。它是派生文件（`computedHash` = `sha256(SKILL.md)`），却被手工维护过 —— 实测漂成「6 个 skill 里 3 个没登记、2 个哈希过期」。自动而不阻塞的理由同上 |
 
-`check_leakage.py` 的 blocklist 放在仓库**之外**（`~/.config/skill-name-blocklist.txt`，一行一个词）—— 放进仓库它自己就泄露了。未配置时跳过、不阻塞。
+`check_leakage.py` 的 blocklist 放在仓库**之外**（`~/.config/agent-skills/skill-name-blocklist.txt`，一行一个词）—— 放进仓库它自己就泄露了。未配置时跳过、不阻塞。
 
 hook 不会随 clone 自动生效，新机器上执行一次：
 

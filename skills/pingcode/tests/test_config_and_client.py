@@ -14,7 +14,7 @@
 4. 官方示例的 `expires_in` 给的是**绝对时间戳**（1577808000），而 OAuth 常规语义是秒数。
    两种都要能算对，否则要么立刻过期要么几十年后过期。
 
-测试全部在临时配置目录里跑（`PINGCODE_CONFIG_DIR`），**不碰真实的 ~/.config/pingcode**。
+测试全部在临时配置目录里跑（`PINGCODE_CONFIG_DIR`），**不碰真实的 ~/.config/agent-skills/pingcode**。
 
 跑法：
     python3 -m unittest discover -s tests -v
@@ -147,7 +147,8 @@ class ConfigTest(TempConfigCase):
     def test_目录与文件名稳定(self):
         saved = os.environ.pop(cfg.ENV_DIR, None)
         try:
-            self.assertTrue(cfg.config_dir().endswith(os.path.join(".config", "pingcode")))
+            self.assertTrue(cfg.config_dir().endswith(
+            os.path.join(".config", "agent-skills", "pingcode")))
         finally:
             if saved is not None:
                 os.environ[cfg.ENV_DIR] = saved
@@ -579,6 +580,25 @@ class AuthTest(TempConfigCase):
         record = cfg.save_token({"access_token": "a", "expires_in": absolute}, "user")
         self.assertEqual(absolute, record["expires_at"], "不能算成 现在 + 1791902383 秒")
 
+
+    def test_旧位置仍可读_新位置优先(self):
+        """配置目录统一之后，老机器（配置还在旧位置）不该被迫搬家。
+
+        这是我实测实现的行为，不是设想：新目录不存在、旧目录存在 → 读旧的；
+        两个都在 → 读新的。用 monkeypatch 指向临时目录，不碰真实主目录。
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            legacy = os.path.join(tmp, "legacy-pingcode")
+            new_root = os.path.join(tmp, "agent-skills")
+            os.makedirs(legacy)
+            # `PINGCODE_CONFIG_DIR` 优先级**高于**这里要测的两条路径，必须先清空 ——
+            # 测试环境里它是指向临时目录的（我第一版忘了清，断言拿到的是它）。
+            with mock.patch.dict(os.environ, {cfg.ENV_DIR: ""}), \
+                 mock.patch.object(cfg, "shared_config_dir", lambda: new_root), \
+                 mock.patch.object(cfg, "legacy_config_dir", lambda: legacy):
+                self.assertEqual(legacy, cfg.config_dir())
+                os.makedirs(os.path.join(new_root, "pingcode"))
+                self.assertEqual(os.path.join(new_root, "pingcode"), cfg.config_dir())
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -9,7 +9,7 @@ description: >-
   compute every coordinate. Do NOT use for editing, moving, or organizing notes (use
   `obsidian-personal-knowledge-base`), for recording completed work or release notes (use
   `obsidian-work-log-release-recorder`), or for decorative illustration, posters, or wireframes.
-  需要 vault 路径的，从 $OBSIDIAN_VAULT_PATH 或 ~/.config/obsidian-vault-path 解析，不要写死。
+  需要 vault 路径的，从 $OBSIDIAN_VAULT_PATH 或 ~/.config/agent-skills/obsidian-vault-path 解析，不要写死。
 ---
 
 # 技术图（两个后端：Excalidraw / draw.io）

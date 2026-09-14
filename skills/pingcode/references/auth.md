@@ -72,7 +72,7 @@ python3 scripts/pingcode.py auth logout                # 只删本地令牌，�
 **全局一套，放在用户目录，不进仓库**（`PINGCODE_CONFIG_DIR` 可以换目录）：
 
 ```text
-~/.config/pingcode/
+~/.config/agent-skills/pingcode/
 ├── credentials.json    # 你手填：host / auth_mode / client_id / client_secret / redirect_uri
 ├── token.json          # 程序写：access_token / refresh_token / 到期时间
 ├── context.json        # 程序写：当前项目、当前迭代

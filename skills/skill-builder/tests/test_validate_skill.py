@@ -138,7 +138,7 @@ class ValidateSkillTest(unittest.TestCase):
         for form in self.NEGATED_FORMS:
             with self.subTest(form=form):
                 body = (f"# t\n\n- {form}\n"
-                        "- path reads from ~/.config/obsidian-vault-path\n\n"
+                        "- path reads from ~/.config/agent-skills/obsidian-vault-path\n\n"
                         "| a | b |\n| --- | --- |\n")
                 self.assertFalse(
                     self.fails(_skill(self.tmp, "negation", body=body)),
@@ -149,7 +149,7 @@ class ValidateSkillTest(unittest.TestCase):
         # 前看窗口不能太长，否则上一句的否定会连这一句的真声明一起豁免
         body = ("# t\n\n"
                 "- This skill is not a chat toy. It is bound to a specific machine.\n"
-                "- path reads from ~/.config/obsidian-vault-path\n\n"
+                "- path reads from ~/.config/agent-skills/obsidian-vault-path\n\n"
                 "| a | b |\n| --- | --- |\n")
         self.assertTrue(
             self.fails(_skill(self.tmp, "neg-cross", body=body)),
@@ -186,7 +186,7 @@ class ValidateSkillTest(unittest.TestCase):
         )
 
     def test_portable_only_is_not_flagged(self):
-        body = "# t\n\nvault path reads from ~/.config/obsidian-vault-path\n\n| a | b |\n| --- | --- |\n"
+        body = "# t\n\nvault path reads from ~/.config/agent-skills/obsidian-vault-path\n\n| a | b |\n| --- | --- |\n"
         self.assertFalse(
             self.fails(_skill(self.tmp, "portable-only", body=body)),
             "只有可移植表述不该被判矛盾",

@@ -19,7 +19,7 @@ description: >-
 本 skill 一次只服务一个 vault。**路径不写死在本文件**，按序解析：
 
 1. 环境变量 `OBSIDIAN_VAULT_PATH`
-2. 配置文件 `~/.config/obsidian-vault-path`（单行，内容就是路径）
+2. 配置文件 `~/.config/agent-skills/obsidian-vault-path`（单行，内容就是路径）
 
 规范取法（不要猜、不要写死）：
 

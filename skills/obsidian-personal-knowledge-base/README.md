@@ -33,7 +33,7 @@ npx skills add <repo> --skill obsidian-personal-knowledge-base --agent claude-co
 
 | 配置项 | 从哪里读 | 说明 |
 | --- | --- | --- |
-| vault 路径 | `$OBSIDIAN_VAULT_PATH` → `~/.config/obsidian-vault-path` | 后者是单行文本文件，内容就是路径 |
+| vault 路径 | `$OBSIDIAN_VAULT_PATH` → `~/.config/agent-skills/obsidian-vault-path` | 后者是单行文本文件，内容就是路径 |
 
 **一次只服务一个 vault**：没有「多库」配置。两个 skill 与三个脚本都从上面这一处解析，
 换机器或 vault 搬家只改这里一处 —— 这个路径以前散在 10 个地方，漏改一处就会**静默用错路径**。
@@ -42,7 +42,7 @@ npx skills add <repo> --skill obsidian-personal-knowledge-base --agent claude-co
 ```sh
 # 二选一
 export OBSIDIAN_VAULT_PATH="/path/to/your/vault"
-echo "/path/to/your/vault" > ~/.config/obsidian-vault-path
+echo "/path/to/your/vault" > ~/.config/agent-skills/obsidian-vault-path
 
 python3 scripts/vault_path.py --explain     # 确认：解析结果 + 来源 + 目录是否存在
 ```
@@ -61,7 +61,7 @@ python3 -m unittest discover -s tests              # 19 条脚本回归
 ```text
 $ python3 scripts/vault_path.py --explain
 /path/to/your/vault
-来源:配置文件 ~/.config/obsidian-vault-path
+来源:配置文件 ~/.config/agent-skills/obsidian-vault-path
 ✓ 目录存在
 ```
 
