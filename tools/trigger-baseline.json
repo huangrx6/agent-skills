@@ -1,4 +1,7 @@
 {
+  "aliases": {
+    "excalidraw-diagram": "diagram-authoring"
+  },
   "note": "补中文触发词之前/之后的第一次基线（ASKILL-12）",
   "saved_at": "2026-09-14",
   "sessions_scanned": 9,

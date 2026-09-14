@@ -30,7 +30,7 @@
 | 1 | **回填 6 个 skill 的 README** | 体检的「缺 README.md」从 5 个降到 **0**；六份章节结构完全一致（都按 `skill-readme-template.md`） |
 | 4 | **清死文件** | 删了 10 个没人引用的图标 svg（去掉 assets 约定后留下的）；体检的「死文件」从 10 降到 **0** |
 | 5 | **pingcode 建项目实测** | 在真实租户建了一个项目（scrum，带描述与起止日期），`project list` 从 1 个变 2 个 |
-| 3 | **补 2 个缺 evals 的 skill** | 给 excalidraw-diagram（6 条）与 skill-builder（6 条）写了 `evals/evals.json`；体检的「缺 evals」从 2 降到 **0** |
+| 3 | **补 2 个缺 evals 的 skill** | 给 diagram-authoring（6 条）与 skill-builder（6 条）写了 `evals/evals.json`；体检的「缺 evals」从 2 降到 **0** |
 
 还开着：
 
@@ -55,7 +55,7 @@
 | # | 做什么 | 等什么 |
 | --- | --- | --- |
 | 9 | pingcode 的扩展面（复杂搜索 / 批量 / 附件 / 测试管理 / 需求 / 工单） | 等你在真实工作里真的被 `api` 逃生口卡住，再封装成子命令 |
-| 10 | `excalidraw-diagram` 的图标库与其它视觉细节 | 等它真的被高频使用，而不是「有空就打磨」 |
+| 10 | `diagram-authoring` 的图标库与其它视觉细节 | 等它真的被高频使用，而不是「有空就打磨」 |
 
 ---
 
@@ -66,12 +66,16 @@
 
 | skill | 自动触发（description 生效） | 显式加载（`$name`） |
 | --- | --- | --- |
-| excalidraw-diagram | 2 | 0 |
+| excalidraw-diagram&nbsp;※ | 2 | 0 |
 | git-dev-workflow | 0 | 2 |
 | obsidian-personal-knowledge-base | 0 | 1 |
 | obsidian-work-log-release-recorder | 0 | 1 |
 | skill-builder | 0 | 1 |
 | pingcode | 0 | 0（刚建） |
+
+> ※ **2026-09-14 改名为 `diagram-authoring`**（原因：同一个 skill 要出 Excalidraw 与 draw.io 两种格式，
+> 名字不该带工具名）。上表是**改名前的历史数据，不改写**；`tools/trigger-baseline.json` 里写了
+> `aliases`，所以 `--compare` 会把两边合并计数 —— 否则一次改名会被读成「旧 skill 停用、新 skill 从零开始」。
 
 **最值得注意的一条：6 个 skill 里只有一个被「自动触发」过。**
 其余全部靠显式 `$name` 调用 —— 也就是说，那些 skill 的 `description` 在**自动触发**这件事上

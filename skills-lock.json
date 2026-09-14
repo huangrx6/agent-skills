@@ -1,8 +1,8 @@
 {
   "skills": {
-    "excalidraw-diagram": {
-      "computedHash": "cf74748ea63eae2674d1030b691d50cae548aea3683c6ab6de999103013ea122",
-      "skillPath": "skills/excalidraw-diagram/SKILL.md",
+    "diagram-authoring": {
+      "computedHash": "566cb8147bceb3cb270b94356061256441d19d5521a9990ecd018e12e2436acb",
+      "skillPath": "skills/diagram-authoring/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
@@ -25,7 +25,7 @@
       "sourceType": "github"
     },
     "pingcode": {
-      "computedHash": "6d2601fb2118a8757dead162de9cada4eff16d5ff39fee252725fe59215a6772",
+      "computedHash": "dafaef2745fe57e399d0428746832f152f5ad3acdc8843c597a7e45ceb85f526",
       "skillPath": "skills/pingcode/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"

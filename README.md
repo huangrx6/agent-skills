@@ -82,7 +82,7 @@ Codex        全局级  →  ~/.codex/skills/<name>
 
 | Skill | 覆盖 |
 | --- | --- |
-| [**excalidraw-diagram**](skills/excalidraw-diagram/SKILL.md) | 把系统画成可编辑的 Excalidraw 图（架构 / 依赖 / 流程 / 状态 / 部署拓扑 / 思维导图）：区域（网格底 + 虚线框）、四组样式轴、一套配色系统；模型只描述结构，坐标全由脚本算 |
+| [**diagram-authoring**](skills/diagram-authoring/SKILL.md) | 把系统画成可编辑的 Excalidraw 图（架构 / 依赖 / 流程 / 状态 / 部署拓扑 / 思维导图）：区域（网格底 + 虚线框）、四组样式轴、一套配色系统；模型只描述结构，坐标全由脚本算 |
 | [**git-dev-workflow**](skills/git-dev-workflow/SKILL.md) | git 写操作（提交 / 分支 / 丢弃改动 / 删分支与 worktree / 改写历史 / force push）前的状态核对与拦截：先读真实状态，不可逆动作前跑机械前置检查，报告只引原始输出 |
 | [**pingcode**](skills/pingcode/SKILL.md) | PingCode 项目 / 工作项（史诗·特性·用户故事·任务·缺陷）的命令行：查我的待办与缺陷、按条件搜、看详情、建项目、建改工作项（描述 / 起止日期 / 负责人 / 优先级 / 父项 / 迭代）、改状态、加评论、删工作项。端点来自官方文档生成的端点表（发送前校验），名字→ID 解析歧义时列候选而不猜 |
 
@@ -99,7 +99,7 @@ Codex        全局级  →  ~/.codex/skills/<name>
 ```text
 使用 $obsidian-personal-knowledge-base 帮我 <整理 / 归位 / 创建 / 审阅 笔记>
 使用 $obsidian-work-log-release-recorder 帮我 <记录 / 沉淀 / 写发版文档>
-使用 $excalidraw-diagram 帮我 <画架构图 / 画流程图 / 把这段说明画出来>
+使用 $diagram-authoring 帮我 <画架构图 / 画流程图 / 把这段说明画出来>
 使用 $git-dev-workflow 帮我 <提交 / 建分支 / 丢弃改动 / 清理分支 / 改写历史>
 使用 $pingcode 帮我 <查我的任务与缺陷 / 建项目 / 建任务或缺陷 / 改状态 / 看项目进度>
 使用 $skill-builder 帮我 <判断要不要建 skill / 评审触发描述 / 起 SKILL.md 一稿>
@@ -125,7 +125,7 @@ python3 skills/skill-builder/scripts/validate_skill.py   # 结构硬错误
 | --- | --- | --- |
 | P0 | Obsidian 工作流（知识库 + 发版记录） | ✅ 2026-08 |
 | P0 | `skill-builder`（建 skill 的元能力） | ✅ 2026-09 |
-| P0 | `excalidraw-diagram`（技术图） | ✅ 2026-09 |
+| P0 | `diagram-authoring`（技术图） | ✅ 2026-09 |
 | P0 | `git-dev-workflow`（git 写操作） | ✅ 2026-09 |
 | P1 | `pingcode`（PingCode 项目 / 工作项） | ✅ 2026-09，已在真实租户跑通只读 + 写全链路 |
 

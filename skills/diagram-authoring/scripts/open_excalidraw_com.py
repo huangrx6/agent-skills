@@ -69,7 +69,7 @@ def make_handler(filename: str, payload: bytes):
     """造一个只认这一个文件名的请求处理器。"""
 
     class _SceneHandler(http.server.BaseHTTPRequestHandler):
-        server_version = "excalidraw-diagram-scene/1"
+        server_version = "diagram-authoring-scene/1"
 
         def _end_headers(self) -> None:
             # 只允许 excalidraw.com：别的网站就算猜到地址也读不到这个文件。

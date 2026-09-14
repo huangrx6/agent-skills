@@ -100,7 +100,7 @@ skills/obsidian-personal-knowledge-base/
 
 - 要记录**已完成**的工作、落地事实、发版文档 → 用 `obsidian-work-log-release-recorder`。
 - 纯讨论 / 头脑风暴 / 没有笔记要建要改 → 不需要 skill，直接聊。
-- 要画技术图 → 用 `excalidraw-diagram`（本 skill 只负责笔记里的配图清单与图片引用）。
+- 要画技术图 → 用 `diagram-authoring`（本 skill 只负责笔记里的配图清单与图片引用）。
 - 要读写本机文件或提交 git → 用 `git-dev-workflow`。
 - 请求在「编辑已有笔记」与「记录已完成工作」之间模糊（比如同时出现「发版」和「整理」）→ **先问清是哪一种**，不猜。
 

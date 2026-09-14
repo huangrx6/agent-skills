@@ -44,7 +44,7 @@ from typing import Any
 
 SCENE_TYPE = "excalidraw"
 SCENE_VERSION = 2
-SOURCE = "excalidraw-diagram skill"
+SOURCE = "diagram-authoring skill"
 ELEMENT_VERSION = 1
 STROKE_WIDTH = 2
 ROUGHNESS = 1

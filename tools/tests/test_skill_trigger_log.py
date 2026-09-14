@@ -192,6 +192,31 @@ class BaselineTest(Case):
         self.assertRegex(payload["saved_at"], r"^\d{4}-\d{2}-\d{2}$")
         self.assertEqual("补了中文触发词", payload["note"])
 
+    def test_改名后按现名合并对比(self):
+        """基线里是旧名、现在是新名 —— 改名不能被读成「旧 skill 停用、新 skill 从零开始」。
+
+        那个基线存在的唯一目的，就是看这个 skill 的自动触发有没有变多；
+        一次改名把计数劈成两半，等于把这个目的废掉。
+        """
+        base = {"saved_at": "2026-09-01", "sessions_scanned": 9,
+                "aliases": {"old-name": "new-name"},
+                "skills": {"old-name": {"auto": 1, "manual": 0, "sessions": 1}}}
+        self.write_session("--proj-a--", "s1.jsonl",
+                           [inline("new-name"), inline("new-name")])
+        lines = "\n".join(log.compare(log.collect(self.sessions), base))
+        self.assertIn("改名合并", lines)
+        self.assertIn("1 → 2", lines, "旧名的计数要并进现名")
+        rows = [line for line in lines.splitlines() if line and not line.startswith(("-", "skill", "（", "自动触发", "看结论"))]
+        self.assertFalse(any(row.startswith("old-name") for row in rows),
+                         f"旧名不该再单列成一行：{rows}")
+
+    def test_基线里坏计数按_0_处理(self):
+        """基线是外部文件，可能被手改坏 —— 不该为一条坏数据崩掉整个对比。"""
+        base = {"saved_at": "2026-09-01", "sessions_scanned": 9,
+                "skills": {"aaa": {"auto": "坏了", "manual": None}}}
+        lines = "\n".join(log.compare(log.collect(self.sessions), base))
+        self.assertIn("0 → 0", lines)
+
     def test_没有基线时读回_None(self):
         self.assertIsNone(log.load_baseline(self.repo()))
 

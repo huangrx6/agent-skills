@@ -7,7 +7,7 @@ description: >-
   与限流问题（401/403/429）。命令形如 python3 scripts/pingcode.py …，端点和参数名以官方文档
   生成的端点表为准。
   Do NOT use for: 读写本机文件或 git 仓库（用 git-dev-workflow）、把工作项整理成 Obsidian 笔记
-  （用 obsidian-personal-knowledge-base）、画图（用 excalidraw-diagram）、创建或评审 skill
+  （用 obsidian-personal-knowledge-base）、画图（用 diagram-authoring）、创建或评审 skill
   （用 skill-builder）；也不要用它做成员/权限/流水线管理，也不要凭记忆拼 API 路径。
 ---
 

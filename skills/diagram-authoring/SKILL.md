@@ -1,5 +1,5 @@
 ---
-name: excalidraw-diagram
+name: diagram-authoring
 description: >-
   Draw technical diagrams as editable Excalidraw files in the Obsidian vault: architecture, dependency,
   flow, state, deployment topology, and mind maps. Use when the user asks to 画图 / 画架构图 / 画流程图 /
@@ -11,7 +11,7 @@ description: >-
   需要 vault 路径的，从 $OBSIDIAN_VAULT_PATH 或 ~/.config/obsidian-vault-path 解析，不要写死。
 ---
 
-# Excalidraw 技术图
+# 技术图（当前后端：Excalidraw）
 
 把"系统怎么运作"画成可编辑的 Excalidraw 图。**你负责理解与描述结构，脚本负责一切坐标。**
 

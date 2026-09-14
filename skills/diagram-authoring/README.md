@@ -1,4 +1,4 @@
-# excalidraw-diagram
+# diagram-authoring
 
 > 把「系统怎么运作」画成**可编辑**的 Excalidraw 图（架构 / 依赖 / 流程 / 状态 / 部署拓扑 / 思维导图 / 网状）。
 > **模型只描述结构，坐标全由脚本算。**
@@ -18,7 +18,7 @@
 
 ```sh
 python3 tools/install_skills.py            # 默认装软链（推荐）
-npx skills add <repo> --skill excalidraw-diagram --global
+npx skills add <repo> --skill diagram-authoring --global
 ```
 
 依赖：**核心链路零依赖**（只用 Python 标准库）。
@@ -35,7 +35,7 @@ npx skills add <repo> --skill excalidraw-diagram --global
 ## 快速开始
 
 ```sh
-cd skills/excalidraw-diagram
+cd skills/diagram-authoring
 
 # 1. 写一份规格：只有结构（节点 / 边 / 分组），没有任何坐标
 #    完整字段见 references/diagram-spec.md
@@ -85,7 +85,7 @@ $ python3 scripts/emit_excalidraw.py tests/fixtures/specs/01-architecture.json -
 ## 目录结构
 
 ```text
-excalidraw-diagram/
+diagram-authoring/
 ├── SKILL.md                # 给 Agent 的规则（不写坐标等硬规则、图类型策略表）
 ├── README.md               # 本文件
 ├── references/
@@ -109,7 +109,7 @@ excalidraw-diagram/
 ## 验证
 
 ```sh
-cd skills/excalidraw-diagram
+cd skills/diagram-authoring
 python3 -m unittest discover -s tests -v     # 348 条，全绿（约 10 秒）
 python3 scripts/emit_excalidraw.py tests/fixtures/specs/07-regions.json -o /tmp/a.excalidraw
 ```

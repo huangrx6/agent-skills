@@ -226,11 +226,44 @@ def load_baseline(root: str) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
+def as_count(value: object) -> int:
+    """基线是**外部文件**（可能被手改坏），读不成数字就当 0 —— 别为一条坏数据崩掉整个对比。"""
+    try:
+        return int(value)  # type: ignore[call-overload]
+    except (TypeError, ValueError):
+        return 0
+
+
+def fold_aliases(skills: dict[str, Any], aliases: dict[str, str]) -> dict[str, Any]:
+    """把基线里的**旧名**折到现名下。
+
+    基线是历史快照，旧名不能改写；但比较时必须把两边当同一个 skill ——
+    否则一次改名会被读成「旧 skill 停用、新 skill 从零开始」，
+    而那个基线存在的唯一目的就是看这个 skill 的自动触发有没有变多。
+    """
+    out: dict[str, Any] = {}
+    for name, item in skills.items():
+        target = aliases.get(name, name)
+        if target in out:
+            merged = dict(out[target])
+            for key in ("auto", "manual", "sessions"):
+                merged[key] = as_count(merged.get(key)) + as_count(item.get(key))
+            merged["last"] = max(str(merged.get("last") or ""), str(item.get("last") or ""))
+            out[target] = merged
+        else:
+            out[target] = dict(item)
+    return out
+
+
 def compare(data: dict[str, Any], base: dict[str, Any]) -> list[str]:
     """与基线逐 skill 对比。只说**变化**，不重新解释数据。"""
     out = [f"基线 {base.get('saved_at', '?')}（扫了 {base.get('sessions_scanned', '?')} 个会话）"
            f" → 现在扫了 {data['sessions_scanned']} 个", ""]
-    before = dict(base.get("skills") or {})
+    aliases = {str(k): str(v) for k, v in (base.get("aliases") or {}).items()}
+    if aliases:
+        pairs = "、".join(f"`{old}`→`{new}`" for old, new in sorted(aliases.items()))
+        out += [f"（改名合并：{pairs} —— 基线里的旧名是历史数据、不改写，这里按现名合并计数）", ""]
+    before = fold_aliases(dict(base.get("skills") or {}), aliases)
     after = {name: {"auto": b["自动触发"], "manual": b["显式加载"], "sessions": b["sessions"]}
              for name, b in data["skills"].items()}
     head = "%-34s %-14s %-14s" % ("skill", "自动（前→后）", "显式（前→后）")
@@ -249,7 +282,7 @@ def compare(data: dict[str, Any], base: dict[str, Any]) -> list[str]:
             name, f"{old_auto} → {new_auto}", f"{old_manual} → {new_manual}", mark))
     out.append("")
     # 判定口径写死在这里：改 description 的目的就是让自动触发变多
-    auto_before = sum(b.get("auto", 0) for b in before.values())
+    auto_before = sum(as_count(b.get("auto")) for b in before.values())
     auto_after = sum(b["自动触发"] for b in data["skills"].values())
     out.append(f"自动触发总数：{auto_before} → {auto_after}"
                f"（{'有变化' if auto_after != auto_before else '没有变化'}，共 {changed} 个 skill 的计数变了）")

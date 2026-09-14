@@ -129,7 +129,7 @@ skills/pingcode/
 
 - 想读写本机文件或提交 git → 用 `git-dev-workflow`。
 - 想把工作项整理成笔记 → 用 `obsidian-personal-knowledge-base`。
-- 想画图 → 用 `excalidraw-diagram`。
+- 想画图 → 用 `diagram-authoring`。
 - 想建/评审 skill → 用 `skill-builder`。
 - 成员 / 权限 / 角色 / 部门 / 流水线管理：本 skill 没有类型化命令（官方有接口，走 `api` 逃生口）。
 - 项目**不能删**：官方没有删除项目的接口。

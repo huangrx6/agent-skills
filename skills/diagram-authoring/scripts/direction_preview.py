@@ -112,7 +112,7 @@ def build(directions: list[str] | None = None) -> dict:
     return {
         "type": "excalidraw",
         "version": 2,
-        "source": "excalidraw-diagram/direction_preview.py",
+        "source": "diagram-authoring/direction_preview.py",
         "elements": elements,
         "appState": {"gridSize": None, "viewBackgroundColor": "#FFFFFF",
                      # round 而不是 int：这两个数来自自己的布局运算，不是外部输入
