@@ -98,7 +98,6 @@ skills/git-dev-workflow/
 ├── README.md         # 本文件
 ├── references/       # 四本手册：commit-messages / worktrees / recovery / history-surgery
 ├── scripts/          # state / guard / commit_style / worktree / report / commit_plan
-├── tests/            # 在 tempfile 里真 git init 一个仓库来造状态（在仓库顶层 tests/<skill>/）
 └── evals/            # 7 条触发与行为评估
 ```
 
@@ -114,7 +113,7 @@ skills/git-dev-workflow/
 
 ```sh
 cd skills/git-dev-workflow
-python3 -m unittest discover -s tests/<skill> -v     # 约 40 秒
+python3 -m unittest discover -s tests/<skill> -v     # 约 40 秒；在 tempfile 里真 git init 一个仓库来造状态
 ```
 
 「通过」的意思是：`git_state.py` / `git_guard.py` 的判据在**真仓库**上验过（脏工作区、

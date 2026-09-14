@@ -121,7 +121,7 @@ skills/pingcode/
 │   └── format.py           # 紧凑输出白名单 + 时间转换 + 表格
 ├── dev-tools/
 │   └── gen_endpoints.py    # 从官方 api_data.json 生成 endpoints.py
-├── tests/                  # 4 个测试文件：契约 / 传输 / 解析 / CLI└── evals/
+└── evals/
     └── evals.json          # 触发与行为评估
 ```
 

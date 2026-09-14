@@ -197,7 +197,9 @@ def scan_skill(root: str, name: str, validator) -> dict[str, Any]:
         "has_skill_md": os.path.isfile(skill_md),
         "references": len(listdir(refs_dir)) if os.path.isdir(refs_dir) else 0,
         "script_lines": sum(count_lines(p) for p in walk_files(os.path.join(skill_dir, "scripts"))),
-        "test_files": len([f for f in walk_files(os.path.join(skill_dir, "tests"))
+        # 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时
+        # 读的是 `skills/<skill>/` 那棵树）。这里也跟着看顶层，否则每行都显示 0。
+        "test_files": len([f for f in walk_files(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tests", os.path.basename(os.path.normpath(skill_dir))))
                            if f.endswith(".py")]),
         "tree_issues": readme_tree_issues(skill_dir),
     }

@@ -91,7 +91,6 @@ skills/obsidian-personal-knowledge-base/
 ├── README.md         # 本文件
 ├── references/       # 6 个细节手册（见上）
 ├── scripts/          # vault_path.py（路径唯一来源）+ check_links.py + check_paths.py
-├── tests/            # 回归：守两个检查脚本的误报与漏报
 ├── evals/            # 6 条触发与行为评估
 └── agents/           # openai.yaml（Agent 接口描述）
 ```

@@ -4,7 +4,7 @@
 
 ## 这是什么
 
-每个 skill 是一个独立目录，含 `SKILL.md`（YAML frontmatter + Markdown 正文，**给 Agent 看的规则**）与 `README.md`（**给人看的详解**），以及按需展开的 `references/`（细节手册）、`scripts/`（确定性脚本）、`tests/`（脚本回归）、`evals/`（触发与行为的评估集）。Agent 靠 `SKILL.md` 的 `description` 判断该不该触发。
+每个 skill 是一个独立目录，含 `SKILL.md`（YAML frontmatter + Markdown 正文，**给 Agent 看的规则**）与 `README.md`（**给人看的详解**），以及按需展开的 `references/`（细节手册）、`scripts/`（确定性脚本）、`evals/`（触发与行为的评估集）。**回归测试不在 skill 目录里** —— 它住在仓库顶层 `tests/<skill>/`：AI 调用 skill 时读的就是 skill 目录那棵树，测试放进去会被顺手读走。Agent 靠 `SKILL.md` 的 `description` 判断该不该触发。
 
 **跨 Agent 通用**：兼容 Claude Code / pi / OpenCode / Cursor / Codex 等任意支持 `SKILL.md` frontmatter 约定的 Agent。
 
@@ -157,14 +157,14 @@ python3 skills/skill-builder/scripts/validate_skill.py   # 结构硬错误
 
 ### 自动校验（git hook）
 
-`.githooks/pre-commit` 在提交触及 `skills/` 或 `tools/` 时跑**五道检查 + 一道提示 + 一步自动同步**：
+`.githooks/pre-commit` 在提交触及 `skills/` 或 `tools/` 时跑**四道阻塞检查 + 两道提示 + 一步自动同步**：
 
 | 工序 | 抓什么 |
 | --- | --- |
 | `validate_skill.py` | 结构硬错误：YAML 不可解析、`name` 与目录名不一致、description 超 800 字符、正文超 150 行 |
 | `check_leakage.py` | 外发内容里的真实名称（真实客户名 / 内部系统名 / 内网主机路径 / 内部接口名） |
-| `tests/*` 与 `tools/tests` | 脚本回归：校验器自己的边界、含空格的路径不被截断、扫描范围不扩散…… 这些测试守的正是上面几道的防线，不跑就等于没写 |
-| → 跟在同一段里的 `check_doc_numbers.py` | 文档里写的**测试条数**是不是真的。真实条数刚跑出来就在手上，比一下不要钱 |
+| `tests/*` 与 `tools/tests` | 脚本回归：校验器自己的边界、含空格的路径不被截断、扫描范围不扩散…… 这些测试守的正是上面几道的防线，不跑就等于没写。**默认不阻塞提交**（失败只打印输出 + 提示）；要把它当发布闸门时加 `AGENT_SKILLS_GATE=1` |
+| → 跟在同一段里的 `check_doc_numbers.py` | 文档里写的**测试条数**是不是真的。真实条数刚跑出来就在手上，比一下不要钱。README 现在**已不再写测试条数**（那是每加一条用例都要追着改的数字），这条因此退化成安全网：万一谁又写了，它照样比 |
 | `check_pointers.py` | 指针指向一个不存在的文件（客观错误）；「内容有没有真的搬过去」是语义判断，留给人工核对 |
 | 提示：`tools/skill_health.py` | **只提示不阻塞** —— 它报的是「该优化什么」（正文余量、缺 README、缺 evals、死文件），不是「代码错了」。拿它挡提交会把人逼到 `--no-verify`，而一旦养成那个习惯，前面四道真防线也一起失效 |
 | 同步：`tools/skills_lock.py` | **自动更新并重新暂存** `skills-lock.json`。它是派生文件（`computedHash` = `sha256(SKILL.md)`），却被手工维护过 —— 实测漂成「6 个 skill 里 3 个没登记、2 个哈希过期」。自动而不阻塞的理由同上 |

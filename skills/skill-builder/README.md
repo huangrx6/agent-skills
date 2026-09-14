@@ -90,7 +90,6 @@ skills/skill-builder/
 │   ├── check_leakage.py         # 泄露扫描
 │   ├── check_pointers.py        # 指针目标存在性
 │   └── preflight.py             # 全部检查 + 事实快照
-├── tests/                       # 三个检查器的边界值
 └── evals/
     └── evals.json               # 6 条行为评估（频率证据 / 边界写进 description / 已量不算）
 ```

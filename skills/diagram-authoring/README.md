@@ -117,7 +117,6 @@ diagram-authoring/
 │   └── drawio-backend.md   # 另一个后端：不压缩 XML、形状映射表、与 Excalidraw 有意不同的地方、导出步骤
 ├── scripts/                # 13 个：校验 / 布局 / 两个后端出图 / 结构自检 / 文字测量 / 色板 / 素材 / 方向预览 / **配色预览** / 官网打开
 ├── dev-tools/preview.py    # 出 PNG 供目视复核（需 PIL，非运行时）
-├── tests/                  # 测试与夹具（仓库顶层 tests/<skill>/，不在 skill 目录里）
 └── evals/
     └── evals.json          # 6 条行为评估（不写坐标 / 类型判断 / 风格先问 / 报告改内容）
 ```
