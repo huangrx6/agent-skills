@@ -95,7 +95,7 @@ excalidraw-diagram/
 │   └── icons.md            # 图标素材库：怎么查、怎么选、为什么它是外部尺寸来源
 ├── scripts/                # 10 个：校验 / 布局 / 出图 / 文字测量 / 色板 / 素材 / 主题预览 / 官网打开
 ├── dev-tools/preview.py    # 出 PNG 供目视复核（需 PIL，非运行时）
-├── tests/                  # 11 个测试文件、346 条
+├── tests/                  # 11 个测试文件、348 条
 └── evals/
     └── evals.json          # 6 条行为评估（不写坐标 / 类型判断 / 风格先问 / 报告改内容）
 ```
@@ -110,7 +110,7 @@ excalidraw-diagram/
 
 ```sh
 cd skills/excalidraw-diagram
-python3 -m unittest discover -s tests -v     # 346 条，全绿（约 6 秒）
+python3 -m unittest discover -s tests -v     # 348 条，全绿（约 10 秒）
 python3 scripts/emit_excalidraw.py tests/fixtures/specs/07-regions.json -o /tmp/a.excalidraw
 ```
 

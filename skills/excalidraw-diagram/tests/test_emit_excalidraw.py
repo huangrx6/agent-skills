@@ -792,6 +792,44 @@ class TestRegionLabelElements(unittest.TestCase):
         self.assertIn("\n", element["text"], "长标题没有被断行 —— 它会从区域里冒出去")
         self.assertEqual(element["text"], element["originalText"])
 
+    def test_区域的_style_真的落到矩形上(self):
+        """`groups[].style` 必须真的生效。
+
+        漏过一次：校验器允许这个字段、落笔那边也读 `region.get("style")`，
+        但 `region_boxes` 没把它带出去 —— 规格里写明 `{stroke: dashed,
+        fill: cross-hatch}`，出图仍是 solid + hachure（夹具 07-regions.json 实测）。
+        「写了、校验通过、静默无效」比报错难查得多，所以这条钉在端到端上。
+        """
+        spec = {
+            "type": "architecture", "direction": "LR", "title": "T",
+            "groups": [{"id": "g", "label": "G",
+                        "style": {"stroke": "dashed", "fill": "cross-hatch"}}],
+            "nodes": [{"id": "a", "label": "A", "kind": "service", "group": "g"},
+                      {"id": "b", "label": "B", "kind": "plain"}],
+            "edges": [{"from": "a", "to": "b"}],
+        }
+        boxes = L.boxes_from_spec(spec)
+        scene = E.build_scene(spec, L.layout(spec, boxes), boxes, None, None)
+        rect = next(e for e in scene["elements"]
+                    if e["type"] == "rectangle" and e["id"].startswith("region-"))
+        self.assertEqual("dashed", rect["strokeStyle"])
+        self.assertEqual("cross-hatch", rect["fillStyle"])
+
+    def test_没写_style_时区域回到默认(self):
+        """没写 `style` 就不该被自己的空值影响 —— 默认仍是实线。"""
+        spec = {
+            "type": "architecture", "direction": "LR", "title": "T",
+            "groups": [{"id": "g", "label": "G"}],
+            "nodes": [{"id": "a", "label": "A", "kind": "service", "group": "g"},
+                      {"id": "b", "label": "B", "kind": "plain"}],
+            "edges": [{"from": "a", "to": "b"}],
+        }
+        boxes = L.boxes_from_spec(spec)
+        scene = E.build_scene(spec, L.layout(spec, boxes), boxes, None, None)
+        rect = next(e for e in scene["elements"]
+                    if e["type"] == "rectangle" and e["id"].startswith("region-"))
+        self.assertEqual("solid", rect["strokeStyle"])
+
     def test_element_geometry_equals_the_layout_box(self):
         """宽高必须**逐字**等于 `region_boxes` 算好的那一份。"""
         element = self.label()

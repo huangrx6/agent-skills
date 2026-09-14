@@ -3060,8 +3060,13 @@ def region_boxes(spec: dict, placed: dict, boxes: dict) -> list[dict]:
     同一件文字量两遂必然漂移，而漂移的那一遂会让框和字对不上。
 
     返回 `[{id, label, label_lines, label_size, label_width, label_height,
-    level, members, x, y, width, height, label_x, label_y}, ...]`，
+    level, style, members, x, y, width, height, label_x, label_y}, ...]`，
     顺序沿用 `groups` 的声明顺序（先声明的画在更下面）。
+
+    `style` 必须原样带出去：校验器允许 `groups[].style`（`GROUP_FIELDS`）、
+    落笔那边也会读 `region.get("style")`，而这里漏传过一次 —— 表现是
+    「规格里写了、校验通过、出图却静默无效」。实测：夹具 `07-regions.json` 的
+    `boot` 组写 `{stroke: dashed, fill: cross-hatch}`，出图仍是 solid + hachure。
     """
     members: dict[str, list[str]] = {}
     for node in spec.get("nodes", []):
@@ -3092,6 +3097,8 @@ def region_boxes(spec: dict, placed: dict, boxes: dict) -> list[dict]:
             "id": group["id"],
             "label": label,
             "level": group.get("level", "tint"),
+            # 原样带出去，不要漏：漏了就是「写了但静默无效」（见 docstring）
+            "style": group.get("style"),
             # 标签断行结果与实际占的尺寸 —— 落笔那边直接用这几个数
             "label_lines": list(lines),
             "label_size": REGION_LABEL_SIZE,
