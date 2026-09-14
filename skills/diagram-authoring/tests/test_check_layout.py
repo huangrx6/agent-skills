@@ -658,6 +658,54 @@ class TestEdgeShapeChecks(unittest.TestCase):
         self.assertEqual([], outcome.issues)
 
 
+class TestBendCheck(unittest.TestCase):
+    """#11 折点过多：「不要为了折而折」。
+
+    这一项是从一次真实事故里长出来的：一份 25 节点的竖版流程里，一条边被折了
+    **10 次**（在 x≈1330 与 x≈2200 之间来回横跳三次），而当时的九项校验
+    一项都不管折点数 —— 报告全绿。修完路由（`layout._sidestep_candidates` +
+    `_path_rank` 的折点罚分）之后那条边降到 4 折；实测 96 条边的正常带上界就是 4。
+    """
+
+    @staticmethod
+    def _edge(name: str, points) -> dict:
+        return {"from": name, "to": f"{name}!", "points": points}
+
+    def test_over_budget_is_reported_as_soft(self):
+        # 10 个点 = 8 个折点（事故里那条边就是这个量级）
+        zigzag = [[0, 0], [0, 100], [20, 100], [20, 200], [0, 200],
+                  [0, 300], [20, 300], [20, 400], [0, 400], [0, 500]]
+        issues = C.check_bends(StubResult({}, [self._edge("a", zigzag)]))
+        self.assertEqual(1, len(issues))
+        self.assertFalse(issues[0].blocking, "折点多是软项：图还能看")
+        self.assertIn("8 个折点", issues[0].detail)
+        self.assertIn("绕得太多", issues[0].advice or "", "建议要是内容级的")
+
+    def test_budget_sits_just_above_the_measured_normal_band(self):
+        """4 折不报（实测正常带上界），5 折报 —— 边界卡在两个用例之间。"""
+        four = [[0, 0], [0, 100], [20, 100], [20, 200], [0, 200], [0, 300]]
+        self.assertEqual([], C.check_bends(StubResult({}, [self._edge("a", four)])))
+        five = four + [[20, 300]]
+        self.assertEqual(1, len(C.check_bends(StubResult({}, [self._edge("a", five)]))))
+
+    def test_straight_and_two_corner_edges_are_silent(self):
+        """绝大多数边是 0~2 折 —— 这一项不许对它们出声，否则报告就成了噪声。"""
+        result = StubResult({}, [self._edge("a", [[0, 0], [100, 0]]),
+                                 self._edge("b", [[0, 0], [0, 100], [50, 100], [50, 200]])])
+        self.assertEqual([], C.check_bends(result))
+
+    def test_bend_is_not_tunable(self):
+        """**不进调参循环**：能修它的是路由，不是某个间距参数。
+
+        放进 TUNABLE 会让循环空转 —— 步长表里没有与之对应的参数
+        （而“TUNABLE 里的每一项真的调得动”那条用例会先红）。
+        """
+        self.assertIn("bend", C.CHECK_LABEL)
+        self.assertNotIn("bend", C.TUNABLE)
+        self.assertNotIn("bend", C.STEPPABLE)
+        self.assertNotIn("bend", C.STOP_ON)
+
+
 class TestRegionTitle(unittest.TestCase):
     """#10 区域标题不能溢出（P17）。
 

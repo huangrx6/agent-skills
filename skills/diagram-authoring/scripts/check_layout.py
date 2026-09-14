@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""十项校验 + 自动调参循环 + 报告生成。
+"""十一项校验 + 自动调参循环 + 报告生成。
 
 ## 为什么校验和调参在同一个文件里
 
@@ -92,6 +92,14 @@ TUNABLE = frozenset({"gap", "edge", "crossing", "through", "overlap", "slant"})
 # 这个坑踩过两次（`crossing` 一次、`through` 又一次），所以改成机械检查。
 STEPPABLE = frozenset({"gap", "edge", "crossing", "through", "overlap", "slant"})
 
+# 一条边的折点上限：超过就报告「折点过多」。
+#
+# 数值未由实测定：修正路由（`layout._sidestep_candidates` + `_path_rank` 的折点罚分）
+# 之后，7 个端到端夹具 + 一份真实的 25 节点竖版流程共 96 条边量出来是
+# {0 折:50、2 折:39、3 折:2、4 折:5}—— **正常带上界就是 4**。所以定 5 起报，
+# 刚刚好压在实测带之上：宁可当保安，不当噪声源。
+BEND_MAX = 4
+
 CHECK_LABEL = {
     "gap": "元素间隙",
     "edge": "连线长度",
@@ -108,6 +116,8 @@ CHECK_LABEL = {
     "overlap": "连线重合",
     "slant": "连线斜段",
     "region_label": "区域标题溢出",
+    # 两项都是“路由在结构上不该出现的东西” —— 由 TestEveryCheckHasALabel 钉住。
+    "bend": "折点过多",
 }
 # 报告里用的中文说法。**参数名不许出现在报告里** —— 一旦报告写"建议调大某某"，
 # 参数选择权就又回到模型手上了（validation.md 第二节）。
@@ -442,6 +452,34 @@ def check_edge_overlap(result: ResultT) -> list[Issue]:
 
 
 # ── #9 连线斜段（可调项）──────────────────────────────────
+def check_bends(result: ResultT, threshold: int = BEND_MAX) -> list[Issue]:
+    """一条边的折点太多 —— 「不要为了折而折」。
+
+    折点本身是有用的：避开交叉、避开节点、给区域让路。**加了折点就必须换别的东西**，
+    否则那条路就是“为了折而折”（用户的原话：「不要为了折而折，我们是为了避免交叉重合等」）。
+
+    为什么这一项非有不可：一份 25 节点的竖版流程里，一条边（`registry → validate`）
+    被折了 **10 次** —— 在 x≈1330 与 x≈2200 之间来回横跳三次 —— 而当时的九项校验
+    **一项都不管折点数**，报告全绿。把那一刻的候选表打出来才看清根因不是排序，
+    是**没得选**：直的候选穿两个节点，车道的候选穿一个（详见
+    `layout._sidestep_candidates` 的文档）。那两个修正落地后这条边从 10 降到 4。
+
+    级别：**软**。折点多的图还是能看（不像穿节点那样把内容压住），但它常常是
+    最先被眼睛抓到的一类毛病。**不进调参循环**：能修它的是路由本身（候选里得有
+    “逐个障碍让开”那一种），不是某个间距参数 —— 塞进参数调优只会让循环空转。
+    """
+    out: list[Issue] = []
+    for edge in result.edges:
+        corners = max(0, len(edge["points"]) - 2)
+        if corners > threshold:
+            out.append(Issue(
+                "bend", False, f"{edge['from']} → {edge['to']}",
+                f"{corners} 个折点（超过 {threshold}）",
+                advice="这条边绕得太多了。它多半是跨了好几层、而中间又站着别的节点 —— "
+                       "把它两端拉近一点（少跨几层），或者给它让出一条道。"))
+    return out
+
+
 def check_edge_slant(result: ResultT) -> list[Issue]:
     """连线上出现了**斜段**（既不水平也不竖直）—— 可调项。
 
@@ -594,6 +632,7 @@ def check(spec: dict, result: ResultT,
         *check_edges_through_nodes(spec, result),
         *check_edge_overlap(result),
         *check_edge_slant(result),
+        *check_bends(result),
         *check_regions(spec, result, boxes),
         *check_region_labels(spec, result, boxes),
     ])
@@ -739,7 +778,7 @@ def format_report(spec: dict, attempts: list[Attempt], outcome: Outcome) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="十项校验 + 自动调参（报告里不出现参数名）")
+    ap = argparse.ArgumentParser(description="十一项校验 + 自动调参（报告里不出现参数名）")
     ap.add_argument("spec", help="*.diagram.json")
     ap.add_argument("--json", action="store_true", help="附带机器可读结果")
     args = ap.parse_args(argv)

@@ -1,7 +1,7 @@
 {
   "skills": {
     "diagram-authoring": {
-      "computedHash": "9d735ce219d094f8921d21b54858f11b7e86ba7412cccc937156060ca8ae7837",
+      "computedHash": "2b957938ad8ba05721c4d104a0007f3fb8f0415a4504e70dcc0a119081d92d17",
       "skillPath": "skills/diagram-authoring/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"

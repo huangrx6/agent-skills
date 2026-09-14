@@ -114,6 +114,15 @@ NODE_CLEARANCE = 12.0
 EDGE_MIN = 24.0             # 一条连线上最短的可见段。**唯一定义在这里** ——
                             # check_layout 的判据也从它取：两边各写一个数，迟早会漂。
 SMALL_DODGE = 40.0          # 让开这么多像素以内算「小动作」；再多就该换贴车道的画法
+# 折点的免费额度：到这一步为止的折点**不算账**。超过的部分会加进排序键的档位里
+# （`_path_rank`），也就是“宁可换一条车道，也别折个没完”。
+#
+# 为什么是 2：把 7 个端到端夹具 + 一份真实的 25 节点竖版流程量了一遍，
+# **正常边的折点中位/上界就是 2**（一条跨多层的边典型形状是
+# “横→竖→横”或“竖→横→竖”）；3 以上就已经是绕行，10 那种是路由自己的毛病。
+# 定 2 等于“两折之内免罚”，既不动绝大多数正常边，又能在“挠 10 次”与“走空车道”
+# 之间选后者 —— 实测那条 10 折点的边改走车道后降到 2。
+BEND_TOLERANCE = 2
                             # （实测：把单点推到 424px 的 V 形，比贴着障碍走更乱）
 # 把挡路的线段推开时，偏移量试探的步长与上限。
 # 上限就是“推不出去就算了”的那条线 —— 病态图里无限推比不推更糟。
@@ -157,6 +166,10 @@ WRAP_LANE_STEP = 34.0
 # 通用车道分配（`_spread_lanes`）：同一条车道线上重叠的段要错开时用这两个数。
 # 步长沿用折段那套（34px）；空档放不下就压密，但不再低于 LANE_STEP_MIN ——
 # 再密就分不出是两条线了，宁可夹在空档边上。
+# 逐个障碍让道时，一次让不够就再往外让一档（每档这么多像素）。
+# 存在的理由：擦着障碍边缘走时，另一条边/另一个节点可能刚好压在那里 ——
+# 试三档还不行就放弃这条候选，不硬拗。
+SIDESTEP_WIDEN = 18.0
 LANE_STEP_MIN = 14.0
 LANE_EDGE_MARGIN = 10.0      # 车道离空档边界（节点外缘）至少留这么多
 # 两条线共线重合约 1px 就算“画成一根线” —— 车道分配要避开的正是它。
@@ -2363,7 +2376,15 @@ def _reversals(pts: list) -> int:
 def _path_rank(pts: list, tier: int) -> tuple:
     """候选路径的排序键。
 
-    顺序：**斜段 → 主轴来回 → 毛刺段 → 形状档位 → 折点数 → 偏离 → 绕路比**。
+    顺序：**斜段 → 主轴来回 → 毛刺段 → 档位（含折点罚分）→ 折点数 → 偏离 → 绕路比**。
+
+    ⚠️ 档位里的**折点罚分**（`BEND_TOLERANCE`，本轮加的）解决了这样一个真事：
+    一份 25 节点的竖版流程里，一条边被折了 **10 次**（在 x≈1330 与 x≈2200 之间
+    来回横跳三次），而当时的九项校验一项都不管折点数，报告全绿。根因不在排序，
+    而在比较：排序键里 `tier` 排在 `corners` **前面**，于是“折 10 次但拐点都落在
+    预留行/列上”（档 1）压倒了“只折 2 次但走了一条空车道”（档 3）。
+    用户的原则是「**不要为了折而折，我们是为了避免交叉重合等**」—— 折点本身要付账。
+    所以档位加上“超出容差的折点数”：一条路要么折得少，要么就别想靠档位占便宜。
 
     - 斜段是**用户明确不要的东西**（原话：“就是那种 90 度拐弯的线不行吗”）。
       它必须排在这里，而不是靠档位 —— 因为「简化」会把正交折线的拐点合并掉，
@@ -2396,8 +2417,8 @@ def _path_rank(pts: list, tier: int) -> tuple:
     corners = max(0, len(pts) - 2)
     deviation = max((abs((q[0] - a[0]) * (b[1] - a[1]) - (q[1] - a[1]) * (b[0] - a[0])) / span
                      for q in pts[1:-1]), default=0.0)
-    return (slanted, zigzag, stub, tier, corners, round(deviation, 2),
-            round(length / span, 3))
+    return (slanted, zigzag, stub, tier + max(0, corners - BEND_TOLERANCE),
+            corners, round(deviation, 2), round(length / span, 3))
 
 
 def _align_spine(placed: dict, edges: list, direction: str) -> int:
@@ -2632,6 +2653,123 @@ def _orthogonal_path(a: list, b: list, waypoints: list, direction: str,
     return _simplify_path(deduped)
 
 
+
+def _drop_collinear(path: list[list[float]]) -> list[list[float]]:
+    """去掉重复点与共线的中间点。
+
+    折点数是 `len(pts) - 2` —— 共线的中间点会**白白算一个折点**，
+    而排序键里有折点数。这些点在图上完全看不出来，却会影响选中哪条候选。
+    """
+    out = [list(path[0])]
+    for point in path[1:]:
+        if abs(point[0] - out[-1][0]) < 1e-6 and abs(point[1] - out[-1][1]) < 1e-6:
+            continue
+        while len(out) >= 2 and (
+                (abs(out[-1][0] - out[-2][0]) < 1e-6 and abs(point[0] - out[-1][0]) < 1e-6)
+                or (abs(out[-1][1] - out[-2][1]) < 1e-6
+                    and abs(point[1] - out[-1][1]) < 1e-6)):
+            out.pop()
+        out.append(list(point))
+    return out
+
+
+def _sidestep_candidates(a: list[float], b: list[float], placed: dict,
+                         exclude: set[str], sides: tuple[int, ...] = (0, -1, 1),
+                         max_moves: int = 4) -> list[list[list[float]]]:
+    """**逐个障碍让开**的候选路径：遇到一个就让一点，而不是绕整体包围盒。
+
+    为什么必须有这个原语（一次真实的诊断）：一份 25 节点的竖版流程里，
+    `registry → validate` 被折了 **10 次**（在 x≈1330 与 x≈2200 之间来回横跳三次）。
+    把那一刻的候选表打出来才看清：**它不是被排序选坏的，是根本没得选** ——
+
+    | 候选 | 档 | 折点 | 穿节点 |
+    | --- | --- | --- | --- |
+    | 正交变体 0 | 1 | 10 | 0 | ← 只有它没穿节点，于是中选
+    | 正交变体 1 | 1 | **2** | 2 | ← 直的那条被两个节点挡住
+    | 车道 0 | 3 | 2 | 4 |
+    | 车道 1 | 3 | **2** | **1** | ← 只差一个节点
+
+    `_lane_candidates` 只给“障碍**整体**包围盒外侧”两个位置（left / right），
+    而这条边的障碍**分散在不同层**：整体包围盒跨了两千多像素高，贴着它走反而
+    撞上另一层里别的节点。人画这种线的方式是“遇到一个就让一点”——
+    用户的原话是「为什么这里的高度不能大一些呢，非要拐个弯」。
+
+    所以：沿**两点之间较长的那一根轴**（不写死看 direction）向前走，碰到挡路的
+    节点就从它左/右外缘擦过去，越过它的远边再继续。变体数 = `sides`
+    （默认贪心选最近的一侧，另加“一律左 / 一律右”两种备选）。
+
+    ⚠️ **横移段与随后的直行段都要查一遍**——第一版只查了“剩下的那条直线”，
+    于是让开第一个障碍之后沿车道直下，而那条车道上正好还站着两个节点；
+    表现是候选表里它自己带着 2 处穿节点，永远进不了 viable。
+
+    **它只负责提名，选不选由 `_path_rank` 决定** —— 和这里所有其它候选一样：
+    任何一种候选都不该自己宣布自己更好。
+    """
+    vertical = abs(b[1] - a[1]) >= abs(b[0] - a[0])
+    main, cross = (1, 0) if vertical else (0, 1)
+    main_attr, main_size = ("y", "height") if vertical else ("x", "width")
+    cross_attr, cross_size = ("x", "width") if vertical else ("y", "height")
+    sign = 1.0 if b[main] >= a[main] else -1.0
+    others = list(_visible_nodes(placed, exclude))
+
+    def blocked(p1: list[float], p2: list[float]) -> list[tuple[str, Any]]:
+        return [item for item in others
+                if _segment_hits_box(p1, p2, item[1], NODE_CLEARANCE)]
+
+    def point(cross_value: float, main_value: float) -> list[float]:
+        return [cross_value, main_value] if vertical else [main_value, cross_value]
+
+    out: list[list[list[float]]] = []
+    for prefer in sides:
+        pts: list[list[float]] = [list(a)]
+        cur = list(a)
+        for _ in range(max_moves):
+            # 沿主轴“向前”还挡着的障碍里，最近的那个（已经越过的不再回头处理）
+            ahead = [(nid, box) for nid, box in blocked(cur, b)
+                     if (getattr(box, main_attr) - cur[main]) * sign >= 0]
+            if not ahead:
+                break
+            nid, box = min(ahead, key=lambda item: (
+                getattr(item[1], main_attr) - cur[main]) * sign)
+            exit_main = ((getattr(box, main_attr) + getattr(box, main_size) + NODE_CLEARANCE)
+                         if sign > 0 else (getattr(box, main_attr) - NODE_CLEARANCE))
+            # 车道的横轴位置：障碍**横轴**两边的外缘，离当前最近的那侧优先。
+            # （曾经把主轴的 near/beyond 当成横轴坐标用 —— 一个 y 值当了 x 用，
+            #   于是让开的车道根本不在障碍旁边，当然还是撞。）
+            sides_at = (getattr(box, cross_attr) - NODE_CLEARANCE,
+                        getattr(box, cross_attr) + getattr(box, cross_size) + NODE_CLEARANCE)
+            order = sorted(sides_at, key=lambda v: abs(v - cur[cross]))
+            if prefer:
+                order = [sides_at[0] if prefer < 0 else sides_at[1]]
+            chosen = None
+            for widen_step in (0, 1, 2):
+                for side in order:
+                    # **往外**扩：左缘继续往左、右缘继续往右。写反过一次 ——
+                    # 左缘 +18 等于往障碍里钻，于是每一档都被自己挡掉，候选恒为空。
+                    outward = -1.0 if side == sides_at[0] else 1.0
+                    widen = SIDESTEP_WIDEN * widen_step * outward
+                    lane = side + widen
+                    move = point(lane, cur[main])
+                    run = point(lane, exit_main)
+                    if not blocked(cur, move) and not blocked(move, run):
+                        chosen = (move, run)
+                        break
+                if chosen:
+                    break
+            if chosen is None:
+                break                     # 这个障碍让不开就不硬拗（候选后面会被筛掉）
+            pts += [chosen[0], chosen[1]]
+            cur = chosen[1]
+        if len(pts) == 1:
+            continue                      # 一个障碍都没遇到：没这种候选
+        # 回到 b 的横轴位置**再**纵向落到 b —— 不能直接连 b，那是斜段，
+        # 而 `_path_rank` 的**第一项**就罚斜段：这样的候选永远进不了 viable。
+        pts.append(point(b[cross], cur[main]))
+        pts.append(list(b))
+        out.append(_drop_collinear(pts))
+    return [path for path in out if len(path) >= 2]
+
+
 def _lane_candidates(a: list[float], b: list[float], placed: dict,
                      exclude: set[str]) -> list[list[list[float]]]:
     """绕过**一整列节点**的候选：让开、贴着走、再回来。
@@ -2708,6 +2846,10 @@ def straighten(pts: list, placed: dict, exclude: set[str],
     candidates.append((2 if _max_deviation(pushed) <= SMALL_DODGE else 4, pushed))
     candidates += [(3, lane) for lane in _lane_candidates(straight[0], straight[1],
                                                           placed, exclude)]
+    # 档 2 的另一半：**逐个障碍让开**（越过它再继续）。和上一条同为“小动作”性质，
+    # 谁更优交给 `_path_rank` 按折点数与偏离量算。
+    candidates += [(2, path) for path in _sidestep_candidates(
+        straight[0], straight[1], placed, exclude)]
     # 档 4：斜的直线弦，档 5：原来的虚节点车道 —— 只在正交都不可行时才用
     candidates.append((4, straight))
     candidates.append((5, pts))
