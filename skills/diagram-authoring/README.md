@@ -68,7 +68,8 @@ $ python3 scripts/emit_drawio.py tests/fixtures/specs/01-architecture.json -o /t
 | --- | --- | --- |
 | 出图（默认后端） | `emit_excalidraw.py x.diagram.json` | 串起整条流水线；**有阻塞项时不写文件** |
 | 出图（draw.io） | `emit_drawio.py x.diagram.json` | 同一份规格 → `.drawio`（不压缩的 mxGraph XML） |
-| 选 drawio 配色 | `emit_drawio.py … --scheme <名>` | 五套方案，默认 `engineering`（白底 + 等宽标签 + 灰边框）；`classic` / `print` / `night` / `blueprint` |
+| 挑 drawio 配色 | `scheme_preview.py -o /tmp/s.drawio` | **五套配色一页一套**，给用户切页签挑；挑完由 agent 落成 `--scheme` / `--seed` |
+| 在方案上改色 | `emit_drawio.py … --scheme classic --seed accent=<品牌蓝的色值>` | 用户说"主色用我们的品牌蓝"就走这个；规格里照样不写颜色 |
 | 多页交付件 | `emit_drawio.py a.json b.json … -o book.drawio` | 多份规格 → 一个文件多页（drawio 的页签）；21 张 = 一本 21 页 |
 | 只校验规格 | `validate_spec.py x.diagram.json` | 封闭字段集检查 |
 | 只看布局 | `layout.py x.diagram.json --explain` | 用的哪个算法、层/环内顺序、坐标、交叉数 |
@@ -114,9 +115,9 @@ diagram-authoring/
 │   ├── icons.md            # 图标素材库：怎么查、怎么选、为什么它是外部尺寸来源
 │   ├── excalidraw-backend.md  # 默认后端：plain JSON 的理由、官网接着改、它自己重排文字这个限制
 │   └── drawio-backend.md   # 另一个后端：不压缩 XML、形状映射表、与 Excalidraw 有意不同的地方、导出步骤
-├── scripts/                # 12 个：校验 / 布局 / 两个后端出图 / 结构自检 / 文字测量 / 色板 / 素材 / 主题预览 / 官网打开
+├── scripts/                # 13 个：校验 / 布局 / 两个后端出图 / 结构自检 / 文字测量 / 色板 / 素材 / 方向预览 / **配色预览** / 官网打开
 ├── dev-tools/preview.py    # 出 PNG 供目视复核（需 PIL，非运行时）
-├── tests/                  # 13 个测试文件、416 条
+├── tests/                  # 13 个测试文件、421 条
 └── evals/
     └── evals.json          # 6 条行为评估（不写坐标 / 类型判断 / 风格先问 / 报告改内容）
 ```
@@ -131,7 +132,7 @@ diagram-authoring/
 
 ```sh
 cd skills/diagram-authoring
-python3 -m unittest discover -s tests -v     # 416 条，全绿（约 11 秒）
+python3 -m unittest discover -s tests -v     # 421 条，全绿（约 11 秒）
 python3 scripts/emit_excalidraw.py tests/fixtures/specs/07-regions.json -o /tmp/a.excalidraw
 python3 scripts/emit_drawio.py tests/fixtures/specs/07-regions.json -o /tmp/a.drawio
 ```

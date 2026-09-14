@@ -656,6 +656,8 @@ SCHEME_FOR_DIRECTION = {"night": "night"}
 
 _active_backend = "excalidraw"
 _active_scheme: str | None = None
+_active_seeds: dict[str, str] = {}      # 在方案之上覆盖的种子色（用户指定的那些）
+SEED_KEYS = ("canvas", "ink", "accent", "critical")
 
 
 def available_schemes() -> list[str]:
@@ -679,13 +681,26 @@ def resolve_scheme(scheme: str | None = None, mood: str | None = None,
 
 
 def use_backend(backend: str, scheme: str | None = None, mood: str | None = None,
-                visual: str | None = None) -> str:
-    """选后端 = **选画法**。excalidraw 走原来的方向系统，drawio 走配色方案。"""
-    global _active_backend, _active_scheme
+                visual: str | None = None,
+                seeds: dict[str, str] | None = None) -> str:
+    """选后端 = **选画法**。excalidraw 走原来的方向系统，drawio 走配色方案。
+
+    `seeds` 是"在选定方案的基础上改种子色"那一条路（用户说"用 classic，但主色换成我们
+    的品牌蓝 #0B5FFF"）。**它由调用方（agent）传，不是让用户去记参数名** ——
+    颜色是用户的决定，而"决定在哪儿落地"是这套东西的事。键与取值都判失败，不 fallback。
+    """
+    global _active_backend, _active_scheme, _active_seeds
     if backend not in ("excalidraw", "drawio"):
         raise KeyError(f"未知后端 {backend!r}（只有 excalidraw / drawio）")
     _active_backend = backend
     _active_scheme = None
+    _active_seeds = dict(seeds or {})
+    for key, value in _active_seeds.items():
+        if key not in SEED_KEYS:
+            raise KeyError(f"没有这个种子色 {key!r}；可用的：{sorted(SEED_KEYS)}")
+        if not (isinstance(value, str) and len(value) == 7 and value.startswith("#")
+                and all(c in "0123456789abcdefABCDEF" for c in value[1:])):
+            raise KeyError(f"种子色 {key}={value!r} 不是 #RRGGBB 形式")
     if backend == "drawio":
         _active_scheme = resolve_scheme(scheme, mood, visual)
     _rebind()
@@ -720,7 +735,9 @@ def _rebind_drawio() -> None:
     """drawio 的派生：语义档位与原画一样，配比换成交付件那一套。"""
     global ROLES, LEVELS, KINDS, EDGE_KINDS, CANVAS, _FRAME_RATIO
     scheme = DRAWIO_SCHEMES[_active_scheme or DEFAULT_SCHEME]
-    seeds = scheme["seeds"]
+    seeds = dict(scheme["seeds"])
+    # 用户点名要的颜色盖在方案之上 —— 只动他说的那一个，其余照方案
+    seeds.update(_active_seeds)
     canvas, ink = seeds["canvas"], seeds["ink"]
     accent, critical = seeds["accent"], seeds["critical"]
     mix = DRAWIO_MIX

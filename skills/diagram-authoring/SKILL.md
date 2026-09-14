@@ -47,10 +47,16 @@ description: >-
 拿不准就问一句"**给谁看、要不要导出成图片**"。**同一份规格两个后端都能出** —— 换后端只换一条命令，
 不重写规格：几何、校验、调参、文字全是同一份推导。
 
-**drawio 侧有五套配色方案**（默认 `engineering` 工程文档风：白底 + 等宽标签 + 灰边框）：
-`--scheme classic|engineering|print|night|blueprint`。用户说了"专业 / 黑白 / 深色 / 蓝图"这类词
-就直接对号入座（`mood` 字段也能自动选）。五个方案共用**同一套语义档位**，只换 4 个种子色 +
-字体/圆角那几个平台旋钮 —— 细节见 `references/drawio-backend.md`。
+**drawio 侧有五套配色方案**（`classic` / `engineering`[默认，白底+等宽标签+灰边框] / `print` /
+`night` / `blueprint`）。选择流程和上面那条硬规则一样是**先问**：
+
+- 用户说了气质（"专业 / 商务 / 黑白 / 深色 / 蓝图"）→ 直接对号入座，别多问一轮；
+- **没说 → 跑 `scripts/scheme_preview.py`，把那一份多页预览给他，让他切页签挑**；
+- 他说"在某套基础上把主色换成我们的品牌蓝"→ 用 `--seed accent=<那个色值>`
+  （颜色是**他**的决定；规格里照样一个颜色都不写）。
+
+`--scheme` / `--seed` 是**你落笔用的机制**，不是要他记的接口。五套方案共用同一套语义档位，
+只换 4 个种子色 + 字体/圆角那几个平台旋钮 —— 细节见 `references/drawio-backend.md`。
 
 ## 图类型 → 布局策略
 
@@ -76,7 +82,8 @@ description: >-
 | `kind` 只能取色板里的值 | **未知 kind 直接判失败**，不会 fallback 到默认色 |
 | 一张图一个文件 | 信息量用 `detail` 控制，不拆多视图 |
 | 图标只取图形 | 素材自带的文字缩到节点尺寸会糊成噪点，默认剥掉（见 `references/icons.md`） |
-| 先让用户挑主题 | **用户没指定风格时**：出图前跑 `scripts/direction_preview.py`，5 个方向并排给他挑。**「你看着来 / 随便 / 都行」也算没指定** —— 那是把选择权交给你，而选风格正是硬规则不让模型单方面做的那些空间/视觉决定之一；真说了"要绿色/要深色/像手绘"就直接照办，别再多问一轮 |
+| 先让用户挑主题 | **用户没指定风格时**：Excalidraw 跑 `scripts/direction_preview.py`（5 个方向并排）、drawio 跑 `scripts/scheme_preview.py`（5 套配色**一页一套**，让他切页签看），**把文件给他挑**。**「你看着来 / 随便 / 都行」也算没指定** —— 那是把选择权交给你，而选风格正是硬规则不让模型单方面做的那些空间/视觉决定之一；真说了"要绿色/要深色/像手绘/要专业/黑白"就直接照办，别再多问一轮 |
+| 别让用户记参数 | 挑完之后**由你**把选择落成参数（`--scheme` / `--seed`），**不要把这几个参数名教给用户**。用户说的是"要专业一点""主色用我们的品牌蓝"，说得出这个就够了 —— 把"审美的话"翻译成"参数"是你的活 |
 
 ## 校验与「自动调参」循环
 
@@ -105,6 +112,7 @@ layout(参数) → 校验 ──通过──→ 输出
 python3 scripts/emit_excalidraw.py x.diagram.json     # 默认后端：串起整条流水线，写 .excalidraw
 python3 scripts/emit_drawio.py x.diagram.json         # 另一个后端：写 .drawio（不压缩的 mxGraph XML）
 python3 scripts/check_drawio.py x.drawio              # .drawio 结构自检（打不开的图在这里拦住）
+python3 scripts/scheme_preview.py -o /tmp/schemes.drawio  # 五套配色一页一套：给用户切着挑
 python3 scripts/open_excalidraw_com.py x.excalidraw   # 在 excalidraw.com 官网上打开它、接着手改
 python3 scripts/validate_spec.py x.diagram.json       # 只校验规格（封闭字段集）
 python3 scripts/layout.py x.diagram.json --explain    # 只算布局：用的哪个算法、层/环内顺序、坐标、交叉数

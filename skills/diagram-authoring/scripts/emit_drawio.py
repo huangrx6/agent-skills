@@ -562,8 +562,8 @@ def build_model(spec: dict, result: Any, boxes: dict,
     return build_file([build_page(spec, result, boxes, detail_level)])
 
 
-def emit_page(spec: dict, *, params: dict | None = None,
-              scheme: str | None = None) -> tuple[str, Any, Any, list]:
+def emit_page(spec: dict, *, params: dict | None = None, scheme: str | None = None,
+              seeds: dict[str, str] | None = None) -> tuple[str, Any, Any, list]:
     """跑完整条流水线并返回 XML。**校验有阻塞项就不出图。**
 
     顺序与 Excalidraw 后端**逐条一致**（validate → layout → check → 落笔）：
@@ -579,7 +579,7 @@ def emit_page(spec: dict, *, params: dict | None = None,
     # **选后端 = 选画法**：Excalidraw 走方向系统（手绘 + 植物/杂志…那五套），
     # drawio 走自己的配色方案（4 个种子色 + 交付件配比）。两者共用的是**语义档位**。
     palette.use_backend("drawio", scheme=scheme, mood=spec.get("mood"),
-                        visual=spec.get("visual"))
+                        visual=spec.get("visual"), seeds=seeds)
 
     icons_used = [n["id"] for n in spec.get("nodes", []) if n.get("icon")]
     if icons_used:
@@ -596,10 +596,11 @@ def emit_page(spec: dict, *, params: dict | None = None,
     return build_page(spec, result, boxes), result, outcome, attempts
 
 
-def emit(spec: dict, *, params: dict | None = None,
-         scheme: str | None = None) -> tuple[str, Any, Any, list]:
+def emit(spec: dict, *, params: dict | None = None, scheme: str | None = None,
+         seeds: dict[str, str] | None = None) -> tuple[str, Any, Any, list]:
     """单份规格 → 整个 `.drawio` 文件（一页）。多份请用 `build_file` 拼。"""
-    page, result, outcome, attempts = emit_page(spec, params=params, scheme=scheme)
+    page, result, outcome, attempts = emit_page(spec, params=params, scheme=scheme,
+                                                seeds=seeds)
     return (build_file([page]) if page else ""), result, outcome, attempts
 
 
@@ -612,6 +613,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--scheme",
                     help="配色方案（默认 " + palette.DEFAULT_SCHEME + "）；可选："
                          + "、".join(palette.available_schemes()))
+    ap.add_argument("--seed", action="append", metavar="键=#RRGGBB",
+                    help="在选定方案之上改种子色，可重复：canvas / ink / accent / critical。"
+                         "例如 --seed accent=#0B5FFF")
     ap.add_argument("--stdout", action="store_true", help="打到标准输出，不写文件")
     args = ap.parse_args(argv)
 
@@ -619,6 +623,14 @@ def main(argv: list[str] | None = None) -> int:
         print("多份规格要显式指定 -o：页数多了之后，用第一份的名字当输出名会很难预料",
               file=sys.stderr)
         return 2
+
+    seeds: dict[str, str] = {}
+    for item in args.seed or []:
+        key, _, value = str(item).partition("=")
+        if not value:
+            print(f"--seed 要写成 键=#RRGGBB 的形式，收到的是 {item!r}", file=sys.stderr)
+            return 2
+        seeds[key.strip()] = value.strip()
 
     pages: list[str] = []
     node_total = edge_total = 0
@@ -630,7 +642,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"读不到规格 {path}：{exc}", file=sys.stderr)
             return 2
         try:
-            page, _result, outcome, attempts = emit_page(spec, scheme=args.scheme)
+            page, _result, outcome, attempts = emit_page(spec, scheme=args.scheme,
+                                                         seeds=seeds)
         except (SpecError, KeyError) as exc:
             print(f"{path}：{exc}", file=sys.stderr)
             return 1

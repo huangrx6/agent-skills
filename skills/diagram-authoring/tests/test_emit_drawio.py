@@ -80,8 +80,9 @@ def spec_from_file(path: str) -> dict:
     return loaded
 
 
-def build(spec: dict, scheme: str | None = None) -> str:
-    xml, _result, outcome, _attempts = D.emit(spec, scheme=scheme)
+def build(spec: dict, scheme: str | None = None,
+          seeds: dict | None = None) -> str:
+    xml, _result, outcome, _attempts = D.emit(spec, scheme=scheme, seeds=seeds)
     assert xml, f"没出图：{[i.line() for i in outcome.blocking]}"
     return xml
 
@@ -724,6 +725,68 @@ class TestSchemesAndPlatform(unittest.TestCase):
         self.assertNotIn("tooltip=", build(spec))
         spec["detail"] = "standard"      # `detail` 的合法值是 standard，不是 normal
         self.assertIn('tooltip="次要说明"', build(spec))
+
+    def test_preview_has_one_page_per_scheme(self):
+        """`scheme_preview`：**一页一套**，给用户切页签挑 —— 这是“先问”那一步的载体。"""
+        preview = D._load_sibling("scheme_preview")
+        xml = preview.build()
+        self.assertEqual(xml.count("<diagram "), len(D.palette.available_schemes()))
+        self.assertEqual(C.check_text(xml), [])
+        for name in D.palette.available_schemes():
+            self.assertIn(f"（{name}）", xml, f"页签名要写清是哪套：{name}")
+
+    def test_preview_can_be_limited_to_a_few_schemes(self):
+        preview = D._load_sibling("scheme_preview")
+        xml = preview.build(schemes=["classic", "print"])
+        self.assertEqual(xml.count("<diagram "), 2)
+        self.assertNotIn("（night）", xml)
+
+    @staticmethod
+    def _spec_with_accent() -> dict:
+        """带一个 `emphasis: primary` 节点的规格 —— 只有它才会用到 accent 那个种子色。
+
+        （第一版拿 07-regions 当夹具，而它一个重点节点都没有，于是种子色根本没被渲染，
+        断言“找不到 #0B5FFF”就红了 —— 是**夹具选错**，不是覆盖没生效。）
+        """
+        return spec_of(["a", "b"], [("a", "b")], nodes=[
+            {"id": "a", "kind": "service", "label": "重点", "emphasis": "primary"},
+            {"id": "b", "kind": "service", "label": "普通"}])
+
+    def test_seed_overrides_one_color_on_top_of_a_scheme(self):
+        """“用 classic，但主色换成品牌蓝”—— 只动他说的那一个，其余照方案。"""
+        spec = self._spec_with_accent()
+        plain = build(spec, scheme="classic")
+        branded = build(spec, scheme="classic", seeds={"accent": "#0B5FFF"})
+        self.assertIn("#0B5FFF", branded)
+        self.assertNotIn("#0B5FFF", plain)
+        # “只动他说的那一个”：classic 原来的强调色必须消失（而这个规格里
+        # 没有警示节点，所以别拿 critical 的色值去断言 —— 它压根不会被渲染）
+        self.assertIn("#2563EB", plain)
+        self.assertNotIn("#2563EB", branded)
+        self.assertIn("#374151", branded, "没点名的 ink 照旧")
+
+    def test_bad_seed_is_refused(self):
+        spec = self._spec_with_accent()
+        with self.assertRaises(KeyError):
+            D.emit(spec, seeds={"brand": "#0B5FFF"})       # 没有这个种子键
+        with self.assertRaises(KeyError):
+            D.emit(spec, seeds={"accent": "蓝色"})          # 不是 #RRGGBB
+
+    def test_seed_flag_from_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            spec_path = os.path.join(tmp, "s.json")
+            with open(spec_path, "w", encoding="utf-8") as handle:
+                json.dump(self._spec_with_accent(), handle, ensure_ascii=False)
+            with contextlib.redirect_stdout(io.StringIO()):
+                code = D.main([spec_path, "--scheme", "classic", "--seed", "accent=#0B5FFF"])
+            self.assertEqual(code, 0)
+            with open(os.path.join(tmp, "s.drawio"), encoding="utf-8") as handle:
+                self.assertIn("#0B5FFF", handle.read())
+            # 写法不对要当场说清楚，而不是默默忽略
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                self.assertEqual(D.main([spec_path, "--seed", "乱写"]), 2)
+            self.assertIn("键=#RRGGBB", err.getvalue())
 
     def test_multi_page_writes_one_file_with_n_pages(self):
         first = spec_from_file(os.path.join(SPECS, "01-architecture.json"))
