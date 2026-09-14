@@ -90,7 +90,7 @@ skills/skill-builder/
 │   ├── check_leakage.py         # 泄露扫描
 │   ├── check_pointers.py        # 指针目标存在性
 │   └── preflight.py             # 全部检查 + 事实快照
-├── tests/                       # 48 条：三个检查器的边界值
+├── tests/                       # 三个检查器的边界值
 └── evals/
     └── evals.json               # 6 条行为评估（频率证据 / 边界写进 description / 已量不算）
 ```
@@ -107,7 +107,7 @@ skills/skill-builder/
 
 ```sh
 cd skills/skill-builder
-python3 -m unittest discover -s tests/<skill> -v     # 48 条
+python3 -m unittest discover -s tests/<skill> -v     # 全绿
 ```
 
 守的东西分三层，都是**边界值**（按仓库定的停止判据：元工具只要求边界值测试）：

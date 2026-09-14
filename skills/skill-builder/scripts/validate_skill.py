@@ -148,6 +148,37 @@ def load_yaml(text: str):
 EVAL_REQUIRED = ("id", "prompt", "expected_output")
 
 
+# AI 调用 skill 时读的材料：`SKILL.md` 与 `references/*.md`。
+# **不指向测试**是硬要求 —— 这些材料里写 `tests/test_x.py::TestY`（"由那个用例钉住"）
+# 对 AI 毫无用处：它读不到测试，也不该被引向测试。要表达"这条有保障"，写
+# **哪个校验项守着它**。（测试已搬到仓库顶层 `tests/<skill>/`，结构上就读不到；
+# 这条规则是**防回流** —— 不然下一个人照样会顺手写回去。）
+TEST_POINTER_RE = re.compile(r"tests/|test_[a-z0-9_]+\.py|::test_|::Test")
+
+
+def check_consumable_surface(skill_dir: str, name: str, add) -> None:
+    """`SKILL.md` 与 `references/*.md` 里不许出现指向测试的指针。"""
+    import glob as _glob
+
+    hits = []
+    for pattern in ("SKILL.md", "references/*.md"):
+        for path in sorted(_glob.glob(os.path.join(skill_dir, pattern))):
+            # 读不了不是「不指向测试」，而是另一个问题：如实报出来，别让它变成崩溃。
+            try:
+                with open(path, encoding="utf-8") as fh:
+                    text = fh.read()
+            except OSError as exc:
+                add(f"{os.path.relpath(path, skill_dir)} 可读", False, str(exc))
+                continue
+            for lineno, line in enumerate(text.split("\n"), 1):
+                found = TEST_POINTER_RE.search(line)
+                if found:
+                    rel = os.path.relpath(path, skill_dir)
+                    hits.append(f"{rel}:{lineno} 的 “{found.group(0)}”")
+    add("可消费面不指向测试", not hits,
+        ("；".join(hits[:4]) + "（改成写「哪个校验项守着它」）") if hits else "")
+
+
 def check_evals(skill_dir: str, name: str, add) -> None:
     """校验 evals/ 下每个 .json 的形状。
 
@@ -238,6 +269,8 @@ def check_skill(path: str) -> dict:
         add("SKILL.md 可读", False, str(exc))
         return result
     add("SKILL.md 可读", True)
+
+    check_consumable_surface(path, name, add)
 
     m = FM_RE.match(content)
     if not m:

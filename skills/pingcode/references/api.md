@@ -26,7 +26,7 @@ scripts/pingcode.py                    ← 类型化子命令；所有路径都�
 
 - 路径来自生成表，`require()` 在**发送前**就报错，并给最接近的候选；
 - `build()` 在占位符没填全、或参数名拼错时当场报错（不会拼出一个注定 404 的 URL）；
-- `tests/test_endpoints.py` 里有两条契约测试：**本 skill 用到的每个端点必须在表里**，
+- **本 skill 用到的每个端点必须在官方表里** —— 有契约守着：
   以及**上面那几条过期路径必须不存在**（把那次调研的结论钉成回归）。
 
 ## 自己查
@@ -45,8 +45,8 @@ python3 scripts/pingcode.py api --list 需求          # 同样的能力，从 C
 2. 在 `scripts/pingcode.py` 里写处理函数，路径用 `_api.require(...)` 取、用 `_api.build(...)` 拼，
    **不要写字面路径**。
 3. 需要「名字 → ID」就加进 `scripts/resolve.py` 的 `SOURCES` 表（那是字典类型的唯一一处定义）。
-4. 在 `tests/test_endpoints.py` 的 `USED` 里加上这个端点（契约测试会守住它真实存在）。
-5. 在 `tests/test_cli.py` 里加一条用例：**至少要断言 dry-run 不发请求**，以及 body 里的 id 是解析后的真 id。
+4. 把它登记进 `USED` 清单（契约会守住它真实存在：不在官方表里就被拦下）。
+5. 并且要覆盖这两条：**`--dry-run` 不发请求**、body 里的 id 是**解析后的真 id**。
 
 ## 文档漂移怎么发现
 

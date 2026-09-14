@@ -84,7 +84,7 @@ skills/obsidian-work-log-release-recorder/
 ├── scripts/
 │   └── check_release_note.py       # 守本 skill 自己写下的规则（文件名/周号/骨架/重复周/已挂 MOC）
 ├── tests/
-│   └── test_check_release_note.py  # 20 条（夹具从模板生成，模板改了测试跟着变）
+│   └── test_check_release_note.py  # 夹具从模板生成，模板改了测试跟着变
 └── evals/
     └── evals.json                  # 8 条行为评估（触发边界 / 位置探查 / 该不该记）
 ```

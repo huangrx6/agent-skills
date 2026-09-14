@@ -55,7 +55,7 @@ cd skills/obsidian-personal-knowledge-base
 python3 scripts/vault_path.py --explain            # 路径 / 来源 / 目录是否存在；退出码 0 或 2
 python3 scripts/check_links.py --ignore-template   # 全库失效 wikilink 与嵌入；0 无 / 1 有 / 2 路径解析失败
 python3 scripts/check_paths.py                     # .obsidian/ 配置里的失效绝对路径
-python3 -m unittest discover -s tests/<skill>              # 19 条脚本回归
+python3 -m unittest discover -s tests/<skill>              # 脚本检查回归
 ```
 
 ```text
@@ -91,7 +91,7 @@ skills/obsidian-personal-knowledge-base/
 ├── README.md         # 本文件
 ├── references/       # 6 个细节手册（见上）
 ├── scripts/          # vault_path.py（路径唯一来源）+ check_links.py + check_paths.py
-├── tests/            # 19 条回归，守两个检查脚本的误报与漏报
+├── tests/            # 回归：守两个检查脚本的误报与漏报
 ├── evals/            # 6 条触发与行为评估
 └── agents/           # openai.yaml（Agent 接口描述）
 ```
@@ -107,12 +107,12 @@ skills/obsidian-personal-knowledge-base/
 ## 验证
 
 ```sh
-python3 -m unittest discover -s tests/<skill>        # 19 条，全绿
+python3 -m unittest discover -s tests/<skill>        # 全绿
 python3 scripts/check_links.py --ignore-template
 python3 scripts/check_paths.py
 ```
 
-「通过」的意思：19 条测试守的是两个检查脚本的**误报与漏报** —— 代码块里的 `[[ "$a" == *"$b"* ]]`
+「通过」的意思：这些测试守的是两个检查脚本的**误报与漏报** —— 代码块里的 `[[ "$a" == *"$b"* ]]`
 不算 wikilink、只索引 `.md` 会让图片嵌入假失效、含空格的路径不能被截断。链接检查输出 `0` 表示无失效链接。
 
 ## 已知限制与未验证项

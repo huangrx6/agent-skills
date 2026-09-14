@@ -66,7 +66,6 @@ npx skills add <repo> --skill <skill-name> # 副本方式
 ├── README.md         # 本文件
 ├── references/       # 细节手册
 ├── scripts/          # 确定性脚本
-├── tests/            # 脚本回归
 └── evals/            # 触发与行为评估
 \```
 
