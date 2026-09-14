@@ -1,19 +1,20 @@
 ---
 name: diagram-authoring
 description: >-
-  Draw technical diagrams as editable Excalidraw files in the Obsidian vault: architecture, dependency,
-  flow, state, deployment topology, and mind maps. Use when the user asks to 画图 / 画架构图 / 画流程图 /
-  画依赖图 / 把这段说明画出来 / draw a diagram / visualize a system or flow. The model only describes
-  structure (nodes, edges, groups); a script computes every coordinate — never hand-write positions.
-  Do NOT use for editing, moving, or organizing notes (use `obsidian-personal-knowledge-base`), for
-  recording completed work or release notes (use `obsidian-work-log-release-recorder`), or for
-  decorative illustration, posters, or wireframes — this skill draws explanatory technical diagrams only.
+  Draw technical diagrams from a structure-only spec (architecture, dependency, flow, state,
+  topology, mind maps). Two backends from one spec: editable Excalidraw in the Obsidian vault
+  (default), or .drawio for standard shape libraries and PNG/PDF/SVG deliverables. Use when the
+  user asks to 画图 / 画架构图 / 画流程图 / 画依赖图 / 把这段说明画出来 / draw a diagram /
+  visualize a system or flow. The model describes structure only (nodes, edges, groups); scripts
+  compute every coordinate. Do NOT use for editing, moving, or organizing notes (use
+  `obsidian-personal-knowledge-base`), for recording completed work or release notes (use
+  `obsidian-work-log-release-recorder`), or for decorative illustration, posters, or wireframes.
   需要 vault 路径的，从 $OBSIDIAN_VAULT_PATH 或 ~/.config/obsidian-vault-path 解析，不要写死。
 ---
 
-# 技术图（当前后端：Excalidraw）
+# 技术图（两个后端：Excalidraw / draw.io）
 
-把"系统怎么运作"画成可编辑的 Excalidraw 图。**你负责理解与描述结构，脚本负责一切坐标。**
+把"系统怎么运作"画成可编辑的图。**你负责理解与描述结构，脚本负责一切坐标。**
 
 ## 为什么不能由你写坐标（这条不可协商）
 
@@ -32,9 +33,20 @@ description: >-
 2. **判断图类型**，查下面的策略表（类型决定布局算法，不是学美规则）。
 3. **写规格**：一份 `*.diagram.json`，只有结构（节点／边／分组），见 `references/diagram-spec.md`。
 4. **校验规格**：`python3 scripts/validate_spec.py x.diagram.json` —— 字段集是封闭的，未知字段会判失败（包括坐标）。
-5. **出图**：`python3 scripts/emit_excalidraw.py x.diagram.json` —— 它串起整条流水线（校验 → `layout.py` 分层布局 → `check_layout.py` 十项校验、失败时脚本自己调参重跑 → 写出 `.excalidraw`）。**有阻塞项时不写文件。**
+5. **选出图后端**（见下一节），然后出图：`python3 scripts/emit_excalidraw.py x.diagram.json`（或 `emit_drawio.py`）—— 它串起整条流水线（校验 → `layout.py` 分层布局 → `check_layout.py` 十项校验、失败时脚本自己调参重跑 → 写出成品）。**有阻塞项时不写文件。**
 6. **看报告**：只有脚本自动重试耗尽时才有报告，此时按报告建议改**内容**，不要改参数。报告里不会出现参数名。
-7. **保留规格文件**，和 `.excalidraw` 放一起；以后的修改改规格再重新生成。
+7. **保留规格文件**，和成品放一起；以后的修改改规格再重新生成。
+
+## 两个后端：选哪个
+
+| 情况 | 后端 | 产物 |
+| --- | --- | --- |
+| 要标准图元（云 / K8s / UML / BPMN / 泳道）、要交给别人、要导出 PNG/PDF/SVG | draw.io | `.drawio` |
+| 其余情况（**默认**） | Excalidraw | `.excalidraw` |
+
+拿不准就问一句"**给谁看、要不要导出成图片**"。**同一份规格两个后端都能出** —— 换后端只换一条命令，
+不重写规格：几何、校验、调参、文字全是同一份推导。两个后端的实现细节分别见
+`references/excalidraw-backend.md` 与 `references/drawio-backend.md`。
 
 ## 图类型 → 布局策略
 
@@ -86,7 +98,9 @@ layout(参数) → 校验 ──通过──→ 输出
 ## 脚本
 
 ```sh
-python3 scripts/emit_excalidraw.py x.diagram.json     # 出图：串起整条流水线，写 .excalidraw
+python3 scripts/emit_excalidraw.py x.diagram.json     # 默认后端：串起整条流水线，写 .excalidraw
+python3 scripts/emit_drawio.py x.diagram.json         # 另一个后端：写 .drawio（不压缩的 mxGraph XML）
+python3 scripts/check_drawio.py x.drawio              # .drawio 结构自检（打不开的图在这里拦住）
 python3 scripts/open_excalidraw_com.py x.excalidraw   # 在 excalidraw.com 官网上打开它、接着手改
 python3 scripts/validate_spec.py x.diagram.json       # 只校验规格（封闭字段集）
 python3 scripts/layout.py x.diagram.json --explain    # 只算布局：用的哪个算法、层/环内顺序、坐标、交叉数
@@ -97,53 +111,21 @@ python3 scripts/palette.py                            # 打印色板与 kind 取
 
 `check_layout.py` 退出码：0 = 无阻塞项，1 = 有阻塞项，2 = 读不到规格。
 
-## 在官网（excalidraw.com）上接着画
-
-**能做到，已实测跑通。** `scripts/open_excalidraw_com.py` 起一个只服务那一个场景文件、
-且只允许 excalidraw.com 这一个源的本地服务，然后打开：
-
-```text
-https://excalidraw.com/#url=http://localhost:8789/x.excalidraw
-```
-
-`#url=` 是 Excalidraw 的“从外部 JSON 地址导入场景”（PR #2726，无官方 UI 入口）。
-实测结果：官网把 23 个元素全部加载进画布、可以直接接着画；加载完 app 会自己把 hash 清掉。
-
-**两个坑（都踩过）**：`file://` fetch 不到；excalidraw.com 去 fetch localhost **需要 CORS 头**
-（`http.server` 不发，现象是"打开后一直空白"），所以脚本自己包了一层。
-**在 Obsidian 插件里不需要它** —— 文件放进 vault 双击即可。
-
-## `dev-tools/preview.py` —— 不是运行时的一部分
-
-把 `.excalidraw` 画成 PNG，给我自己**目视复核**用。它**需要 PIL**，而上面那条链跑图
-**不需要**——用户用这个 skill 出图仍然是零依赖。放在 `dev-tools/` 而不是 `scripts/`，
-就是为了让“核心链路零依赖”这句话不被含糊掉。
-
-**它能判断**：结构一眼能不能看懂、排版顺不顺眼、颜色比例、节点疏密、连线走向、
-标签有没有压在节点上。
-
-**它不能判断**：它画的是我们**自己的布局模型**（与 `layout.py` 同源），
-所以它**在构造上**看不见“渲染器与我们的模型不一致”这类问题 —— 尤其是容器绑定文字
-在 Excalidraw 里的实际断行。那类问题只有真实 Excalidraw 才算数，见 `references/validation.md`。
+`dev-tools/preview.py` 与两个后端的细节（`.excalidraw` 为什么是 plain JSON、
+Excalidraw 会自己重排文字这个限制、drawio 的形状映射与导出步骤）都在
+`references/` 里对应的后端文档里。
 
 ```sh
 python3 dev-tools/preview.py x.excalidraw out.png
 ```
 
-## 输出格式：`.excalidraw`（plain JSON）
-
-**不是 `.excalidraw.md`** —— 后者的场景用 **lz-string** 压缩，而 lz-string 没有 stdlib Python
-等价物（用它就得手抄一份 JS 压缩算法）。理由与实测证据在 `emit_excalidraw.py` 的文档注释里。
-
-同一份规格每次生成的字节相同（seed 由元素 id 的 sha256 推出），所以图能进 git、diff 有意义。
+它看到的只是我们自己的布局模型，看不见渲染器差异 —— 边界写在 `references/excalidraw-backend.md`。
 
 ## ⚠ 限制：Excalidraw 会自己重新排版文字
 
-`text_metrics` 的尺寸是我们对“文字占多大”的**推算**，而容器绑定的文字在 Excalidraw 里
-**由它自己按真实字体重新断行** —— **渲染器是第二个尺寸来源，不在我们控制之内。**
-断行不一样多出一行，容器就被撑高、布局随之偏移。
-
-**所以：规格与校验全绿不等于渲染出来就是那样。** 已实测的结论与它的边界见 `references/validation.md` 第六节。
+容器绑定的文字在 Excalidraw 里**由它自己按真实字体重新断行**，所以
+**规格与校验全绿不等于渲染出来就是那样**。实测结论与边界见
+`references/excalidraw-backend.md` 第三节；drawio 后端不重折（折行写死）。
 
 ## 引用文件
 
@@ -151,6 +133,8 @@ python3 dev-tools/preview.py x.excalidraw out.png
 - `references/diagram-spec.md`：内容层契约 —— 允许写什么、刻意不存在的字段、`kind` 封闭枚举与色板、**区域（`groups`）**、**四组样式轴（`style`）**、`detail` 信息量档位、尺寸档位与字号。
 - `references/validation.md`：十项校验的阈值与级别、自动调参循环的细节、报告该说什么。
 - `references/icons.md`：图标/素材库 —— 怎么查、按语义怎么选、怎么写进规格，以及它为什么是第一个**外部尺寸来源**。
+- `references/excalidraw-backend.md`：默认后端的细节 —— plain JSON 的理由、在官网上接着手改、**它自己重排文字**这个限制、`dev-tools/preview.py` 看到什么。
+- `references/drawio-backend.md`：另一个后端 —— 为什么写不压缩的 XML、形状映射表、与 Excalidraw 后端**有意不同**的地方、结构自检、人怎么导出 PNG/PDF。
 
 ## 与 PKB 的关系
 

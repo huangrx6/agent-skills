@@ -464,6 +464,33 @@ class TestSizeSourcePremise(unittest.TestCase):
         self.assertEqual(C.tm.FONT_NODE + P.emphasis_font_step("primary"),
                          boxes["p"].text.font_size)
 
+    def test_detail_level_is_judged_the_same_way_when_re_measuring(self):
+        # `detail: executive` 下非重点节点的 `detail` **不算进盒子**，重量时也不许算。
+        #
+        # 这是一次真事故：`check_text_fit` 重量时**无条件**把 `detail` 量进去，而
+        # `boxes_from_spec` 只在 `shows_node_detail(node, level)` 为真时才加。两边判据
+        # 不一致的后果不是“画错”，而是**整张图根本出不来** —— 报的还是一句
+        # 「这是生成脚本的内部不一致（测量与落笔不符），不是你内容的问题」，
+        # 把模型引向“去改文案”那条完全没用的路。
+        # （由 drawio 后端的跨后端用例抓出来；Excalidraw 后端同样中招，只是现成
+        # 夹具里没同时凑齐 `executive` 与“非重点节点带 detail”这两件事。）
+        spec = {"type": "architecture", "direction": "LR", "detail": "executive",
+                "nodes": [{"id": "p", "kind": "service", "label": "甲",
+                           "detail": "次要说明", "emphasis": "primary"},
+                          {"id": "n", "kind": "service", "label": "乙",
+                           "detail": "次要说明", "emphasis": "normal"}],
+                "edges": [{"from": "p", "to": "n"}]}
+        _result, outcome, _attempts = run(spec)
+        self.assertEqual([i.line() for i in outcome.blocking], [],
+                         "executive 档不该因为 detail 被判成「脚本内部不一致」")
+        boxes = L.boxes_from_spec(spec)
+        # 高度不同 = 判据真的在起作用（重点节点留 detail、普通节点不留）
+        self.assertGreater(boxes["p"].height, boxes["n"].height)
+        # 换到 normal 档：两边都要把 detail 算进去，同样不许报
+        spec["detail"] = "normal"
+        _result, outcome, _attempts = run(spec)
+        self.assertEqual([i.line() for i in outcome.blocking], [])
+
     def test_effective_growth_stays_small(self):
         # §13：要层次，不是海报式跳跃。卡的是**总放大**（盒子倍数 × 字号倍数），
         # 因为这两条会相乘。

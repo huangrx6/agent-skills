@@ -238,7 +238,17 @@ def check_text_fit(spec: dict, result: ResultT,
         # **用盒子自己的字号重新量。** 强调档会让字号大一步（§14），按默认字号量
         # 出来的尺寸当然对不上 —— 那会把它误报成「文字溢出」，而其实落笔是对的。
         # 这里仍然卡"恰好相等"，没有放宽：字号不一致照样会被抓住。
-        fresh = tm.measure(node.get("label", ""), node.get("detail", ""),
+        #
+        # ⚠️ `detail` 也要跟 `layout.boxes_from_spec` **同一句判据**。这里曾经无条件把
+        # `detail` 量进去，而落笔那边只在 `shows_node_detail(node, level)` 为真时才加 ——
+        # 两处不一致的结果是：`detail: executive` 加上一个非重点节点带 `detail`，
+        # **整张图直接阻塞**，报的还是「这是生成脚本的内部不一致」。
+        # （本轮由 drawio 后端的跨后端一致性测试抓出来；Excalidraw 后端同样中招，
+        # 只是现成的夹具里没同时凑齐这两件事。）
+        detail_level = spec.get("detail", L.DEFAULT_DETAIL)
+        node_detail = (node.get("detail", "") if L.shows_node_detail(node, detail_level)
+                       else "")
+        fresh = tm.measure(node.get("label", ""), node_detail,
                            font_size=getattr(used, "font_size", tm.FONT_NODE))
         if abs(fresh.width - used.width) > TOLERANCE or abs(fresh.height - used.height) > TOLERANCE:
             out.append(Issue("text", True, nid,

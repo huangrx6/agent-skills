@@ -1,7 +1,7 @@
 # diagram-authoring
 
-> 把「系统怎么运作」画成**可编辑**的 Excalidraw 图（架构 / 依赖 / 流程 / 状态 / 部署拓扑 / 思维导图 / 网状）。
-> **模型只描述结构，坐标全由脚本算。**
+> 把「系统怎么运作」画成**可编辑**的图（架构 / 依赖 / 流程 / 状态 / 部署拓扑 / 思维导图 / 网状）。
+> **模型只描述结构，坐标全由脚本算。** 一份规格两个后端：**Excalidraw**（默认）/ **draw.io**。
 > **不画**装饰性插图、海报、线框图；**不整理**笔记，**不记录**发版。
 
 ## 解决什么问题
@@ -45,6 +45,9 @@ python3 scripts/validate_spec.py my.diagram.json
 
 # 3. 出图：这一条串起整条流水线（校验 → 分层布局 → 十项校验 → 失败自己调参重跑 → 写文件）
 python3 scripts/emit_excalidraw.py my.diagram.json
+
+# 3'. 换后端：同一份规格，只换一条命令（要交付 / 要标准图元时用）
+python3 scripts/emit_drawio.py my.diagram.json
 ```
 
 用仓库自带的示例规格跑一遍（已实测）：
@@ -52,6 +55,8 @@ python3 scripts/emit_excalidraw.py my.diagram.json
 ```sh
 $ python3 scripts/emit_excalidraw.py tests/fixtures/specs/01-architecture.json -o /tmp/arch.excalidraw
 ✓ /tmp/arch.excalidraw  （14 个节点 / 14 条边 / 50 个元素 / 交叉 0）
+$ python3 scripts/emit_drawio.py tests/fixtures/specs/01-architecture.json -o /tmp/arch.drawio
+✓ 已写出 /tmp/arch.drawio（14 个节点 / 14 条边 / 98 行 XML）
 ```
 
 同一份规格**每次生成的字节完全相同**（seed 由元素 id 的 sha256 推出），所以图能进 git、diff 有意义 ——
@@ -61,15 +66,21 @@ $ python3 scripts/emit_excalidraw.py tests/fixtures/specs/01-architecture.json -
 
 | 能力 | 入口 | 说明 |
 | --- | --- | --- |
-| 出图 | `emit_excalidraw.py x.diagram.json` | 串起整条流水线；**有阻塞项时不写文件** |
+| 出图（默认后端） | `emit_excalidraw.py x.diagram.json` | 串起整条流水线；**有阻塞项时不写文件** |
+| 出图（draw.io） | `emit_drawio.py x.diagram.json` | 同一份规格 → `.drawio`（不压缩的 mxGraph XML） |
 | 只校验规格 | `validate_spec.py x.diagram.json` | 封闭字段集检查 |
 | 只看布局 | `layout.py x.diagram.json --explain` | 用的哪个算法、层/环内顺序、坐标、交叉数 |
 | 只看校验与调参报告 | `check_layout.py x.diagram.json` | 退出码：`0` 无阻塞项 / `1` 有阻塞项 / `2` 读不到规格 |
+| `.drawio` 结构自检 | `check_drawio.py x.drawio` | `id=0/1`、id 唯一、引用完整、几何合法；**打不开的图在这里拦住** |
 | 量文字尺寸 | `text_metrics.py "节点标题"` | 文字 → 容器尺寸的实际推算 |
 | 看色板 | `palette.py` | 打印色板与 `kind` 的合法取值 |
 | 挑主题方向 | `direction_preview.py` | **用户没指定风格时**出图前跑它，5 个方向并排给人挑 |
 | 在官网接着画 | `open_excalidraw_com.py x.excalidraw` | 起一个只服务单文件、只允许 excalidraw.com 的本地服务，用 `#url=` 导入官网画布（已实测：23 个元素全进画布、可直接接着改） |
 | 目视复核 | `dev-tools/preview.py x.excalidraw out.png` | **需要 PIL**；给我自己看排版用的，不是运行时的一部分 |
+
+**两个后端怎么选**：要标准图元（云/K8s/UML/BPMN/泳道）或要导出 PNG/PDF/SVG → draw.io；
+其余（默认）→ Excalidraw。拿不准就问「给谁看、要不要导出成图片」。细节见
+`references/excalidraw-backend.md` 与 `references/drawio-backend.md`。
 
 **图类型决定布局算法**（`type` 自动选，人不用选算法）：
 
@@ -92,10 +103,12 @@ diagram-authoring/
 │   ├── diagram-spec.md     # 内容层契约：允许写什么、刻意不存在的字段、kind 封闭枚举、groups、style、detail
 │   ├── validation.md       # 十项校验的阈值与级别、自动调参循环、报告该说什么
 │   ├── visual-design.md    # 审美总原则 + 可校验 / 不可校验的分界 + 9 条实测问题清单
-│   └── icons.md            # 图标素材库：怎么查、怎么选、为什么它是外部尺寸来源
-├── scripts/                # 10 个：校验 / 布局 / 出图 / 文字测量 / 色板 / 素材 / 主题预览 / 官网打开
+│   ├── icons.md            # 图标素材库：怎么查、怎么选、为什么它是外部尺寸来源
+│   ├── excalidraw-backend.md  # 默认后端：plain JSON 的理由、官网接着改、它自己重排文字这个限制
+│   └── drawio-backend.md   # 另一个后端：不压缩 XML、形状映射表、与 Excalidraw 有意不同的地方、导出步骤
+├── scripts/                # 12 个：校验 / 布局 / 两个后端出图 / 结构自检 / 文字测量 / 色板 / 素材 / 主题预览 / 官网打开
 ├── dev-tools/preview.py    # 出 PNG 供目视复核（需 PIL，非运行时）
-├── tests/                  # 11 个测试文件、348 条
+├── tests/                  # 13 个测试文件、402 条
 └── evals/
     └── evals.json          # 6 条行为评估（不写坐标 / 类型判断 / 风格先问 / 报告改内容）
 ```
@@ -110,8 +123,9 @@ diagram-authoring/
 
 ```sh
 cd skills/diagram-authoring
-python3 -m unittest discover -s tests -v     # 348 条，全绿（约 10 秒）
+python3 -m unittest discover -s tests -v     # 402 条，全绿（约 10 秒）
 python3 scripts/emit_excalidraw.py tests/fixtures/specs/07-regions.json -o /tmp/a.excalidraw
+python3 scripts/emit_drawio.py tests/fixtures/specs/07-regions.json -o /tmp/a.drawio
 ```
 
 「通过」的意思是：规格的封闭字段集挡住了含坐标/未知 kind 的写法；七份示例规格都能出图；

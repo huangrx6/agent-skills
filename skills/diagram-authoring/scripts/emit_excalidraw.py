@@ -774,9 +774,8 @@ def scene_bounds(elements: list[dict]) -> tuple[float, float, float, float]:
             max(b[2] for b in boxes), max(b[3] for b in boxes))
 
 
-# 标题底边到内容顶边的距离。数值来源：与最小元素间隙（12px）同量级再放大一档，
-# 让标题与图之间看得出“这不是图的一部分”。**未经真实数据校准**，属于待验证。
-TITLE_GAP = 28
+# 标题底边到内容顶边的距离。定义在 `layout`（两个后端都要用，同一件几何量只留一处）。
+TITLE_GAP = L.TITLE_GAP
 # 打开文件时用的**名义视口**与留白（Excalidraw 不会告诉我们真实视口有多大）。
 # 顶部那条留白是给工具栏的 —— 不留的话内容会压在工具下面。
 OPEN_VIEW = (1400.0, 800.0)
