@@ -32,12 +32,13 @@ python3 scripts/make_pptx.py --png-dir pages/ -o deck.pptx          # 6) 出 PPT
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 21 条
+python3 -m unittest discover -s tests/deck-authoring -v     # 24 条
 ```
 
-钉住五项不变量：墨色推导 + 三套色板门禁、同 spec + 同种子字节一致、六项校验的
+钉住六项不变量：墨色推导 + 三套色板门禁、同 spec + 同种子字节一致、六项校验的
 变异验证（每项都造违规样例，且变异替换的是产物里**真实存在**的值）、半调墨覆盖率
-随灰度单调（100% → 0%）、缓存命中后仍过色板三角形不变量。
+随灰度单调（100% → 0%）、缓存命中后仍过色板三角形不变量、SKILL.md 的版式表与
+`render.py` 实测行为一致。
 
 ## 依赖
 
