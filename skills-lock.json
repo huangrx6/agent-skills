@@ -1,7 +1,7 @@
 {
   "skills": {
     "excalidraw-diagram": {
-      "computedHash": "efc9f7c76523b712cf7dafb32f1a0eae8800f265ac5b8ea156ac1d97b2653600",
+      "computedHash": "cf74748ea63eae2674d1030b691d50cae548aea3683c6ab6de999103013ea122",
       "skillPath": "skills/excalidraw-diagram/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
