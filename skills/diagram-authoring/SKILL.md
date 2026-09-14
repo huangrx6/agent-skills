@@ -45,8 +45,12 @@ description: >-
 | 其余情况（**默认**） | Excalidraw | `.excalidraw` |
 
 拿不准就问一句"**给谁看、要不要导出成图片**"。**同一份规格两个后端都能出** —— 换后端只换一条命令，
-不重写规格：几何、校验、调参、文字全是同一份推导。两个后端的实现细节分别见
-`references/excalidraw-backend.md` 与 `references/drawio-backend.md`。
+不重写规格：几何、校验、调参、文字全是同一份推导。
+
+**drawio 侧有五套配色方案**（默认 `engineering` 工程文档风：白底 + 等宽标签 + 灰边框）：
+`--scheme classic|engineering|print|night|blueprint`。用户说了"专业 / 黑白 / 深色 / 蓝图"这类词
+就直接对号入座（`mood` 字段也能自动选）。五个方案共用**同一套语义档位**，只换 4 个种子色 +
+字体/圆角那几个平台旋钮 —— 细节见 `references/drawio-backend.md`。
 
 ## 图类型 → 布局策略
 

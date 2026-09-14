@@ -80,16 +80,48 @@ def spec_from_file(path: str) -> dict:
     return loaded
 
 
-def build(spec: dict) -> str:
-    xml, _result, outcome, _attempts = D.emit(spec)
+def build(spec: dict, scheme: str | None = None) -> str:
+    xml, _result, outcome, _attempts = D.emit(spec, scheme=scheme)
     assert xml, f"没出图：{[i.line() for i in outcome.blocking]}"
     return xml
 
 
 # ── 读文件 ────────────────────────────────────────────────────────
+#
+# ⚠️ 节点的 id 现在在 `<UserObject>` 上（不是内层 mxCell）—— 所以**一切查找都要走
+# “身份元素”**：带 UserObject 的取外层，裸 mxCell 取自己。直接遍历 `//mxCell` 会
+# 找不到任何节点 id，而症状是"区域没包住成员"这种看着像布局问题的假象。
 
-def _attr(cell: ET.Element, name: str) -> str:
-    return cell.get(name) or ""
+def _inner(element: ET.Element) -> ET.Element:
+    """身份元素 → 真正带 vertex / edge / style 的那个 mxCell。"""
+    if element.tag != "UserObject":
+        return element
+    inner = element.find("mxCell")
+    assert inner is not None, "UserObject 里没有 mxCell"
+    return inner
+
+
+def identity(xml: str) -> list[tuple[str, ET.Element]]:
+    """[(id, 身份元素)]，**按文档顺序**（顺序就是层叠顺序，z-order 用例靠它）。
+
+    内层 mxCell 不带 id，所以一遍遍历就能两种写法都收全。
+    """
+    root: ET.Element = ET.fromstring(xml)
+    out: list[tuple[str, ET.Element]] = []
+    for element in root.iter():
+        cell_id = element.get("id")
+        if cell_id and element.tag in ("UserObject", "mxCell"):
+            out.append((cell_id, element))
+    return out
+
+
+def _attr(element: ET.Element, name: str) -> str:
+    """属性：先看身份元素，没有就钻进 UserObject 取内层（style / parent 都在内层）。"""
+    value = element.get(name)
+    if value is None and element.tag == "UserObject":
+        inner = element.find("mxCell")
+        value = None if inner is None else inner.get(name)
+    return value or ""
 
 
 def _num(element: ET.Element, field: str) -> float:
@@ -104,12 +136,7 @@ def cells(xml: str) -> list[ET.Element]:
 
 
 def by_id(xml: str) -> dict[str, ET.Element]:
-    out: dict[str, ET.Element] = {}
-    for cell in cells(xml):
-        cell_id = cell.get("id")
-        if cell_id is not None:
-            out[cell_id] = cell
-    return out
+    return dict(identity(xml))
 
 
 def diagram_id(xml: str) -> str:
@@ -118,32 +145,36 @@ def diagram_id(xml: str) -> str:
     return element.get("id") or ""
 
 
-def rect_of(cell: ET.Element) -> tuple[float, float, float, float]:
-    geometry = cell.find("mxGeometry")
-    assert geometry is not None, f"{_attr(cell, 'id')} 没有几何"
+def rect_of(element: ET.Element) -> tuple[float, float, float, float]:
+    geometry = element.find(".//mxGeometry")
+    assert geometry is not None, f"{_attr(element, 'id')} 没有几何"
     return (_num(geometry, "x"), _num(geometry, "y"),
             _num(geometry, "width"), _num(geometry, "height"))
 
 
 def node_rects(xml: str) -> dict[str, tuple[float, float, float, float]]:
-    return {_attr(cell, "id")[2:]: rect_of(cell) for cell in cells(xml)
-            if _attr(cell, "id").startswith("n-")}
+    return {cid[2:]: rect_of(element) for cid, element in identity(xml)
+            if cid.startswith("n-")}
 
 
 def region_rects(xml: str) -> dict[str, tuple[float, float, float, float]]:
-    return {_attr(cell, "id")[7:]: rect_of(cell) for cell in cells(xml)
-            if _attr(cell, "id").startswith("region-")
-            and not _attr(cell, "id").startswith("region-label-")}
+    return {cid[7:]: rect_of(element) for cid, element in identity(xml)
+            if cid.startswith("region-") and not cid.startswith("region-label-")}
 
 
-def value_lines(cell: ET.Element) -> list[str]:
-    """把 cell 的 value 还原成文字行。
+def _label_of(element: ET.Element) -> str:
+    """文字：`UserObject` 用 `label`，裸 mxCell 用 `value`。"""
+    return _attr(element, "label") if element.tag == "UserObject" else _attr(element, "value")
 
-    ⚠️ 这里换的是 **`<br>`**，不是 `&lt;br&gt;` —— `ElementTree` 读属性时已经把 XML 实体
+
+def value_lines(element: ET.Element) -> list[str]:
+    """把文字还原成行（`<br>` → 换行）。
+
+    ⚠️ 换的是 **`<br>`**，不是 `&lt;br&gt;` —— `ElementTree` 读属性时已经把 XML 实体
     解开了。第一版换的是 `&lt;br&gt;`，于是每一行都还原成带 `<br>` 的一坨，
-    跨后端逐行比对当即全红（那正是那条测试该干的事）。
+    跳后端逐行比对当即全红（那正是那条测试该干的事）。
     """
-    return _attr(cell, "value").replace("<br>", "\n").split("\n")
+    return _label_of(element).replace("<br>", "\n").split("\n")
 
 
 def inside(inner: tuple, outer: tuple, tol: float = 0.01) -> bool:
@@ -203,10 +234,10 @@ class TestZOrder(unittest.TestCase):
 
     def test_regions_then_nodes_then_edges(self):
         xml = build(spec_from_file(os.path.join(SPECS, "07-regions.json")))
+        case_ids = identity(xml)
         kinds = []
-        for cell in cells(xml):
-            cell_id = _attr(cell, "id")
-            if not (cell.get("vertex") or cell.get("edge")):
+        for cell_id, element in case_ids:
+            if _inner(element).get("vertex") is None and _inner(element).get("edge") is None:
                 continue
             if cell_id.startswith("region-label-"):
                 kinds.append("label")
@@ -430,9 +461,10 @@ class TestCrossBackendAgreement(unittest.TestCase):
         其实是比较器自己少看了东西。
         """
         lines: list[str] = []
-        for cell in cells(xml):
-            if cell.get("vertex") or cell.get("edge"):
-                lines += [line for line in value_lines(cell) if line != ""]
+        for _cid, element in identity(xml):
+            inner = _inner(element)
+            if inner.get("vertex") or inner.get("edge"):
+                lines += [line for line in value_lines(element) if line != ""]
         return sorted(lines)
 
     def _scene_lines(self, spec: dict) -> list[str]:
@@ -625,6 +657,112 @@ class TestCli(unittest.TestCase):
                 self.assertEqual(os.listdir(tmp), ["s.json"])
         finally:
             real.layout_with_retry = original
+
+
+class TestSchemesAndPlatform(unittest.TestCase):
+    """配色方案 + 平台适配（图层/锁定/编辑数据/白底/多页）。
+
+    这些都在**真实 app.diagrams.net 里看过**（2026-09-14）：图层面板里出现「区域与标题（锁定）」
+    并带锁图标、区域渲染在节点下面、底部页签可切、等宽标签不溢出。
+    这里的用例钉的是“别再改回没图层/没 id/没背景那个样子”。
+    """
+
+    def _spec(self) -> dict:
+        return spec_from_file(os.path.join(SPECS, "07-regions.json"))
+
+    def test_default_scheme_is_engineering_and_uses_offset_font(self):
+        xml = build(self._spec())
+        self.assertIn('background="#FFFFFF"', xml, "白底要显式写")
+        self.assertIn("fontFamily=Courier New", xml)
+        # 等宽字体配了缩小比例（16 → 14），否则标签会顶出框
+        self.assertIn("fontSize=14", xml)
+
+    def test_scheme_changes_the_palette(self):
+        spec = self._spec()
+        engineering = build(spec)
+        classic = build(spec, scheme="classic")
+        self.assertNotEqual(engineering, classic)
+        self.assertIn("fontFamily=Helvetica", classic, "classic 用比例字体")
+        # 深色方案连页面底色一起变
+        night = build(spec, scheme="night")
+        self.assertIn('background="#0D1117"', night)
+
+    def test_unknown_scheme_is_refused(self):
+        with self.assertRaises(KeyError):
+            build(self._spec(), scheme="花哨")
+
+    def test_regions_live_on_a_locked_layer(self):
+        """区域在**独立图层**上并锁住 —— 没做之前它们是普通单元，拖歪了就散了。"""
+        xml = build(self._spec())
+        cells = by_id(xml)
+        layer = cells["2"]
+        self.assertIn("区域", _attr(layer, "value"))
+        self.assertEqual(_attr(layer, "parent"), "0", "图层是 root 的直接子元素")
+        for region_id in ("region-boot", "region-guard", "region-label-boot"):
+            self.assertEqual(_attr(cells[region_id], "parent"), "2", region_id)
+            self.assertIn("locked=1", _attr(cells[region_id], "style"), region_id)
+            self.assertIn("movable=0", _attr(cells[region_id], "style"), region_id)
+
+    def test_nodes_are_user_objects_with_data(self):
+        """`<UserObject>` 带 tooltip 与自定义属性（将来读回改过的文件的锚点）。"""
+        xml = build(self._spec())
+        node = by_id(xml)["n-load"]
+        self.assertEqual(node.tag, "UserObject")
+        self.assertEqual(_attr(node, "node_id"), "load")
+        self.assertTrue(_attr(node, "kind"))
+        self.assertTrue(_attr(node, "level"))
+        inner = node.find("mxCell")
+        assert inner is not None
+        self.assertIsNone(inner.get("id"), "身份只能有一处：内层不许再带 id")
+        self.assertEqual(inner.get("vertex"), "1")
+
+    def test_detail_level_also_gates_the_tooltip(self):
+        """`detail: executive` 是对信息量的明示 —— 不能从悬停里把它漏出去。"""
+        spec = spec_of(["a"], [], nodes=[{"id": "a", "kind": "service", "label": "甲",
+                                          "detail": "次要说明", "emphasis": "normal"}])
+        spec["detail"] = "executive"
+        self.assertNotIn("tooltip=", build(spec))
+        spec["detail"] = "standard"      # `detail` 的合法值是 standard，不是 normal
+        self.assertIn('tooltip="次要说明"', build(spec))
+
+    def test_multi_page_writes_one_file_with_n_pages(self):
+        first = spec_from_file(os.path.join(SPECS, "01-architecture.json"))
+        second = self._spec()
+        pages = [D.build_page(first, layout_of(first), D.L.boxes_from_spec(first)),
+                 D.build_page(second, layout_of(second), D.L.boxes_from_spec(second))]
+        xml = D.build_file(pages)
+        self.assertEqual(xml.count("<diagram "), 2)
+        self.assertEqual(xml.count("<mxGraphModel"), 2, "每页各自一套模型（页尺寸/背景各算）")
+        self.assertEqual(C.check_text(xml), [])
+
+    def test_multi_page_cli_needs_an_explicit_output(self):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            code = D.main([FIXTURES[0], FIXTURES[1]])
+        self.assertEqual(code, 2)
+        self.assertIn("-o", err.getvalue())
+
+    def test_multi_page_cli_writes_the_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = os.path.join(tmp, "book.drawio")
+            with contextlib.redirect_stdout(io.StringIO()):
+                code = D.main([FIXTURES[0], FIXTURES[1], "-o", out])
+            self.assertEqual(code, 0)
+            with open(out, encoding="utf-8") as handle:
+                text = handle.read()
+            self.assertEqual(text.count("<diagram "), 2)
+            self.assertEqual(C.check_text(text), [])
+
+    def test_scheme_flag_from_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            spec_path = os.path.join(tmp, "s.json")
+            with open(spec_path, "w", encoding="utf-8") as handle:
+                json.dump(self._spec(), handle, ensure_ascii=False)
+            with contextlib.redirect_stdout(io.StringIO()):
+                code = D.main([spec_path, "--scheme", "print"])
+            self.assertEqual(code, 0)
+            with open(os.path.join(tmp, "s.drawio"), encoding="utf-8") as handle:
+                self.assertIn("fontFamily=Helvetica", handle.read())
 
 
 if __name__ == "__main__":

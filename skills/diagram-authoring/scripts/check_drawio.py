@@ -79,19 +79,53 @@ def _finite(value: str | None) -> float | None:
     return number if math.isfinite(number) else None
 
 
+def _cells_with_identity(root: ET.Element) -> tuple[list[tuple[str, ET.Element]], list[str]]:
+    """取出所有“有身份的 cell”，返回 ([(id, 内层 mxCell)], 问题)。
+
+    drawio 里一个元素有两种写法：
+
+    - 裸 `<mxCell id=...>`：id 在它自己身上
+    - `<UserObject id=... tooltip=... 自定义属性=...><mxCell .../></UserObject>`：
+      **身份在外层**，被包住的 mxCell **不该再带 id**（带了两边就是两个东西）
+
+    两种都得认 —— 本后端把节点写成了后者（为了 tooltip 与“编辑数据”）。
+    """
+    out: list[tuple[str, ET.Element]] = []
+    problems: list[str] = []
+    for element in root:
+        if element.tag == "UserObject":
+            cell_id = element.get("id")
+            inner = element.find("mxCell")
+            if cell_id is None:
+                problems.append("有一个 <UserObject> 没有 id")
+                continue
+            if inner is None:
+                problems.append(f"<UserObject id={cell_id}> 里没有 <mxCell>")
+                continue
+            if inner.get("id") is not None:
+                problems.append(
+                    f"<UserObject id={cell_id}> 的内层 mxCell 又带了 id="
+                    f"{inner.get('id')} —— 身份只能有一处，drawio 会当成两个东西")
+            out.append((cell_id, inner))
+        elif element.tag == "mxCell":
+            cell_id = element.get("id")
+            if cell_id is None:
+                problems.append("有一个 cell 没有 id")
+                continue
+            out.append((cell_id, element))
+    return out, problems
+
+
 def _check_model(model: ET.Element, diagram_name: str) -> list[str]:
     problems: list[str] = []
     roots = [element for element in model.iter(ROOT_TAG)]
     if not roots:
         return [f"[{diagram_name}] 没有 <root>"]
     root = roots[0]
-    cells = [element for element in root if element.tag == "mxCell"]
+    pairs, identity_problems = _cells_with_identity(root)
+    problems += [f"[{diagram_name}] {p}" for p in identity_problems]
     by_id: dict[str, ET.Element] = {}
-    for cell in cells:
-        cell_id = cell.get("id")
-        if cell_id is None:
-            problems.append(f"[{diagram_name}] 有一个 cell 没有 id")
-            continue
+    for cell_id, cell in pairs:
         if cell_id in by_id:
             problems.append(f"[{diagram_name}] id 重复：{cell_id}")
         by_id[cell_id] = cell

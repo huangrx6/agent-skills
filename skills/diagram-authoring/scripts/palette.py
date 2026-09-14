@@ -143,7 +143,7 @@ def frame_stroke(level: str) -> str:
     判据：区域是**背景**，它的框只该表示"到这儿为止"，不该和前景抢。所以往画布
     方向退一半多，让它明确落在"背景层"那一档。
     """
-    return _mix(CANVAS["background"], LEVELS[level]["stroke"], 1.0 - FRAME_MIX)
+    return _mix(CANVAS["background"], LEVELS[level]["stroke"], _FRAME_RATIO)
 
 
 def merge_style(base: dict | None, override: dict | None) -> dict:
@@ -536,7 +536,16 @@ def _mix(a: str, b: str, ratio: float) -> str:
 # ══════════════════════════════════════════════════════════════════
 
 def _rebind() -> None:
-    global ROLES, LEVELS, KINDS, EDGE_KINDS, CANVAS
+    """按**当前后端**重建派生表。语义档位两边一样，画法是各自一套。"""
+    if _active_backend == "drawio":
+        _rebind_drawio()
+    else:
+        _rebind_excalidraw()
+
+
+def _rebind_excalidraw() -> None:
+    global ROLES, LEVELS, KINDS, EDGE_KINDS, CANVAS, _FRAME_RATIO
+    _FRAME_RATIO = 1.0 - FRAME_MIX
     spec = VISUAL_DIRECTIONS[_active_direction]
     seeds = spec["seeds"]
     name = _active_seed if _active_seed in seeds else next(iter(seeds))
@@ -565,6 +574,180 @@ def _rebind() -> None:
     CANVAS = {"background": canvas, "grid": _mix(canvas, ink, 0.06), "text": ink,
               "stroke_style": "hand-drawn",
               "font_family": 2}      # native Excalidraw scene 里 CJK-safe 的那一档
+
+
+# ══════════════════════════════════════════════════════════════════
+# drawio 后端：配色方案（照 Excalidraw 那套 —— **固定推导 + 只换 4 个种子色**）
+# ══════════════════════════════════════════════════════════════════
+#
+# Excalidraw 那边的做法（照抄的就是这个结构）：每套方向只有 4 个种子色
+# （canvas / ink / accent / critical），其余全部由**固定的混合比例**推导 ——
+# 所以"基准风格固定、配色可换"是靠"推导规则固定 + 只换种子"实现的，
+# 而不是给每套配色各写一整套色值。
+#
+# drawio 这边复用**同一套语义档位**（neutral / tint / accent / critical），
+# 但换一份配比：交付件的色块是"提示"不是"装饰"，所以填充更淡；区域框更浅
+# （它是背景，只表示"到这儿为止"）。
+DRAWIO_MIX = {"wash": 0.10, "soft": 0.14, "critical": 0.12,
+              "edge": 0.45, "edge_muted": 0.30,
+              "frame": 0.25, "grid": 0.06}
+
+DRAWIO_SCHEMES: dict[str, dict] = {
+    "classic": {
+        "zh": "经典企业扁平",
+        "use_for": "方案、汇报、给非技术同事看的交付件",
+        "seeds": {"canvas": "#FFFFFF", "ink": "#374151",
+                  "accent": "#2563EB", "critical": "#DC2626"},
+        "font_family": "Helvetica", "font_scale": 1.0,
+        "arc": 4, "edge_width": 1, "arrow": "classic",
+    },
+    "engineering": {
+        "zh": "工程文档风（等宽标签）",
+        "use_for": "节点名是代码标识符的技术图；放仓库 / 文档里",
+        "seeds": {"canvas": "#FFFFFF", "ink": "#1F2328",
+                  "accent": "#0969DA", "critical": "#CF222E"},
+        # 等宽字体的字比比例字体宽 —— 而盒子是按我们那份字宽表量的，
+        # 所以**必须**配一个缩小比例，否则等宽标签会顶出框。
+        "font_family": "Courier New", "font_scale": 0.88,
+        "arc": 8, "edge_width": 1, "arrow": "block",
+    },
+    "print": {
+        "zh": "黑白制图",
+        "use_for": "要打印、或要嵌进黑白文档；重点靠线宽不靠颜色",
+        "seeds": {"canvas": "#FFFFFF", "ink": "#111827",
+                  "accent": "#6B7280", "critical": "#B91C1C"},
+        "font_family": "Helvetica", "font_scale": 1.0,
+        "arc": 0, "edge_width": 1, "arrow": "classic",
+    },
+    "night": {
+        "zh": "深色技术",
+        "use_for": "深色文档 / 深色主题的截图",
+        "seeds": {"canvas": "#0D1117", "ink": "#E6EDF3",
+                  "accent": "#58A6FF", "critical": "#F85149"},
+        "font_family": "Helvetica", "font_scale": 1.0,
+        "arc": 6, "edge_width": 1, "arrow": "block",
+    },
+    "blueprint": {
+        "zh": "蓝图",
+        "use_for": "讲解 / 示意图；深蓝底浅色线",
+        "seeds": {"canvas": "#0B2545", "ink": "#DCE9F5",
+                  "accent": "#7FB3E8", "critical": "#F2A65A"},
+        "font_family": "Helvetica", "font_scale": 1.0,
+        "arc": 0, "edge_width": 1, "arrow": "classic",
+    },
+}
+# 默认：工程文档风。理由是"节点名基本是代码标识符"这一件事在这个仓库里成立 ——
+# 而它也是最不像"手绘 Excalidraw"的那一套。
+DEFAULT_SCHEME = "engineering"
+
+# 用户说的词 → 方案。和 `DIRECTION_FOR_MOOD` 同一套路：规格里那句原话就能选，
+# 不需要用户记住方案名。
+SCHEME_FOR_MOOD: dict[str, str] = {
+    "专业": "classic", "商务": "classic", "企业": "classic", "正式": "classic",
+    "汇报": "classic", "交付": "classic",
+    "工程": "engineering", "代码": "engineering", "文档": "engineering",
+    "等宽": "engineering", "仓库": "engineering", "技术": "engineering",
+    "黑白": "print", "打印": "print", "印刷": "print", "单色": "print",
+    "深色": "night", "夜": "night", "dark": "night",
+    "蓝图": "blueprint", "蓝底": "blueprint",
+}
+# Excalidraw 的视觉方向里，有明确专业对应物的照搬过来；其余用默认
+SCHEME_FOR_DIRECTION = {"night": "night"}
+
+_active_backend = "excalidraw"
+_active_scheme: str | None = None
+
+
+def available_schemes() -> list[str]:
+    return sorted(DRAWIO_SCHEMES)
+
+
+def resolve_scheme(scheme: str | None = None, mood: str | None = None,
+                   visual: str | None = None) -> str:
+    """定方案：显式 → 用户原话 → 视觉方向 → 默认。**未知方案名判失败，不 fallback。**"""
+    if scheme:
+        if scheme not in DRAWIO_SCHEMES:
+            raise KeyError(f"没有配色方案 {scheme!r}；可用的：{available_schemes()}")
+        return scheme
+    if mood:
+        for word, name in SCHEME_FOR_MOOD.items():
+            if word in str(mood):
+                return name
+    if visual and str(visual) in SCHEME_FOR_DIRECTION:
+        return SCHEME_FOR_DIRECTION[str(visual)]
+    return DEFAULT_SCHEME
+
+
+def use_backend(backend: str, scheme: str | None = None, mood: str | None = None,
+                visual: str | None = None) -> str:
+    """选后端 = **选画法**。excalidraw 走原来的方向系统，drawio 走配色方案。"""
+    global _active_backend, _active_scheme
+    if backend not in ("excalidraw", "drawio"):
+        raise KeyError(f"未知后端 {backend!r}（只有 excalidraw / drawio）")
+    _active_backend = backend
+    _active_scheme = None
+    if backend == "drawio":
+        _active_scheme = resolve_scheme(scheme, mood, visual)
+    _rebind()
+    return _active_scheme or _active_direction
+
+
+def active_backend() -> str:
+    return _active_backend
+
+
+def active_scheme() -> str | None:
+    return _active_scheme
+
+
+def knobs() -> dict:
+    """当前后端的**画法旋钮**：字体族 / 字号比例 / 圆角 / 线宽 / 箭头 / 是否手绘。
+
+    单独一个入口的理由：这些不是颜色，但同样属于"画法"；**只有 emit 一处读它们** ——
+    摊得到处读方案字典，等于把"方案"和"落笔"重新耦合起来。
+    """
+    if _active_backend == "drawio":
+        scheme = DRAWIO_SCHEMES[_active_scheme or DEFAULT_SCHEME]
+        return {"font_family": scheme["font_family"], "font_scale": scheme["font_scale"],
+                "arc": scheme["arc"], "edge_width": scheme["edge_width"],
+                "arrow": scheme["arrow"], "sketch": 0}
+    # Excalidraw：字号与字体族由它自己的 CANVAS 决定，这里只报"没这些旋钮"
+    return {"font_family": None, "font_scale": 1.0, "arc": None,
+            "edge_width": 0, "arrow": "classic", "sketch": 1}
+
+
+def _rebind_drawio() -> None:
+    """drawio 的派生：语义档位与原画一样，配比换成交付件那一套。"""
+    global ROLES, LEVELS, KINDS, EDGE_KINDS, CANVAS, _FRAME_RATIO
+    scheme = DRAWIO_SCHEMES[_active_scheme or DEFAULT_SCHEME]
+    seeds = scheme["seeds"]
+    canvas, ink = seeds["canvas"], seeds["ink"]
+    accent, critical = seeds["accent"], seeds["critical"]
+    mix = DRAWIO_MIX
+    ROLES = {
+        "canvas":        canvas,
+        "ink":           ink,
+        "accent":        accent,
+        "accent-wash":   _mix(canvas, accent, mix["wash"]),
+        "accent-soft":   _mix(canvas, accent, mix["soft"]),
+        "critical":      critical,
+        "critical-soft": _mix(canvas, critical, mix["critical"]),
+        "edge":          _mix(canvas, ink, mix["edge"]),
+        "edge-muted":    _mix(canvas, ink, mix["edge_muted"]),
+    }
+    LEVELS = {level: {"stroke": ROLES[LEVEL_ROLES[level][0]],
+                      "fill": ROLES[LEVEL_ROLES[level][1]]}
+              for level in VISUAL_LEVELS}
+    KINDS = dict(DEFAULT_KIND_LEVELS)
+    EDGE_KINDS = {kind: {"zh": zh, "style": style, "stroke": ROLES[EDGE_ROLES[kind]]}
+                  for kind, (zh, style) in EDGE_STYLES.items()}
+    CANVAS = {"background": canvas, "grid": _mix(canvas, ink, mix["grid"]),
+              "text": ink,
+              # 交付件是"画出来的"，不是"手画的"：不带 Excalidraw 那套手绘抖动。
+              # 规格里显式写 `line: sketch` 时才让 drawio 用它的原生 sketch。
+              "stroke_style": "clean",
+              "font_family": scheme["font_family"]}
+    _FRAME_RATIO = mix["frame"]
 
 
 # ── 选择方向：AUTO 与用户意图 ────────────────────────────────────

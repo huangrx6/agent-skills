@@ -68,6 +68,8 @@ $ python3 scripts/emit_drawio.py tests/fixtures/specs/01-architecture.json -o /t
 | --- | --- | --- |
 | 出图（默认后端） | `emit_excalidraw.py x.diagram.json` | 串起整条流水线；**有阻塞项时不写文件** |
 | 出图（draw.io） | `emit_drawio.py x.diagram.json` | 同一份规格 → `.drawio`（不压缩的 mxGraph XML） |
+| 选 drawio 配色 | `emit_drawio.py … --scheme <名>` | 五套方案，默认 `engineering`（白底 + 等宽标签 + 灰边框）；`classic` / `print` / `night` / `blueprint` |
+| 多页交付件 | `emit_drawio.py a.json b.json … -o book.drawio` | 多份规格 → 一个文件多页（drawio 的页签）；21 张 = 一本 21 页 |
 | 只校验规格 | `validate_spec.py x.diagram.json` | 封闭字段集检查 |
 | 只看布局 | `layout.py x.diagram.json --explain` | 用的哪个算法、层/环内顺序、坐标、交叉数 |
 | 只看校验与调参报告 | `check_layout.py x.diagram.json` | 退出码：`0` 无阻塞项 / `1` 有阻塞项 / `2` 读不到规格 |
@@ -81,6 +83,12 @@ $ python3 scripts/emit_drawio.py tests/fixtures/specs/01-architecture.json -o /t
 **两个后端怎么选**：要标准图元（云/K8s/UML/BPMN/泳道）或要导出 PNG/PDF/SVG → draw.io；
 其余（默认）→ Excalidraw。拿不准就问「给谁看、要不要导出成图片」。细节见
 `references/excalidraw-backend.md` 与 `references/drawio-backend.md`。
+
+**drawio 的五套配色**是照 Excalidraw 那套架构做的：每套**只换 4 个种子色**
+（canvas / ink / accent / critical）+ 字体与圆角几个平台旋钮，其余由固定配比推导 ——
+所以"基准风格固定、配色可换"。等宽那套自带字号缩小比例（等宽字更宽，不缩会顶出框）。
+平台侧还适配了 drawio 的原生能力：**区域与标题在独立图层并锁定**、节点写成
+`<UserObject>`（悬停看 detail、自定义属性留住节点 id）、显式白底、一个文件多页。
 
 **图类型决定布局算法**（`type` 自动选，人不用选算法）：
 
@@ -108,7 +116,7 @@ diagram-authoring/
 │   └── drawio-backend.md   # 另一个后端：不压缩 XML、形状映射表、与 Excalidraw 有意不同的地方、导出步骤
 ├── scripts/                # 12 个：校验 / 布局 / 两个后端出图 / 结构自检 / 文字测量 / 色板 / 素材 / 主题预览 / 官网打开
 ├── dev-tools/preview.py    # 出 PNG 供目视复核（需 PIL，非运行时）
-├── tests/                  # 13 个测试文件、406 条
+├── tests/                  # 13 个测试文件、416 条
 └── evals/
     └── evals.json          # 6 条行为评估（不写坐标 / 类型判断 / 风格先问 / 报告改内容）
 ```
@@ -123,7 +131,7 @@ diagram-authoring/
 
 ```sh
 cd skills/diagram-authoring
-python3 -m unittest discover -s tests -v     # 406 条，全绿（约 11 秒）
+python3 -m unittest discover -s tests -v     # 416 条，全绿（约 11 秒）
 python3 scripts/emit_excalidraw.py tests/fixtures/specs/07-regions.json -o /tmp/a.excalidraw
 python3 scripts/emit_drawio.py tests/fixtures/specs/07-regions.json -o /tmp/a.drawio
 ```
