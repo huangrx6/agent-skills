@@ -20,6 +20,7 @@
 
 from __future__ import annotations
 
+import glob
 import importlib.util
 import json
 import math
@@ -1113,3 +1114,35 @@ class TestEveryTopFieldIsRead(unittest.TestCase):
         missing = sorted(f for f in V.TOP_FIELDS if f'"{f}"' not in text)
         self.assertEqual([], missing,
                          f"这些顶层字段只有校验器认识，没有任何脚本读它们（空壳）：{missing}")
+
+
+class TestEveryLabelSurvives(unittest.TestCase):
+    """规格里写了标注的边，**每一条都必须真的画出标注**。
+
+    落位搜索找不到干净位置时有一条静默路径：先用自动标注顶替（`同步`/`异步`），
+    再不行就干脆不画。实测 0 次触发，但那条分支存在 —— 一旦触发就是
+    **信息悄悄消失**（仓库里最讨厌的那类失败），所以用夹具把它钉住：
+    只要某条带标注的边被丢了或换了字，这条用例就红。
+    """
+
+    def test_fixture_labels_all_rendered_verbatim(self):
+        specs = sorted(glob.glob(os.path.join(HERE, "fixtures", "specs", "*.json")))
+        self.assertTrue(specs, "一个夹具规格都没找到")
+        checked = 0
+        for path in specs:
+            spec = json.load(open(path, encoding="utf-8"))
+            scene = build(spec)
+            drawn = {e["id"]: e["text"] for e in scene["elements"]
+                     if e["type"] == "text" and str(e["id"]).startswith("elabel-")}
+            for i, edge in enumerate(spec.get("edges") or []):
+                if not edge.get("label"):
+                    continue
+                checked += 1
+                # 用发射器自己的 `_eid` 拼 id，别手搓 —— 索引为 0 时它**不带** `-0`
+                # 后缀（`f"{kind}-{safe}-{index}" if index else ...`），手搓必错。
+                eid = E._eid("elabel", f"{edge['from']}-{edge['to']}", i)
+                self.assertIn(eid, drawn,
+                              f"{os.path.basename(path)}：{eid} 的标注没画出来")
+                self.assertEqual(edge["label"], drawn[eid],
+                                 f"{os.path.basename(path)}：{eid} 的标注被换成了别的字")
+        self.assertGreater(checked, 0, "夹具里居然没有一条带标注的边，这条用例等于没跑")

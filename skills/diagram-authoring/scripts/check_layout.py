@@ -347,9 +347,24 @@ def check_palette(spec: dict) -> list[Issue]:
 def check_crossings(spec: dict, result: ResultT) -> list[Issue]:
     """超过 边数 × 0.5 就报。
 
-    软阈值而不是硬门：**零交叉不是总能达到**。把它当硬门会导致"为了过门把节点排成
-    不可读的形状"或者干脆卡死。它的真正作用是仪表盘 —— 前作没有这个指标，
-    所以层内排序质量差只能靠人眼发现（"这几根线绕得很奇怪"）。
+    ## 这个数**不是**"线有没有撞在一起"
+
+    它量的是**相邻层之间的位置反序对**（`crossing_pairs`：层内 A 在 B 前面，下一层却
+    反了过来）。这是**层内排序质量的仪表盘**，不是视觉遮挡：实测他们那张 43 条边的
+    依赖图反序对 **8**、而**几何相交 0** —— 路由把反序的那几条各自绕开了，肉眼一处
+    交叉都没有。
+
+    我曾经想按"分层图 0 是能做到的"把阈值收到 0（2026-09-14），量完就撤了：
+    那会在**一张看起来毫无交叉的图**上报 8 处、还建议用户"拆节点、调换位置"，
+    让人去修一个眼睛看不见的东西 —— 这比不报更糟。
+
+    真要管"线遮挡线"，该量的是 `geometric_crossing_pairs`（画出来的折线真的相交）。
+    那个数今天全库只有 3 处，且全在力导向/径向里（那两种布局交叉是形状本身）；
+    分层图 0 处。它**目前没有独立的校验项** —— 记在这里，别再拿反序对顶替它。
+
+    软阈值而不是硬门：**零交叉不是总能达到**（径向/力导向），把它当硬门会导致
+    "为了过门把节点排成不可读的形状"或者干脆卡死。它的真正作用是仪表盘 ——
+    前作没有这个指标，所以层内排序质量差只能靠人眼发现（"这几根线绕得很奇怪"）。
 
     报告必须给出**交叉的是哪几条边**：只有计数的话，人没法定位问题。
     这就是 `layout.crossing_pairs` 与 `count_crossings` 共用一份实现的原因。
@@ -364,7 +379,8 @@ def check_crossings(spec: dict, result: ResultT) -> list[Issue]:
         eb = edges[b] if 0 <= b < len(edges) else None
         if ea and eb:
             pairs.append(f"{ea['from']}→{ea['to']} ✕ {eb['from']}→{eb['to']}")
-    detail = f"{result.crossings} 处，软阈值 {limit:.1f}（边数 {len(edges)} × {CROSSING_RATIO}）"
+    detail = (f"{result.crossings} 处层内反序（不是视觉交叉），阈值 {limit:.1f}"
+              f"（边数 {len(edges)} × {CROSSING_RATIO}）")
     return [Issue("crossing", False, "；".join(pairs) or "（无法归因）", detail,
                   advice="连线交叉偏多：考虑拆节点、减少 detail、或调换两个节点的先后位置。")]
 

@@ -900,3 +900,4 @@ class TestRegionOverlap(unittest.TestCase):
         result = L.layout(spec, boxes)
         names = {i.check for i in C.check(spec, result, boxes).issues}
         self.assertNotIn("region", names, "完全包含被判成重叠了")
+
