@@ -117,7 +117,7 @@ diagram-authoring/
 │   └── drawio-backend.md   # 另一个后端：不压缩 XML、形状映射表、与 Excalidraw 有意不同的地方、导出步骤
 ├── scripts/                # 13 个：校验 / 布局 / 两个后端出图 / 结构自检 / 文字测量 / 色板 / 素材 / 方向预览 / **配色预览** / 官网打开
 ├── dev-tools/preview.py    # 出 PNG 供目视复核（需 PIL，非运行时）
-├── tests/                  # 13 个测试文件、421 条
+├── tests/                  # 13 个测试文件、423 条
 └── evals/
     └── evals.json          # 6 条行为评估（不写坐标 / 类型判断 / 风格先问 / 报告改内容）
 ```
@@ -132,7 +132,7 @@ diagram-authoring/
 
 ```sh
 cd skills/diagram-authoring
-python3 -m unittest discover -s tests -v     # 421 条，全绿（约 11 秒）
+python3 -m unittest discover -s tests -v     # 423 条，全绿（约 11 秒）
 python3 scripts/emit_excalidraw.py tests/fixtures/specs/07-regions.json -o /tmp/a.excalidraw
 python3 scripts/emit_drawio.py tests/fixtures/specs/07-regions.json -o /tmp/a.drawio
 ```

@@ -940,3 +940,32 @@ class TestRegions(unittest.TestCase):
         boxes = L.boxes_from_spec(spec)
         result = L.layout(spec, boxes)
         self.assertEqual([], CL.check_region_labels(spec, result, boxes))
+
+
+class TestSidestepCandidates(unittest.TestCase):
+    """「逐个障碍让开」的候选**必须是干净的**（不含穿节点）。
+
+    这条不变量是踩出来的：第一版只查了"剩下的那条直线"，于是让开中间几个障碍之后，
+    尾部仍会撞上目标附近的节点 —— 候选自己带着 1 处穿节点，永远进不了 viable，
+    而症状是"那条边宁可折 9 次也不走这条路"。现在改成**按整条路径查**，
+    并且只把干净的候选交出去（脏的直接丢掉，不指望调用方再筛一遍）。
+    """
+
+    @staticmethod
+    def _placed(node_id: str, x: float, y: float, w: float = 80.0, h: float = 50.0):
+        return L.Placed(id=node_id, x=x, y=y, width=w, height=h, rank=0)
+
+    def test_every_candidate_is_free_of_node_hits(self):
+        # 两个障碍横在直线 a→b 上（a 在上、b 在下，竖向为主）
+        placed = {"a": self._placed("a", 0, 0), "b": self._placed("b", 0, 600),
+                  "x": self._placed("x", -30, 180), "y": self._placed("y", -30, 380)}
+        steps = L._sidestep_candidates([40, 25], [40, 575], placed, {"a", "b"})
+        self.assertTrue(steps, "挡了两个节点却一个候选都没给出")
+        for path in steps:
+            self.assertEqual([], L.nodes_hit_by_polyline(path, placed, {"a", "b"}),
+                             f"交出来的候选自己还穿着节点：{path}")
+
+    def test_clear_line_yields_no_candidate(self):
+        """一个障碍都没有时不该伪造候选 —— 那是"为了绕而绕"。"""
+        placed = {"a": self._placed("a", 0, 0), "b": self._placed("b", 0, 600)}
+        self.assertEqual([], L._sidestep_candidates([40, 25], [40, 575], placed, {"a", "b"}))

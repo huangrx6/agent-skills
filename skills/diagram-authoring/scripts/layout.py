@@ -2720,35 +2720,47 @@ def _sidestep_candidates(a: list[float], b: list[float], placed: dict,
         return [cross_value, main_value] if vertical else [main_value, cross_value]
 
     out: list[list[list[float]]] = []
+    seen: set[tuple] = set()          # 三种 prefer 常常让出同一条路，去重
     for prefer in sides:
         pts: list[list[float]] = [list(a)]
         cur = list(a)
+        moved = False                 # 到底让过道没有 —— 看它是 len(pts) 会误判（尾部两段也算）
         for _ in range(max_moves):
-            # 沿主轴“向前”还挡着的障碍里，最近的那个（已经越过的不再回头处理）
-            ahead = [(nid, box) for nid, box in blocked(cur, b)
-                     if (getattr(box, main_attr) - cur[main]) * sign >= 0]
-            if not ahead:
+            # **按整条路径查**（含最后回到 b 的那两段），不是只查"剩下的那条直线"。
+            # 只查后者的话，让开中间那几个之后，尾部仍会撞上目标附近的节点 ——
+            # 实测那条 9 折点的边就是这样：候选自己带着 1 处穿节点，永远进不了 viable。
+            trial = pts + [point(b[cross], cur[main]), list(b)]
+            hits = nodes_hit_by_polyline(trial, placed, exclude)
+            if not hits:
+                pts = trial[:-1]                 # 尾部两段由最后统一补，避免重复
                 break
-            nid, box = min(ahead, key=lambda item: (
-                getattr(item[1], main_attr) - cur[main]) * sign)
+            # 路径上第一个被撞的节点 = 下一个要绕的目标
+            nid = hits[0]
+            box = next((p for pid, p in others if pid == nid), None)
+            if box is None:
+                break
             exit_main = ((getattr(box, main_attr) + getattr(box, main_size) + NODE_CLEARANCE)
                          if sign > 0 else (getattr(box, main_attr) - NODE_CLEARANCE))
-            # 车道的横轴位置：障碍**横轴**两边的外缘，离当前最近的那侧优先。
-            # （曾经把主轴的 near/beyond 当成横轴坐标用 —— 一个 y 值当了 x 用，
-            #   于是让开的车道根本不在障碍旁边，当然还是撞。）
-            sides_at = (getattr(box, cross_attr) - NODE_CLEARANCE,
-                        getattr(box, cross_attr) + getattr(box, cross_size) + NODE_CLEARANCE)
-            order = sorted(sides_at, key=lambda v: abs(v - cur[cross]))
+            # 候选车道 = 这个障碍的两侧 + **走廊里每个可见节点的两侧**，按离当前最近排序。
+            # 只看当前障碍的两侧（第一版）不够：实测让开它之后，车道正好停在**另一个**
+            # 节点的框里 —— 左右都扫一眼、挑条空的走，跟人画这条线时是一回事。
+            pool = {getattr(box, cross_attr) - NODE_CLEARANCE,
+                    getattr(box, cross_attr) + getattr(box, cross_size) + NODE_CLEARANCE}
+            for _other_id, other in others:
+                pool.add(getattr(other, cross_attr) - NODE_CLEARANCE)
+                pool.add(getattr(other, cross_attr) + getattr(other, cross_size)
+                         + NODE_CLEARANCE)
+            order = sorted(pool, key=lambda v: abs(v - cur[cross]))
             if prefer:
-                order = [sides_at[0] if prefer < 0 else sides_at[1]]
+                narrowed = [v for v in order if (v < cur[cross]) == (prefer < 0)]
+                order = narrowed or order
             chosen = None
             for widen_step in (0, 1, 2):
                 for side in order:
-                    # **往外**扩：左缘继续往左、右缘继续往右。写反过一次 ——
-                    # 左缘 +18 等于往障碍里钻，于是每一档都被自己挡掉，候选恒为空。
-                    outward = -1.0 if side == sides_at[0] else 1.0
-                    widen = SIDESTEP_WIDEN * widen_step * outward
-                    lane = side + widen
+                    # **往外**扩：比当前点更左的往左、更右的往右。写反过一次 ——
+                    # 往障碍里钻，于是每一档都被自己挡掉，候选恒为空。
+                    outward = -1.0 if side < cur[cross] else 1.0
+                    lane = side + SIDESTEP_WIDEN * widen_step * outward
                     move = point(lane, cur[main])
                     run = point(lane, exit_main)
                     if not blocked(cur, move) and not blocked(move, run):
@@ -2757,16 +2769,22 @@ def _sidestep_candidates(a: list[float], b: list[float], placed: dict,
                 if chosen:
                     break
             if chosen is None:
-                break                     # 这个障碍让不开就不硬拗（候选后面会被筛掉）
+                break                             # 这个障碍让不开就不硬拗
             pts += [chosen[0], chosen[1]]
             cur = chosen[1]
-        if len(pts) == 1:
-            continue                      # 一个障碍都没遇到：没这种候选
-        # 回到 b 的横轴位置**再**纵向落到 b —— 不能直接连 b，那是斜段，
-        # 而 `_path_rank` 的**第一项**就罚斜段：这样的候选永远进不了 viable。
-        pts.append(point(b[cross], cur[main]))
-        pts.append(list(b))
-        out.append(_drop_collinear(pts))
+            moved = True
+        else:
+            continue                              # 让满 max_moves 次仍不干净：丢掉这条
+        if not moved:
+            # 一个障碍都没让过：**不出候选**。直连那条由 `straighten` 的档 0/1 覆盖，
+            # 这里再给一份只是"为了绕而绕"（而且三个 prefer 会产出三份一模一样的）。
+            continue
+        candidate = _drop_collinear(pts + [list(b)])
+        # 去重键必须是**元组的元组**（列表不可哈布；按两位小数归一，免浮点抖动）
+        key = tuple((round(point[0], 2), round(point[1], 2)) for point in candidate)
+        if key not in seen and not nodes_hit_by_polyline(candidate, placed, exclude):
+            seen.add(key)
+            out.append(candidate)
     return [path for path in out if len(path) >= 2]
 
 
