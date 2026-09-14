@@ -132,6 +132,7 @@ def _load(name: str, path: str):
 
 
 E = _load("emit_excalidraw_for_fixtures", EMIT)
+CHECK = _load("check_layout_for_fixtures", os.path.join(SCRIPTS, "check_layout.py"))
 
 
 def spec_paths() -> list[str]:
@@ -468,6 +469,30 @@ class TestKnownProblemsDoNotWorsen(unittest.TestCase):
         spec["nodes"][1]["shape"] = "diamond"
         self.assertEqual("diamond", E.L.boxes_from_spec(spec)["s"].shape)
         del sh
+
+
+
+class TestNoEdgeIsOverFolded(unittest.TestCase):
+    """「让路」这条通路的验收：成品里不该留下折点超标的边。
+
+    `check_layout` 的第 11 项（`bend`）只是**报告** —— 它说得出缺陷，但不会让布局变好。
+    真正动手的是 `layout._open_channels`：把挡在**直线弦**上的节点在层内挪开一个身位。
+    这条通路曾经"看得见缺陷、却一个候选都收不下"，而且**一声不响**（三处判据错：
+    步长取错了轴、挡弦者按路由前的旧几何挑、把虚节点当障碍）。所以这里钉住**结果**，
+    而不是"它被调用过"。
+    """
+
+    def test_no_fixture_edge_exceeds_bend_max(self):
+        worst = []
+        for path in spec_paths():
+            with open(path, encoding="utf-8") as fh:
+                spec = json.load(fh)
+            res = E.L.layout(spec, E.L.boxes_from_spec(spec))
+            for e in res.edges:
+                folds = max(0, len(e["points"]) - 2)
+                if folds > CHECK.BEND_MAX:
+                    worst.append(f"{os.path.basename(path)}: {e['from']}→{e['to']} 折 {folds} 次")
+        self.assertEqual([], worst, "折点数超过 BEND_MAX，说明「让路」没生效")
 
 
 if __name__ == "__main__":

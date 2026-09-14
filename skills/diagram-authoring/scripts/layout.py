@@ -46,6 +46,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import dataclasses
 import math
 import os
 import sys
@@ -2969,6 +2970,115 @@ def wrap_route(a: Placed, b: Placed, band: float, lane: float,
 
 
 
+WAY_MAX_EDGES = 1         # 最多服务几条边（只处理折点超标的，且只动一条）
+WAY_MAX_MOVES = 3         # 每条边最多试挪开几个挡弦节点
+WAY_BEND_MIN = 4          # 折点超过这个数才值得动布局（与 check_layout.BEND_MAX 同值：
+                          # 那边是"报不报"的门槛，这边是"值不值得挪节点"的门槛）
+NODE_GAP_STEP = 70.0      # 一次挪开的身位（默认 nodeSeparation 的量级）
+
+
+def _open_channels(placed: dict[str, Placed], node_ids: list[str],
+                   dummy_ids: list[str], direction: str,
+                   finish) -> tuple[dict[str, Placed], list[dict]]:
+    """让路：把挡在**直线弦**上的节点在层内挪开一个身位，好让那条边能直着走。
+
+    ## 为什么必须动布局，而不是继续加强路由
+
+    实测一条跨 5 层的边折了 9 次。实测它**一个节点都没穿** ——
+    路由的产物是干净的，问题是"没得选"：直线弦上堵着同层的若干节点，任何"折点少"的走法都要压到某个节点上。
+    用户最初的直觉就是对的：「为什么这里的高度不能大一些呢，非要拐个弯」。
+    把其中挡弦的那个节点在层内挪开一个身位：那条边 **9 折 → 2 折**、整图 45 → 35 折。
+
+    ## 判据必须接在**最终管线**（`finish`）上
+
+    最终折点还要过"选版 → 跨栏绕行 → 车道错开"三步，拿中间状态做判据会收下
+    "中间量变好、最终却变差"的挪动（实测：2 折边 198→185、多冒出一条 6 折边）。
+
+    ## 每一步都要真的变好
+
+    折点总数**严格下降**、穿节点**一处不许多**（硬条件，不参与比较 ——
+    写成字典序会导致"折点少一个、多穿一个节点"被收下，三个既有用例当场抓到过）。
+    挪完还必须与同层其他节点保持 `NODE_CLEARANCE`（与 `check_layout.GAP_MIN` 同值），
+    否则修好折点、撞出阻塞项，整体是倒退。有界、确定性，挪不动就原样返回。
+
+    ## 步长取的是**层内那根轴上的尺寸** —— 别写反
+
+    层内轴：`TB` 图是 x（层是横排），`LR` 图是 y（层是竖列）。
+    所以 `TB` 挪 x、步长该用 `width`；`LR` 挪 y、步长该用 `height`。
+    我第一版两处都取反了：LR 图用了 `width`（304 而非 109）→ 挪得太远、
+    直接压到同层邻居上、被间隙检查拒掉 → **一个候选都没通过、整条通路悄无声息地失效**。
+    """
+    def crowded(table: dict[str, Placed], nid: str) -> bool:
+        # **虚节点不是障碍**（踩过的坑）：折点用的辅助点尺寸为 0、图上不可见，
+        # 校验器（`check_layout`）也不把它们算进间隙 —— 我第一版却当邻居，
+        # 于是那个合法挪动被一个虚节点（净空 10.5 < 12）拦下，
+        # 整条通路一个候选都过不了、悄无声息。判据要和校验器**看同一批东西**。
+        moved = table[nid]
+        for other_id, other in table.items():
+            if other_id == nid or other_id in dummy_ids or other.rank != moved.rank:
+                continue
+            if not (moved.x + moved.width + NODE_CLEARANCE <= other.x
+                    or other.x + other.width + NODE_CLEARANCE <= moved.x
+                    or moved.y + moved.height + NODE_CLEARANCE <= other.y
+                    or other.y + other.height + NODE_CLEARANCE <= moved.y):
+                return True
+        return False
+
+    # **先用 `finish` 拿到成品**，再据它真正站的几何找挡弦者 ——
+    # 不能拿路由之前的 `placed` 算：`route_edges(align=True)` 会把主轴拉直、挪动节点，
+    # 画箭头时的几何与那之前不是一套。第一版就是这么错的：照旧几何去挪一个节点，
+    # 而真正挡弦的那个根本没进候选表，通路于是悄无声息地空转。
+    # **两手各拿一张表**（踩过的坑）：
+    # - 找挡弦者要用 `finish` 之后的几何（`route_edges(align=True)` 会拉直主轴、
+    #   挪动节点，画箭头时的几何和那之前不是一套；照旧几何找，真正挡道的那一个
+    #   根本不进候选表 → 通路空转）。
+    # - 但**挪动必须落在对齐之前的那张表上**：`finish` 里的对齐会把挪过去的节点
+    #   拉回主轴，在后对齐的表上挪等于白挪（实测折点数一个不变）。
+    best_pre = dict(placed)
+    best_table, base_routed = finish(best_pre)
+    base_bends = sum(max(0, len(e["points"]) - 2) for e in base_routed)
+    base_hits = sum(len(nodes_hit_by_polyline(e["points"], best_table, {e["from"], e["to"]}))
+                    for e in base_routed)
+    work = [e for e in base_routed
+            if max(0, len(e["points"]) - 2) > WAY_BEND_MIN
+            and e["from"] in best_table and e["to"] in best_table]
+    if not work:
+        return best_table, base_routed     # 没有超标边：一次多余的路由都不做
+
+    best_bends, best_hits = base_bends, base_hits
+    axis = "x" if direction == "TB" else "y"
+    work.sort(key=lambda e: (-max(0, len(e["points"]) - 2), e["from"], e["to"]))
+    for edge in work[:WAY_MAX_EDGES]:
+        a, b = best_table[edge["from"]], best_table[edge["to"]]
+        tail = [a.x + a.width / 2, a.y + a.height / 2]
+        head = [b.x + b.width / 2, b.y + b.height / 2]
+        blockers = [nid for nid in node_ids
+                    if nid not in (edge["from"], edge["to"]) and nid in best_table
+                    and nid not in dummy_ids          # 虚节点挪了也没意义
+                    and _segment_hits_box(tail, head, best_table[nid], NODE_CLEARANCE)]
+        for nid in blockers[:WAY_MAX_MOVES]:
+            box = best_pre[nid]
+            step = (box.width if axis == "x" else box.height) + NODE_GAP_STEP
+            for sign in (-1, 1):
+                cand_pre = dict(best_pre)
+                cand_pre[nid] = dataclasses.replace(box, **{axis: getattr(box, axis) + sign * step})
+                if crowded(cand_pre, nid):
+                    continue
+                cand_table, cand_routed = finish(cand_pre)
+                bends = sum(max(0, len(e["points"]) - 2) for e in cand_routed)
+                hits = sum(len(nodes_hit_by_polyline(e["points"], cand_table, {e["from"], e["to"]}))
+                           for e in cand_routed)
+                # 穿节点是**硬条件**，不参与比较（写成字典序会收下"折点少一个、
+                # 多穿一个节点"的挪动）；折点总数必须**严格下降**。
+                if hits <= best_hits and bends < best_bends:
+                    best_pre, best_table = cand_pre, cand_table
+                    best_bends, best_hits = bends, hits
+                    break
+    # 收下过挪动就按最终那张表重算一次，保证**坐标与路径是同一套**。
+    final_table, final_routed = finish(best_pre)
+    return final_table, final_routed
+
+
 def layout(spec: dict, boxes: dict[str, Box],
            params: dict[str, float] | None = None) -> LayoutResult:
     p = dict(DEFAULT_PARAMS)
@@ -3077,54 +3187,66 @@ def layout(spec: dict, boxes: dict[str, Box],
                     diagonal += length
         return (hit, own, slide, round(diagonal / total, 3) if total else 0.0)
 
-    plain_table = dict(placed)
-    plain_routed = route_edges(origins, segments, plain_table, direction,
-                               set(reversed_edges), align=False)
-    aligned_table = dict(placed)
-    aligned_routed = route_edges(origins, segments, aligned_table, direction,
-                                 set(reversed_edges), align=True)
-    if quality(aligned_routed, aligned_table) <= quality(plain_routed, plain_table):
-        placed, routed = aligned_table, aligned_routed
-    else:
-        placed, routed = plain_table, plain_routed
-    # 折段之后，两端落在不同段的连线改走空档 —— 直连会横穿两栏。
-    if coords.bands:
-        lane_uses: dict[float, int] = {}
-        for e in routed:
-            sa = coords.segments.get(placed[e["from"]].rank) if e["from"] in placed else None
-            sb = coords.segments.get(placed[e["to"]].rank) if e["to"] in placed else None
-            if sa is None or sb is None or sa == sb:
-                continue
-            pa = placed[e["from"]]
-            pb = placed[e["to"]]
-            # 通道放在**源节点那一层的外缘之外**（主轴方向），不是源节点自己的中线 ——
-            # 同层里源节点旁边/下面可能还站着别的节点。留 30px 余量。
-            peers = [q for q in placed.values() if q.rank == pa.rank]
-            # 目标在哪一侧就往哪一侧绕，别绕反了。
-            if direction == "TB":
-                far = max(q.y + q.height for q in peers) + 30.0
-                near = min(q.y for q in peers) - 30.0
-                lane = far if pb.y >= pa.y else near
-            else:
-                far = max(q.x + q.width for q in peers) + 30.0
-                near = min(q.x for q in peers) - 30.0
-                lane = far if pb.x >= pa.x else near
-            band = coords.bands[min(sa, sb)]
-            # **分车道**：同一个空档里已经走过 n 条边，就往外让 n 个步长 ——
-            # 否则两条边会精确重叠，图上看起来是一根线（实测踩过）。
-            used = lane_uses.get(band, 0)
-            lane_uses[band] = used + 1
-            # **对称往两边散**（-1、+1、-2、+2…），不是一路往右挤 ——
-            # 空档本来就夹在左右两块之间，只往一边让会把后面那条挤到右边那块身上去。
-            offset = WRAP_LANE_STEP * (used // 2 + 1) * (-1 if used % 2 == 0 else 1)
-            e["points"] = wrap_route(pa, placed[e["to"]], band + offset, lane, direction)
+    def finish(table: dict[str, Placed]) -> tuple[dict[str, Placed], list[dict]]:
+        """从 `placed` 一路做到**成品**：选版 → 跨栏绕行 → 车道错开。
 
-    # 最后一道：**把叠在同一条线上的段错开**（见 `_spread_lanes`）。
-    # 必须放在**折段那一块之后** —— 跨栏连线的走法是那里才定下来的，
-    # 早一步做就等于对着一份还没成形的点表算（02-flow 的 `scan→stage` 就是这样漏掉的：
-    # `route_edges` 里它还是一根两点斜线，折段回来后才是最终那个五折点路径）。
-    # 也只在这里做：重叠是**边与边之间**的事，单看一条边永远看不出来。
-    _spread_lanes(routed, placed, direction)
+        抽成函数是为了让「让路」（`_open_channels`）按**同一个阶段**评价候选 ——
+        判据和产物必须在同一阶段，不然会收下"中间量变好、最终却变差"的挪动
+        （同"标签落位必须在 emit 里定"的道理）。
+        """
+        plain_table = dict(table)
+        plain_routed = route_edges(origins, segments, plain_table, direction,
+                                   set(reversed_edges), align=False)
+        aligned_table = dict(table)
+        aligned_routed = route_edges(origins, segments, aligned_table, direction,
+                                     set(reversed_edges), align=True)
+        if quality(aligned_routed, aligned_table) <= quality(plain_routed, plain_table):
+            use_table, routed = aligned_table, aligned_routed
+        else:
+            use_table, routed = plain_table, plain_routed
+        # 折段之后，两端落在不同段的连线改走空档 —— 直连会横穿两栏。
+        if coords.bands:
+            lane_uses: dict[float, int] = {}
+            for e in routed:
+                sa = coords.segments.get(use_table[e["from"]].rank) if e["from"] in use_table else None
+                sb = coords.segments.get(use_table[e["to"]].rank) if e["to"] in use_table else None
+                if sa is None or sb is None or sa == sb:
+                    continue
+                pa = use_table[e["from"]]
+                pb = use_table[e["to"]]
+                # 通道放在**源节点那一层的外缘之外**（主轴方向），不是源节点自己的中线 ——
+                # 同层里源节点旁边/下面可能还站着别的节点。留 30px 余量。
+                peers = [q for q in use_table.values() if q.rank == pa.rank]
+                # 目标在哪一侧就往哪一侧绕，别绕反了。
+                if direction == "TB":
+                    far = max(q.y + q.height for q in peers) + 30.0
+                    near = min(q.y for q in peers) - 30.0
+                    lane = far if pb.y >= pa.y else near
+                else:
+                    far = max(q.x + q.width for q in peers) + 30.0
+                    near = min(q.x for q in peers) - 30.0
+                    lane = far if pb.x >= pa.x else near
+                band = coords.bands[min(sa, sb)]
+                # **分车道**：同一个空档里已经走过 n 条边，就往外让 n 个步长 ——
+                # 否则两条边会精确重叠，图上看起来是一根线（实测踩过）。
+                used = lane_uses.get(band, 0)
+                lane_uses[band] = used + 1
+                # **对称往两边散**（-1、+1、-2、+2…），不是一路往右挤 ——
+                # 空档本来就夹在左右两块之间，只往一边让会把后面那条挤到右边那块身上去。
+                offset = WRAP_LANE_STEP * (used // 2 + 1) * (-1 if used % 2 == 0 else 1)
+                e["points"] = wrap_route(pa, use_table[e["to"]], band + offset, lane, direction)
+
+        # 最后一道：**把叠在同一条线上的段错开**（见 `_spread_lanes`）。
+        # 必须放在**折段那一块之后** —— 跨栏连线的走法是那里才定下来的，
+        # 早一步做就等于对着一份还没成形的点表算（02-flow 的 `scan→stage` 就是这样漏掉的：
+        # `route_edges` 里它还是一根两点斜线，折段回来后才是最终那个五折点路径）。
+        # 也只在这里做：重叠是**边与边之间**的事，单看一条边永远看不出来。
+        _spread_lanes(routed, use_table, direction)
+        return use_table, routed
+
+    # 「让路」：折点超标的边多半不是路由选错，而是**直线弦上堵着节点** ——
+    # 路由不是选错了，是没得选。必须在 `finish` 之前动 `placed`。
+    placed, routed = _open_channels(placed, node_ids, dummy_ids, direction, finish)
 
     return LayoutResult(direction=direction, params=p, ranks=ranks, order=order,
                         placed=placed, edges=routed, crossings=crossings,
