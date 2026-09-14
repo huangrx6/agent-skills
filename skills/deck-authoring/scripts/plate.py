@@ -5,8 +5,8 @@
 真实孔版印刷的图是网点密度表现灰度、只有两个专色的 —— 所以这里是"重新制版"，
 不是"加个滤镜"：先把图变灰度，再把灰度映射到 两墨叠印 的色阶上，最后叠半调网点。
 
-跑法：python3 treat_image.py in.jpg -o out.png --tokens design-tokens.json --color-set vivid
-     python3 treat_image.py --sample -o sample.png      # 没有真图时生成一张测试卡
+跑法：python3 plate.py in.jpg -o out.png --tokens styles/risograph/style.json --color-set vivid
+     python3 plate.py --sample -o sample.png            # 没有真图时生成一张测试卡
 """
 from __future__ import annotations
 

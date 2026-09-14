@@ -5,12 +5,15 @@
 而两墨 multiply 的叠印色达标（9.55）。所以文字色不是**选**出来的，是**推导**出来的：
 换色板时它自动跟着变，不许手写第二个值。
 
-跑法：python3 ink.py design-tokens.json      # 三组色板逐个校验，任一不达标退出码 1
+跑法：python3 ink.py [styles/risograph/style.json]   # 不传就用仓库那份；任一色板不达标退出码 1
 """
 from __future__ import annotations
 
 import json
+import os
 import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def _rgb(h: str) -> tuple[int, int, int]:
@@ -67,7 +70,10 @@ def check(tokens: dict) -> int:
 
 
 def main(argv: list[str]) -> int:
-    path = argv[1] if len(argv) > 1 else "design-tokens.json"
+    # 默认路径跟其它脚本一致（指向仓库那份 token）—— 原来写死的 "design-tokens.json"
+    # 是原型期的文件名，在这个仓库里不存在，不传参数会直接 traceback。
+    path = argv[1] if len(argv) > 1 else os.path.join(
+        HERE, "..", "styles", "risograph", "style.json")
     with open(path, encoding="utf-8") as fh:
         return check(json.load(fh))
 

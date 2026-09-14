@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""#76 四项机械校验 —— 只查能机械判定的东西，不承诺审美。
+"""#76 六项机械校验 —— 只查能机械判定的东西，不承诺审美。
 
 1. 对比度   文字色必须是两墨叠印色（主/副色天生 2.3~3.0，承载不了文字），且按字号分档过门槛
 2. 文字溢出 按字宽估算表算文本盒，超出内容区就报
 3. 错位区间 从**产物 HTML** 里读实际写进去的 --dx/--dy/--rot，比对 token 区间
 4. 装饰不压文字 墨块必须落在安全区，不与文字栏相交
+5. 图表成比例 柱高两两之间必须与数据成比例（基准取数据最大那条，不拿图形最高那根）
+6. 图表区无错位 图表容器里不许出现 riso 错位元素（错位会毁掉柱与刻度的可读性）
 
-跑法：python3 check_deck.py deck-spec.json out.html      # 全过退出 0，任一不过退出 1
+跑法：python3 check.py deck-spec.json out.html      # 全过退出 0，任一不过退出 1
 """
 from __future__ import annotations
 
@@ -164,7 +166,7 @@ def check(spec: dict, html_path: str, tokens: dict) -> list[str]:
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(description="deck 产物四项机械校验")
+    ap = argparse.ArgumentParser(description="deck 产物六项机械校验")
     ap.add_argument("spec")
     ap.add_argument("html")
     ap.add_argument("--tokens", default=TOKENS)

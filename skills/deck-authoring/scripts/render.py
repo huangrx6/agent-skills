@@ -2,7 +2,7 @@
 """deck-spec.json → HTML（riso 效果）。
 
 两条硬规矩（都是 #73/#74 量出来、并被脚本守着的）：
-1. **渲染层不写死任何颜色/参数** —— 全部来自 design-tokens.json，CSS 里只有 var()。
+1. **渲染层不写死任何颜色/参数** —— 全部来自 styles/risograph/style.json，CSS 里只有 var()。
 2. **同一份 spec + 同一种子 = 完全一致的输出** —— 错位量/颗粒强度按 (seed, 元素) 派生，
    不用全局 random（全局的话两次渲染就不一样，没法回归对比，也没法复现一版给别人）。
 """
@@ -73,7 +73,7 @@ def halftone(tokens: dict, seed, index: int) -> str:
 
 
 HEAD = """<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>__TITLE__</title><style>
-/* 所有视觉参数都从 design-tokens.json 注入；CSS 里没有一处写死的色值或尺寸 ——
+/* 所有视觉参数都从 styles/risograph/style.json 注入；CSS 里没有一处写死的色值或尺寸 ——
    换色板/换字号只改 token，这里零改动（原型阶段定下的硬规矩）。 */
 :root{ __VARS__ }
 html,body{margin:0;background:var(--viewer)}

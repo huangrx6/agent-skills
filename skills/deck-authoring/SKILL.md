@@ -23,17 +23,19 @@ description: >-
 （原型实测：主 / 副色单独当文字色只有 2.35 / 2.68 ✗）。所以：
 
 - 规格 schema 里**没有**色值字段、字号字段、坐标字段 —— 不存在，不是"不推荐填"。
-  写错了会被 `check.py` 当作"主 / 副色载文字"判失败。
+  写了也**不起作用**（渲染器只读它认得的键）；唯一会被主动拦下的是 `color`：
+  `check.py` 第 ① 条只接受 `"overprint"`，写成色值（如 `"#FF0000"`）会判失败。
 - 文字色**只能**是 overprint（两墨叠印）；`check.py` 第 ① 条会拦"主 / 副色声明当文字色"。
 
 换色板只改 `styles/risograph/style.json`，spec 与渲染器零改动。
 
 ## 起手流程
 
-1. **先读 demo**：`dev-tools/demo.spec.json` —— 字段集封闭、未知字段会被 `check.py` 报。
+1. **先读 demo**：`dev-tools/demo.spec.json` —— spec 该写哪些键以它为准
+   （逐键说明见 `references/style-architecture.md`）。
 2. **写 spec**：每页只有 `type` + 内容（标题 / 条目 / 时间点 / 数据），见
-   `references/style-architecture.md`。`seed` 必填 —— 错位与颗粒按 (seed, 元素) 派生，
-   不靠全局 random（两次渲染不重 = 没法回归、也没法复现）。
+   `references/style-architecture.md`。`seed` 建议显式写（不写默认 1）—— 错位与颗粒
+   按 (seed, 元素) 派生，不靠全局 random（两次渲染不重 = 没法回归、也没法复现）。
 3. **三道门**：
    - 墨色：`python3 scripts/ink.py styles/risograph/style.json`（任一色板不达标退出 1）
    - 渲染：`python3 scripts/render.py your.spec.json -o out.html`
