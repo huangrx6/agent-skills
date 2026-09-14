@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""十一项校验 + 自动调参循环 + 报告生成。
+"""十二项校验 + 自动调参循环 + 报告生成。
 
 ## 为什么校验和调参在同一个文件里
 
@@ -100,6 +100,10 @@ STEPPABLE = frozenset({"gap", "edge", "crossing", "through", "overlap", "slant"}
 # 刚刚好压在实测带之上：宁可当保安，不当噪声源。
 BEND_MAX = 4
 
+# 「相交属于形状本身」的两种图型：径向（兄弟节点绕着父节点排）与力导向（没有层可依）。
+# 只有这两种的几何相交是**形状**；其余图型出现相交，就是**路由该绕的没绕开**。
+CROSSING_INHERENT_TYPES = frozenset({"mindmap", "network"})
+
 CHECK_LABEL = {
     "gap": "元素间隙",
     "edge": "连线长度",
@@ -118,6 +122,7 @@ CHECK_LABEL = {
     "region_label": "区域标题溢出",
     # 两项都是“路由在结构上不该出现的东西” —— 由 TestEveryCheckHasALabel 钉住。
     "bend": "折点过多",
+    "intersect": "连线相交",
 }
 # 报告里用的中文说法。**参数名不许出现在报告里** —— 一旦报告写"建议调大某某"，
 # 参数选择权就又回到模型手上了（validation.md 第二节）。
@@ -649,9 +654,43 @@ def check(spec: dict, result: ResultT,
         *check_edge_overlap(result),
         *check_edge_slant(result),
         *check_bends(result),
+        *check_geometric_crossings(spec, result),
         *check_regions(spec, result, boxes),
         *check_region_labels(spec, result, boxes),
     ])
+
+
+# ── #12 连线相交（画面上的遮挡）─────────────────────────────
+def check_geometric_crossings(spec: dict, result: ResultT) -> list[Issue]:
+    """**画出来的折线真的相交** —— 这才是「线不要遮挡线」。
+
+    与 #5 不是一回事，别再互相顶替（我自己混用过一次，经过记在 `check_crossings` 里）：
+
+      #5 `crossing`      层内位置**反序对** —— 排序质量的仪表盘（反序 8 / 相交 0 很常见）
+      #12 `intersect`    **几何相交** —— 画面上看得见的遮挡（就是这个）
+
+    只对**不需要相交**的图型报：径向、力导向那两种的相交是形状本身，
+    报了等于让人去修一张本来就长那样的图 → 静默放行。
+
+    不进 TUNABLE / STEPPABLE（与 `bend` 同理）：它是**结论**、不是驱动量。
+    调参循环改的是间距，不是"去把这两条线分开"；接进去只会让循环白转四轮。
+    """
+    if (spec.get("type") or "") in CROSSING_INHERENT_TYPES:
+        return []
+    pairs = L.geometric_crossing_pairs(result.edges)
+    if not pairs:
+        return []
+    edges = spec.get("edges") or []
+    shown = []
+    for a, b in pairs:
+        ea = edges[a] if 0 <= a < len(edges) else None
+        eb = edges[b] if 0 <= b < len(edges) else None
+        if ea and eb:
+            shown.append(f"{ea['from']}→{ea['to']} ✕ {eb['from']}→{eb['to']}")
+    return [Issue("intersect", False, "；".join(shown) or "（无法归因）",
+                  f"{len(pairs)} 处折线在画面上真的相交",
+                  advice="两条连线在画面上交在一起了：考虑拆节点、减少 detail、"
+                         "或调换两个节点的先后位置。")]
 
 
 # ── 自动调参 ────────────────────────────────────────────────
@@ -794,7 +833,7 @@ def format_report(spec: dict, attempts: list[Attempt], outcome: Outcome) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="十一项校验 + 自动调参（报告里不出现参数名）")
+    ap = argparse.ArgumentParser(description="十二项校验 + 自动调参（报告里不出现参数名）")
     ap.add_argument("spec", help="*.diagram.json")
     ap.add_argument("--json", action="store_true", help="附带机器可读结果")
     args = ap.parse_args(argv)

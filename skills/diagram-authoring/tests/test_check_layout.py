@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""check_layout.py 的回归测试：十项校验 + 自动调参 + 报告措辞。
+"""check_layout.py 的回归测试：十二项校验 + 自动调参 + 报告措辞。
 
 ## 用例的着力点
 
@@ -901,3 +901,54 @@ class TestRegionOverlap(unittest.TestCase):
         names = {i.check for i in C.check(spec, result, boxes).issues}
         self.assertNotIn("region", names, "完全包含被判成重叠了")
 
+
+
+class TestGeometricCrossing(unittest.TestCase):
+    """#12：量的是**画面上真的相交**，不是 #5 那个层内反序对。
+
+    这条检查的来历值得记：我曾经拿 #5 的反序对当"线有没有撞在一起"，
+    差点按它的数（某张依赖图 **8 处反序 / 0 处相交**）去让用户"拆节点、调换位置" ——
+    那是让人去修一个眼睛看不见的东西。所以这两条必须各管各的，别互相顶替。
+    """
+
+    class _Result:
+        def __init__(self, edges):
+            self.edges = edges
+
+    @staticmethod
+    def _edges(*pairs):
+        return [{"origin": i, "from": a, "to": b, "points": [list(p), list(q)]}
+                for i, (a, b, p, q) in enumerate(pairs)]
+
+    def test_reports_a_real_crossing(self):
+        spec = spec_of(["a", "b", "c", "d"], [("a", "b"), ("c", "d")])
+        result = self._Result(self._edges(("a", "b", (0, 0), (100, 100)),
+                                          ("c", "d", (0, 100), (100, 0))))
+        issues = C.check_geometric_crossings(spec, result)
+        self.assertEqual(1, len(issues))
+        self.assertIn("✕", issues[0].where, "得说出是哪两条线交在一起")
+        self.assertFalse(issues[0].blocking, "相交不该挡输出（空间不够时确实分不开）")
+
+    def test_parallel_lines_report_nothing(self):
+        spec = spec_of(["a", "b", "c", "d"], [("a", "b"), ("c", "d")])
+        result = self._Result(self._edges(("a", "b", (0, 0), (100, 0)),
+                                          ("c", "d", (0, 40), (100, 40))))
+        self.assertEqual([], C.check_geometric_crossings(spec, result))
+
+    def test_not_in_the_tuning_loop(self):
+        """**不进调参**（与 #11 同理）：它是结论、不是驱动量。
+
+        调参循环改的是间距，不是"去把这两条线分开"；接进去只会让循环白转四轮。
+        这个决定必须有守卫 —— 否则哪天有人顺手加进 `TUNABLE`，没人会发现。
+        """
+        self.assertNotIn("intersect", C.TUNABLE)
+        self.assertNotIn("intersect", C.STEPPABLE)
+
+    def test_inherent_types_are_silent(self):
+        """径向/力导向的相交是**形状本身** —— 报了等于让人去修一张本来就长那样的图。"""
+        result = self._Result(self._edges(("a", "b", (0, 0), (100, 100)),
+                                          ("c", "d", (0, 100), (100, 0))))
+        for diagram_type in ("mindmap", "network"):
+            spec = spec_of(["a", "b", "c", "d"], [("a", "b"), ("c", "d")])
+            spec["type"] = diagram_type
+            self.assertEqual([], C.check_geometric_crossings(spec, result), diagram_type)
