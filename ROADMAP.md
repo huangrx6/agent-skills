@@ -206,14 +206,13 @@ python3 $P project progress --project ASKILL            # 看进度
 已完成：回填 6 份 README ・ 清死文件 ・ 补 2 个 evals ・ 触发日志 + 基线 ・ 重看 description
          ・ 体检接进 pre-commit ・ pingcode 建项目实测 + 镜像 32 条工作项
          ・ 补 create-plan / search / bulk-update / 评论附件 ・ WLRR 机械校验
-         ・ 行为 eval 开跑（2026-09-14）：skill-builder 6/6 ・ git-dev-workflow 7/7
+         ・ 行为 eval **6 个 skill 全跑过一遍**（2026-09-14，共 41 次运行）—— 查出 9 个真缺陷：
+           3 个代码 bug（pingcode --state 两处、gen_endpoints --check 跨天虚报、
+           excalidraw groups[].style 静默失效）、4 处规则表述缺口、2 处 eval 自身的设计缺口
          ↓
 1. 三周后跑 skill_trigger_log.py --compare   ← 基线已存，只需等时间
-2. 行为 eval 还剩 26 条没跑（PKB 6 / WLRR 8 / pingcode 6 / excalidraw 6）—— 每条都要一份
-   一次性沙箱：PKB・WLRR・excalidraw 的落点在 vault（把 vault 拷一份、把
-   $OBSIDIAN_VAULT_PATH 指过去），pingcode 会写真租户（只跑只读用例）
-3. 其余候选（pingcode-plan 已做；weekly-plan / 桥等数据）
-4. references 瘦身    ← 不主动做；两个 skill 已只剩 2~5 行余量，下次加规则时会先被迫瘦身
+2. 其余候选（pingcode-plan 已做；weekly-plan / 桥等数据）
+3. references 瘦身    ← 不主动做；两个 skill 已只剩 2~5 行余量，下次加规则时会先被迫瘦身
 ```
 
 ## 七、行为 eval 怎么跑（实测出来的，不是设想）
