@@ -30,3 +30,5 @@ dist/
 
 # subagent 探查报告（保留在工作区，不进 git 历史）
 file-only/
+# skill 打包产物（安装/分发用）。**曾被我误用 git add -A 扫进一次** —— 真要入库请用 git add -f
+skills/*.zip
