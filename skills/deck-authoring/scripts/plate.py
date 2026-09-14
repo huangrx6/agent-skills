@@ -24,10 +24,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 def _load_sibling(name: str):
     """动态加载同目录脚本（`scripts/` 不是包，同级 import 在静态层面无法解析）。
 
-    沿用 `check_layout.py` 里那一个的写法与理由：必须把模块注册进 sys.modules
-    之后再 exec，否则被加载模块里的 `@dataclass` 会炸 —— dataclasses._is_type 会查
-    sys.modules.get(cls.__module__) 并拿到 None，报 "'NoneType' object has no
-    attribute '__dict__'"。
+    把模块注册进 sys.modules 之后再 exec —— 写法沿用 `check_layout.py`。那一步是为
+    `@dataclass` / 自引用 import 准备的（dataclasses._is_type 查
+    sys.modules.get(cls.__module__)，拿到 None 会炸）。本 skill 的脚本都没有这两样，
+    属防御性写法；它**不**负责“同一模块只加载一次”（实测：两次加载是两个对象）。
     """
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"{name}.py")
     mod_spec = importlib.util.spec_from_file_location(f"_deck_{name}", path)

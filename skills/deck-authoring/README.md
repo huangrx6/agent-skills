@@ -42,7 +42,7 @@ python3 -m unittest discover -s tests/deck-authoring -v     # 24 条
 
 ## 依赖
 
-- Python ≥ 3.10（用了 `from __future__ import annotations` + dataclass 友好的 importlib）
+- Python ≥ 3.10（用了 `from __future__ import annotations` + importlib 动态加载同目录脚本）
 - `Pillow`（duotone + 半调）
 - `python-pptx`（PPTX 拼装）
 - macOS 上 `shots.py` 需要 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`
