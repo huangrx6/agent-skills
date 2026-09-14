@@ -42,6 +42,16 @@
       "prompt": "坏了，我刚才 git reset --hard 把东西弄丢了，怎么办？",
       "expected_output": "先取证再动手：把 git reflog 的输出留档（因为后续操作会继续往上面写），然后用 git reflog / git fsck --unreachable 找候选，并且**先 git show 确认再 reset**（reflog 里相邻行很像，点错就又丢一次）。明确区分两类：提交过的东西通常能救；未提交的内容（clean 掉、checkout -- 丢的）**基本救不回**——不许承诺'肯定能恢复'。结尾给出下一步可执行命令，而不是只给安慰。",
       "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "我上次那个 worktree 目录还在，这次给我在同一位置再建一个，直接覆盖就行。",
+      "expected_output": "目标是 **拒绝**，而不是想办法建出来：worktree.py create 在建之前会查分支是否已存在、目标路径是否已存在、同级目录是否落在另一个 git 仓库里 —— 撞上就拒绝并说清撞在什么上（用 worktree.py list 说明那个目录/分支现在归谁）。**不做 --force，也不 rm -rf 覆盖**（覆盖 = 把别人未提交的工作删掉，那是不可逆操作，要按 guard 的规矩先看清再动）。给出的安全路径是：先 list 看清，再决定是 remove 还是换位置/换分支名。"
+    },
+    {
+      "id": 9,
+      "prompt": "我 reset --hard 之前还 git clean 掉了一批没提交的文件，这些也能一起找回来吗？",
+      "expected_output": "必须**把两类分开答**，不能合并成「都能/都不能」：① 已经提交过的 → 走 git reflog / git fsck --unreachable 通常能救回，而且**先 git show 确认再 reset**（reflog 里相邻行很像，点错就又丢一次）；② 从来没提交过、被 clean 掉的未跟踪文件、被 checkout -- 丢掉的改动 → 对象库里没有它们，**基本救不回**，不许承诺「都能找回」。若想再挣扎一次，可提的下一条是 git fsck --lost-found（只对「曾 git add 过」的 blob 有戏），并明说这是碰运气。拿不准就直说拿不准。"
     }
   ]
 }

@@ -206,11 +206,31 @@ python3 $P project progress --project ASKILL            # 看进度
 已完成：回填 6 份 README ・ 清死文件 ・ 补 2 个 evals ・ 触发日志 + 基线 ・ 重看 description
          ・ 体检接进 pre-commit ・ pingcode 建项目实测 + 镜像 32 条工作项
          ・ 补 create-plan / search / bulk-update / 评论附件 ・ WLRR 机械校验
+         ・ 行为 eval 开跑（2026-09-14）：skill-builder 6/6 ・ git-dev-workflow 7/7
          ↓
 1. 三周后跑 skill_trigger_log.py --compare   ← 基线已存，只需等时间
-2. 其余候选（pingcode-plan 已做；weekly-plan / 桥等数据）
-3. references 瘦身    ← 不主动做；两个 skill 已只剩 2~5 行余量，下次加规则时会先被迫瘦身
+2. 行为 eval 还剩 26 条没跑（PKB 6 / WLRR 8 / pingcode 6 / excalidraw 6）—— 每条都要一份
+   一次性沙箱：PKB・WLRR・excalidraw 的落点在 vault（把 vault 拷一份、把
+   $OBSIDIAN_VAULT_PATH 指过去），pingcode 会写真租户（只跑只读用例）
+3. 其余候选（pingcode-plan 已做；weekly-plan / 桥等数据）
+4. references 瘦身    ← 不主动做；两个 skill 已只剩 2~5 行余量，下次加规则时会先被迫瘦身
 ```
+
+## 七、行为 eval 怎么跑（实测出来的，不是设想）
+
+`evals.json` 建起来之后一直没跑过。2026-09-14 第一次真跑（skill-builder 6 条、
+git-dev-workflow 7 条，共 13 条全过），过程里踩到两件必须记住的事：
+
+1. **跑之前把仓库/ skill 复制出去，并删掉 `evals/`** —— 实测被测 Agent 会翻到
+   `evals/evals.json` 直接读到自己那条 `expected_output`（skill-builder 第 6 条那次判定
+   因此作废，隔离重跑后才有效）。能跑干净的机例：一次性 git 仓库（git-dev-workflow）、
+   浅克隆的仓库副本（skill-builder）。
+2. **一条 eval 一个沙箱**。同一轮里 6 个子 agent 共享一个仓库时，会互相改文件（其中一个
+   把另一个新建的 references 当成「别人写的并发改动」）。
+
+已知的覆盖缺口（也是跑出来的，已补两条用例）：git-dev-workflow 原来的 7 条里，
+「worktree 撞上已有路径 → 拒绝」与「未提交内容救不回」这两条规则从未被触发过 ——
+现在补成第 8、9 条。
 
 第 1 件就是当初那个「真正改变后续所有判断」的那一件（触发日志）—— 它已到位，基线已存，
 剩下的事只有等时间：三周后跑一次 `--compare`，看看自动触发的 skill 数有没有真的上去。
