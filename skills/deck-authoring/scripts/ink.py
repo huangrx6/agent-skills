@@ -23,8 +23,13 @@ def _hex(rgb: tuple[int, int, int]) -> str:
 
 
 def overprint(primary: str, secondary: str) -> str:
-    """两墨叠印色：sRGB 逐通道相乘（打印机混色就是这个含义）。"""
-    return _hex(tuple(a * b // 255 for a, b in zip(_rgb(primary), _rgb(secondary))))
+    """两墨叠印色：sRGB 逐通道相乘（打印机混色就是这个含义）。
+
+    三通道**显式构造**，不用 `tuple(生成器)` —— 后者被推断成 `tuple[int, ...]`，
+    而 `_hex` 要的是长度写死的 `tuple[int, int, int]`。
+    """
+    a, b = _rgb(primary), _rgb(secondary)
+    return _hex((a[0] * b[0] // 255, a[1] * b[1] // 255, a[2] * b[2] // 255))
 
 
 def luminance(color: str) -> float:

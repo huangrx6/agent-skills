@@ -24,12 +24,16 @@ from pptx.util import Emu, Inches
 def build(png_paths: list[str], out: str, width: int, height: int) -> None:
     prs = Presentation()
     ratio = width / height
-    prs.slide_width = Inches(13.333)
-    prs.slide_height = Emu(int(prs.slide_width / ratio))
+    # 先落到局部变量：`prs.slide_width` 的类型是 `Optional[Length]`，直接拿来算除法
+    # 在 Pyright 眼里是「None 不支持 /」。赋值之后再读也一样，所以用局部量。
+    slide_width = Inches(13.333)
+    slide_height = Emu(int(slide_width / ratio))
+    prs.slide_width = slide_width
+    prs.slide_height = slide_height
     blank = prs.slide_layouts[6]                       # 空白版式，不放任何占位符
     for path in png_paths:
         slide = prs.slides.add_slide(blank)
-        slide.shapes.add_picture(path, 0, 0, width=prs.slide_width, height=prs.slide_height)
+        slide.shapes.add_picture(path, Emu(0), Emu(0), width=slide_width, height=slide_height)
     prs.save(out)
 
 

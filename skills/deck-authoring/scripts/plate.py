@@ -69,11 +69,16 @@ def duotone(image: Image.Image, primary: str, secondary: str, paper: str,
         w, h = gray.size
         mask = Image.new("L", (w, h), 255)
         load = mask.load()
-        gp = gray.load()
+        source = gray.load()
+        if load is None or source is None:
+            raise SystemExit("✗ 拿不到像素访问器（Pillow 返回 None）")
         for y in range(h):
             by = (y // dots) % 4
             for x in range(w):
-                v = gp[x, y]
+                v = source[x, y]
+                # 灰度图（"L"）的像素一定是标量；这里收窄类型，不是运行时分支。
+                if not isinstance(v, (int, float)):
+                    continue
                 if v < (matrix[by][(x // dots) % 4] + 0.5) / 16 * 255:
                     load[x, y] = 0
         out = Image.composite(out, Image.new("RGB", (w, h), _rgb(primary)), mask)
@@ -136,7 +141,14 @@ def main(argv: list[str]) -> int:
     # duotone 的过渡色落在「叠印墨 ↔ 纸」连线上，半调边缘又落在「主色 ↔ 该点」之间 ——
     # 所以可达颜色集正好是 **主色 / 叠印墨 / 纸色** 三点构成的三角形。
     # 我第一版写成"离三个色值都不许超过 90"，把中间过渡色全判成越界 ✗（240 种"违规"全是它）。
-    hues = {tuple(c) for c in list(treated.getcolors(maxcolors=1 << 24) or []) for c in [c[1]]}
+    hues: set[tuple[int, int, int]] = set()
+    for entry in treated.getcolors(maxcolors=1 << 24) or []:
+        color = entry[1]
+        # getcolors 的第二项在类型上是 `int | tuple[int, ...]`（"L" 图给 int，RGB 给元组）。
+        # duotone 的产物是 RGB，所以只收三元组 —— 显式构造而不是 tuple(c)，
+        # 后者会被推断成 tuple[int, ...] 而不是长度写死的三元组。
+        if isinstance(color, tuple) and len(color) == 3:
+            hues.add((color[0], color[1], color[2]))
     tri = (_rgb(colors["primary"]), _rgb(ink.overprint(colors["primary"], colors["secondary"])),
            _rgb(colors["background"]))
     stray = [c for c in hues if not _in_triangle(c, *tri)]

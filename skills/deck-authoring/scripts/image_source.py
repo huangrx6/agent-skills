@@ -92,8 +92,18 @@ def in_palette(image: Image.Image, colors: dict, tol: float = 0.01) -> list[tupl
     tri = (treat_image._rgb(colors["primary"]),
            treat_image._rgb(ink.overprint(colors["primary"], colors["secondary"])),
            treat_image._rgb(colors["background"]))
-    hues = {c for _, c in (image.getcolors(maxcolors=1 << 20) or [])}
-    return [c for c in hues if not treat_image._in_triangle(c, *tri, tol=tol)]
+    entries = image.getcolors(maxcolors=1 << 20) or []
+    stray: list[tuple[int, int, int]] = []
+    for entry in entries:
+        # getcolors 的第二项在类型上是 `int | tuple[int, ...]`（"L" 图给 int，RGB 给元组）。
+        # 显式收窄并构造三元组，不用 `c for _, c in ...` —— 后者留下 int 分支。
+        color = entry[1]
+        if not isinstance(color, tuple) or len(color) != 3:
+            continue
+        rgb = (color[0], color[1], color[2])
+        if not treat_image._in_triangle(rgb, *tri, tol=tol):
+            stray.append(rgb)
+    return stray
 
 
 def resolve(prompt: str, colors: dict, size: tuple[int, int], out: str,
