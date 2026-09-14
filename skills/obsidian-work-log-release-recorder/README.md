@@ -103,7 +103,7 @@ skills/obsidian-work-log-release-recorder/
 
 ```sh
 python3 tools/skill_health.py | grep obsidian-work-log-release-recorder
-python3 -m unittest discover -s tests                       # 20 条
+python3 -m unittest discover -s tests/<skill>                       # 20 条
 python3 skills/skill-builder/scripts/validate_skill.py skills/obsidian-work-log-release-recorder
 python3 skills/skill-builder/scripts/check_leakage.py
 ```

@@ -37,7 +37,11 @@ import sys
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCRIPTS = os.path.join(os.path.dirname(HERE), "scripts")
+# 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时读的是
+# `skills/<skill>/` 那棵树，测试放在里面会被顺手读进去）。
+# 所以从 `tests/<skill>/` 往上两级到仓库根，再进 `skills/<skill>/`。
+SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
+SCRIPTS = os.path.join(SKILL, "scripts")
 SPECS = os.path.join(HERE, "fixtures", "specs")
 
 
@@ -389,7 +393,7 @@ class TestDocsDoNotRestateColours(unittest.TestCase):
     ALLOWED_MENTIONS = {"#6E879B", "#7F96A5", "#AAB8C0"}
 
     def test_no_hex_colours_in_docs(self):
-        root = os.path.dirname(HERE)
+        root = SKILL
         offenders = []
         pattern = re.compile(r"#[0-9A-Fa-f]{6}\b")
         for base in (os.path.join(root, "references"), root):

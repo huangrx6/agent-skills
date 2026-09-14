@@ -31,7 +31,11 @@ import tempfile
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCRIPTS = os.path.join(os.path.dirname(HERE), "scripts")
+# 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时读的是
+# `skills/<skill>/` 那棵树，测试放在里面会被顺手读进去）。
+# 所以从 `tests/<skill>/` 往上两级到仓库根，再进 `skills/<skill>/`。
+SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
+SCRIPTS = os.path.join(SKILL, "scripts")
 EMIT = os.path.join(SCRIPTS, "emit_excalidraw.py")
 
 # Excalidraw 元素共有的字段（照 `_ExcalidrawElementBase`）
@@ -1098,8 +1102,8 @@ class TestEveryTopFieldIsRead(unittest.TestCase):
     def _script_text() -> str:
         import glob
         import os
-        here = os.path.dirname(os.path.abspath(__file__))
-        folder = os.path.join(os.path.dirname(here), "scripts")
+        # 用模块级的 SKILL（测试搬到顶层 `tests/<skill>/` 之后，"上一级"不再是 skill 目录）
+        folder = SCRIPTS
         chunks = []
         for path in sorted(glob.glob(os.path.join(folder, "*.py"))):
             if os.path.basename(path) == "validate_spec.py":

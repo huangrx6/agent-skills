@@ -35,7 +35,11 @@ from email.message import Message
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCRIPTS = os.path.join(os.path.dirname(HERE), "scripts")
+# 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时读的是
+# `skills/<skill>/` 那棵树，测试放在里面会被顺手读进去）。
+# 所以从 `tests/<skill>/` 往上两级到仓库根，再进 `skills/<skill>/`。
+SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
+SCRIPTS = os.path.join(SKILL, "scripts")
 
 
 def _load(name: str, alias: str):

@@ -75,7 +75,7 @@ class HookCase(unittest.TestCase):
 
     def test_文档里的测试条数过期要挡住提交(self):
         """这一类错在本仓库出现过四次；真实条数在跑完测试时就在手上，比一下不要钱。"""
-        self.write("skills/foo/tests/test_one.py",
+        self.write("tests/foo/test_one.py",
                    "import unittest\n\nclass T(unittest.TestCase):\n"
                    "    def test_ok(self):\n        self.assertTrue(True)\n")
         self.write("skills/foo/README.md",
@@ -86,7 +86,7 @@ class HookCase(unittest.TestCase):
         self.assertIn("1 条", result.stdout + result.stderr, "要给实际值")
 
     def test_文档里的测试条数对得上就放过(self):
-        self.write("skills/foo/tests/test_one.py",
+        self.write("tests/foo/test_one.py",
                    "import unittest\n\nclass T(unittest.TestCase):\n"
                    "    def test_ok(self):\n        self.assertTrue(True)\n")
         self.write("skills/foo/README.md",
@@ -95,7 +95,7 @@ class HookCase(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
     def test_文档里没有数字就不管(self):
-        self.write("skills/foo/tests/test_one.py",
+        self.write("tests/foo/test_one.py",
                    "import unittest\n\nclass T(unittest.TestCase):\n"
                    "    def test_ok(self):\n        self.assertTrue(True)\n")
         self.write("skills/foo/README.md", "# foo\n\n只写「全绿」，不写数字。\n")

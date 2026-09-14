@@ -132,7 +132,7 @@ diagram-authoring/
 
 ```sh
 cd skills/diagram-authoring
-python3 -m unittest discover -s tests -v     # 429 条，全绿（约 11 秒）
+python3 -m unittest discover -s tests/<skill> -v     # 429 条，全绿（约 11 秒）
 python3 scripts/emit_excalidraw.py tests/fixtures/specs/07-regions.json -o /tmp/a.excalidraw
 python3 scripts/emit_drawio.py tests/fixtures/specs/07-regions.json -o /tmp/a.drawio
 ```

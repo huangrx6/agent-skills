@@ -37,7 +37,11 @@ import tempfile
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCRIPTS = os.path.join(os.path.dirname(HERE), "scripts")
+# 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时读的是
+# `skills/<skill>/` 那棵树，测试放在里面会被顺手读进去）。
+# 所以从 `tests/<skill>/` 往上两级到仓库根，再进 `skills/<skill>/`。
+SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
+SCRIPTS = os.path.join(SKILL, "scripts")
 CHECK = os.path.join(SCRIPTS, "check_layout.py")
 
 
@@ -836,7 +840,7 @@ class TestEveryCheckHasALabel(unittest.TestCase):
         还看不出来。源码扫描与数据无关，加检查时不改标签照样会被抓到（这正是当初
         'through' 漏掉的那一次）。
         """
-        path = os.path.join(HERE, "..", "scripts", "check_layout.py")
+        path = os.path.join(SKILL, "scripts", "check_layout.py")
         with open(path, encoding="utf-8") as handle:
             text = handle.read()
         return set(re.findall(r'Issue\(\s*"([a-z_]+)"', text))

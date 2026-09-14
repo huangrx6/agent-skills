@@ -107,7 +107,7 @@ skills/skill-builder/
 
 ```sh
 cd skills/skill-builder
-python3 -m unittest discover -s tests -v     # 48 条
+python3 -m unittest discover -s tests/<skill> -v     # 48 条
 ```
 
 守的东西分三层，都是**边界值**（按仓库定的停止判据：元工具只要求边界值测试）：

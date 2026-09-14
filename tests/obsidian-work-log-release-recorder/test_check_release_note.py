@@ -20,7 +20,11 @@ import tempfile
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SKILL = os.path.dirname(HERE)
+# 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时
+# 读的是 `skills/<skill>/` 那棵树，测试放在里面会被顺手读进去）。
+# 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时读的是
+# `skills/<skill>/` 那棵树，测试放在里面会被顺手读进去）。
+SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPT = os.path.join(SKILL, "scripts", "check_release_note.py")
 TEMPLATE = os.path.join(SKILL, "references", "release-note-template.md")
 

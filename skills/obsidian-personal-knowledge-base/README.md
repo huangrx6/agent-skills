@@ -55,7 +55,7 @@ cd skills/obsidian-personal-knowledge-base
 python3 scripts/vault_path.py --explain            # 路径 / 来源 / 目录是否存在；退出码 0 或 2
 python3 scripts/check_links.py --ignore-template   # 全库失效 wikilink 与嵌入；0 无 / 1 有 / 2 路径解析失败
 python3 scripts/check_paths.py                     # .obsidian/ 配置里的失效绝对路径
-python3 -m unittest discover -s tests              # 19 条脚本回归
+python3 -m unittest discover -s tests/<skill>              # 19 条脚本回归
 ```
 
 ```text
@@ -107,7 +107,7 @@ skills/obsidian-personal-knowledge-base/
 ## 验证
 
 ```sh
-python3 -m unittest discover -s tests        # 19 条，全绿
+python3 -m unittest discover -s tests/<skill>        # 19 条，全绿
 python3 scripts/check_links.py --ignore-template
 python3 scripts/check_paths.py
 ```
