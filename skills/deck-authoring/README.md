@@ -17,12 +17,17 @@
 
 ```bash
 cd skills/deck-authoring/
-python3 scripts/ink.py styles/risograph/style.json              # 1) 墨色门禁
-python3 scripts/render.py dev-tools/demo.spec.json -o out.html  # 2) 出 HTML
-python3 scripts/check.py dev-tools/demo.spec.json out.html      # 3) 六项校验
-python3 scripts/shots.py out.html --out-dir pages/ --count 6    # 4) 截图（要 Chrome）
-python3 scripts/make_pptx.py --png-dir pages/ -o deck.pptx      # 5) 出 PPTX
+python3 scripts/ink.py styles/risograph/style.json                  # 1) 墨色门禁
+python3 scripts/plate.py --sample -o sample-treated.png             # 2) 造演示图
+python3 scripts/render.py dev-tools/demo.spec.json -o out.html      # 3) 出 HTML
+python3 scripts/check.py dev-tools/demo.spec.json out.html          # 4) 六项校验
+python3 scripts/shots.py out.html --out-dir pages/ --count 6        # 5) 截图（要 Chrome）
+python3 scripts/make_pptx.py --png-dir pages/ -o deck.pptx          # 6) 出 PPTX
 ```
+
+第 2 步是给 demo 的图文页造图：`demo.spec.json` 的 `image` 是个占位文件名，
+不先生成它就是一张裂图。要换成真照片走 `image_source.py`（再改 spec 里的文件名）。
+该产物**不入库**（见「已知限制」第 7 条）。
 
 ## 测试
 
@@ -54,6 +59,12 @@ python3 -m unittest discover -s tests/deck-authoring -v     # 21 条
    塞彩图会被拒绝并丢弃重做。
 6. **同 spec + 同种子 = 字节级一致**：用 random.Random(seed, parts) 派生错位 / 颗粒，
    不是全局 random。如果改了 seed 输出没变，多半是 spec 里没把 seed 传进去。
+7. **demo 的图文页要先造图**：`dev-tools/demo.spec.json` 的 `image` 是占位文件名，
+   按「跑法」跑一遍才有图。产物是本地文件，不进仓库（仓库只收文本 + 两个 SVG 图标）。
+8. **IO 还没走 `deckio.py`**：那个模块是按仓库「调用文件 IO 必须有 try/except」
+   那条约定预留的收口点，但**目前没有任何脚本用它** —— 也就是说那条约定现在**没被满足**
+   （`open()` / `json.load()` 直接散在 check / render / plate / image_source / ink 里）。
+   这是已知缺口，不是设计选择：见下方「跟外层仓库的关系」。
 
 ## 仓库布局
 
@@ -96,6 +107,7 @@ tests/deck-authoring/           # 测试住在仓库顶层（不在 skill 目录
 
 - 同目录模块用 `importlib.util` + `sys.modules` 加载（见 `_load_sibling`），
   不靠 `sys.path.insert` —— 这条 Pyright 才会过。
-- 所有 IO 走 `deckio.py`，不在调用点零散包 try/except（仓库要求"调用文件 IO
-  必须有 try/except"，集中比散落可靠）。
+- IO **目前散在各脚本里**（`with open(...)` 管关闭），**没走** `deckio.py` ——
+  那个模块是为此预留的收口点，却一次都没被用上。所以仓库那条「调用文件 IO 必须有
+  try/except」的约定**目前没被满足**，详见「已知限制」第 8 条。
 - 渲染层不写死任何颜色 / 尺寸 —— 全从 `style.json` 注入，CSS 里只有 `var()`。

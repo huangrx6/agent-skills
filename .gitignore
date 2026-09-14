@@ -32,3 +32,10 @@ dist/
 file-only/
 # skill 打包产物（安装/分发用）。**曾被我误用 git add -A 扫进一次** —— 真要入库请用 git add -f
 skills/*.zip
+
+# deck-authoring 的 demo 产物（本地生成，不入库）。
+# 仓库只收文本 + assets/icons 下两个 SVG；见该 skill 的 README「跑法」第 2 步。
+skills/deck-authoring/sample-treated.png
+skills/deck-authoring/pages/
+skills/deck-authoring/out.html
+skills/deck-authoring/deck.pptx
