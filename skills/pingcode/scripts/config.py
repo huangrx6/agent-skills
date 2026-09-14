@@ -233,7 +233,11 @@ def load_credentials() -> Credentials:
                 "缺 client_id / client_secret。两种补法：\n"
                 f"  1) 写 {path_of(CREDENTIALS)}（0600），格式见 README 的「配置」一节；\n"
                 f"  2) 设环境变量 {ENV_ID} 与 {ENV_SECRET}。\n"
-                "凭据在 PingCode 企业后台的凭据管理里创建应用后获得。"
+                "凭据在 PingCode 企业后台的凭据管理里创建应用后获得。\n"
+                f"配置会写到这里：{path_of(CREDENTIALS)}\n"
+                "目录不存在就先建它（macOS / Linux / Windows 通用）：\n"
+                f'  python3 -c "from pathlib import Path; '
+                f'Path(\'{config_dir()}\').mkdir(parents=True, exist_ok=True)"'
             )
     return Credentials(host, mode, client_id, client_secret, redirect_uri, source, has_secret)
 
