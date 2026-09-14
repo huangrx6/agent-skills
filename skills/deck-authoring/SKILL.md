@@ -23,8 +23,8 @@ description: >-
 （原型实测：主 / 副色单独当文字色只有 2.35 / 2.68 ✗）。所以：
 
 - 规格 schema 里**没有**色值字段、字号字段、坐标字段 —— 不存在，不是"不推荐填"。
-  写了也**不起作用**（渲染器只读它认得的键）；唯一会被主动拦下的是 `color`：
-  `check.py` 第 ① 条只接受 `"overprint"`，写成色值（如 `"#FF0000"`）会判失败。
+  手写它们会被 `validate_spec.py` **直接判失败**（字段集封闭），不是静默忽略 ——
+  静默最坏：模型以为写进去了，出的图却没变，于是跑去改别的地方。
 - 文字色**只能**是 overprint（两墨叠印）；`check.py` 第 ① 条会拦"主 / 副色声明当文字色"。
 
 换色板只改 `styles/risograph/style.json`，spec 与渲染器零改动。
@@ -32,14 +32,15 @@ description: >-
 ## 起手流程
 
 1. **先读 demo**：`dev-tools/demo.spec.json` —— spec 该写哪些键以它为准
-   （逐键说明见 `references/style-architecture.md`）。
+   （逐键说明见 `references/style-architecture.md`；写完先跑 `validate_spec.py` 过字段集）。
 2. **写 spec**：每页只有 `type` + 内容（标题 / 条目 / 时间点 / 数据），见
    `references/style-architecture.md`。`seed` 建议显式写（不写默认 1）—— 错位与颗粒
    按 (seed, 元素) 派生，不靠全局 random（两次渲染不重 = 没法回归、也没法复现）。
-3. **三道门**：
+3. **四道门**（顺序有意义：先验输入，再渲，最后验产物）：
+   - 规格：`python3 scripts/validate_spec.py your.spec.json`（字段集封闭，未知键直接失败）
    - 墨色：`python3 scripts/ink.py styles/risograph/style.json`（任一色板不达标退出 1）
    - 渲染：`python3 scripts/render.py your.spec.json -o out.html`
-   - 校验：`python3 scripts/check.py your.spec.json out.html`（六项机械校验全过退出 0）
+   - 产物：`python3 scripts/check.py your.spec.json out.html`（六项机械校验全过退出 0）
 4. **可选交付**：
    - PNG 截图：`python3 scripts/shots.py out.html --out-dir pages/ --count N`
    - PPTX：`python3 scripts/make_pptx.py --png-dir pages/ -o deck.pptx`
@@ -80,6 +81,9 @@ description: >-
 
 ## 出错时去哪查
 
+- **`validate_spec.py` 说某个字段不存在** → 那是刻意不留的三类（坐标 / 字号 / 色值）。
+  按它给的专门说明改：版式用 `type` 表达，换色板改 `styles/risograph/style.json`。
+  **别把字段删了就交差** —— 先想清楚本来想表达什么。
 - **对比度不达标** → `python3 scripts/ink.py styles/risograph/style.json` 看三套色板
   各自的叠印墨对比度；不达标的换色板，不要改 `contrast.minBody`。
 - **"第 N 页 X 估算宽 > 该版式上限"** → `references/validation.md` 第 ② 条，
