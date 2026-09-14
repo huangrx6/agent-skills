@@ -106,6 +106,7 @@ pingcode.py api --method POST --path /v1/comments --data '{...}'
 响应两边一样：`{id, url, title, size, type, file_type, ext, download_url, created_at, created_by}`。
 往某条评论的附件上传时多传一个 `comment_id`（两种都适用）。
 
-**两个都已实测跑通**：文件（传了个 28 字节的文件，列表里能看到下载地址）、代码段（必须带
-`comment_id` —— 先加一条评论拿 id 再传）。删附件走逃生口：
-`api --method DELETE --path '/v1/attachments/{attachment_id}' --param attachment_id=… --param principal_type=workitem --param principal_id=…`
+**三个都已实测跑通**：文件（传了个 28 字节的文件，列表里能看到下载地址）、代码段（必须带
+`comment_id` —— 先加一条评论拿 id 再传）、删除（`DELETE /v1/attachments/{attachment_id}`
+加两个查询参数；删完再删同 id 回 400 code=100045「附件不存在」，说明是真删）。
+删除有类型化命令 `workitem attach-remove <ref> <附件 id> --yes`。

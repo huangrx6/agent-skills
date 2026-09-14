@@ -87,6 +87,8 @@ pingcode.py workitem comment SCR-12 "这段是根因"     # 先拿评论 id
 pingcode.py workitem comments SCR-12 --full
 pingcode.py workitem attach-code SCR-12 --comment <评论 id> --title "ngx.conf" \
     --format nginx --content-file ./ngx.conf
+# 删附件：不可逆，所以要 --yes（评论里的附件再加 --comment <评论 id>）
+pingcode.py workitem attach-remove SCR-12 <附件 id> --yes
 
 # 批量改**一个**属性（官方限制：单属性 + 单值 + ≤100 个 id）
 pingcode.py workitem bulk-update --ids SCR-1,SCR-2,SCR-3 --state 已完成

@@ -89,7 +89,7 @@ SCR-12  登录页 500    缺陷  处理中  高      John    2026-09-30 00:00  h
 | 一次建一棵树 | `workitem create-plan --file plan.json [--yes]` | 封闭字段集的 JSON 计划，**默认只打印整棵树**；--yes 才建，且中途失败会报出已建成的编号 |
 | 结构化搜索 | `workitem search --created-after/--title-contains/--filter …` | 类 MongoDB 条件；操作符**不带 `$`**、值必须是对象（实测） |
 | 批量改 | `workitem bulk-update --ids A,B,C --state 已完成` | 官方限制（单属性 + 单值 + ≤100）做进了接口形状 |
-| 评论 / 附件 | `workitem comments <ref>`、`workitem attachments <ref>`、**`workitem attach <ref> --file …`**、**`workitem attach-code <ref> --comment <id> --title … --format …`** | 列表默认不列软删除的（实测评论列表不过滤，附件列表过滤 —— 已统一成 `--all` 才列）；上传两端点都已封装并实测 |
+| 评论 / 附件 | `workitem comments <ref>`、`workitem attachments <ref>`、**`workitem attach <ref> --file …`**、**`workitem attach-code <ref> --comment <id> …`**、**`workitem attach-remove <ref> <附件 id> --yes`** | 列表默认不列软删除的（实测评论列表不过滤、附件列表过滤 —— 已统一成 `--all` 才列）；上传（两个端点形状不同）与删除都已封装并实测 |
 | 改工作项 | `workitem update <ref> …` | 只发改动的字段；`--description-file` 读长文本 |
 | 改状态 | `workitem set-state <ref> <状态名>` | 先查该类型可用的状态；失败时把可用状态列出来 |
 | 评论 | `workitem comment <ref> "…"` | |
@@ -138,7 +138,7 @@ skills/pingcode/
 
 ```sh
 cd skills/pingcode
-python3 -m unittest discover -s tests -v     # 184 条：全绿
+python3 -m unittest discover -s tests -v     # 187 条：全绿
 python3 dev-tools/gen_endpoints.py --check   # 端点表与官方文档无漂移（离线时加 --input）
 ```
 
@@ -171,6 +171,6 @@ CLI 层证明了 dry-run 不发写、写操作打到正确端点且 body 里是�
 | `POST /v1/pjm/workitems/search`（复杂过滤：日期、自定义属性） | ✅ 已封：`workitem search`（常用条件做成参数，其余 `--filter` 透传；操作符格式是实测的） |
 | 批量改（`PATCH /v1/pjm/workitems`） | ✅ 已封：`workitem bulk-update`（只允许一个属性、≤100 个） |
 | 附件**上传** | ✅ 已实测（两端点都封了）：`workitem attach` 走 multipart（字段 `title` + `file`），真传了个 28 字节文件上去、列表里能看到下载地址；`workitem attach-code` 走 JSON，**实测必须带 `--comment`** —— 官方文档把 `comment_id` 标成「可选」，不带必回 400 code=100039（错误信息不告诉你是缺它），所以缺了当场拒绝 |
-| 附件**删除** | 走逃生口（路径占位符已修）：`api --method DELETE --path '/v1/attachments/{attachment_id}' --param attachment_id=… --param principal_type=workitem --param principal_id=…` |
+| 附件**删除** | ✅ 已封装并实测：`workitem attach-remove <ref> <附件 id> --yes`（不可逆，缺 `--yes` 拒绝；评论里的附件再加 `--comment <评论 id>`）。实测链路：传一个 → 删掉 → 列表回到空 → 再删同 id 回 **400 code=100045「附件不存在」**（证明是真删，不是静默失败） |
 | 关注人 / 关联 / 测试管理 / 需求 / 工单 | 未封装，走逃生口 |
 | 成员 / 权限 / 部门 / DevOps 流水线 | 明确不做类型化命令 |

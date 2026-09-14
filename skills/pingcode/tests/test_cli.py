@@ -748,6 +748,31 @@ class CliCase(unittest.TestCase):
         self.assertIn("100039", err)
         self.assertEqual([], router.find("POST", "/v1/attachments"), "不该白跑一趟")
 
+    # ── 删附件（不可逆；上传能用了，没有配对的删除就是陷阱）──
+    def test_删附件缺_yes_要拒绝(self):
+        code, _out, err, router = self.run_cli(
+            ["workitem", "attach-remove", "DOC-1", "at1"],
+            {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]}})
+        self.assertEqual(1, code)
+        self.assertIn("--yes", err)
+        self.assertEqual([], router.find("DELETE", "/v1/attachments"), "没确认不能删")
+
+    def test_删附件把路径与查询占位符都填上(self):
+        """「字面量 {attachment_id} 被发出去」那个错不能再犯一次。"""
+        code, out, _err, router = self.run_cli(
+            ["workitem", "attach-remove", "DOC-1", "at1", "--yes"],
+            {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]},
+             ("DELETE", "/v1/attachments"): {}})
+        self.assertEqual(0, code)
+        deletes = router.find("DELETE", "/v1/attachments")
+        self.assertEqual(1, len(deletes))
+        url = deletes[0][1]
+        self.assertIn("/v1/attachments/at1", url)
+        self.assertNotIn("{", url, "路径里不能残留字面量占位符")
+        self.assertIn("principal_type=workitem", url)
+        self.assertIn("principal_id=w1", url)
+        self.assertIn("已删除", out)
+
     # ── 删除 ──
     def test_删除缺_yes_要拒绝(self):
         code, _out, err, router = self.run_cli(

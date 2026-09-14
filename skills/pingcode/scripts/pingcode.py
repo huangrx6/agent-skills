@@ -60,6 +60,9 @@ WORKITEM = "/v1/pjm/workitems"
 PROJECTS = "/v1/pjm/projects"
 COMMENTS = "/v1/comments"
 ATTACHMENTS = "/v1/attachments"
+# 单个附件：路径占位符 + 两个查询占位符都在模板里，必须走 _api.build 填
+ATTACHMENT_ONE = ("/v1/attachments/{attachment_id}"
+                  "?principal_type={principal_type}&principal_id={principal_id}")
 
 # 工作项编号的形状（`DEMO-80` / `SCR-12`）：带连字符 + 结尾是数字。
 # 用形状先分流，省掉一次注定 400 的直取（官方对编号返回 400 而不是 404）。
@@ -1012,6 +1015,28 @@ def cmd_workitem_attach_code(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_workitem_attach_remove(args: argparse.Namespace) -> int:
+    """删一个附件：`DELETE /v1/attachments/{attachment_id}?principal_type=&principal_id=`。
+
+    不可逆，所以要 `--yes`（和 `workitem delete` 同一套）。上传现在是真能用的，
+    没有配对的删除就是个陷阱 —— 传错了只能去网页端收拾。
+    路径与查询串都交给 `_api.build`：「字面量占位符被发出去」那个错不能再犯一次。
+    评论里的附件再多带一个 `comment_id`（它不在模板里，所以走额外查询参数）。
+    """
+    client = build_client(args)
+    current = fetch_workitem(client, args.ref, include_deleted=bool(args.all))
+    if not args.yes and not args.dry_run:
+        raise CliError(f"删除附件不可逆。确认要删 {args.attachment_id} 就加 --yes")
+    path = _api.build(ATTACHMENT_ONE, attachment_id=args.attachment_id,
+                      principal_type="workitem", principal_id=current["id"])
+    extra = {"comment_id": args.comment} if args.comment else None
+    summary = f"删除 {current.get('identifier', args.ref)} 上的附件 {args.attachment_id}"
+    perform(args, client, "DELETE", path, params=extra, summary=summary)
+    if not args.dry_run:
+        print("✓ 附件已删除")
+    return 0
+
+
 def cmd_workitem_delete(args: argparse.Namespace) -> int:
     client = build_client(args)
     current = fetch_workitem(client, args.ref)
@@ -1375,6 +1400,13 @@ def build_parser() -> argparse.ArgumentParser:
     waf.add_argument("--comment", help="挂到某条评论下（评论 id）")
     waf.add_argument("--all", action="store_true", help="按编号找时含已删除的")
     waf.set_defaults(func=cmd_workitem_attach)
+    war = make(wsub, "attach-remove", help="删一个附件（不可逆，要 --yes）")
+    war.add_argument("ref")
+    war.add_argument("attachment_id")
+    war.add_argument("--comment", help="评论里的附件要带上评论 id")
+    war.add_argument("--yes", action="store_true", help="确认删除")
+    war.add_argument("--all", action="store_true", help="按编号找时含已删除的")
+    war.set_defaults(func=cmd_workitem_attach_remove)
     wac = make(wsub, "attach-code", help="上传代码段（JSON）")
     wac.add_argument("ref")
     wac.add_argument("--title", required=True, help="代码段标题")

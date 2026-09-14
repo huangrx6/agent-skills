@@ -75,6 +75,11 @@ USED = [
     ("POST", "/v1/pjm/workitems", None),
     ("PATCH", "/v1/pjm/workitems", None),
     ("POST", "/v1/pjm/workitems/search", None),
+    # 附件三件套（此前一条都没进 USED —— 契约测试其实没守住它们）
+    ("GET", "/v1/attachments", {"principal_type": "workitem", "principal_id": "x"}),
+    ("POST", "/v1/attachments", {"principal_type": "workitem", "principal_id": "x"}),
+    ("DELETE", "/v1/attachments/{attachment_id}",
+     {"principal_type": "workitem", "principal_id": "x"}),
     ("GET", "/v1/pjm/workitems/{workitem_id}", None),
     ("PATCH", "/v1/pjm/workitems/{workitem_id}", None),
     ("DELETE", "/v1/pjm/workitems/{workitem_id}", None),
@@ -146,6 +151,15 @@ class UsedEndpointsContractTest(unittest.TestCase):
             with self.subTest(endpoint=f"{method} {path}"):
                 entry = api.require(method, path, query)
                 self.assertEqual(path, entry.path)
+
+    def test_代码段那个附件变体在表里且没有查询参数(self):
+        """`POST /v1/attachments` 有两个变体：**无查询参数**的是「代码段」，带
+        principal_type/principal_id 的是「文件」。前一个没法用 `require(query)` 选
+        （空 query 不做窄化），所以这里直接盯住「两个变体都在、且哪个是空的」。
+        """
+        variants = api.find(method="POST", path="/v1/attachments")
+        templates = sorted(tuple(sorted(k for k, _ in v.query_template)) for v in variants)
+        self.assertEqual([(), ("principal_id", "principal_type")], templates)
 
     def test_写操作要的是写_scope(self):
         for method, path in (("POST", "/v1/pjm/workitems"),
