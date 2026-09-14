@@ -153,6 +153,34 @@
 - 顺带把 `skill-builder` 自己搬了一次（报告纪律的「为什么」→ `references/reporting.md`，
   正文 148 → 137），因为它的真实需求已经发生了
 
+### ⑥ draw.io 架构图 / 流程图 · 裁定**折进 `diagram-authoring` 当第二后端**，不新建 skill
+
+- **用户的原话**：「我需要能画架构图、流程图（draw.io 那种）的 skill」。研究之后的结论是
+  **一份规格、两个后端**。
+- **代码核实过（不是设想）**：`layout.py` 已经产出全部几何（`placed` / `edges[].points` 含
+  裁到框边 / `region_boxes` / 折行后的文字行），`emit_excalidraw.py` 是纯格式层，
+  `check_layout.py` 只 import `layout` + `palette`（与格式无关）。所以新工作只是
+  「mxGraph 序列化 + 一张形状映射表」。
+- **为什么不新建 skill**：跨 skill 共享代码在这个仓库**没有先例**，而且会在
+  `install_skills.py --copy` 下直接裂开（默认是软链）。两个后端共用一份几何与判据，
+  折进同一个 skill 是唯一不出现「第二份定义」的做法。（先做的那个动作是改名
+  `excalidraw-diagram` → `diagram-authoring`：名字不该带工具名。）
+- **做成了什么**：`emit_drawio.py`（不压缩的 mxGraph XML）+ `check_drawio.py`（写文件前的
+  结构自检）+ 53 条测试。其中**跨后端一致性**用例（同规格出两张图逐行比文字）当场拓出
+  两件事：drawio 侧漏画标题（只写进 `<diagram name>` 的话，导出的 PNG 上根本没有它）；
+  以及一个共享 layout 的假阻塞 bug（`check_text_fit` 与落笔对 `detail` 的判据不一致，
+  `detail: executive` + 非重点节点带 `detail` 会让**整张图出不来**）。
+
+### ⑦ Inkscape（SVG / 矢量）· 独立 skill，**下一个候选**
+
+- **范围分两层**：机械层（SVG → PNG/PDF/EMF、DPI 与尺寸控制、`--query-all` 几何自检、
+  文字转路径、批量）+ 执行层（按给定的 spec 实现并自检可校验项）。
+  `--query-all` 是「SVG 层的 `check_layout`」。
+- **明确不承诺审美** —— 审美是不可机械校验项，写进能力范围就是给自己挖坑
+  （与 `visual-design.md` 的「可校验 / 不可校验分界」同源）。
+- **关系**：与 `diagram-authoring` 是**单向可选依赖** —— diagram 可以调它来导图，
+  但它不依赖 diagram，也不要求对方存在。
+
 ### 明确不建议
 
 | 想法 | 为什么不 |
@@ -208,15 +236,17 @@ python3 $P project progress --project ASKILL            # 看进度
 
 ```text
 已完成：回填 6 份 README ・ 清死文件 ・ 补 2 个 evals ・ 触发日志 + 基线 ・ 重看 description
-         ・ 体检接进 pre-commit ・ pingcode 建项目实测 + 镜像 32 条工作项
+         ・ 体检接进 pre-commit ・ pingcode 建项目实测 + 镜像工作项
          ・ 补 create-plan / search / bulk-update / 评论附件 ・ WLRR 机械校验
          ・ 行为 eval **6 个 skill 全跑过一遍**（2026-09-14，共 41 次运行）—— 查出 9 个真缺陷：
            3 个代码 bug（pingcode --state 两处、gen_endpoints --check 跨天虚报、
            excalidraw groups[].style 静默失效）、4 处规则表述缺口、2 处 eval 自身的设计缺口
+         ・ draw.io 第二后端（同一份规格出 .drawio、结构自检、跨后端一致性测试）+ 修掉一个假阻塞
          ↓
-1. 三周后跑 skill_trigger_log.py --compare   ← 基线已存，只需等时间
-2. 其余候选（pingcode-plan 已做；weekly-plan / 桥等数据）
-3. references 瘦身    ← 不主动做；两个 skill 已只剩 2~5 行余量，下次加规则时会先被迫瘦身
+1. Inkscape skill 立项（先跑 skill-builder 的 Q1/Q3；装软件要先问）
+2. 三周后跑 skill_trigger_log.py --compare   ← 基线已存，只需等时间
+3. 其余候选（pingcode-plan 已做；weekly-plan / 桥等数据）
+4. references 瘦身    ← 不主动做；下次加规则时会先被迫瘦身
 ```
 
 ## 七、行为 eval 怎么跑（实测出来的，不是设想）
