@@ -95,6 +95,44 @@ SVG。中文在导出 PDF/SVG 后仍是文字（不会变路径），要继续�
 导出是**人在应用里点一下**的事，而 `.drawio` 本身是我们可以自己生成的纯 XML。
 （这也正是"不需要安装任何东西"这个结论的由来。）
 
+### 5.1 自动化验证：真实 draw.io 怎么打开我们的文件
+
+**走不通的路（已实测，别再试）**：本地起一个带 CORS 的服务，然后用
+`https://app.diagrams.net/#Uhttp%3A%2F%2F127.0.0.1%3A8790%2Fd.drawio` 打开。
+页面自己的 `fetch` 会直接 **`TypeError: Failed to fetch`** —— 这是 Chrome 的
+**本地网络访问**策略（公网 https 页面取 127.0.0.1 要过私有网络预检），实测即使响应带上
+`Access-Control-Allow-Private-Network: true` 仍然被挡（现在还要用户授权提示）。
+`#U<url>` 与老的 `url=` 参数都会撞这堵墙，**不要**围绕它写 dev-tool。
+
+**走得通的路（已实测）**：在页面上下文里**造一个 File 再派发 drop 事件** ——
+等价于人把文件拖进画布：
+
+```js
+const dt = new DataTransfer();
+dt.items.add(new File([xmlText], 'x.drawio', {type: 'application/xml'}));
+const el = document.querySelector('.geDiagramContainer') || document.body;
+['dragenter', 'dragover', 'drop'].forEach(t => (t === 'drop' ? document : el)
+  .dispatchEvent(new DragEvent(t, {bubbles: true, cancelable: true, dataTransfer: dt})));
+```
+
+之后会弹对话框，要各点一次：**「在当前窗口打开」**与**「放弃更改」**
+（后者只在当前图有未保存改动时出现）。
+
+⚠️ **别用 `g[data-cell-id]` 去数渲染出来的元素** —— 新版 draw.io 不是那个 DOM 结构，
+查到 0 会让人误判成“导入失败”（其实图已经画出来了，截图看一下就知道）。
+本轮就在这上面白跑了几步。
+
+### 5.2 已实测的渲染结论（真实 app.diagrams.net，不只是结构自检）
+
+| 项 | 结果 |
+| --- | --- |
+| 7 种形状映射 | 全部按设计渲染：椭圆 / 圆角 / 胶囊（`arcSize=50` = 两端半圆）/ 菱形 / **圆柱真的有椭圆顶盖** / 便签有折角且虚线 / 矩形 |
+| 区域 | 圆角 + 虚线边框 + 填充 ✓，标题居中于区域顶部 ✓ |
+| 图标题 | 24px 居中、在内容上方 ✓（只写 `<diagram name>` 的话导出的 PNG 上没有它） |
+| 边 | 正交走向 + 箭头 ✓；async 虚线 / sync 实线 ✓；标签在线中点 ✓ |
+| 大图 | 25 节点 / 3 区域、`detail: diagnostic` 的实测图打开即自动适应整页（落在 20%）✓；节点文字全在框内 ✓ |
+| 已知观感差异 | 边标签用 draw.io 自己的中点摆放，两个节点靠得近时会**贴到形状边上**（Excalidraw 后端会躲障碍）。算 P0 可接受；真要躲需自己算偏移（P2） |
+
 ## 六、已知边界与后续
 
 - **P1**：读回压缩过的 `.drawio`（把 app 存过的文件也能改进后再生成）。
