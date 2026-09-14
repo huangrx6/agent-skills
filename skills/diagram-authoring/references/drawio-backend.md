@@ -31,7 +31,7 @@
 
 `scripts/emit_drawio.py` 的 `SHAPE_STYLE` 是**本后端唯一新增的封闭集合**：
 把 `shapes.SHAPES` 里的语义形状名映射到 drawio 的 style 片段。
-`tests/test_emit_drawio.py::test_every_shape_has_a_drawio_mapping` 钉住"一一对应" ——
+"每种形状都有对应映射"是硬要求：漏掉一种形状，校验直接报错 ——
 **少一个键就报错，绝不 fallback 成矩形**（静默换形状比报错难查得多）。
 
 | 语义形状 | 中文 | drawio style |
@@ -113,7 +113,7 @@
 ## 三、与 Excalidraw 后端**有意不同**的地方
 
 这些差异是渲染器不同导致的，不是漂移。两边的**文字逐行相等**由
-`tests/test_emit_drawio.py::TestCrossBackendAgreement` 钉住（7 个夹具 × 默认档 + 诊断档）。
+两个后端会被逐图对照：同一份规格生成的 drawio 与 excalidraw，节点与边必须一一对上。
 
 | 项 | Excalidraw 后端 | drawio 后端 | 说明 |
 | --- | --- | --- | --- |

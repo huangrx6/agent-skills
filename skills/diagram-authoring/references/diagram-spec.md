@@ -357,7 +357,7 @@
 | 数值 | 位置 | 状态 |
 | --- | --- | --- |
 | CJK 1.00 em | `text_metrics.py` | **已实测**：偏差 0.0%（Excalidraw 渲染量出 10 字 = 160px @16px） |
-| 拉丁每字符前进宽度 | `text_metrics.py` | **已实测**：Helvetica 逐个字符量出后向上取整（`tests/test_text_metrics.py` 锁住数值） |
+| 拉丁每字符前进宽度 | `text_metrics.py` | **已实测**：Helvetica 逐个字符量出后向上取整（数值有实测记录：改量尺必须同步复核这张表） |
 | 断行档位 S/M/L = 10/16/24 单位 | `text_metrics.py` | **待验证**：依据前作档位与常识设的起点 |
 | `nodeSeparation` 120 / `rankSeparation` 120 | `layout.py` | **待验证**：来自前作 Dagre 默认值 |
 | 阈值 12px / 24px / 重合 1px | `check_layout.py` | **待验证**：依据前作数值与常识设的起点 |
@@ -366,7 +366,7 @@
 | 贴点对齐容差 `EDGE_MIN` / 边距 8 | `layout.py` | **待验证**：容差复用可见下限（两者必须同源），边距是新定的 |
 | 区域标题字号 20 / 上边距 10 / 间隙 5 / 左右边距 8 | `layout.py` | **待验证**：字号延续比节点大一步的旧值，其余三个是依照现有留白设的起点 |
 | 区域标题最多 2 行 | `layout.py` | **判断，不是推导**：写成了一个常数，理由在 `REGION_TITLE_MAX_LINES` 上 |
-| 2 个色相 + 5 档层级 + 3 档 emphasis 派生 | `palette.py` | **已实测**：对比度 / ΔE / 色相跨度 / 颜色密度全部由 `tests/test_palette.py` 锁住（数值是量出来的） |
+| 2 个色相 + 5 档层级 + 3 档 emphasis 派生 | `palette.py` | **已实测**：对比度 / ΔE / 色相跨度 / 颜色密度全部有实测数值（改 `palette.py` 必须同步复核对比度 / ΔE / 色相跨度 / 颜色密度）（数值是量出来的） |
 | 图标高 22 / 与文字间隙 10 / 无尺寸时占位 30 | `icons.py` `layout.py` | **待验证**：新定的数，没有真实数据校准过 |
 | 标题上方 28px / 上边距 | `emit_excalidraw.py` | **待验证**：与最小间隙同量级再放大一档，未校准 |
 
