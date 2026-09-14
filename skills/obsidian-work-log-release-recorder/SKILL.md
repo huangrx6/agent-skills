@@ -74,14 +74,16 @@ For this skill, resolve paths by **probing**, not from memory.
 
 1. Probe the candidate area before writing (`ls "$VAULT/01 Projects"`, `ls "$VAULT/02 Areas"`, `ls "$VAULT/03 Resources"`).
 2. Pick the narrowest existing directory that owns the topic.
-3. If the intended directory does not exist, **ask the user where to create it** — do not write into a non-existent path.
+3. If the intended directory does not exist, **ask the user where to create it** — do not write into a non-existent path. Exception：用户**本轮已指名了确切路径**（「放到 `02 Areas/05 数据平台/` 下」）→ 用那个路径，不要再问一遍（问的是「不知道放哪」，不是「用户说了不算」）。
 4. Update the nearest MOC/index after creating a new durable note.
 
 ### Common scenario：部署与运维类发布
 
-部署与运维类的发布工作（打包、上传、解压、配置拷贝、容器重启、前后端分开发布）在 vault 里通常归属于某个 `02 Areas/<领域>/<子主题>/` 目录。
+这类发布（打包、上传、解压、配置拷贝、容器重启、前后端分开发布）通常归 `02 Areas/<领域>/<子主题>/`。没有匹配领域时：告知用户历史路径已不在，问清记录放哪再动手 —— **不要写进记忆中的旧路径，也不要假定某类项目一定有对应 Area**。
 
-> ⚠️ 这类目录当前不存在 —— `02 Areas/` 下只有索引文件，没有领域子目录。**先探查**；没有匹配领域时，告知用户历史路径已不在，并问清记录该放哪再动手。不要写入任何记忆中的旧路径，也不要假定某类项目一定有对应 Area。
+### 模糊话「把这周做的事记一下」：不要自己判
+
+它同时命中触发词（记一下）与排除项（笼统的本周汇总）。先问用户要哪一种：**周报** → PKB（`references/work-management.md`）；**本周已落地的发版事实** → 本 skill。回答前不写任何笔记。
 
 ## Weekly Release Note
 
@@ -93,7 +95,7 @@ Default naming:
 
 Examples: `01 Projects/<项目名>/发版 - <项目名> - 2026-W18.md` or `02 Areas/<领域>/<子主题>/发版 - <系统或项目名> - 2026-W18.md`.
 
-Use ISO week numbering unless the user provides a different release naming convention. If a note for the current week already exists, update it instead of creating another. Probe the parent folder before writing; if it does not exist, ask the user where the release note should live.
+Use ISO week numbering unless the user provides a different release naming convention. If a note for the current week already exists, update it instead of creating another. Probe the parent folder before writing; if it does not exist, ask the user where the release note should live（同上：用户本轮已指名的路径就是答案）。
 
 ## Weekly Release Note Template
 
