@@ -79,6 +79,15 @@ pingcode.py workitem set-state SCR-12 已完成
 pingcode.py workitem comment SCR-12 "已定位到网关超时"
 pingcode.py workitem delete SCR-12 --yes            # 不可逆
 
+# 附件：列表默认不列软删除的（--all 才列）；上传两端点形状不同
+pingcode.py workitem attachments SCR-12
+pingcode.py workitem attach SCR-12 --file ./trace.log --title "网关日志"
+# 代码段**实测必须带 --comment**（官方文档把 comment_id 标成可选，不带回 400 code=100039）：
+pingcode.py workitem comment SCR-12 "这段是根因"     # 先拿评论 id
+pingcode.py workitem comments SCR-12 --full
+pingcode.py workitem attach-code SCR-12 --comment <评论 id> --title "ngx.conf" \
+    --format nginx --content-file ./ngx.conf
+
 # 批量改**一个**属性（官方限制：单属性 + 单值 + ≤100 个 id）
 pingcode.py workitem bulk-update --ids SCR-1,SCR-2,SCR-3 --state 已完成
 pingcode.py workitem bulk-update --ids SCR-1,SCR-2 --assignee @me --dry-run

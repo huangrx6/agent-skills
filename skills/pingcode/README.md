@@ -89,7 +89,7 @@ SCR-12  登录页 500    缺陷  处理中  高      John    2026-09-30 00:00  h
 | 一次建一棵树 | `workitem create-plan --file plan.json [--yes]` | 封闭字段集的 JSON 计划，**默认只打印整棵树**；--yes 才建，且中途失败会报出已建成的编号 |
 | 结构化搜索 | `workitem search --created-after/--title-contains/--filter …` | 类 MongoDB 条件；操作符**不带 `$`**、值必须是对象（实测） |
 | 批量改 | `workitem bulk-update --ids A,B,C --state 已完成` | 官方限制（单属性 + 单值 + ≤100）做进了接口形状 |
-| 评论 / 附件 | `workitem comments <ref>`、`workitem attachments <ref>` | 只列不传；**上传的契约已从文档挖出**（文件走 multipart，字段 `title` + `file`；代码段走 JSON，字段 `title`/`format`/`content`），见 `references/api.md` |
+| 评论 / 附件 | `workitem comments <ref>`、`workitem attachments <ref>`、**`workitem attach <ref> --file …`**、**`workitem attach-code <ref> --comment <id> --title … --format …`** | 列表默认不列软删除的（实测评论列表不过滤，附件列表过滤 —— 已统一成 `--all` 才列）；上传两端点都已封装并实测 |
 | 改工作项 | `workitem update <ref> …` | 只发改动的字段；`--description-file` 读长文本 |
 | 改状态 | `workitem set-state <ref> <状态名>` | 先查该类型可用的状态；失败时把可用状态列出来 |
 | 评论 | `workitem comment <ref> "…"` | |
@@ -138,7 +138,7 @@ skills/pingcode/
 
 ```sh
 cd skills/pingcode
-python3 -m unittest discover -s tests -v     # 175 条：全绿
+python3 -m unittest discover -s tests -v     # 184 条：全绿
 python3 dev-tools/gen_endpoints.py --check   # 端点表与官方文档无漂移（离线时加 --input）
 ```
 
@@ -170,6 +170,7 @@ CLI 层证明了 dry-run 不发写、写操作打到正确端点且 body 里是�
 | `assignee_id` 是否接受 `me` 这类占位 | 仍未试；本 skill 一律解析成真实 id，不依赖服务端支持 |
 | `POST /v1/pjm/workitems/search`（复杂过滤：日期、自定义属性） | ✅ 已封：`workitem search`（常用条件做成参数，其余 `--filter` 透传；操作符格式是实测的） |
 | 批量改（`PATCH /v1/pjm/workitems`） | ✅ 已封：`workitem bulk-update`（只允许一个属性、≤100 个） |
-| 附件**上传** | ⏳ **契约已从文档确认**（之前写的“字段名没法从文档确认”是错的，根因在我自己的生成器：它把 `parameter`/`header` 两节丢了，见 `references/api.md`）。文件 = `multipart/form-data`，字段 `title` + `file`；代码段 = JSON，字段 `title`/`format`/`content`。两个端点都能解析，尚未封装成类型化命令 |
+| 附件**上传** | ✅ 已实测（两端点都封了）：`workitem attach` 走 multipart（字段 `title` + `file`），真传了个 28 字节文件上去、列表里能看到下载地址；`workitem attach-code` 走 JSON，**实测必须带 `--comment`** —— 官方文档把 `comment_id` 标成「可选」，不带必回 400 code=100039（错误信息不告诉你是缺它），所以缺了当场拒绝 |
+| 附件**删除** | 走逃生口（路径占位符已修）：`api --method DELETE --path '/v1/attachments/{attachment_id}' --param attachment_id=… --param principal_type=workitem --param principal_id=…` |
 | 关注人 / 关联 / 测试管理 / 需求 / 工单 | 未封装，走逃生口 |
 | 成员 / 权限 / 部门 / DevOps 流水线 | 明确不做类型化命令 |

@@ -206,9 +206,21 @@ def fetch_workitem(client: Any, ref: str, include_deleted: bool = False) -> dict
 
 def perform(args: argparse.Namespace, client: Any, method: str, path: str,
             body: dict[str, Any] | None = None, params: dict[str, Any] | None = None,
-            summary: str = "") -> Any:
-    """统一的写入口：先回显「要做什么」，dry-run 就停在这里。"""
-    plan = client.describe(method, path, params, body)
+            summary: str = "",
+            files: list[tuple[str, str, bytes]] | None = None) -> Any:
+    """统一的写入口：先回显「要做什么」，dry-run 就停在这里。
+
+    `files` 给了就走 `multipart/form-data`（附件上传要用它）。回显里只放字段名与
+    文件名/字节数 —— 二进制正文没法看，而且 boundary 是每次请求现生的。
+    """
+    if files:
+        shown: dict[str, Any] = dict(body or {})
+        for name, filename, data in files:
+            shown[name] = f"{filename}（{len(data)} 字节）"
+        plan = client.describe(method, path, params, shown,
+                               content_type="multipart/form-data")
+    else:
+        plan = client.describe(method, path, params, body)
     if args.dry_run:
         print("--dry-run：只描述，不发送")
         print(json.dumps(plan, ensure_ascii=False, indent=2))
@@ -217,7 +229,10 @@ def perform(args: argparse.Namespace, client: Any, method: str, path: str,
         # flush=True：管道里 stdout 会被缓冲，stderr 不会 —— 不刷的话错误信息会
         # 出现在这句「将要做什么」的**前面**（Agent 抓输出时看着就像先报错后动手）。
         print(f"→ {summary}", flush=True)
-    result = client.request(method, path, params=params, body=body)
+    if files:
+        result = client.post_multipart(path, body or {}, files, **(params or {}))
+    else:
+        result = client.request(method, path, params=params, body=body)
     if result.quota.have_any:
         print(f"  配额：{result.quota.line()}")
     return result
@@ -869,12 +884,25 @@ def cmd_workitem_bulk_update(args: argparse.Namespace) -> int:
     return 0
 
 
+def visible(records: list[dict[str, Any]], include_deleted: bool) -> list[dict[str, Any]]:
+    """默认不列软删除的条目，`--all` 才列。
+
+    实测（删一条评论之后）：**评论列表不过滤 `is_deleted`** —— 删掉的评论会变成
+    一行「空内容 + 创建人 + 时间」留在列表里，看着像是还有内容；而附件列表是过滤的。
+    同两条相邻命令两套行为，所以这里统一成「默认不列、--all 才列」。
+    """
+    if include_deleted:
+        return records
+    return [r for r in records if not r.get("is_deleted")]
+
+
 def cmd_workitem_comments(args: argparse.Namespace) -> int:
     """列评论：GET /v1/comments?principal_type=workitem&principal_id=<id>。"""
     client = build_client(args)
     current = fetch_workitem(client, args.ref, include_deleted=bool(args.all))
-    values = client.paginate(COMMENTS, max_items=args.limit,
-                             principal_type="workitem", principal_id=current["id"])
+    values = visible(client.paginate(COMMENTS, max_items=args.limit,
+                                     principal_type="workitem", principal_id=current["id"]),
+                     bool(args.all))
     if args.full:
         print(json.dumps(values, ensure_ascii=False, indent=2))
         return 0
@@ -893,8 +921,9 @@ def cmd_workitem_attachments(args: argparse.Namespace) -> int:
     """
     client = build_client(args)
     current = fetch_workitem(client, args.ref, include_deleted=bool(args.all))
-    values = client.paginate(ATTACHMENTS, max_items=args.limit,
-                             principal_type="workitem", principal_id=current["id"])
+    values = visible(client.paginate(ATTACHMENTS, max_items=args.limit,
+                                     principal_type="workitem", principal_id=current["id"]),
+                     bool(args.all))
     if args.full:
         print(json.dumps(values, ensure_ascii=False, indent=2))
         return 0
@@ -913,6 +942,73 @@ def cmd_workitem_comment(args: argparse.Namespace) -> int:
     result = perform(args, client, "POST", COMMENTS, body=body, summary=summary)
     if result is not None and isinstance(result.data, dict):
         print(f"✓ 评论已创建（id={result.data.get('id', '?')}）")
+    return 0
+
+
+def cmd_workitem_attach(args: argparse.Namespace) -> int:
+    """上传文件附件：`POST /v1/attachments`，**multipart/form-data**。
+
+    form-data 的字段名是官方文档定的（`references/api.md` 有抄出来的契约表）：
+    `title` + `file`，两个都必填；`principal_type=workitem` 与主体 id 走查询参数。
+    缺省标题用文件名 —— 官方示例里 title 不是可选的，不给服务端会报必填。
+    """
+    client = build_client(args)
+    current = fetch_workitem(client, args.ref, include_deleted=bool(args.all))
+    try:
+        with open(args.file, "rb") as handle:
+            data = handle.read()
+    except OSError as exc:
+        raise CliError(f"读不了文件 {args.file}：{exc}") from exc
+    name = os.path.basename(args.file)
+    title = args.title or name
+    params: dict[str, Any] = {"principal_type": "workitem", "principal_id": current["id"]}
+    if args.comment:
+        params["comment_id"] = args.comment
+    summary = (f"把 {name}（{len(data)} 字节）传到 "
+               f"{current.get('identifier', args.ref)}：{title}")
+    result = perform(args, client, "POST", ATTACHMENTS, body={"title": title},
+                     params=params, summary=summary,
+                     files=[("file", name, data)])
+    if result is not None and isinstance(result.data, dict):
+        print(f"✓ 附件已上传（id={result.data.get('id', '?')}，"
+              f"{result.data.get('size', len(data))} 字节）")
+    return 0
+
+
+def cmd_workitem_attach_code(args: argparse.Namespace) -> int:
+    """上传代码段：`POST /v1/attachments`（**这个变体没有任何查询参数，正文是 JSON**）。
+
+    字段名同样来自官方文档：`principal_type` `principal_id` `title` `format` `content`
+    （都必填）+ `comment_id`（**文档写可选，实测必填**）。和文件上传只差一个名字，但请求形状完全不同 ——
+    文档里这是两个条目（见 `references/api.md` 的契约表）。
+    """
+    if not args.comment:
+        # 实测约束做成接口形状：官方文档把 comment_id 标成「可选」，但不带它必回
+        # 400 code=100039（那个错误不会告诉你是缺它）。与其白跑一趟网络，不如当场说清。
+        raise CliError(
+            "上传代码段要带 --comment <评论 id>：实测这个端点不带 comment_id 会回 "
+            "400 code=100039（官方文档把它标成可选，实测像必填）。\n"
+            "  先加一条评论拿到 id：workitem comment <ref> \"…\"，再 "
+            "workitem comments <ref> --full 看 id"
+        )
+    client = build_client(args)
+    current = fetch_workitem(client, args.ref, include_deleted=bool(args.all))
+    content = args.content
+    if content is None:
+        try:
+            with open(args.content_file, encoding="utf-8") as handle:
+                content = handle.read()
+        except OSError as exc:
+            raise CliError(f"读不了代码文件 {args.content_file}：{exc}") from exc
+    body: dict[str, Any] = {"principal_type": "workitem", "principal_id": current["id"],
+                           "title": args.title, "format": args.format, "content": content}
+    if args.comment:
+        body["comment_id"] = args.comment
+    summary = (f"把代码段「{args.title}」（{args.format}，{len(content)} 字符）"
+               f"传到 {current.get('identifier', args.ref)}")
+    result = perform(args, client, "POST", ATTACHMENTS, body=body, summary=summary)
+    if result is not None and isinstance(result.data, dict):
+        print(f"✓ 代码段已上传（id={result.data.get('id', '?')}）")
     return 0
 
 
@@ -1039,8 +1135,25 @@ def cmd_api(args: argparse.Namespace) -> int:
             body = json.loads(args.data)
         except json.JSONDecodeError as exc:
             raise CliError(f"--data 不是合法 JSON：{exc}") from exc
+    # 路径占位符必须交给 build 填。以前直接把带 `{...}` 的模板交给 client，
+    # 于是 URL 里留着字面量 `{attachment_id}`、而值被塞进了查询串 —— 表现是
+    # **凡路径带占位符的端点（470 条里的大多数）从逃生口都发不出去**。
+    # 模板里没点名的参数才是「额外查询参数」，那些照旧交给 client 做 urlencode。
+    if chosen is None:
+        # --force 走了「官方表里没有这条」的路：没有模板可填，按用户给的路径原样发
+        target = path
+        for_query = params
+    else:
+        needed = set(_api.placeholders(chosen.url))
+        for_path = {k: v for k, v in params.items() if k in needed}
+        for_query = {k: v for k, v in params.items() if k not in needed}
+        try:
+            target = _api.build(chosen.url, **for_path) if needed else chosen.url
+        except _api.PathParamError as exc:
+            raise CliError(f"{exc}\n  路径占位符用 --param 给："
+                           f"{'、'.join(sorted(needed))}") from exc
     client = build_client(args)
-    result = client.request(method, path, params=params or None, body=body)
+    result = client.request(method, target, params=for_query or None, body=body)
     payload = result.data
     print(json.dumps(payload, ensure_ascii=False, indent=2) if args.full or args.data
           else json.dumps(payload, ensure_ascii=False, indent=2))
@@ -1250,11 +1363,28 @@ def build_parser() -> argparse.ArgumentParser:
     wcl.add_argument("--limit", type=int, default=50)
     wcl.add_argument("--all", action="store_true", help="按编号找时含已删除的")
     wcl.set_defaults(func=cmd_workitem_comments)
-    wat = make(wsub, "attachments", help="列附件（上传未实现，见 README 已知限制）")
+    wat = make(wsub, "attachments", help="列附件")
     wat.add_argument("ref")
     wat.add_argument("--limit", type=int, default=50)
     wat.add_argument("--all", action="store_true", help="按编号找时含已删除的")
     wat.set_defaults(func=cmd_workitem_attachments)
+    waf = make(wsub, "attach", help="上传文件附件（multipart/form-data）")
+    waf.add_argument("ref")
+    waf.add_argument("--file", required=True, help="本地文件路径")
+    waf.add_argument("--title", help="附件标题（缺省用文件名；官方要求必填）")
+    waf.add_argument("--comment", help="挂到某条评论下（评论 id）")
+    waf.add_argument("--all", action="store_true", help="按编号找时含已删除的")
+    waf.set_defaults(func=cmd_workitem_attach)
+    wac = make(wsub, "attach-code", help="上传代码段（JSON）")
+    wac.add_argument("ref")
+    wac.add_argument("--title", required=True, help="代码段标题")
+    wac.add_argument("--format", required=True, help="语言，如 python / sql")
+    wac.add_argument("--content", help="代码段正文")
+    wac.add_argument("--content-file", help="从文件读代码段正文")
+    wac.add_argument("--comment",
+                     help="评论 id（实测必填：不带会回 400 code=100039，缺了当场拒绝）")
+    wac.add_argument("--all", action="store_true", help="按编号找时含已删除的")
+    wac.set_defaults(func=cmd_workitem_attach_code)
     wd = make(wsub, "delete", help="删除工作项（不可逆）")
     wd.add_argument("ref")
     wd.add_argument("--yes", action="store_true", help="确认删除")

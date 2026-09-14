@@ -88,12 +88,19 @@ class Router:
 
     def __init__(self, routes: dict) -> None:
         self.routes = sorted(routes.items(), key=lambda kv: len(kv[0][1]), reverse=True)
-        self.calls: list[tuple[str, str, object]] = []
+        self.calls: list[tuple[str, str, object, dict[str, str]]] = []
 
     def __call__(self, request, timeout=None):  # noqa: ARG002
         body = request.data
-        self.calls.append((request.method, request.full_url,
-                           json.loads(body.decode("utf-8")) if body else None))
+        parsed: object = None
+        if body:
+            try:
+                parsed = json.loads(body.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                # multipart 之类的二进制正文：原样记下来，别在这里炸
+                parsed = body
+        self.calls.append((request.method, request.full_url, parsed,
+                           dict(request.headers)))
         for (method, needle), payload in self.routes:
             if method == request.method and needle in request.full_url:
                 # payload 可以是：响应体 / 异常实例 / 函数（按调用次序造不同响应）
@@ -522,6 +529,12 @@ class CliCase(unittest.TestCase):
         self.assertNotIn("%E7%BC%BA%E9%99%B7", url)
 
     # ── 计划：一次建一棵树 ──
+    def write_temp(self, name: str, text: str) -> str:
+        path = os.path.join(self._tmp.name, name)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        return path
+
     def write_plan(self, payload: dict) -> str:
         path = os.path.join(self._tmp.name, "plan.json")
         with open(path, "w", encoding="utf-8") as fh:
@@ -676,6 +689,64 @@ class CliCase(unittest.TestCase):
         self.assertIn("未开始", err)
         self.assertIn("正常", err)
         self.assertEqual([], router.find("PATCH", "/v1/pjm/projects/pj1"), "不能瞎改")
+
+    # ── 附件上传（字段名 title + file 是官方文档定的，不是猜的）──
+    def test_上传文件走_multipart_字段名对(self):
+        path = self.write_temp("日志.txt", "trace 内容")
+        code, _out, _err, router = self.run_cli(
+            ["workitem", "attach", "DOC-1", "--file", path],
+            {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]},
+             ("POST", "/v1/attachments"): {"id": "at1", "title": "日志.txt", "size": 9}})
+        self.assertEqual(0, code)
+        posts = router.find("POST", "/v1/attachments")
+        self.assertEqual(1, len(posts))
+        _method, url, body, headers = posts[0]
+        self.assertIn("principal_type=workitem", url)
+        self.assertIn("principal_id=w1", url)
+        ctype = next(v for k, v in headers.items() if k.lower() == "content-type")
+        self.assertTrue(ctype.startswith("multipart/form-data; boundary="), ctype)
+        assert isinstance(body, bytes)
+        text = body.decode("utf-8")
+        self.assertIn('name="title"', text)
+        self.assertIn('name="file"; filename="日志.txt"', text)
+        self.assertIn("trace 内容", text)
+        self.assertTrue(text.endswith("--\r\n"), "结尾要是结束边界 + CRLF")
+
+    def test_上传文件的_dry_run_不发请求且写明是_multipart(self):
+        path = self.write_temp("日志.txt", "x")
+        code, out, _err, router = self.run_cli(
+            ["workitem", "attach", "DOC-1", "--file", path, "--dry-run"],
+            {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]}})
+        self.assertEqual(0, code)
+        self.assertIn("multipart/form-data", out)
+        self.assertIn("日志.txt", out)
+        self.assertEqual([], router.find("POST", "/v1/attachments"), "dry-run 不能真发")
+
+    def test_上传代码段走_json_那个变体(self):
+        code, _out, _err, router = self.run_cli(
+            ["workitem", "attach-code", "DOC-1", "--title", "t", "--format", "python",
+             "--content", "print(1)", "--comment", "cm1"],
+            {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]},
+             ("POST", "/v1/attachments"): {"id": "at2"}})
+        self.assertEqual(0, code)
+        _method, url, body, _headers = router.find("POST", "/v1/attachments")[0]
+        self.assertNotIn("principal_type=", url, "代码段那个变体没有任何查询参数")
+        self.assertEqual(["comment_id", "content", "format", "principal_id",
+                          "principal_type", "title"], sorted(body))
+        self.assertEqual("w1", body["principal_id"])
+        self.assertEqual("cm1", body["comment_id"])
+
+    def test_上传代码段缺_comment_当场拒绝而不是白跑一趟(self):
+        """官方文档把 comment_id 标成「可选」，实测不带必回 400 code=100039 ——
+        那个错误不会告诉你是缺它。所以做成接口形状约束：当场拒绝 + 说清原因。"""
+        code, _out, err, router = self.run_cli(
+            ["workitem", "attach-code", "DOC-1", "--title", "t", "--format", "python",
+             "--content", "print(1)"],
+            {("GET", "/v1/pjm/workitems"): {"values": [WORKITEM]}})
+        self.assertEqual(1, code)
+        self.assertIn("--comment", err)
+        self.assertIn("100039", err)
+        self.assertEqual([], router.find("POST", "/v1/attachments"), "不该白跑一趟")
 
     # ── 删除 ──
     def test_删除缺_yes_要拒绝(self):

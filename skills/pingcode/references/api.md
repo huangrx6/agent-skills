@@ -75,6 +75,11 @@ pingcode.py api --method POST --path /v1/comments --data '{...}'
 路径不在官方表里会被拦下并给候选；确认要用加 `--force`。**逃生口不猜参数名**——
 它只校验路径；参数写错由服务端返回 400，CLI 会把 `{code, message}` 翻出来。
 
+`--param` 里与模板占位符同名的那些会填进**路径和查询串**（`--path '/v1/attachments/{attachment_id}'
+--param attachment_id=…` → `/v1/attachments/…`）；其余才是额外查询参数。这条以前是坏的：
+路径里的 `{attachment_id}` 会原样发出去、值被塞进查询串 —— 于是**凡路径带占位符的端点
+（470 条里的大多数）从逃生口都发不出去**。
+
 ## 已知边界
 
 - 生成表只收「接口」条目：官方 JSON 里那 124 条纯文档页（没有 method/url）不进表。
@@ -94,9 +99,13 @@ pingcode.py api --method POST --path /v1/comments --data '{...}'
 | | `POST /v1/attachments`（代码段） | `POST /v1/attachments?principal_type=&principal_id=[&comment_id=]`（文件） |
 | --- | --- | --- |
 | Content-Type | `application/json` | **`multipart/form-data`**（文档写成必填 header） |
-| 正文 | `principal_type` `principal_id` `title` `format` `content`（均必填）+ `comment_id`（选） | **form-data：`title` + `file`**（均必填） |
+| 正文 | `principal_type` `principal_id` `title` `format` `content`（均必填）+ `comment_id`（**文档写可选，实测必填** —— 不带回 400 code=100039，报错不说是缺它） | **form-data：`title` + `file`**（均必填） |
 | `principal_type` 取值 | `workitem` / `workitem_review` / `workitem_deliverable` / `testcase` / `testcase_review` / `testrun` / `idea` / `idea_review` / `ticket` / `page` | 同左 |
 | 作用域 | 随主体（如 `workitem` 要 `pcp:write:pjm:workitem`） | 同左 |
 
 响应两边一样：`{id, url, title, size, type, file_type, ext, download_url, created_at, created_by}`。
 往某条评论的附件上传时多传一个 `comment_id`（两种都适用）。
+
+**两个都已实测跑通**：文件（传了个 28 字节的文件，列表里能看到下载地址）、代码段（必须带
+`comment_id` —— 先加一条评论拿 id 再传）。删附件走逃生口：
+`api --method DELETE --path '/v1/attachments/{attachment_id}' --param attachment_id=… --param principal_type=workitem --param principal_id=…`

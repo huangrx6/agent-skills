@@ -246,6 +246,57 @@ class ConfigTest(TempConfigCase):
 
 
 # ── 客户端 ────────────────────────────────────────────────────
+class MultipartTest(TransportCase):
+    """附件上传的正文编码。字段名是官方文档定的（`title` + `file`），不是猜的。
+
+    CRLF 不是风格问题：规范要求 CRLF，用 `\n` 拼出来的正文有些服务端整段解析失败，
+    而且报的错不会告诉你是换行符的问题。
+    """
+
+    def test_正文含两个字段与结束边界(self):
+        body = client.encode_multipart({"title": "日志.txt"},
+                                       [("file", "日志.txt", "trace".encode())],
+                                       "BOUND")
+        text = body.decode("utf-8")
+        self.assertIn('--BOUND\r\nContent-Disposition: form-data; name="title"\r\n\r\n'
+                      "日志.txt\r\n", text)
+        self.assertIn('name="file"; filename="日志.txt"', text)
+        self.assertIn("trace", text)
+        self.assertTrue(text.endswith("--BOUND--\r\n"), "结尾必须是结束边界 + CRLF")
+
+    def test_每个换行都是_crlf(self):
+        body = client.encode_multipart({"title": "t"}, [("file", "f", b"x")], "B")
+        self.assertEqual(body.count(b"\n"), body.count(b"\r\n"), "出现了裸 \n")
+
+    def test_文件名里的引号与换行会被清掉(self):
+        """文件名进的是 Content-Disposition 头，引号/换行会把头写坏。"""
+        body = client.encode_multipart({}, [("file", 'a"b\r\nc.txt', b"x")], "B").decode()
+        self.assertIn('filename="a\'bc.txt"', body)
+
+    def test_post_multipart_带_boundary_和正确_content_type(self):
+        cli, calls = self.make_client(FakeResponse({"id": "a1"}))
+        result = cli.post_multipart("/v1/attachments", {"title": "t"},
+                                    [("file", "f.txt", b"data")],
+                                    principal_type="workitem", principal_id="w1")
+        self.assertEqual("a1", result.data["id"])
+        request = calls[0]
+        self.assertIn("principal_type=workitem", request.full_url)
+        ctype = next(v for k, v in request.headers.items() if k.lower() == "content-type")
+        self.assertTrue(ctype.startswith("multipart/form-data; boundary="), ctype)
+        self.assertIn(b'name="file"; filename="f.txt"', request.data)
+
+    def test_post_multipart_的_dry_run_回显不含二进制(self):
+        cli, calls = self.make_client(FakeResponse({}), dry_run=True)
+        result = cli.post_multipart("/v1/attachments", {"title": "t"},
+                                    [("file", "f.txt", b"\x00\x01binary")],
+                                    principal_type="workitem", principal_id="w1")
+        self.assertEqual([], calls)
+        shown = json.dumps(result.data["body"], ensure_ascii=False)
+        self.assertIn("f.txt", shown)
+        self.assertIn("字节", shown)
+        self.assertNotIn("\u0000", shown)
+
+
 class ClientTest(TransportCase):
     def test_describe_不带真令牌(self):
         cli, _calls = self.make_client(FakeResponse({}))

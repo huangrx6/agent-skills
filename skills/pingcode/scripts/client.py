@@ -31,6 +31,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from typing import Any, Callable, NamedTuple
 
 
@@ -74,6 +75,41 @@ MAX_RETRY_SLEEP = 60
 # 「这个范围里没有优先级可选项」。而 dry-run 的用处正是「把解析后的真 body 给人看一眼」，
 # 那本来就必须要能读。
 WRITE_METHODS = ("POST", "PUT", "PATCH", "DELETE")
+
+
+def _safe_filename(name: str) -> str:
+    """文件名进的是 `Content-Disposition` 头，引号/换行会把头写坏。"""
+    cleaned = str(name).replace('"', "'").replace("\r", "").replace("\n", "")
+    return cleaned or "upload"
+
+
+def encode_multipart(fields: dict[str, str],
+                     files: list[tuple[str, str, bytes]],
+                     boundary: str) -> bytes:
+    """拼 `multipart/form-data` 正文（RFC 7578）。零依赖，不引第三方。
+
+    官方对附件文件的要求就是它：header 必须写 `multipart/form-data`，
+    form-data 字段是 `title` + `file`（见 `references/api.md` 的契约表），
+    所以这两个名字是文档定的，不是猜的。
+
+    行结束符必须是 **CRLF**（规范要求）—— 用 `\n` 拼出来的正文，
+    有些服务端会整段解析失败，而且报的错不会告诉你是换行符的问题。
+
+    字段顺序就是 dict / list 的顺序：`title` 在前、`file` 在后，跟文档示例一致。
+    """
+    out = bytearray()
+    for name, value in fields.items():
+        out += f"--{boundary}\r\n".encode("utf-8")
+        out += f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode("utf-8")
+        out += str(value).encode("utf-8") + b"\r\n"
+    for name, filename, data in files:
+        out += f"--{boundary}\r\n".encode("utf-8")
+        out += (f'Content-Disposition: form-data; name="{name}"; '
+                f'filename="{_safe_filename(filename)}"\r\n').encode("utf-8")
+        out += b"Content-Type: application/octet-stream\r\n\r\n"
+        out += data + b"\r\n"
+    out += f"--{boundary}--\r\n".encode("utf-8")
+    return bytes(out)
 
 RETRY_HEADERS = ("X-RateLimit-Retry-After", "X-PC-Retry-After")
 REASON_HEADER = "X-RateLimit-Reason"
@@ -237,19 +273,21 @@ class Client:
             return path
         return _config.api_base(self.host) + "/" + path.lstrip("/")
 
-    def _headers(self, has_body: bool, authenticate: bool = True) -> dict[str, str]:
+    def _headers(self, has_body: bool, authenticate: bool = True,
+                 content_type: str | None = None) -> dict[str, str]:
         headers = {"Accept": "application/json"}
         if authenticate:
             token = self._bearer()
             if token:
                 headers["Authorization"] = f"Bearer {token}"
         if has_body:
-            headers["Content-Type"] = "application/json"
+            headers["Content-Type"] = content_type or "application/json"
         return headers
 
     def describe(self, method: str, path: str, params: dict[str, Any] | None = None,
                  body: dict[str, Any] | None = None,
-                 authenticate: bool = True) -> dict[str, Any]:
+                 authenticate: bool = True,
+                 content_type: str | None = None) -> dict[str, Any]:
         """只描述将发出的请求（`--dry-run` 与写操作回显都用它）。**不含令牌。**"""
         method = method.upper()
         url = self.url_for(path)
@@ -261,36 +299,41 @@ class Client:
         if authenticate:
             headers["Authorization"] = "Bearer ***"
         if body:
-            headers["Content-Type"] = "application/json"
+            headers["Content-Type"] = content_type or "application/json"
         return {"method": method, "url": url, "headers": headers, "body": body}
 
     # ── 发送 ──────────────────────────────────────────────────
     def request(self, method: str, path: str, params: dict[str, Any] | None = None,
                 body: dict[str, Any] | None = None,
-                authenticate: bool = True) -> Result:
+                authenticate: bool = True,
+                raw: bytes | None = None,
+                content_type: str | None = None) -> Result:
+        """`raw` 给自己拼好的正文（multipart）用；那时 `body` 只用于回显。"""
         method = method.upper()
-        plan = self.describe(method, path, params, body, authenticate)
+        plan = self.describe(method, path, params, body, authenticate,
+                             content_type=content_type)
         if self.dry_run and method in WRITE_METHODS:
             return Result(0, plan, method, plan["url"], Quota({}))
 
-        payload = None
-        if body is not None:
+        payload = raw
+        if payload is None and body is not None:
             payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
 
         attempt = 0
         while True:
             attempt += 1
             try:
-                return self._once(method, plan["url"], payload, authenticate)
+                return self._once(method, plan["url"], payload, authenticate, content_type)
             except RateLimited as exc:
                 if attempt > self.retries:
                     raise
                 self._sleep(_retry_wait(exc, attempt))
 
     def _once(self, method: str, url: str, payload: bytes | None,
-              authenticate: bool = True) -> Result:
+              authenticate: bool = True, content_type: str | None = None) -> Result:
         request = urllib.request.Request(
-            url, data=payload, method=method, headers=self._headers(payload is not None, authenticate)
+            url, data=payload, method=method,
+            headers=self._headers(payload is not None, authenticate, content_type)
         )
         try:
             response = self._opener(request, timeout=self.timeout)
@@ -381,6 +424,24 @@ class Client:
     def delete(self, path: str, **params: Any) -> Result:
         clean = {k: v for k, v in params.items() if v is not None and v != ""}
         return self.request("DELETE", path, params=clean or None)
+
+    def post_multipart(self, path: str, fields: dict[str, str],
+                       files: list[tuple[str, str, bytes]], **params: Any) -> Result:
+        """POST `multipart/form-data`（附件文件就这么传）。
+
+        boundary 每次随机（`uuid4`）—— 固定 boundary 在正文里出现同名字符串时
+        会把正文切错；随机一个的成本几乎为零。
+        回显（`--dry-run`）里 body 只放字段名与文件名/字节数，不放正文（二进制没法看）。
+        """
+        clean = {k: v for k, v in params.items() if v is not None and v != ""}
+        boundary = "----pingcode-skill-" + uuid.uuid4().hex
+        payload = encode_multipart(fields, files, boundary)
+        shown: dict[str, Any] = dict(fields)
+        for name, filename, data in files:
+            shown[name] = f"{_safe_filename(filename)}（{len(data)} 字节）"
+        return self.request("POST", path, params=clean or None, body=shown,
+                            raw=payload,
+                            content_type=f"multipart/form-data; boundary={boundary}")
 
     def paginate(self, path: str, page_size: int = 100, max_items: int = 500,
                  **params: Any) -> list[dict[str, Any]]:
