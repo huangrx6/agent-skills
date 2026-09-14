@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "colorSets": {
+    "vivid": {
+      "primary": "#FF48B0",
+      "secondary": "#00A8E8",
+      "background": "#F5EFDD"
+    },
+    "warm": {
+      "primary": "#FF6B35",
+      "secondary": "#004E89",
+      "background": "#FAF3E7"
+    },
+    "muted": {
+      "primary": "#E4572E",
+      "secondary": "#4A2E1E",
+      "background": "#EDE6D6"
+    }
+  },
+  "ink": {
+    "derivation": "srgb-multiply",
+    "forText": "overprint",
+    "note": "文字一律用两墨叠印色（primary × secondary，派生不手写）。主色/副色只做墨层、色块与装饰 —— 它们是荧光/高饱和色，当文字色对比度天生不达标（原型实测 2.35~2.68）。",
+    "rule": "每套色板必须含**一个深墨**：叠印色 = primary × secondary，两墨都亮时压不深、承载不了正文（实测：朱红×土黄 只有 3.74 ✗；换成朱红×深棕 后达标）。"
+  },
+  "contrast": {
+    "minBody": 4.5,
+    "minLarge": 3.0,
+    "largeTextPx": 32
+  },
+  "misregistration": {
+    "offsetRangeX": [
+      1,
+      3
+    ],
+    "offsetRangeY": [
+      1,
+      3
+    ],
+    "rotationRange": [
+      -1.5,
+      1.5
+    ],
+    "blendMode": "multiply"
+  },
+  "texture": {
+    "grainOpacity": [
+      0.08,
+      0.15
+    ],
+    "grainBaseFrequency": 0.9,
+    "halftoneDotSize": [
+      2,
+      4
+    ]
+  },
+  "fonts": {
+    "display": "Songti SC, Georgia, serif",
+    "mono": "SF Mono, Menlo, monospace"
+  },
+  "viewerBackground": "#141414"
+}

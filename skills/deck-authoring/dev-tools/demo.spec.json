@@ -1,0 +1,78 @@
+{
+  "deck": {
+    "colorSet": "vivid",
+    "seed": 11,
+    "title": "2026 产品复盘",
+    "slides": [
+      {
+        "type": "title",
+        "title": "2026 产品复盘",
+        "subtitle": "从 0 到 1 的十二个月 / riso print · 双色叠印"
+      },
+      {
+        "type": "content-text",
+        "title": "核心结论",
+        "bullets": [
+          "用户留存提升 23%",
+          "核心链路耗时下降 40%",
+          "新增渠道贡献 15% 增量"
+        ]
+      },
+      {
+        "type": "content-image",
+        "title": "现场照片",
+        "bullets": [
+          "把原始照片重新制版",
+          "两墨色阶 + 半调网点"
+        ],
+        "image": "sample-treated.png"
+      },
+      {
+        "type": "two-column",
+        "title": "做对 vs 做错",
+        "columns": [
+          {
+            "title": "做对的",
+            "bullets": [
+              "错位只用在标题",
+              "正文保持清晰"
+            ]
+          },
+          {
+            "title": "做错的",
+            "bullets": [
+              "整页都在飘",
+              "荧光色当正文色"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "timeline",
+        "title": "这一年",
+        "nodes": [
+          {
+            "label": "Q1 立项",
+            "note": "确定了两个方向"
+          },
+          {
+            "label": "Q2 上线",
+            "note": "灰度 10%"
+          },
+          {
+            "label": "Q3 放量",
+            "note": "全量铺开"
+          },
+          {
+            "label": "Q4 复盘",
+            "note": "留存 +23%"
+          }
+        ]
+      },
+      {
+        "type": "end",
+        "title": "谢谢"
+      }
+    ]
+  }
+}
