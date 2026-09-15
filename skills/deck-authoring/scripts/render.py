@@ -59,13 +59,19 @@ def grain_opacity(tokens: dict, seed, *parts) -> float:
     return round(_rng(seed, "grain", *parts).uniform(*tokens["texture"]["grainOpacity"]), 3)
 
 
-def _entry(mid: str, slide: int, role: str, text: str = "", size: float | None = None) -> dict:
+def _entry(mid: str, slide: int, role: str, text: str = "", size: float | None = None,
+           **extra) -> dict:
     """语义清单的一条。几何不在里面 —— 几何由 measure.py 从真浏览器拿。
 
     这里只记“事实”：这个元素是什么、写了什么字、设计意图用多大字号。
     职责划得很清：**意图在渲染层，几何在测量层**。两者对不上就是 bug。
+
+    额外键（目前只有图表数据）原样带走：导出层需要它，而它既不是几何、
+    也不是“样式”，是这个元素的**内容**。
     """
-    return {"id": mid, "slide": slide, "role": role, "text": text, "fontSize": size}
+    entry = {"id": mid, "slide": slide, "role": role, "text": text, "fontSize": size}
+    entry.update(extra)
+    return entry
 
 
 def halftone(tokens: dict, seed, index: int) -> str:
@@ -345,9 +351,10 @@ def render(deck_spec: dict, tokens: dict) -> str:
 
     man: list[dict] = []          # 语义清单：元素身份 + 意图（几何由 measure.py 量）
 
-    def tag(mid: str, slide_no: int, role: str, text: str = "", size: float | None = None) -> str:
+    def tag(mid: str, slide_no: int, role: str, text: str = "", size: float | None = None,
+            **extra) -> str:
         """登记一条并返回 `data-m` 属性串。"""
-        man.append(_entry(mid, slide_no, role, text, size))
+        man.append(_entry(mid, slide_no, role, text, size, **extra))
         return f'data-m="{mid}"'
 
     out = [head]
@@ -420,7 +427,10 @@ def render(deck_spec: dict, tokens: dict) -> str:
             out.append(f'<div class="end" style="--riso-size:{tsize}px">{title_html}</div>')
         elif kind == "chart":
             out.append(f'<div style="--riso-size:{tsize}px;height:88px">{title_html}</div>')
-            chart_attrs = tag(f"s{i}.chart", i, "chart", "", None)
+            # 图表把**数据本身**也带进清单：导出层要拿它建原生图表（数据可改），
+            # 而数据不是几何 —— 几何仍旧只从 measure.py 来。
+            chart_attrs = tag(f"s{i}.chart", i, "chart", "", None,
+                              data=slide.get("data", []), unit=slide.get("unit", ""))
             out.append(chart_svg(slide.get("data", []), slide.get("unit", ""), chart_attrs))
             if slide.get("caption"):
                 cap_attrs = tag(f"s{i}.caption", i, "bullet", slide["caption"], 26)

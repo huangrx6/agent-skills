@@ -46,7 +46,8 @@ description: >-
    - 演示：直接把 `out.html` 给人（`out.html?present` 一页一屏、`←/→` 翻页、`F` 全屏）
    - PDF：`python3 scripts/pdf.py out.html -o deck.pdf`（矢量、能打印；脚本会验页数与页尺寸）
    - PNG 截图：`python3 scripts/shots.py out.html --out-dir pages/ --count N`
-   - PPTX：`python3 scripts/make_pptx.py --png-dir pages/ -o deck.pptx`
+   - PPTX（观感 100%）：`python3 scripts/make_pptx.py --png-dir pages/ -o deck.pptx`
+   - PPTX（**对方要改字**）：`python3 scripts/pptx_native.py out.html -o deck-editable.pptx`
 5. **图页**：先 `python3 scripts/image_source.py --prompt "…" -o pic.png` 出图，
    再把文件名写到 spec 的 `image` 字段。几何色块拼贴是默认（无 provider），
    它本身就是 riso 的，不是灰占位图。

@@ -162,6 +162,20 @@ PROBE_JS = r"""
         naturalW: im.naturalWidth, naturalH: im.naturalHeight
       });
     });
+    // 装饰墨块（data-zone）：不是内容、不属语义清单，但导出层要把它画成**原生形状**
+    // —— 所以也量。它自己不带 id，所在页从 DOM 里找最近的一页。
+    out.decor = [];
+    var secs = [].slice.call(document.querySelectorAll('section.slide'));
+    document.querySelectorAll('[data-zone]').forEach(function (el) {
+      var r = el.getBoundingClientRect();
+      out.decor.push({
+        slide: secs.indexOf(el.closest('section.slide')) + 1,
+        zone: el.getAttribute('data-zone'),
+        size: parseFloat(el.getAttribute('data-size')),
+        x: Math.round(r.x * 10) / 10, y: Math.round(r.y * 10) / 10,
+        w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10
+      });
+    });
     // 每页版面**各自的盒子**。产物是竖向堆叠的多页，第 2 页的元素 y 本来就在 900 以下；
     // 拿全局页面边界（1600×900）去比多页产物，会把后面每一页都误报成“越界”（实测踩过）。
     out.slides = [];
