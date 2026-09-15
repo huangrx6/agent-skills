@@ -79,7 +79,7 @@ measure_mod = _load_sibling("measure")
 EMU_PER_PX = 9525
 PX_TO_PT = 0.75
 
-# 角色 → 用哪套字。/ 是否加粗。字体族本身从产物里的 --serif / --mono 取。
+# 角色 → 用哪套字。/ 是否加粗。字体族本身从产物里的 --display / --body 取。
 SERIF_ROLES = {"title"}
 BOLD_ROLES = {"title"}
 MONO_ROLES = {"subtitle", "bullet", "foot", "caption"}
@@ -94,10 +94,11 @@ NON_TEXT_ROLES = {"image", "chart"}
 
 
 def parse_root_vars(html: str) -> dict[str, str]:
-    """从产物里读 `:root{--paper:…;--ink-a:…}`。
+    """从产物里读 `:root{--paper:…;--accent:…}`。
 
     为什么不读 `style.json`：产物**已经**把 token 解析成 CSS 变量写进页面了。
-    以产物为唯一事实来源，就不会出现"改了 token 但产物是旧的"这种错配。
+    以产物为唯一事实来源，就不会出现"改了 token 但产物是旧的"这种错配 ——
+    也自然支持多风格（不管哪个 skin，契约变量名是同一组）。
     """
     m = re.search(r":root\s*\{(.*?)\}", html, re.S)
     if m is None:
@@ -173,14 +174,14 @@ def add_text(slide, el: dict, box: tuple[float, float, float, float],
     run = p.add_run()
     run.text = el.get("text", "")
 
-    fam = first_family(vars_.get("--serif", "") if role in SERIF_ROLES
-                       else vars_.get("--mono", ""))
+    fam = first_family(vars_.get("--display", "") if role in SERIF_ROLES
+                       else vars_.get("--body", ""))
     run.font.name = fam
     run.font.size = Pt(round((el.get("fontSize") or 24) * PX_TO_PT, 1))
     run.font.bold = role in BOLD_ROLES
     # 标题取叠印色（单层替代双墨错位）；其余用**实测到的**计算色 —— 又是"量不是猜"
-    color = vars_["--ink-text"] if role in SERIF_ROLES else (el.get("measuredColor")
-                                                            or vars_["--ink-text"])
+    color = vars_["--text"] if role in SERIF_ROLES else (el.get("measuredColor")
+                                                         or vars_["--text"])
     run.font.color.rgb = css_color(color)
 
 
@@ -196,7 +197,7 @@ def add_decor(slide, d: dict, slides: list[dict], vars_: dict[str, str]) -> None
     # ⚠️ 属性名是 `pattern`，不是 `pattern_type` —— 写错了不会报错，会被当成普通属性
     # 默默吞掉，XML 里的 `<a:pattFill>` 就光秃秃没有 prst（实测踩过：渲染出来是个空圈）。
     shape.fill.pattern = MSO_PATTERN.PERCENT_25
-    shape.fill.fore_color.rgb = css_color(vars_["--ink-a"])
+    shape.fill.fore_color.rgb = css_color(vars_["--accent"])
     shape.fill.back_color.rgb = css_color(vars_["--paper"])
 
 
@@ -221,7 +222,7 @@ def add_chart(slide, el: dict, box: tuple[float, float, float, float],
     plot.gap_width = 60
     for series in plot.series:
         series.format.fill.solid()
-        series.format.fill.fore_color.rgb = css_color(vars_["--ink-a"])
+        series.format.fill.fore_color.rgb = css_color(vars_["--accent"])
 
 
 def build(html_path: str, out_path: str) -> dict:

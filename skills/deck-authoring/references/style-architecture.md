@@ -87,27 +87,69 @@
 
 `render.py` / `check.py` 不需要改 —— 它们从 token 注入一切。
 
-### B. 加一种新视觉风格（比如 watercolor / screenprint / letterpress）
+### B. 加一种新视觉风格
 
-那要走一个比这更大的改造：
+> 之前这一节写的是「要走一个比这更大的改造，代价 ≈ 0.5~1 个工作日」。那个 seam 现在
+> **已经建好了，而且不是靠分支实现的** —— 下面是实际做法。
 
-1. `styles/` 下加一个目录（如 `styles/watercolor/`），自带一套 `style.json`。
-2. `render.py` 的 `TOKENS` 默认值改成可注入；spec 增 `style` 字段。
-3. `render.py` 的 CSS 块按风格切换（或拆出多个 HEAD 模板）—— **这是 seam**：
-   token 里**只有视觉参数**，HTML 结构与 DOM 不变；
-   CSS 才允许按风格分支。
-4. `check.py` 内的字号限制、错位区间、装饰 zone 都需要按风格重审。
-5. 新风格的视觉检查项（watercolor 没套色错位、letterpress 不需要网点）需要新校验。
+一个风格 = `styles/<name>/` 一个目录，里面两件东西：
 
-这条 seam 的代价 ≈ 0.5 ~ 1 个工作日。**不要为了"统一性"硬合并**两种风格
-—— 它们的"硬规矩"不重叠，并存比合并清爽。
+```text
+styles/<name>/
+  style.json   token：色板 / 字号级数 / 字体 / 纹理 / 装饰 / 错位区间 / 对比度门槛
+  skin.css     视觉层：颜色、字体、纹理、装饰观感
+```
+
+**加一种风格 = 拷一份目录改内容，不碰任何 .py。** 已经这样加了 `keynote-dark`
+与 `swiss-grid` 两套，除了给 token 添了一个可选字段（`colorSets.*.text`，见下）以外，
+渲染/校验/导出的代码一行未改。
+
+**为什么要做成目录而不是 CSS 分支**：分支意味着每加一种风格就多一个 if，
+而且校验层也得跟着分支 —— 最后没人愿意加第三种。目录意味着新风格**碰不到别人**。
+
+#### 风格契约（skin.css 只能长在这几个钩子上）
+
+渲染器只出**语义骨架**：`section.slide` + `.title` / `.subtitle` / `.bullets` /
+`.col` / `.tl` / `.chartwrap` / `.foot` 加几何。skin.css 负责它们的"长相"，
+并把风格专属零件（纸纹 `.grain`、装饰 `.halftone`）接上去。
+
+必须提供的 CSS 变量：
+
+| 变量 | 含义 |
+| --- | --- |
+| `--paper` / `--text` | 底色 / 正文色 |
+| `--accent` / `--accent-2` | 主色 / 副色（做色块、细线、图表、装饰） |
+| `--display` / `--body` | 标题字体 / 正文字体 |
+| `--viewer` | 浏览器外底色 |
+
+字号不走变量硬写：token 的 `type` 级数整份注入为 `--t-*`，每种版式再用 `--s-title` /
+`--s-bullet` … 指向其中一档。**字号只有这一处来源** —— Python 侧写进语义清单的
+也是同一份（早先 Python 一张表、CSS 另一张表，实测写岔过：清单说 86、CSS 是 180）。
+
+#### token 里的两个可选字段
+
+- **`colorSets.*.text`**：显式文字色。孔版的文字色是**派生**的
+  （`overprint(primary, secondary)`，两墨相乘就是真实叠印的数学）；
+  黑底白字/白底黑字这类风格的文字色是**声明**的 —— 拿它们的 primary×secondary
+  去推会得到一个根本不适合当文字的色。两者走同一个入口 `ink.text_color()`，
+  所以对比度门槛仍然只有一条。
+- **`decor.kind`**：放什么装饰（`halftone-circle` / `null`）。
+  连带 `decor.types`（哪些版式放）与 `decor.zones`（放哪个角）都是**风格自报的**，
+  不是写死在渲染器里的。
+
+#### 换风格需要重审什么
+
+`check.py` 的门槛**全部从所选风格的 token 读**，不用改代码；但要确认新 token 里
+这几项填得合理：`type` 的级数（字号是否匹配观看距离）、`misregistration` 区间
+（不做错位的风格写 `[0,0]`，字段别删 —— ③ 那条区间校验靠它）、`contrast` 门槛。
 
 ## spec 字段集（deck-spec.json）
 
 ```jsonc
 {
   "deck": {
-    "colorSet": "vivid",              // 必须存在于 token.colorSets
+    "style":    "risograph",          // 可选；缺省 risograph。styles/ 下的目录名
+    "colorSet": "vivid",              // 必须存在于该风格 token.colorSets
     "seed":     11,                   // 建议显式写（缺省 1）；错位/颗粒按 (seed, 元素) 派生
     "title":    "封面文案",
     "slides": [

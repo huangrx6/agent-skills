@@ -77,18 +77,22 @@ def _stub_image(directory: str) -> None:
 
 
 class TestCheckMutations(unittest.TestCase):
-    """六项校验，每项都有一条干净基线 + 一条变异。"""
+    """校验项，每项都有一条干净基线 + 一条变异。
+
+    变异有两种：改**产物**（拼 HTML）与改**风格 token**（色板/字号）。后者需要把改过的
+    token 包回一个完整风格字典 —— 风格现在是一个目录（token + skin），不是裸 token。
+    """
 
     @classmethod
     def setUpClass(cls) -> None:
-        with open(TOKENS, encoding="utf-8") as fh:
-            cls.tokens = json.load(fh)
         with open(DEMO, encoding="utf-8") as fh:
             cls.demo = json.load(fh)
+        cls.style = render.load_style()          # {"name", "tokens", "skin"}
+        cls.tokens = cls.style["tokens"]
         cls.chart_spec = copy.deepcopy(cls.demo)
         cls.chart_spec["deck"]["slides"].append(copy.deepcopy(CHART_SLIDE))
-        cls.demo_html = render.render(cls.demo, cls.tokens)
-        cls.chart_html = render.render(cls.chart_spec, cls.tokens)
+        cls.demo_html = render.render(cls.demo, cls.style)
+        cls.chart_html = render.render(cls.chart_spec, cls.style)
 
     def _problems(self, spec: dict, html_text: str, tokens: dict | None = None) -> list[str]:
         with tempfile.TemporaryDirectory() as td:
@@ -119,7 +123,8 @@ class TestCheckMutations(unittest.TestCase):
         bad = copy.deepcopy(self.tokens)
         bad["colorSets"]["vivid"] = {
             "primary": "#FF6B35", "secondary": "#FFCC00", "background": "#FAF3E7"}
-        problems = self._problems(self.demo, render.render(self.demo, bad), bad)
+        bad_style = dict(self.style, tokens=bad)
+        problems = self._problems(self.demo, render.render(self.demo, bad_style), bad)
         self._assert_reports(problems, "对比度", "① 对比度")
 
     # ── ② 文字溢出 ────────────────────────────────────────────────────────
@@ -138,7 +143,7 @@ class TestCheckMutations(unittest.TestCase):
                 break
         else:
             self.fail("demo 里没有 content-image 页 —— 这条用例的前提变了")
-        problems = self._problems(bad, render.render(bad, self.tokens))
+        problems = self._problems(bad, render.render(bad, self.style))
         self._assert_reports(problems, "越出版面", "② 版面越界")
 
     # ── ③ 错位区间 ────────────────────────────────────────────────────────

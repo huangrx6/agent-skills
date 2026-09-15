@@ -1,0 +1,76 @@
+{
+  "version": 2,
+  "label": "瑞士栅格 Swiss Grid",
+  "temperature": "安静",
+  "reference": "Massimo Vignelli / Müller-Brockmann 栅格系统 / Vercel·Geist / Sequoia 的 10 页 pitch 模板",
+  "note": "为什么是这个风格：前两套都有自己的「质感」（孔版的墨、剧场的黑），它**没有任何质感** —— 全部表达力都来自栅格、字号层级和一条细线。它适合「内容本身要经得起看」的场合：路演、评审、研报、需要被反复翻阅的文档型 deck。代价是它对**内容和排印纪律**要求最高：骨架乱一点、字距松一点，它就从「克制」变成「没做完」—— 这个风格不提供任何掩饰。",
+
+  "colorSets": {
+    "blue":      { "primary": "#0033CC", "secondary": "#0A0A0A", "background": "#FFFFFF", "text": "#0A0A0A" },
+    "vermilion": { "primary": "#D93F0B", "secondary": "#0A0A0A", "background": "#FFFFFF", "text": "#0A0A0A" },
+    "forest":    { "primary": "#0B6B3A", "secondary": "#0A0A0A", "background": "#FFFFFF", "text": "#0A0A0A" },
+    "slate":     { "primary": "#0043CE", "secondary": "#4A4A4A", "background": "#F4F4F4", "text": "#161616" }
+  },
+
+  "ink": {
+    "derivation": "explicit",
+    "forText": "declared",
+    "note": "文字色声明为近黑（#0A0A0A）而不是纯黑：纯黑在白底上边缘会有「硬切」感，印刷出厂也不会用 100K 铺文字。强调色只做**小面积**的事（编号、细线、图表一档），不当文字色 —— 它过不了正文门槛。",
+    "rule": "文字近黑；强调色只碰小面积。"
+  },
+
+  "contrast": {
+    "minBody": 4.5,
+    "minLarge": 3.0,
+    "largeTextPx": 32
+  },
+
+  "type": {
+    "note": "比孔版略小、比剧场小很多：这个风格的观众距离是「拿在手里 / 一臂之内」。字号层级靠**跨度**而不是绝对值 —— 标题 96 配正文 32，跨度 3 倍，层级就立住了。",
+    "cover": 128,
+    "compact": 96,
+    "small": 84,
+    "end": 128,
+    "subtitle": 32,
+    "bullet": 32,
+    "bulletSmall": 26,
+    "colTitle": 40,
+    "nodeLabel": 28,
+    "nodeNote": 22,
+    "chartValue": 20,
+    "chartLabel": 18,
+    "caption": 24,
+    "foot": 20
+  },
+
+  "fonts": {
+    "display": "Helvetica Neue, Inter, Hiragino Sans GB, Arial, sans-serif",
+    "body": "Helvetica Neue, Inter, Hiragino Sans GB, Arial, sans-serif",
+    "note": "Roboto/Arial 当 display 是 slop（太常见、读者看不出这是设计过的）；但 Helvetica Neue 是瑞士学派的**本源**，不是 slop —— 区别在于有没有拿它做字距/字重的功夫。中文落在 Hiragino Sans GB。"
+  },
+
+  "texture": {
+    "grainOpacity": [0, 0],
+    "grainBaseFrequency": 0.9,
+    "halftoneDotSize": [2, 4],
+    "note": "没有纸纹。"
+  },
+
+  "decor": {
+    "kind": null,
+    "note": "不放装饰。这个风格里唯一允许的「装饰」是一条 1px 细线和一个编号。",
+    "types": [],
+    "zones": [],
+    "sizes": []
+  },
+
+  "misregistration": {
+    "note": "不做错位（全 0）。字段留着是为了让校验层（check.py ③）那套区间检查对所有风格都成立。",
+    "offsetRangeX": [0, 0],
+    "offsetRangeY": [0, 0],
+    "rotationRange": [0, 0],
+    "blendMode": "normal"
+  },
+
+  "viewerBackground": "#E8E8E8"
+}

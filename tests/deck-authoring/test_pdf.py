@@ -56,7 +56,7 @@ class TestPdfExport(unittest.TestCase):
         with open(DEMO, encoding="utf-8") as fh:
             spec = json.load(fh)
         cls.slides = len(spec["deck"]["slides"])
-        html = cls.render.render(spec, tokens)
+        html = cls.render.render(spec)
 
         cls._tmp = tempfile.TemporaryDirectory()
         cls.addClassCleanup(cls._tmp.cleanup)

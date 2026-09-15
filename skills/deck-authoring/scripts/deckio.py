@@ -43,6 +43,19 @@ def ensure_dir(path: str) -> None:
         raise SystemExit(f"✗ 建不了目录 {path}：{exc}") from exc
 
 
+def list_dirs(path: str) -> list[str]:
+    """列出目录下的子目录名（已排序）。
+
+    目录不存在时返回空表 —— 调用方（如“认不出风格，列一下有哪些”）要的是**能写进
+    报错里的候选表**，而不是一个 traceback。没得列就列空。
+    """
+    try:
+        return sorted(d for d in os.listdir(path)
+                      if os.path.isdir(os.path.join(path, d)))
+    except OSError:
+        return []
+
+
 def read_bytes(path: str) -> bytes:
     """读二进制（PDF / PNG 之类）。
 

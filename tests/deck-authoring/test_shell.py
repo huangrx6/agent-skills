@@ -124,7 +124,7 @@ class TestShell(unittest.TestCase):
             cls.tokens = json.load(fh)
         with open(DEMO, encoding="utf-8") as fh:
             cls.spec = json.load(fh)
-        cls.html = cls.render.render(cls.spec, cls.tokens)
+        cls.html = cls.render.render(cls.spec)
         cls.total = len(cls.spec["deck"]["slides"])
         cls.default = probe_browser(cls.html)                        # 不预设视图
         cls.present = probe_browser(cls.html, query="?present")      # 直接进演示态

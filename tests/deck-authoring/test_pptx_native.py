@@ -97,7 +97,7 @@ class TestPptxNative(unittest.TestCase):
 
         cls.html = os.path.join(td, "out.html")
         with open(cls.html, "w", encoding="utf-8") as fh:
-            fh.write(cls.render.render(demo, tokens))
+            fh.write(cls.render.render(demo))
         # 图页引用的那张图要放在产物旁边，否则 image 角色会被（正确地）跳过
         from PIL import Image
         Image.new("RGB", (8, 8), (245, 239, 221)).save(os.path.join(td, "sample-treated.png"))
@@ -106,7 +106,7 @@ class TestPptxNative(unittest.TestCase):
         chart_deck["deck"]["slides"].append(CHART_SLIDE)
         cls.chart_html = os.path.join(td, "chart.html")
         with open(cls.chart_html, "w", encoding="utf-8") as fh:
-            fh.write(cls.render.render(chart_deck, tokens))
+            fh.write(cls.render.render(chart_deck))
 
         cls.pptx = os.path.join(td, "native.pptx")
         cls.counts = cls.native.build(cls.html, cls.pptx)
@@ -115,9 +115,9 @@ class TestPptxNative(unittest.TestCase):
 
         cls.slides = _slide_xmls(cls.pptx)
         cls.chart_slides = _slide_xmls(cls.chart_pptx)
-        cls.manifest = cls.measure.read_manifest(cls.render.render(demo, tokens))
+        cls.manifest = cls.measure.read_manifest(cls.render.render(demo))
         cls.chart_manifest = cls.measure.read_manifest(
-            cls.render.render(chart_deck, tokens))
+            cls.render.render(chart_deck))
 
     # ── 能改字：这是这个产物存在的理由 ───────────────────────────────────
 

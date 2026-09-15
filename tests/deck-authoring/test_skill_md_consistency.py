@@ -62,7 +62,8 @@ def _load(name: str, path: str):
 
 
 render = _load("_deck_test_render_md", os.path.join(SCRIPTS, "render.py"))
-SECTION = re.compile(r'<section class="slide">(.*?)</section>', re.S)
+# 页现在带着 data-slide / 错位变量（`--dx` 等上移到了 section）—— 匹配要允许属性。
+SECTION = re.compile(r'<section class="slide"[^>]*>(.*?)</section>', re.S)
 
 
 class TestSkillMdMatchesRender(unittest.TestCase):
@@ -81,7 +82,7 @@ class TestSkillMdMatchesRender(unittest.TestCase):
     def _render_each(self, kinds: list[str]) -> dict[str, str]:
         deck = {"colorSet": "vivid", "seed": 7, "title": "探针",
                 "slides": [PROBE_SLIDES[k] for k in kinds]}
-        html = render.render({"deck": deck}, self.tokens)
+        html = render.render({"deck": deck})
         sections = SECTION.findall(html)
         self.assertEqual(len(sections), len(kinds),
                          f"渲染出的页数 {len(sections)} ≠ 版式数 {len(kinds)}")
@@ -110,7 +111,7 @@ class TestSkillMdMatchesRender(unittest.TestCase):
         bad = {"deck": {"colorSet": "vivid", "seed": 1, "title": "x",
                         "slides": [{"type": "not-a-real-type", "title": "x"}]}}
         with self.assertRaises(SystemExit):
-            render.render(bad, self.tokens)
+            render.render(bad)
 
 
 if __name__ == "__main__":

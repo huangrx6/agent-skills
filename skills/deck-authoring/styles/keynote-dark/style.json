@@ -1,0 +1,76 @@
+{
+  "version": 2,
+  "label": "黑底剧场 Black Stage",
+  "temperature": "大胆",
+  "reference": "Steve Jobs 2007 iPhone Keynote / 《Presentation Zen》(Garr Reynolds) / 小米发布会",
+  "note": "为什么是这个风格：它解决的是**会议室投屏 + 站着讲**这个具体场景 —— 投影仪对比度差、观众离屏幕 5~10 米、你自己还要说话。所以：纯黑底（投影省电、抗环境光、不刺眼）、一屏一个观点、巨号字。它和孔版是两极：孔版是「拿在手里看的印刷品」，这个是「挂在墙上的标语」。代价是**信息密度低** —— 一页塞 8 条要点的汇报别用它。",
+
+  "colorSets": {
+    "blue":   { "primary": "#2997FF", "secondary": "#5AC8FA", "background": "#000000", "text": "#FFFFFF" },
+    "orange": { "primary": "#FF6900", "secondary": "#FFB020", "background": "#000000", "text": "#FFFFFF" },
+    "green":  { "primary": "#1ED760", "secondary": "#7BF1A8", "background": "#000000", "text": "#FFFFFF" },
+    "paper":  { "primary": "#FF3B30", "secondary": "#FF9F0A", "background": "#F2F2F7", "text": "#0A0A0A" }
+  },
+
+  "ink": {
+    "derivation": "explicit",
+    "forText": "declared",
+    "note": "文字色是**声明**的，不是推导的：黑底白字不是任何两色的乘积。孔版那套「primary × secondary = 文字色」是印刷的数学，只对叠印风格成立 —— 所以文字色改成可选声明（见 ink.text_color）。",
+    "rule": "黑底用纯白；浅底（paper 色板）用近黑。两者的对比度都要过 minBody。"
+  },
+
+  "contrast": {
+    "minBody": 4.5,
+    "minLarge": 3.0,
+    "largeTextPx": 32
+  },
+
+  "type": {
+    "note": "比孔版整体大一档：这个风格的观众距离是 5~10 米，不是 30 厘米。",
+    "cover": 190,
+    "compact": 112,
+    "small": 96,
+    "end": 190,
+    "subtitle": 40,
+    "bullet": 46,
+    "bulletSmall": 34,
+    "colTitle": 54,
+    "nodeLabel": 34,
+    "nodeNote": 26,
+    "chartValue": 24,
+    "chartLabel": 22,
+    "caption": 28,
+    "foot": 24
+  },
+
+  "fonts": {
+    "display": "Helvetica Neue, Inter, Hiragino Sans GB, Arial, sans-serif",
+    "body": "Helvetica Neue, Inter, Hiragino Sans GB, Arial, sans-serif",
+    "note": "为什么把 Helvetica Neue 写在 Inter 前面：Jobs 那代 keynote 本来就是 Helvetica Neue / Myriad，所以它既是「本机真有」的、也是**设计上本来就该用的**。Inter 排在后面给没有 Helvetica 的机器兜底。字体回退时 check.py 会明确告诉你谁顶上了。"
+  },
+
+  "texture": {
+    "grainOpacity": [0, 0],
+    "grainBaseFrequency": 0.9,
+    "halftoneDotSize": [2, 4],
+    "note": "没有纸纹 —— 黑底剧场是发光的屏幕，不是纸。"
+  },
+
+  "decor": {
+    "kind": null,
+    "note": "不放装饰墨块。这个风格的全部装饰就是**字够大 + 负空间**；加一块网点圆就不是它了。",
+    "types": [],
+    "zones": [],
+    "sizes": []
+  },
+
+  "misregistration": {
+    "note": "不做错位（全 0）：这是数字屏幕风格，没有「油墨层」。区间留成 [0,0] 而不是删掉字段 —— 校验层（check.py ③）要读 --dx/--dy/--rot 并确认它们落在声明区间内，字段在、区间为 0，这套机制照样成立。",
+    "offsetRangeX": [0, 0],
+    "offsetRangeY": [0, 0],
+    "rotationRange": [0, 0],
+    "blendMode": "normal"
+  },
+
+  "viewerBackground": "#000000"
+}

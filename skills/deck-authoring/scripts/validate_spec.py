@@ -31,11 +31,13 @@ import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_TOKENS = os.path.join(HERE, "..", "styles", "risograph", "style.json")
+STYLES_DIR = os.path.join(HERE, "..", "styles")
+DEFAULT_STYLE = "risograph"
+DEFAULT_TOKENS = os.path.join(STYLES_DIR, DEFAULT_STYLE, "style.json")
 
 # 封闭字段集。加字段要同时改这里与 `references/style-architecture.md` ——
 # 这正是设计意图：让"顺手加一个"变得有摩擦。
-DECK_FIELDS = {"colorSet", "seed", "title", "slides"}
+DECK_FIELDS = {"colorSet", "seed", "title", "slides", "style"}
 SLIDE_FIELDS = {
     "title":         {"type", "title", "subtitle", "color"},
     "content-text":  {"type", "title", "bullets", "color"},
@@ -182,8 +184,8 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="校验 deck-spec.json 规格（字段集封闭）")
     ap.add_argument("spec", help="规格文件路径")
-    ap.add_argument("--tokens", default=DEFAULT_TOKENS,
-                    help="token 文件（只为把 colorSet 的名字对一遍）")
+    ap.add_argument("--tokens", default=None,
+                    help="覆盖 token 文件（缺省按 deck.style 去 styles/<style>/ 找）")
     ap.add_argument("--json", action="store_true", help="输出 JSON")
     args = ap.parse_args(argv)
 
@@ -199,9 +201,18 @@ def main(argv: list[str] | None = None) -> int:
 
     # token 读不到**不算** spec 的错（可能只是没带对路径）—— 那就跳过 colorSet 存在性校验，
     # 而不是把一件读不到的事报成"规格有问题"。
+    # 风格从 spec 的 deck.style 解析（缺省 risograph）：多风格之后，色板名单必须按
+    # **这一份 deck 选的风格**去查，拿别的风格的名单去核会误报。
+    tokens_path = args.tokens
+    if tokens_path is None:
+        style_name = DEFAULT_STYLE
+        deck = spec.get("deck") if isinstance(spec, dict) else None
+        if isinstance(deck, dict) and isinstance(deck.get("style"), str):
+            style_name = deck["style"]
+        tokens_path = os.path.join(STYLES_DIR, style_name, "style.json")
     color_sets: set[str] | None = None
     try:
-        with open(args.tokens, encoding="utf-8") as fh:
+        with open(tokens_path, encoding="utf-8") as fh:
             color_sets = set(json.load(fh)["colorSets"])
     except (OSError, json.JSONDecodeError, KeyError, TypeError):
         color_sets = None

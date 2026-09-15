@@ -47,13 +47,13 @@ check = _load("_deck_test_check", os.path.join(SCRIPTS, "check.py"))
 
 class TestDeterminism(unittest.TestCase):
     def setUp(self) -> None:
-        with open(TOKENS, encoding="utf-8") as fh:
-            self.tokens = json.load(fh)
+        self.spec = json.load(open(DEMO, encoding="utf-8"))
+        self.style = render.load_style()      # {"name", "tokens", "skin"}
         with open(DEMO, encoding="utf-8") as fh:
             self.spec = json.load(fh)
 
     def _render(self, spec: dict) -> str:
-        return render.render(spec, self.tokens)
+        return render.render(spec)
 
     def test_same_spec_same_seed_is_byte_identical(self) -> None:
         """同 spec + 同种子两次渲染必须逐字节一致。"""
@@ -74,8 +74,8 @@ class TestDeterminism(unittest.TestCase):
             html = os.path.join(td, "out.html")
             with open(html, "w", encoding="utf-8") as fh:
                 fh.write(self._render(self.spec))
-            first = check.check(self.spec, html, self.tokens)
-            second = check.check(self.spec, html, self.tokens)
+            first = check.check(self.spec, html)
+            second = check.check(self.spec, html)
             self.assertEqual(first, second, "check.py 对同一产物两次判定不同")
 
     def test_clean_product_passes_all_checks(self) -> None:
@@ -92,7 +92,7 @@ class TestDeterminism(unittest.TestCase):
                 fh.write(self._render(self.spec))
             Image.new("RGB", (2, 2), (245, 239, 221)).save(
                 os.path.join(td, "sample-treated.png"))
-            problems = check.check(self.spec, html, self.tokens)
+            problems = check.check(self.spec, html)
             self.assertEqual(problems, [], f"demo 产物本应干干净净：{problems}")
 
 

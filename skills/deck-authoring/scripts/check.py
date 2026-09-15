@@ -53,6 +53,7 @@ def _load_sibling(name: str):
 ink = _load_sibling("ink")
 deckio = _load_sibling("deckio")   # IO 收口：读不到产物要报清楚，不甩 traceback
 measure_mod = _load_sibling("measure")   # 实测层：版面判断全部走它，不估算
+render_mod = _load_sibling("render")   # 只为拿“同一个风格”的 token（单一来源）
 
 TOKENS = os.path.join(HERE, "..", "styles", "risograph", "style.json")
 
@@ -202,14 +203,31 @@ def _check_font_fallback(measured: dict) -> list[str]:
     return out
 
 
-def check(spec: dict, html_path: str, tokens: dict,
+def style_tokens(spec: dict, override: dict | None = None) -> dict:
+    """解析 deck 用哪个风格，取它的 token。
+
+    token 不再由调用方“带进来”：风格已经写在 spec 的 `deck.style` 里了
+    （缺省 risograph）。让校验层自己去读同一份，就不会出现“拿 A 风格的门槛
+    去量 B 风格的产物”——那是多风格之后新增的错配面。
+    """
+    if override is not None:
+        return override
+    return render_mod.load_style(spec["deck"].get("style", render_mod.DEFAULT_STYLE))["tokens"]
+
+
+def check(spec: dict, html_path: str, tokens: dict | None = None,
           measured: dict | None = None) -> list[str]:
+    """跑全部阻塞检查，返回问题清单（空的 = 全过）。
+
+    `tokens=None` 时按 spec 里的风格去加载 —— 调用方多数情况下不该手递 token。
+    """
+    tokens = style_tokens(spec, tokens)
     problems: list[str] = []
     page = deckio.read_text(html_path)      # 读一次就够（以前读了三次）
     deck = spec["deck"]
     colors = tokens["colorSets"][deck["colorSet"]]
     paper = colors["background"]
-    ink_text = ink.overprint(colors["primary"], colors["secondary"])
+    ink_text = ink.text_color(colors)
     limits = tokens["contrast"]
     # 文字栏（判"墨块进没进栏"用；版面越界那一套已经改成实测了，不再靠推算）
     bx0, by0, bx1, by1 = TEXT_BAND
@@ -309,10 +327,11 @@ def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="deck 产物校验（版面靠真浏览器实测）")
     ap.add_argument("spec")
     ap.add_argument("html")
-    ap.add_argument("--tokens", default=TOKENS)
+    ap.add_argument("--tokens", default=None,
+                    help="覆盖 token 文件（缺省按 spec 的 deck.style 去找）")
     args = ap.parse_args(argv[1:])
     spec = deckio.read_json(args.spec)
-    tokens = deckio.read_json(args.tokens)
+    tokens = deckio.read_json(args.tokens) if args.tokens else None
     measured = measure_mod.measure(args.html)      # 只量一次，校验与提示共用
     problems = check(spec, args.html, tokens, measured=measured)
     if problems:

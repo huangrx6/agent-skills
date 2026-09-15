@@ -60,7 +60,7 @@ class TestFontAdvisory(unittest.TestCase):
         cls._tmp = tempfile.TemporaryDirectory()
         cls.addClassCleanup(cls._tmp.cleanup)
         cls.html = os.path.join(cls._tmp.name, "out.html")
-        html = cls.render.render(cls.spec, cls.tokens)
+        html = cls.render.render(cls.spec)
         with open(cls.html, "w", encoding="utf-8") as fh:
             fh.write(html)
         cls.measured = cls.check.measure_mod.measure(cls.html)

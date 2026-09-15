@@ -85,7 +85,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── ink.py               # 墨色推导 + 三色板门禁（唯一消费者）
 │   ├── plate.py             # 图片 → duotone + 半调（riso 制版）
 │   ├── image_source.py      # 缓存 / 生图 / 几何色块拼贴
-│   ├── render.py            # deck-spec.json → HTML（语义清单 + 演示壳 + 打印 CSS）
+│   ├── render.py            # deck-spec.json → HTML（语义骨架 + 风格 skin + 演示壳）
 │   ├── measure.py           # 实测层：真浏览器量真盒子（不估算）
 │   ├── check.py             # 校验：越界/裁切/对比度/图表/图片/报错
 │   ├── pdf.py               # HTML → 矢量 PDF（并验页数/页尺寸/位图/字体）
@@ -93,8 +93,12 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── make_pptx.py         # PNG → PPTX（贴图版）
 │   ├── pptx_native.py       # HTML → PPTX（原生 shapes，字能改）
 │   └── deckio.py            # IO 收口（try/except 不散落）
-├── styles/risograph/
-│   └── style.json           # 色板 / 错位 / 颗粒 / 字体 token
+├── styles/                   # 风格目录：一种风格 = 一个目录（token + skin），不碰 .py
+│   ├── risograph/            # 孔版印刷：套色错版 + 纸纹 + 半调网点（大胆·暖）
+│   │   ├── style.json        #   token：色板 / 字号级数 / 字体 / 纹理 / 装饰 / 错位 / 对比度
+│   │   └── skin.css          #   视觉层：只负责"墨与纸"
+│   ├── keynote-dark/         # 黑底剧场：纯黑底 + 巨号字 + 一屏一观点（大胆·暗）
+│   └── swiss-grid/           # 瑞士栅格：白底 + 编号列表 + 1px 细线（安静·冷）
 ├── dev-tools/
 │   └── demo.spec.json       # 一份能跑的样例
 ├── evals/evals.json         # 行为评估用例
