@@ -58,6 +58,18 @@ deckio = _load_sibling("deckio")   # IO 收口：参数写错要报清楚，不�
 STYLES_DIR = os.path.join(HERE, "..", "styles")
 DEFAULT_STYLE = "swiss-grid"
 
+# ── 版面几何：壳里那些数字的**唯一出处** ─────────────────────────────
+# `SHELL_CSS` 里的 `.pad{padding:132px 84px}` 与 `.footrow{bottom:52px}` 是这几个值；
+# check.py（判越界/死白）与 fit.py（试排）都读这里，不各自再拄一份。
+# 拿两份几何常量去对同一张图，只会对出一个错的前提（本仓库已经踩过一次）。
+SLIDE_W, SLIDE_H = 1600, 900
+PAD_X, PAD_Y = 84, 132
+FOOT_BOTTOM, FOOT_H = 52, 24
+# 正文带：内容该待的竖向区间。下界是页脚之上 —— 内容压过它就是和页脚打架。
+# 整数就是它们本来的样子（都是 px）：不做 float() 转一道，那只是给异常多一个入口。
+CONTENT_TOP = PAD_Y
+CONTENT_BOTTOM = SLIDE_H - FOOT_BOTTOM - FOOT_H
+
 # 版式 → 用字号级数里的哪一档（级数本身在 style.json 的 type 里，是唯一来源）
 TITLE_TIER = {"title": "cover", "content-text": "compact", "end": "end"}
 DEFAULT_TITLE_TIER = "small"

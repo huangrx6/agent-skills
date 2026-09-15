@@ -269,6 +269,38 @@ def read_manifest(html: str) -> list[dict]:
         return []
 
 
+# 壳与品牌标记：固定在版面角落，不是“内容”。算内容占位时要把它们排掉 ——
+# 不排的话每页都“装满”（因为页脚永远在底部）。
+CHROME_ROLES = ("foot", "brandfoot", "logo")
+
+
+def slide_content_span(measured: dict, slide_no: int) -> tuple[float, float] | None:
+    """一页里**内容**的竖向占位（相对该页左上角），返回 (顶, 底)；没内容返回 None。
+
+    必须按**自己那页**归一化：产物是纵向堆叠的，`getBoundingClientRect()` 给的是
+    文档坐标（实测踩过：第 2 页之后的元素全都“越出 900px”）。探针把每页的 rect 也
+    带回来了，减一下就好。
+
+    为什么单独一个函数：`fit.py`（试排）与 `check.py`（半页死白的提示）要用**同一个**
+    口径 —— 两处各算一次的话，“fit 说装得下、check 说太稀”这种矛盾只是时间问题。
+    """
+    slides = measured.get("slides") or []
+    if not 1 <= slide_no <= len(slides):
+        return None
+    base = slides[slide_no - 1]["y"]
+    top: float | None = None
+    bottom: float | None = None
+    for el in measured.get("elements", []):
+        if el.get("slide") != slide_no or el.get("role") in CHROME_ROLES:
+            continue
+        loc, end = el["y"] - base, el["y"] + el["h"] - base
+        top = loc if top is None else (loc if loc < top else top)
+        bottom = end if bottom is None else (end if end > bottom else bottom)
+    if top is None or bottom is None:
+        return None
+    return (top, bottom)
+
+
 def measure(html_path: str, budget_ms: int = 2500, chrome: str = CHROME) -> dict:
     """跑一次真浏览器，返回合并了语义清单的实测结果。
 

@@ -64,6 +64,16 @@ TOKENS = os.path.join(HERE, "..", "styles", "swiss-grid", "style.json")
 CONTENT = (84.0, 132.0, 1516.0, 838.0)
 TEXT_BAND = (84.0, 132.0, 1000.0, 770.0)
 SLIDE_W, SLIDE_H = 1600.0, 900.0
+# 内容只占正文带这么少 → 提示“这页几乎没有内容”。
+#
+# ⚠️ 这个阈值只能抓**近于空的页**，不能拿来判“太稀”。第一版写的是 0.55，
+# 结果它在 demo 的 3 个正常页上全部开火（41% / 45% / 37%）—— 而那几页看着
+# 一点都不像没做完（左轨 + 实线 + 巨号页码都在）。当初用户抱怨 swiss 第一版
+# “下半页 55% 是死的”，真正原因不是内容少，而是**没有构图锚点**；修法也是加锚点，
+# 不是加内容。所以：留白是不是问题，取决于风格有没有锚点，**像素密度算不出来**。
+# 密度这个量该在 fit.py 里看（那里是选版式的场景，旁边还带着“可以合页”的建议），
+# 不该在每次校验时拿一个不懂风格的阈值去喷人。
+DEAD_SPACE_NOTE = 0.28
 CORNER = {  # zone → (右偏移, 下/上偏移, 靠上?)
     "tr": (60.0, 40.0, True), "br": (130.0, 140.0, False),
     "tl": (60.0, 40.0, True), "bl": (130.0, 140.0, False),
@@ -256,6 +266,79 @@ def _check_brand(measured: dict, deck: dict, tokens: dict) -> tuple[list[str], l
     return problems, notes
 
 
+def _check_deck_shape(measured: dict, deck: dict) -> tuple[list[str], list[str]]:
+    """deck 级：**半页死白**（提示）+ 版式单一（提示）+ 没有封面（提示）。
+
+    为什么“半页死白”必须在这里补：以前只有“装不下”那半边有牙（越界检查）。
+    另半边一直是绿的 —— 一页内容只占正文带 40% 的话，渲染成功、校验全过，
+    但人一眼就看出“这页没做完”。本仓库 swiss-grid 第一版正是这么死的：
+    “白底 + 左上标题 + 编号列表”，下半页 55% 是死的。
+
+    为什么是**提示**而不是阻塞：留白是风格的一部分（安静派就是靠留白），
+    把“不够满”当硬错误会逼着人把每页塞满 —— 那是另一头错。
+    """
+    problems: list[str] = []
+    notes: list[str] = []
+    slides = deck.get("slides", [])
+    kinds = [s.get("type") for s in slides]
+
+    # 没有封面：不是硬错（有人就把第一页当正文页），但很难是个有意的选择。
+    if slides and "title" not in kinds:
+        notes.append("这份 deck 没有封面页（没有 type=title）—— 是漏了，还是有意？")
+
+    # 版式单一：全是一种版式时，视线没有落点变化。
+    content_kinds = [k for k in kinds if k not in ("title", "end")]
+    if len(set(content_kinds)) == 1 and len(content_kinds) >= 3:
+        notes.append(
+            f"{len(content_kinds)} 页内容全是一种版式（{content_kinds[0]}）—— "
+            f"构图没有变化。用 fit.py 试排一下别的版式，或把其中几页拆/并")
+
+    # 逐页密度：只对“承载内容”的版式判 —— 封面/收尾页本来就该稀疏。
+    for i, slide in enumerate(slides, 1):
+        if slide.get("type") in ("title", "end"):
+            continue
+        box = measure_mod.slide_content_span(measured, i)
+        if box is None:
+            continue
+        top, bottom = box
+        used = (bottom - render_mod.CONTENT_TOP) / (render_mod.CONTENT_BOTTOM
+                                                    - render_mod.CONTENT_TOP)
+        if used < DEAD_SPACE_NOTE:
+            notes.append(
+                f"第 {i} 页几乎没有内容（只占正文带 {used:.0%}）—— 内容底 "
+                f"{bottom:.0f}px / 正文带底 {render_mod.CONTENT_BOTTOM:.0f}px。"
+                f"一页只有标题没条目通常是漏了；确实要留白就删掉这页"
+                f"（想看疏密去跑 fit.py）")
+    return problems, notes
+
+
+def _check_empty_content(deck: dict) -> list[str]:
+    """空标题 / 空条目 —— **阻塞**。
+
+    渲染器不会因为它空就不画那个盒子：空标题会画一条标题块的下划线，空条目会占
+    一行高。结果是一页看着像渲染坏了。而它本来只是“内容没写”。
+    """
+    problems: list[str] = []
+    for i, slide in enumerate(deck.get("slides", []), 1):
+        if not str(slide.get("title", "")).strip():
+            problems.append(f"第 {i} 页标题是空的 —— 标题块会画出一条线却什么都不写")
+        for key in ("bullets",):
+            for k, item in enumerate(slide.get(key) or []):
+                if not str(item).strip():
+                    problems.append(f"第 {i} 页 {key}[{k}] 是空的 —— 会占一行却是空白")
+        for ci, col in enumerate(slide.get("columns") or []):
+            for k, item in enumerate((col or {}).get("bullets") or []):
+                if not str(item).strip():
+                    problems.append(f"第 {i} 页 columns[{ci}].bullets[{k}] 是空的")
+        for k, node in enumerate(slide.get("nodes") or []):
+            if not str((node or {}).get("label", "")).strip():
+                problems.append(f"第 {i} 页 nodes[{k}].label 是空的 —— 时间线上会是一个空节点")
+        for k, d in enumerate(slide.get("data") or []):
+            if not str((d or {}).get("label", "")).strip():
+                problems.append(f"第 {i} 页 data[{k}].label 是空的 —— 图表会少一根柱的标签")
+    return problems
+
+
 def _overlap(a: dict, b: dict) -> bool:
     return not (a["x"] + a["w"] <= b["x"] or b["x"] + b["w"] <= a["x"]
                 or a["y"] + a["h"] <= b["y"] or b["y"] + b["h"] <= a["y"])
@@ -301,6 +384,8 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     problems.extend(_check_measured_health(data))
     brand_problems, _ = _check_brand(data, deck, tokens)
     problems.extend(brand_problems)
+    # 空内容与品牌无关，但它和越界一样是“一页看着坏了”—— 所以也走阻塞
+    problems.extend(_check_empty_content(deck))
 
     for i, slide in enumerate(deck["slides"], 1):
         declared = slide.get("color")
@@ -385,6 +470,8 @@ def advisories(measured: dict, spec: dict | None = None,
     if spec is not None and tokens is not None:
         _, brand_notes = _check_brand(measured, spec.get("deck", {}), tokens)
         notes.extend(brand_notes)
+        _, shape_notes = _check_deck_shape(measured, spec.get("deck", {}))
+        notes.extend(shape_notes)
     return notes
 
 

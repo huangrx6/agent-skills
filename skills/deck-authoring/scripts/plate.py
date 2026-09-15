@@ -5,7 +5,7 @@
 真实孔版印刷的图是网点密度表现灰度、只有两个专色的 —— 所以这里是"重新制版"，
 不是"加个滤镜"：先把图变灰度，再把灰度映射到 两墨叠印 的色阶上，最后叠半调网点。
 
-跑法：python3 plate.py in.jpg -o out.png --tokens styles/swiss-grid/style.json --color-set vivid
+跑法：python3 plate.py in.jpg -o out.png --tokens styles/swiss-grid/style.json --color-set blue
      python3 plate.py --sample -o sample.png            # 没有真图时生成一张测试卡
 """
 from __future__ import annotations
@@ -111,7 +111,7 @@ def _in_triangle(point: tuple[int, int, int], a, b, c, tol: float = 1e-6) -> boo
     if max(abs(x) for x in residual) > 1.5:
         return False
     # **整数化容差**：逐通道 int() 取整会让"数学上恰在边界上"的点落到边界外一丝
-    # （实测 muted/vivid 各有 3 个紫色点 v ≈ −0.002 ✗）。这个容差是明文的，
+    # （实测各套色板都出现过 v ≈ −0.002 的紫色点 ✗）。这个容差是明文的，
     # 不是为了让它变绿而调出来的 —— 残差那一关仍然卡着颜色真的跑偏的情况。
     return (u >= -0.01) and (v >= -0.01) and (u + v <= 1.01)
 
@@ -133,12 +133,22 @@ def main(argv: list[str]) -> int:
     ap.add_argument("src", nargs="?")
     ap.add_argument("-o", "--out", required=True)
     ap.add_argument("--tokens", default=os.path.join(HERE, "..", "styles", "swiss-grid", "style.json"))
-    ap.add_argument("--color-set", default="vivid")
+    # 不写死色板名：写死会在换风格 / 改色板名时**静默过期**。
+    # 实测踩过：risograph 风格连同它的 'vivid' 色板被删掉之后，这条默认值还在，
+    # 于是 `plate.py --sample`（README 跑法第 3 步）直接 KeyError 崩了，而没人发现 ——
+    # 因为测试都自己传 --color-set。缺省取该 token 的第一个，就跟不坏了。
+    ap.add_argument("--color-set", default=None,
+                    help="缺省用该 token 里的第一个色板")
     ap.add_argument("--dots", type=int, default=3)
     ap.add_argument("--sample", action="store_true", help="不读真图，生成测试卡")
     args = ap.parse_args(argv[1:])
     tokens = deckio.read_json(args.tokens)
-    colors = tokens["colorSets"][args.color_set]
+    color_set = args.color_set or next(iter(tokens["colorSets"]), None)
+    if color_set not in tokens["colorSets"]:
+        raise SystemExit(
+            f"✗ colorSet={color_set!r} 不在 {args.tokens} 里"
+            f"（可用：{sorted(tokens['colorSets'])}）")
+    colors = tokens["colorSets"][color_set]
     source = sample() if args.sample else Image.open(args.src)
     treated = duotone(source, colors["primary"], colors["secondary"], colors["background"], args.dots)
     treated.save(args.out)
