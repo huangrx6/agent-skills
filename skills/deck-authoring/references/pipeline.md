@@ -107,7 +107,7 @@ python3 $S/animate.py deck.html --mp4 deck.mp4       # 逐帧 seek 的确定性�
 
 | 层 | 文档 | 落地脚本 |
 | --- | --- | --- |
-| 说什么 / 为什么这样说 | `content-design.md`（v3.0） | `plan.py --check` |
+| 说什么 / 为什么这样说 | `content-intelligence.md`（内容智能 · v3.0） | `plan.py --check` |
 | 骨架 / 配额 / 页型 / 拆页 | `planning.md` | `plan.py` |
 | 版式语法 / 8 风格 | `style-architecture.md` | `render.py` / `style.py` |
 | 网格 / 间距 / 层级 / 留白 | `layout-system.md` | `grid.py` / `hierarchy.py` |

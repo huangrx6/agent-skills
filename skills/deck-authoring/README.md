@@ -60,7 +60,7 @@ python3 scripts/fit.py --json '{"title":"结论","bullets":["…","…"]}'
 
 它把候选版式与各条目数档位摆进同一份产物渲一次、量一次，报出**实测**的溢出量与
 内容占位 —— 省掉"写完 → 报溢出 → 改了再跑"那几轮。内容怎么组织（一页一个观点、
-版式选择、观众距离）见 `references/content-design.md`。
+版式选择、观众距离）见 `references/content-intelligence.md`（内容智能 / 内容规划系统）。
 
 第 3 步是给 demo 的图文页造图：`demo.spec.json` 的 `image` 是个占位文件名，
 不先生成它就是一张裂图。该产物**不入库**（见「已知限制」第 7 条）。
@@ -87,13 +87,13 @@ python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸�
 先"画什么"、再"怎么画"、最后"绝对不能错"。**图片该要就要，别嫌麻烦少要，多了也没事**：`content-image` 版式**必须**给 `image`
 （缺了渲染器会崩，`validate_spec.py` 拦）；全篇一张图都没有时 `check.py` 会开口并点名
 最容易加图的那几页。什么时候该有图、什么时候版式本身已经承担了视觉功能，见
-`references/content-design.md`。
+`references/content-intelligence.md`。
 
 **一页的信息永远由版面用真文字排**：图只有两种角色 —— **配图**（占一栏）或**点缀**
 （更小），背景那种大图也不承载信息。**一张图盖住整页是禁止的**（实测配图只占整页
 17%，`check.py` 在 ≥60% 时拦）；提示词里也明写"不要把这一页的信息画进去"。
 理由（可编辑 / 可搜索 / 可翻译 / 可被读屏器读，以及为什么贴图版 PPTX 不算违规）见
-`references/content-design.md`。
+`references/content-intelligence.md`。
 
 **「主体 / 场景 / 细节」留空给人填**
 （写作 `〈…〉`）—— 工具只看得见 spec 里的文字，读不到你脑子里的画面，就不该替你编。
@@ -371,7 +371,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
     ├── delivery-formats.md      # HTML / PDF / PNG / PPTX / MP4 的取舍
     ├── animation.md            # 运动规则 0-42 全文落地、按角色 preset、确定性、导出
     ├── brand-assets.md         # 品牌与资产协议（v2.0）：四层、优先级链、v2 对照表
-    ├── content-design.md       # 内容设计（v3.0）：Brief / 论断 / 一页一 Takeaway
+    ├── content-intelligence.md  # 内容智能与规划系统（v3.0）：Brief / 论断 / 一页一 Takeaway
     ├── planning.md             # 规划层模块：schema、骨架表、复杂度、到 spec 的桥
     ├── layout-system.md        # 网格与间距令牌、层级三把尺、路线图
     ├── charts.md               # 图表引擎：意图树、八类、弱化强调、消息先行

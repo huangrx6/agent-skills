@@ -1,152 +1,400 @@
-# 品牌与视觉资产协议（v2.0）
+# AI PPT 品牌与视觉资产统一协议（v2.0 全文落地）
 
-一个组织的视觉身份，**跨 deck 复用**。做十份 deck，同一个公司的 logo、主色、字体是一样的 ——
-这份文档说清它放在哪、谁赢谁、资产管线怎么走，以及 logo 怎么进三种导出。
+适用：PPT / HTML Deck / PDF / MP4 / GIF。目标：把 **Content / Style / Brand /
+Generated Assets** 四层分开管理，避免颜色、字体、Logo、配图、动画互相覆盖；
+同时建立"AI 只生成配图提示词 → 人工/外部模型生成 → 放入约定目录 → 渲染器自动
+取用"的稳定工作流。每节标落地状态：【✅ 已实现】【约定=规则在、机制未接】。
 
-## 四层各管一件事，混在一起必然互相打架
+> 本仓库字段口径：规范示例是嵌套形（`logo:{default,inverse,mark,logoOn}`、
+> `brandColors`、`colorPolicy`…）；实际 `brand.json` 用**更扁的封闭集**
+> `version/label/logo/logoInverse/logoOn/footer/colorSets/fonts/note`——
+> 映射：`logo.default→logo`、`logo.inverse→logoInverse`、`logoOn` 同名。
+> 嵌套形与 policy 字段是协议预留，未实现（§6/§7/§9/§10/§34）。
 
-| 层 | 在哪里 | 管什么 | 不管什么 |
-| --- | --- | --- | --- |
-| 内容 | `*.spec.json` | 说什么（标题 / 条目 / 数据） | 颜色、logo、字体文件、图片路径 |
-| 风格 | `styles/<name>/` | 怎么表达（构图 / 字号跨度 / 墨色 / 运动） | 公司身份、官方 logo、品牌锁定色 |
-| **品牌** | `brands/<name>/` | **是谁**（logo / 色号 / 字体 / 署名） | 页面坐标、布局变体、具体构图 |
-| **资产** | spec 同目录 | 本 deck 真正用的图片/截图文件 | 决定品牌规范、决定风格 |
+## 1. 总体架构
 
-一句话：**Brand 定义"是谁"，Style 定义"怎么表达"，Content 定义"讲什么"，
-Asset 定义"最终拿什么文件来画"**。品牌资产塞进 spec，就等于每次重填一遍，而且
-必然填歪（颜色手抄会抄错，字体名会抄成系统里没有的那个）。塞进 style 更糟 ——
-那等于把这家公司变成"一种视觉语言"，换个风格就把品牌丢了。
-
-品牌是**可选**的：`deck.brand` 不写就完全走风格那一套，一个字都不用改。
-
-## 冲突处理：不用"某层整体覆盖另一层"的粗暴规则
-
-统一走这条优先级链（硬约束 > 语义 > 风格语法 > 创意偏好）：
+四层长期层 + 两个运行时解析层：
 
 ```text
-用户明确硬要求 > 品牌锁定资产（logo 本体） > 品牌身份（色号/字体政策）
-    > 内容事实与语义 > 风格语法 > 页型/情绪 > AI 自由发挥
+Content（说什么）→ Style（怎么表达）→ Brand（是谁）→ Asset（拿什么文件画）
+        → Resolver（Theme / Asset）→ Renderer（HTML/PPTX/PDF/MP4/GIF）
 ```
 
-落到本仓库就是下面那张"谁说话"表 —— 融合发生在**字段级**（色板并入同名覆盖、
-字体整体替换），没有"谁把谁整个吞掉"。
+| 层 | 负责 | 不负责 | 本仓库落点 |
+| --- | --- | --- | --- |
+| Content | 标题、正文、数据、事实、页面目的 | 颜色、Logo、字体文件、图片路径 | spec / 三份规划 JSON |
+| Style | 构图、排版性格、色彩语法、图片/图形/动画语言 | 公司身份、官方 Logo、品牌锁定色 | `styles/<name>/` |
+| Brand | Logo、品牌身份色、字体政策、署名、官方主题、视觉约束 | 页面坐标、布局变体、具体构图 | `brands/<name>/` |
+| Asset | 本 deck 真正用的图片/截图/插图文件 | 决定品牌规范、决定风格 | spec 同目录的图文件 |
 
-| 东西 | 谁说话 | 怎么合 |
-| --- | --- | --- |
-| 色板 | 品牌 | **并入**风格的色板表，同名以品牌为准；风格原有的一个不删 |
-| 字体 | 品牌 | 给了就**整体替换**（display 与 body 一起换） |
-| logo / 署名 | 品牌 | 给了才出现，没给就没有这个元素（不渲染空占位） |
-| **logo 的位置 / 大小** | **风格** | 构图问题 —— 风格知道画面哪里是空的 |
-| logo 出现在**哪些页** | 品牌 | `logoOn` |
+**核心原则**：Brand 定义"是谁"，Style 定义"怎么表达"，Content 定义"讲什么"，
+Asset 定义"最终拿什么文件来画"。Theme Resolver ≈ `brand.py` 的
+`merge_color_sets/merge_fonts`；Asset Resolver ≈ `image_source.py --check`。
 
-### v2.0 协议对照（哪些已落地、哪些是约定）
+## 2. 冲突处理总原则【✅】
 
-| 协议规则 | 本仓库现状 |
-| --- | --- |
-| 字段集封闭，未知字段报错 | ✅ `BRAND_FIELDS`，多一个键直接失败 |
-| logo normal/inverse 按**局部背景亮度**选 | ✅ 纸色亮度 < 0.45 走反白版（实测阈值，深底 #000/#0A0A0A 与浅底 #F4F4F4 分得干净） |
-| 品牌不写坐标（logoTop/logoX 不存在） | ✅ 位置归风格（`skin.css` 的 `.brandlogo`） |
-| 不让图片模型生成 logo | ✅ 图像契约的负面清单里就有 no logo / no watermark（见 images.md） |
-| `colorPolicy.strength`（strict/strong/balanced/subtle） | 未实现 —— 现状是固定策略：并入+同名覆盖（介于 balanced/strong 之间） |
-| `locked` 色不许改、OKLCH 派生 | 未实现 —— 需要时先过 `palette.py` 的 audit 再手工合 |
-| `approvedThemes`（客户官方主题） | 未实现 —— 可用 `colorSets` 并入同名覆盖近似 |
-| `fonts.policy`（strict/hybrid/style_allowed） | 未实现 —— 现状只有 strict（整体替换，理由见下） |
+不用"某层整体覆盖另一层"的粗暴规则；统一
+Hard Constraint > Semantic Requirement > Style Grammar > Creative Preference：
 
-要实现 strength/locked 的时机：真出现"品牌色和风格语法打架"的案例再做 ——
-规则先行于案例，要么做不出来，要么做错方向。
+```text
+用户明确硬要求 > 品牌锁定资产（logo 本体） > 品牌 Locked Identity > 内容事实与语义
+    > Style Grammar > Mood/Page Type > 外部灵感 > AI 自由发挥
+```
 
-> 字体为什么是整体替换：只换一半会得到"标题是品牌字体、正文不是"这种半吊子，
-> 比不换更难看。所以 `fonts` 必须 display + body 都给，只给一个就当没给。
+落地即 §5 的字段级融合表——Brand 不直接覆盖 Style；Style 不改 Locked Asset；
+**Renderer 不临时决定任何事**（它只消费已解析的 tokens）。
 
-## 文件形状
+## 3. 品牌层的正确职责【✅】
 
-`brands/<name>/brand.json`（字段集封闭 —— 多一个键直接失败，不是静默忽略）：
+品牌层只存"身份"和"不可丢失约束"。目录 `brands/<name>/`（logo + brand.json；
+`assets/product|screenshots|official`、`fonts/` 子目录按需自建）。品牌层可以
+不存在：`deck.brand` 不写就全走 Style + Color + Typography + Asset Rules。
+
+## 4. brand.json 结构【✅ 封闭集；嵌套形=约定】
+
+字段集封闭，未知字段**直接报错**（`BRAND_FIELDS`，多一个键就失败，不是静默
+忽略）。实际形状：
 
 ```jsonc
-{
-  "version": 1,
-  "label": "某某科技",
-  "logo": "logo.svg",               // 相对 brand 目录
-  "logoInverse": "logo-inv.svg",    // 深底用的反白版（强烈建议给，见下）
-  "logoOn": "cover+end",            // cover | cover+end | all | none
-  "footer": "© 2026 某某科技",       // 可选：页脚的署名
-  "colorSets": {                    // 可选：并入风格的色板表
-    "brand": { "primary": "#0B5FFF", "secondary": "#101418",
-               "background": "#FFFFFF", "text": "#101418" }
-  },
-  "fonts": { "display": "…", "body": "…" },   // 可选：整体替换
-  "note": "写给人看的备注（可选）"
-}
+{"version": 1, "label": "某某科技",
+ "logo": "logo.svg", "logoInverse": "logo-inv.svg",   // 相对 brand 目录
+ "logoOn": "cover+end",                                // cover|cover+end|all|none
+ "footer": "© 2026 某某科技",
+ "colorSets": {"brand": {"primary": "#0B5FFF", /* … */}},
+ "fonts": {"display": "…", "body": "…"},               // 给了就整体替换（见 §10）
+ "note": "写给人看的备注"}
 ```
 
-`python3 scripts/brand.py` 列出所有品牌；`brand.py <名字>` 看一个的摘要。
+规范的 `brandColors{locked}` / `colorPolicy` / `approvedThemes` / `imagePolicy`
+是协议预留【约定】——要哪个先出真实冲突案例（见各节）。
 
-## logo
+## 5. 品牌颜色与 Style 的融合【✅ 字段级】
 
-### 深底必须有反白版（这不是优化，是刚需）
+禁止两条旧规则：Brand Palette 整体覆盖 Style Palette；品牌色全加、Style 原色
+一个不删（颜色膨胀）。三层模型落地：
 
-抽帧看图当场撞到的：`keynote-dark` 是**纯黑底**，而专为白底设计的 logo 里那块深色
-**直接消失** —— 屏幕上只剩一个白三角和几个字母，看着像图裂了。
+- **A 身份色**：`brand.colorSets`（如 brand.primary #0B5FFF）；
+- **B Style 色彩语法**：`style.json` 的 `colorStructure`（背景模式/色相结构/
+  饱和度/对比度——不硬编码品牌色）；
+- **C Resolved Theme**：`merge_color_sets` 合并出最终色板表（同名键品牌赢，
+  风格原有色板一个不删），**只有这层给 Renderer**。
 
-真实品牌手册里的 logo 从来都是成对的（正版 / 反白版），所以这是品牌层该有的东西。
-给了 `logoInverse` 就自动切换（判据是纸色亮度 < 0.45；本仓库的深底是 `#000000`
-与 `#0A0A0A`，浅底最低 `#F4F4F4`，分得干净）。只给一个也能跑，但 `check.py` 会提示。
+## 6. 品牌颜色强度（colorPolicy.strength）【约定】
 
-### 格式：HTML / PDF 什么格式都行，原生 PPTX 只吃位图
+strict（品牌主导）/ strong（品牌明显、Style 可扩展）/ balanced（品牌做
+Identity/Accent，Style 保留表达力，推荐默认）/ subtle（只在 Logo 与重点）。
+现状是固定策略"并入+同名覆盖"（介于 balanced/strong）；真出现"品牌色与风格
+语法打架"的案例再实现四档。
 
-- **HTML / PDF**：logo 以 base64 **内嵌**进产物，所以产物自己是完整的 —— 挪到哪都不裂图。
-  SVG 最好（矢量，放大不糊）。
-- **原生 PPTX**：python-pptx 不支持 SVG，所以矢量 logo 会**当场用 Chrome 栅格化**成 2 倍
-  位图（Chrome 本来就是这条流水线的依赖）。栅格化不了会明说跳过，不会静默少一个 logo。
-- 贴图版 PPTX 不用管：logo 本来就在那张贴图里。
+## 7. Locked Color 与派生颜色【约定】
 
-⚠️ 栅格化要**按实测的盒子尺寸**做。第一版拿一个标量当窗宽（`--window-size=W,W`），
-出来是正方形：既丢宽高比（图被拉／留一片透明），又因为 SVG 作为文档打开时按自身尺寸渲染
-（那个是 420×100）而被**右边截掉**。两个毛病都不报错，只会默默地丑。现在传的是
-测量到的 `w×h`，再按 2 倍截图。
+locked=true 的 HEX 必须被真实使用（Logo 关联/关键 Accent/识别线/重点数字），
+不得修改；locked=false 可在 OKLCH 派生（Hue 保持，Lightness ±3~15%，Chroma
+±5~25%）。未实现：当前同名即覆盖、无锁定语义；需要时先过 `palette.py --audit`
+的对比度检查再手工合。
 
-### 位置归风格管
+## 8. 品牌色与渐变【约定】
 
-默认在**右上角**（`height:56px`，`width:auto`）—— 壳里给的一条规则，某个风格要另说就覆盖它
-（和 `.foot` 同一套机制）。
+品牌色可作 Gradient Anchor，但不包办所有 Stop（Brand Blue + Style Companion +
+Neutral → Ink Black → Brand Blue → Silver 这类）。品牌负责识别，Color Engine
+负责 Stop 数量/方向/明度/冷暖。现状：风格自带渐变语法，品牌色经 colorSets 进入。
 
-约束的是**高度**不是宽度：logo 多是横长条，锁高度才能让宽高比自然展开
-（给宽会有的被拉横、有的被压扁）。要挪就改 `skin.css` 里的 `.brandlogo` 那一条。
+## 9. Approved Theme【约定】
 
-## 署名（`footer`）
+客户提供完整官方主题（light/dark 的 background/textPrimary）时优先于 Style
+自动配色，但只锁颜色应用，不锁构图/字号跨度/图形/图片/动画语言。未实现；
+近似做法：把官方色写成一套 `colorSets` 并入同名覆盖。
 
-渲染成左下角页脚那一行里的一块（`.footrow` 里的 `.brandfoot`）。
+## 10. 品牌字体与 Style【✅ strict 落地；hybrid/style_allowed=约定】
 
-为什么和页脚**并排**而不是各自靠左右两端：四套风格里有**三套**把右下角给了巨号页码
-（`.slide::after{content:attr(data-idx)}`），署名放右下就直接压在页码上 —— 抽帧图里
-一眼看得见。页脚那一带（左下）四套风格都是空的，而且"文档元信息"本来就该在一块儿。
+fonts.policy：strict（Display+Body 都品牌字体）/ hybrid（正文品牌、标题允许
+Style Display）/ style_allowed（品牌字体只用于署名与 Logo 配套）。**现状=
+strict**：给了 `fonts` 就整体替换（display 与 body 一起换）——只换一半会得到
+"标题是品牌字体、正文不是"的半吊子，比不换更难看；只给一个就当没给。
+hybrid 是协议预留。
 
-## 检查
+## 11. Logo 规则【✅】
 
-`check.py` 里跟品牌有关的三条：
+Logo 永远属于 Brand Asset。禁止：让图片模型生成 Logo、AI 重绘、用文字猜、
+改颜色/比例/形态（除非品牌本身提供可变色规范）。落地：logo 是 `brands/`
+目录里的文件，base64 内嵌进产物；图像契约的负面清单里就有 no logo/no
+watermark（§18），生成图永远不带 Logo。
 
-| 判据 | 级别 | 为什么 |
+## 12. Logo normal / inverse 选择【✅】
+
+不判整页背景，判 **Logo 实际 Bounding Box 背后的局部区域**：纸色相对亮度
+< 0.45 走反白版（实测阈值：本仓库深底 #000000/#0A0A0A 亮度 0.000/0.003，
+浅底最低 #F4F4F4 亮度 0.905，分得干净）。深底 + 没给反白版 → `check.py`
+提示（修法在品牌那边补 `logoInverse`，不是改版面）。两版都不达标时的正解：
+调 Logo 区域背景或加局部保护区，**不是擅自改 Logo**。
+
+## 13. Logo 的"出现"与"位置"分离【✅】
+
+Brand 决定 `logoOn`（cover | cover+end | all | none，缺省 cover+end，封闭集）；
+Style/Layout 决定位置、尺寸、安全边距、与标题的关系。品牌里**不存在**
+logoTop/logoRight/logoX/logoY 这类字段——想挪去改 `skin.css` 的 `.brandlogo`
+（约束高度不约束宽度：logo 多是横长条，锁高才能让宽高比自然展开）。
+
+## 14. 配图必须成为独立 Asset Pipeline【✅】
+
+AI 不"随便找一张图"。落地：
+
+```text
+PagePlan/spec 的 image 字段 → image_source.py --brief（Image Prompt Builder）
+  → image-brief.md（Request）→ 人/外部模型生成 → 放 spec 同目录
+  → image_source.py --check（Asset Resolver + QA）→ Renderer 取用
+```
+
+AI 负责把"需要什么图"描述准确；生成在系统外完成（不配 provider 就永远不会
+调生图模型——这是设计不是疏漏）。
+
+## 15. 图片生成发生在布局之后【✅】
+
+先知道图片角色、盒子比例、视觉焦点、文字在哪边、留白、裁切方向，再写
+Prompt。落地：`--brief` 从**渲染后的实测插槽几何**算（量出来的盒子 ×2 =
+minWidth、目标比例、文字列位置），禁止"先生成图再想怎么塞"。
+
+## 16. 图片角色【✅ 简化】
+
+规范十角色（hero/supporting/background/evidence/product/portrait/
+illustration/diagram/texture/decoration）。落地：spec 的 `type: content-image`
+页即"这一页的主视觉槽"；角色细分由 brief 的 purpose/构图字段承载。
+
+## 17. AI 图片与真实资产必须分开【✅ 原则一致】
+
+Generated（氛围/抽象/概念/3D/背景——非事实性）走契约流程；Official/Factual
+（品牌 Logo、官方产品截图、官方 UI、真实人物照、客户提供的图、法务要求准确
+的视觉）**默认不得用生成图替代**——走人提供的文件。
+
+## 18. 生成图中禁止内嵌正式文字【✅】
+
+PPT 正式文字由 Renderer 排（可搜索/可翻译/可编辑），不要求图片模型生成。
+Prompt 负面清单：**no text / no logo / no watermark**。原因：图片模型文字
+不稳定、字体不可控、品牌字体无法保证、后续无法编辑。
+
+## 19. 文字留白区【✅】
+
+左文右图 → brief 的构图字段写明主体偏哪侧、哪侧留干净负空间（从实测插槽
+几何来，不是猜）。生成图服务布局，不是布局迁就图。
+
+## 20. Image Request 标准结构【✅ 等价形】
+
+规范的 Request JSON（id/slideId/role/purpose/subject/composition/style/
+colorIntent/constraints/output）落地为 `image-brief.md` 的**结构化小节**
+（每图一块：用途/构图/管线提示/中英 Prompt/参数块），字段一一对应、
+人直接可读可贴。
+
+## 21. Prompt Builder【✅】
+
+输入 = 内容语义 + 页型 + 图片角色 + **实测布局** + 风格气质 + 已解析色彩 +
+品牌图片约束；输出 = Positive Prompt + Negative Prompt + 生成参数 + 输出
+契约（文件名/最小宽度/比例/透明度）。
+
+## 22. Prompt 结构【✅ 固定十字段序】
+
+Subject → Scene → Composition → Spatial → Camera(可选) → Lighting →
+Color → Style → Detail → Constraints。**不机械堆词**；镜头行默认不输出
+（要加自己贴，合同里留了位置和示例）。
+
+## 23. Prompt 示例（规范样例，同我们的写法）
+
+> A premium futuristic visualization of a unified AI inference platform, a
+> central computational core connected to distributed model nodes, …, clean
+> negative space covering roughly the left 35% for presentation text, …,
+> dark neutral foundation with restrained brand-blue accents, …, no text,
+> no logos, no watermark, avoid generic blue-purple AI gradients.
+
+## 24. Prompt 不写什么【✅】
+
+不写 PPT 正式标题、品牌 Logo、页码、正文、品牌官方字体名（只可描述气质）、
+Renderer 才处理的 UI 元素。**图片负责画面，Renderer 负责信息**。
+
+## 25. 约定目录【✅ 简化形】
+
+规范推荐 `projects/<deck-id>/assets/{requests,generated,provided,…}`；
+本仓库简化为**产物与 spec 同目录**（deck.spec.json + 图文件并排，交付整体
+拷走不断链）。用户流程相同：读合同 → 按 Prompt 生成 → 用规定文件名放好 →
+Renderer 自动取。
+
+## 26. 文件名必须稳定【✅】
+
+禁止 final.png / new.png / 好看的图2.png；统一 `<语义名>.<ext>`——spec 的
+`image` 字段即文件名，**同一个名字就是同一个语义槽位**（brief 与 spec 一一
+对应，`--check` 按名验收）。
+
+## 27. 多版本管理【约定】
+
+`__v01/__v02` 候选 + manifest 选定；无 selected 时单候选自动用、多候选阻塞。
+未实现——现行约定：一个槽一个文件名，换图就换文件（删旧防重复检查误报）。
+
+## 28. Asset Manifest【约定】
+
+`{version, assets:{id:{kind,role,request,required,selected}}}` 未建独立
+manifest；spec 的 image 字段承担"必需素材清单"职责（required 语义见 §30）。
+
+## 29. Asset Resolver【✅】
+
+解析优先级落地：spec `image` 字段（精确文件名）→ spec 同目录查找 → 品牌资产
+（logo 走 brands/）。**禁止缺图自动去网上随便找**——本仓库没有 web 回退开关，
+结构上不可能发生。
+
+## 30. 图片缺失策略【✅ 阻塞】
+
+`content-image` 页 = required=true：缺图**阻塞**（`--check` 明说缺哪个文件、
+期望路径；渲染前 `check.py` 也拦 content-image 无 image）。required=false 的
+可选素材当前不存在于 schema——要加再议。
+
+## 31. 禁止静默替换【✅】
+
+找不到图、尺寸太小、比例严重不匹配、品牌图被普通图替代、Logo 缺失——一律
+warning 或 blocking，**绝不静默**。落地：`--check` 的四类阻断（缺文件/宽度
+不足/比例不对/同名重复）+ `check.py` 的 logo 三条（§50）。
+
+## 32. 图片质量检查【✅ 子集】
+
+已查：文件存在、宽度（minWidth）、宽高比（与插槽目标比）、同名重复。
+未查【约定】：解码深度、alpha、拉伸/裁切程度、主体被文字遮挡、负面空间
+满足度——这些需要视觉判读，留给抽帧人审。
+
+## 33. 图片裁切规则【约定】
+
+Prompt 阶段对齐比例（实测插槽比）；渲染 `fit` 记录 focalPoint 优先保留焦点、
+禁只用中心裁切——未实现 focalPoint 字段，当前靠比例在合同阶段对齐。
+
+## 34. Brand Image Policy【约定】
+
+`imagePolicy{preferred,avoid,allowGeneratedLogo:false,…}` 未实现；原则已由
+§17/§18 承担（Logo 永不生成、事实素材不生成替代）。品牌要约束图风时写在
+`note` 里给人看。
+
+## 35. Style Image Grammar【✅ 精神落地】
+
+Style 负责图片语言不定内容：风格的气质/管线提示（双色调、网点、纸感）写进
+brief 的 Style/Constraints 段——Content 决定画什么，Style 决定怎么画，Brand
+决定哪些身份元素不能错。
+
+## 36. 图片与品牌色的关系【✅】
+
+Prompt 可继承品牌色作 anchor，但禁止"整张图都必须是品牌蓝"；写法是
+"restrained brand-blue accents with complementary neutrals"——不破坏 Style。
+
+## 37. 官方产品 / UI 截图【✅】
+
+属于 provided/brand asset，不是 generated。禁止让模型重画官方 UI、猜界面、
+改关键业务数据；允许外框/阴影/遮罩/透视 mockup，但**截图像素本身不被篡改**
+（除非用户明确要求）。
+
+## 38. 真实产品图【✅】
+
+要"精确产品外观"优先官方产品图；生成模型只适合围绕真实产品做环境扩展，
+不是重新发明产品。
+
+## 39. 图片生成与 Brand Logo 永远分层【✅】
+
+封面要"品牌 Logo + AI 主视觉"时：Generated Hero Image + **Renderer 叠印
+原版 Logo**；禁止让图片模型把 Logo 画进去（画出来的是猜的）。
+
+## 40. 页面 Image Request 的生成时机【✅】
+
+Content → Storyline → Page Planner → spec（Layout 已定）→ 插槽几何实测 →
+Prompt Builder → Request（image-brief.md）→ 等人生成 → `--check` →
+Renderer。对应 `pipeline.md` 的 ⑤⑥ 站。
+
+## 41. 生成图状态【✅ 简化】
+
+pending/ready/selected/rejected/missing 的机器状态未建；等价物流：brief
+发出=pending，`--check` 通过=ready，缺文件报错=missing（阻塞）。
+
+## 42. 图片 QA 不合格时【✅ 顺序一致】
+
+不自动改整页。按序：换更大图/对齐比例（重生成）→ 调整图片盒子（改 spec）→
+调蒙版/overlay → 重新生成 Prompt → 请求重生成。**主体位置完全错 → 回
+Prompt Builder 重写，不靠裁切硬救**。
+
+## 43. 统一资产 ID【✅】
+
+PagePlan/spec 的 `image` 值 = brief 里的文件名 = 磁盘文件名，三处一致
+（规范四处含 manifest，本仓库无独立 manifest）。
+
+## 44. Renderer 不负责生成 Prompt【✅】
+
+Prompt Builder（image_source）→ Request；Asset Resolver（--check）→ File；
+Renderer → Draw。**Renderer 只接受已解析的 asset 路径，禁止临时调图片模型**
+（结构上就没这条路径）。
+
+## 45. 导出规则【✅】
+
+HTML/PDF：logo base64 内嵌（产物自包含，挪动不断链），SVG 最好。PPTX：
+python-pptx 不吃 SVG → **按实测盒子尺寸 ×2 栅格化**（Chrome 现场做；第一版
+拿标量当窗宽出过正方形截断的坑——既丢宽高比又被右边截掉，都不报错只是丑，
+现在传实测 w×h 再 ×2 截图）。栅格化保持宽高比、按实际盒子、≥2×，**不得
+固定方形窗口**。栅格化不了明说跳过，不静默少一个 logo。
+
+## 46. 品牌与图片的最终冲突判定【✅】
+
+品牌硬禁止 > 内容真实性 > Page Type > Style Image Grammar > Creative
+Preference。品牌禁 cyberpunk：即使 Style=futuristic 也不能用，但可走 clean
+futuristic / premium digital / technical editorial。
+
+## 47. 与 Color Rules 的接口【✅】
+
+Brand 不输出最终 Theme。Color 侧输入 = 身份色（colorSets）+ Style 色彩语法
+（colorStructure）→ 合并出 Resolved 色板 → Renderer 只读最终结果；Prompt
+Builder 只读已解析色彩（§36 的 anchor 写法）。
+
+## 48. 与 Typography Rules 的接口【✅】
+
+Typography 输入 = 品牌字体政策（fonts）+ Style 字栈 + 语言/密度 →
+`merge_fonts` 整体替换或保持 → Renderer 只读最终字栈。
+
+## 49. 与 Motion Rules 的接口【✅】
+
+生成图可参与 Mask Reveal / Image Reveal / Subtle Scale，但**内容不得因动画
+变形**。落地：imageReveal preset = 横向揭开 + `1.02→1` 的 settle——可以；
+skew 40°——管线里根本不存在（preset 写死，没有随机变形）。
+
+## 50. check.py / QA 建议检查【✅ 子集】
+
+| 判据 | 级别 | 状态 |
 | --- | --- | --- |
-| logo 压住文字（两个实测矩形相交） | **阻塞** | 两个盒子都在页内，"越出该页"那套查不出来，但盖上标题就是废页 |
-| 深底 + 没给反白版 | 提示 | 修法在品牌那边（补一个 `logoInverse`），不在版面这边 |
-| 位图 logo 被放大渲染 | 提示 | 原始 200px 拉到 500px 会糊；换更大的图或直接上 SVG |
+| Logo 压住文字（实测矩形相交） | **阻塞** | ✅ |
+| 深底 + 没给反白版 | 提示 | ✅ |
+| 位图 logo 被放大渲染 | 提示 | ✅ |
+| Logo 文件在不在 | 加载时报 | ✅（带具体路径） |
+| required asset 存在/宽度/比例/重复 | **阻塞** | ✅（`--check`） |
+| 锁定色被非法修改 / 字体政策满足 | — | 约定（无 locked/policy 机制） |
+| 图片可解码/拉伸/遮挡/负面空间 | — | 约定（抽帧人审） |
 
-logo 的"文件在不在"由 `brand.py` 加载时报（带具体路径）；"图有没有加载"由既有的
-产物健康度检查覆盖 —— 它已经带 `role="logo"` 进了语义清单。
+## 51. Do NOT【✅ 全部成立】
 
-## 资产层：AI 出合同，人出图（细节见 images.md）
+**Brand**：不把品牌色/字体写进 spec（deck 只有 `brand` 一个入口，字段封闭，
+写了会被指名报出）；不在品牌里写位置（logoTop/logoRight 不存在）；不让品牌
+色无条件覆盖 Style（字段级同名覆盖）；不让 Style 改 locked asset；**不让图片
+模型生成 Logo**。
+**Image**：不让 LLM 随机找图塞页面（没有这条路径）；不先生成图再定布局；
+不让图片模型承担 PPT 正式文字；不让生成图替代官方截图/Logo/事实素材；不用
+final.png/test2.png 不稳定名；**不在素材缺失时静默换图**；不让 Renderer
+临时生成 Prompt。
 
-第四层（Asset）不是"品牌给的文件"，而是本 deck 真正用的图。本仓库的落地就是
-图像契约流程，协议对应关系：
+## 52. 最终推荐工作流【✅ 对应 pipeline.md 九站】
 
-| 协议规则 | 本仓库现状 |
-| --- | --- |
-| AI 只写需求，不随便找图 | ✅ `image_source.py --brief` 出实测几何+比例+管线的合同（image-brief.md） |
-| 稳定文件名 = 稳定语义槽位 | ✅ spec 的 `image` 字段即文件名，与合同一一对应（同名去重有检查） |
-| 缺图**阻塞**，不静默换图 | ✅ `--check` 验存在/宽度/比例；绝不去网上随便找一张顶上 |
-| 生成图不替代官方截图/logo | ✅ 事实性素材（产品照/截图）走人提供的文件，合同只管氛围/概念图 |
-| 多版本 `__v01/__v02` + manifest 选定 | 未实现 —— 约定：一个槽位一个文件名，换图就换文件 |
-| 图片焦点裁切（focalPoint） | 未实现 —— 合同阶段就把比例对齐，渲染阶段按需裁 |
+```text
+Content → Storyline → Page Planner → Style → Brand → Theme（合并）
+  → Layout（spec+实测插槽）→ Asset Requirement（--brief）
+  → 人/外部模型生成 → --check 验收 → Renderer → Visual QA → Repair
+  → PPTX / HTML / PDF / MP4 / GIF
+```
+
+## 53. 一句话定义【✅】
+
+**Brand 负责身份，Style 负责视觉语言，Content 负责语义，Prompt Builder 负责
+描述所需图像，用户或外部模型负责生成实际图片，Asset Resolver 负责从约定
+目录准确取用，Renderer 只负责把已解析好的视觉资产画到页面上。** 由此：品牌
+不破坏 Style、Style 不篡改品牌、图片生成不污染 Renderer、Prompt 与图片一
+一对应、素材可复现可替换可回归、同一品牌跨 deck 复用、同一 deck 换 Style
+不丢品牌身份。
+
+---
 
 ## 起步：做一个品牌
 
@@ -154,21 +402,14 @@ logo 的"文件在不在"由 `brand.py` 加载时报（带具体路径）；"图
 mkdir -p brands/acme
 cp 你的logo.svg brands/acme/logo.svg
 cp 你的反白logo.svg brands/acme/logo-inverse.svg
-$EDITOR brands/acme/brand.json     # 照上面的形状写
-python3 scripts/brand.py acme      # 看摘要：logo 认到了没、色板加了几套
+$EDITOR brands/acme/brand.json     # 照 §4 的形状写
+python3 scripts/brand.py acme                # 看摘要：logo 认到没、色板加了几套
 ```
 
-然后在 spec 的 `deck` 里加一行 `"brand": "acme"`，跑五道门。
+然后在 spec 的 `deck` 里加一行 `"brand": "acme"`，跑五道门（`pipeline.md`）。
 
-## Do NOT
+## 署名（footer）
 
-- **不要把品牌的主色/字体写进 spec**：spec 的 `deck` 只有 `brand` 一个入口，
-  色值和字体名都不在里面（字段集封闭，写了会被指名报出）。改品牌去改 `brand.json`。
-- **不要在品牌里写位置**：`logoPos` / `logoTop` / `logoRight` 这类字段**不存在** ——
-  logo 放哪个角是构图，归风格。想挪就去改 `skin.css`。
-- **不要只给一个 logo 就往深底风格上跑**：`check.py` 会提示，但那条提示是真的 ——
-  先看一眼抽帧图，深色块很容易整个消失。
-- **不要用会随机器变形的图片当 logo**：位图给 2 倍分辨率，或者直接给 SVG。
-- **不要让图片模型画 logo**：logo 永远是品牌层给的文件；生成图里的 logo 是猜的。
-- **不要让品牌色无条件吞掉风格**：现行的融合是字段级（同名覆盖），不是整层替换；
-  要改融合策略先看上面那张 v2.0 对照表。
+渲染成左下角页脚一行里的一块（`.footrow` 里的 `.brandfoot`）。和页脚**并排**
+而不是分居两端：多数风格把右下角给了巨号页码，署名放右下会压页码；页脚一带
+本来就该放"文档元信息"。

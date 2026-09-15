@@ -67,7 +67,7 @@ done
 1. **先读 demo**：`dev-tools/demo.spec.json` —— spec 该写哪些键以它为准
    （逐键说明见 `references/style-architecture.md`；写完先跑 `validate_spec.py` 过字段集）。
 2. **写 spec**：每页只有 `type` + 内容（标题 / 条目 / 时间点 / 数据），见
-   `references/style-architecture.md`；**写什么内容**见 `references/content-design.md`
+   `references/style-architecture.md`；**写什么内容**见 `references/content-intelligence.md`（内容智能 / 内容规划系统）
    （一页一个观点 / 容量估算 / 观众距离）。拿不准一页装不装得下就先跑 `fit.py`，别猜。
    `seed` 显式写（默认 1）：错位与颗粒按 (seed, 元素) 派生，不靠全局 random（否则没法回归）。
    公司有品牌资产（logo / 色号 / 字体 / 署名）就加一行 `deck.brand`，见
