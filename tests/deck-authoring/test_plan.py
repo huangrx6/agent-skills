@@ -53,6 +53,9 @@ render = _load("render")
 def _content(**over):
     base = {
         "topic": "统一平台",
+        "brief": {"purpose": "proposal", "audience": "technical",
+                  "delivery": "live", "desiredAction": "批准平台建设方案"},
+        "coreThesis": {"statement": "统一平台可以解决模型服务碎片化并形成规模化能力"},
         "facts": [
             {"id": "fact_01", "type": "problem", "text": "资源分散",
              "source_type": "original", "source_ref": "doc:p1"},
@@ -178,6 +181,96 @@ class TestContentUnderstanding(unittest.TestCase):
     def test_empty_content_is_an_error(self) -> None:
         problems, _ = plan.check_content({"facts": []})
         self.assertTrue(problems)
+
+
+class TestContentV3(unittest.TestCase):
+    """content-design v3.0 接进来的检查：Brief / Core Thesis / Claim / 空话 / 重复。"""
+
+    def test_missing_core_thesis_is_an_error(self) -> None:
+        """元规则 2：没有统领论断，每页各自为政。"""
+        bad = _content()
+        del bad["coreThesis"]
+        problems, _ = plan.check_content(bad)
+        self.assertTrue(any("coreThesis" in p for p in problems), problems)
+
+    def test_brief_without_any_desired_outcome_is_an_error(self) -> None:
+        """元规则 1：先明确观众要做什么，再决定内容。"""
+        bad = _content()
+        bad["brief"] = {"purpose": "proposal"}
+        problems, _ = plan.check_content(bad)
+        self.assertTrue(any("desiredAction" in p for p in problems), problems)
+
+    def test_missing_brief_is_only_a_note(self) -> None:
+        """Brief 可选 —— 但缺席要开口，不是静默。"""
+        ok = _content()
+        del ok["brief"]
+        problems, notes = plan.check_content(ok)
+        self.assertEqual(problems, [])
+        self.assertTrue(any("desiredAction" in n for n in notes), notes)
+
+    def test_brief_enums_are_closed(self) -> None:
+        bad = _content()
+        bad["brief"]["audience"] = "所有人"
+        problems, _ = plan.check_content(bad)
+        self.assertTrue(any("audience" in p for p in problems), problems)
+
+    def test_brief_target_slides_must_be_positive_int(self) -> None:
+        bad = _content()
+        bad["brief"]["targetSlides"] = 0
+        problems, _ = plan.check_content(bad)
+        self.assertTrue(any("targetSlides" in p for p in problems), problems)
+
+    def test_claims_derived_from_real_facts(self) -> None:
+        ok = _content()
+        ok["claims"] = [{"id": "claim_01", "statement": "接口已碎片化",
+                         "type": "derived", "derivedFrom": ["fact_01"],
+                         "confidence": 0.9}]
+        problems, _ = plan.check_content(ok)
+        self.assertEqual(problems, [])
+
+    def test_claim_with_dangling_derived_from_is_an_error(self) -> None:
+        """判断基于不存在的事实 = 悬空的论证。"""
+        bad = _content()
+        bad["claims"] = [{"id": "claim_01", "statement": "碎片化",
+                          "type": "derived", "derivedFrom": ["fact_99"]}]
+        problems, _ = plan.check_content(bad)
+        self.assertTrue(any("derivedFrom" in p for p in problems), problems)
+
+    def test_message_claim_must_resolve(self) -> None:
+        bad = _content()
+        bad["messages"][0]["claimId"] = "claim_404"
+        problems, _ = plan.check_content(bad)
+        self.assertTrue(any("claimId" in p for p in problems), problems)
+
+    def test_vague_change_word_without_digit_is_flagged(self) -> None:
+        """§50/§51："全面提升能力" 该被追问；带数字的不唠叨。"""
+        vague = _content()
+        vague["messages"].append(
+            {"id": "msg_v", "statement": "平台将全面提升管理能力",
+             "importance": 0.6, "evidence_refs": ["fact_01"]})
+        _p, notes = plan.check_content(vague)
+        self.assertTrue(any("没有数字" in n for n in notes), notes)
+        numbered = _content()
+        numbered["messages"].append(
+            {"id": "msg_n", "statement": "按入口从 5 套提升到 1 套",
+             "importance": 0.6, "evidence_refs": ["fact_01"]})
+        _p, notes2 = plan.check_content(numbered)
+        self.assertFalse(any("没有数字" in n for n in notes2), notes2)
+
+    def test_identical_messages_are_flagged(self) -> None:
+        """§44：同一句话讲两遍 —— 归一化后相同才算（语义相似度未实现）。"""
+        dup = _content()
+        dup["messages"].append(
+            {"id": "msg_d", "statement": "服务分散，缺统一管理！",
+             "importance": 0.7, "evidence_refs": ["fact_01"]})
+        _p, notes = plan.check_content(dup)
+        self.assertTrue(any("同一句话" in n for n in notes), notes)
+
+    def test_no_messages_is_an_error(self) -> None:
+        bad = _content()
+        bad["messages"] = []
+        problems, _ = plan.check_content(bad)
+        self.assertTrue(any("messages" in p for p in problems), problems)
 
 
 class TestStoryline(unittest.TestCase):

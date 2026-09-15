@@ -202,6 +202,21 @@ FACT_TYPES = ("context", "problem", "solution", "metric", "constraint", "risk", 
 SOURCE_TYPES = ("original", "inferred", "generated")
 
 
+PURPOSES = ("decision", "proposal", "report", "update", "training",
+            "sales", "explanation", "review")
+AUDIENCES = ("executive", "technical", "customer", "internal", "general")
+DELIVERIES = ("live", "async", "printable", "editable")
+CLAIM_TYPES = ("original", "derived")
+# v3.0 §50：变化词单独出现（句里没有数字撑着）就该被追问"提升什么？多少？"
+VAGUE_CHANGE_WORDS = ("提升", "优化", "降低", "提高", "改善", "赋能", "助力",
+                       "领先", "先进")
+
+
+def _norm_statement(text: str) -> str:
+    """归一化陈述：去空白与标点、小写 —— 只用于**完全重复**检测。"""
+    return "".join(ch.lower() for ch in text if ch.isalnum())
+
+
 def check_content(content: dict) -> tuple[list[str], list[str]]:
     """校验 content.json。返回 (错误, 提示)。"""
     problems: list[str] = []
@@ -210,6 +225,9 @@ def check_content(content: dict) -> tuple[list[str], list[str]]:
     fact_ids = {f.get("id") for f in facts}
     if not facts:
         problems.append("content.json 里没有 facts —— 内容理解是空的")
+    messages = content.get("messages", [])
+    if not messages:
+        problems.append("content.json 里没有 messages —— 每页的 Takeaway 无从谈起")
     for f in facts:
         for key in ("id", "type", "text"):
             if not f.get(key):
@@ -234,6 +252,76 @@ def check_content(content: dict) -> tuple[list[str], list[str]]:
             notes.append(f"message「{str(m.get('statement', ''))[:20]}…」重要性 "
                          f"{m.get('importance')}，但证据全部是 inferred —— "
                          f"你在把 AI 推断的话当事实讲；要么找到原文证据，要么降重要性")
+        # v3.0 §50/§51：变化词没有数字撑着 → 追问（提示，不阻断）
+        text = str(m.get("statement", ""))
+        if (any(w in text for w in VAGUE_CHANGE_WORDS)
+                and not any(ch.isdigit() for ch in text)):
+            notes.append(f"message「{text[:20]}…」有变化词但全句没有数字 —— "
+                         f"追问：提升什么？多少？有证据吗（数字优先）")
+
+    # v3.0 §44：同一句话讲两遍。归一化后**完全相同**才算（语义相似度是
+    # 未实现的约定 —— 离线、零依赖做不了 embedding）。
+    seen: dict[str, str] = {}
+    for m in messages:
+        norm = _norm_statement(str(m.get("statement", "")))
+        if norm and norm in seen:
+            notes.append(f"message {m.get('id', '?')} 与 {seen[norm]} 是同一句话 —— "
+                         f"合并 / 改写 / 删一条，别让观众听第二遍")
+        elif norm:
+            seen[norm] = str(m.get("id", "?"))
+
+    # ── v3.0 §2：Presentation Brief（可选；给了就必须像样）────────
+    brief = content.get("brief")
+    if brief is None:
+        notes.append("没有 brief —— desiredAction 不明：观众看完该做什么没有答案，"
+                     "骨架只能按 topic 猜")
+    elif not isinstance(brief, dict):
+        problems.append("brief 必须是对象")
+    else:
+        for key, allowed in (("purpose", PURPOSES), ("audience", AUDIENCES),
+                             ("delivery", DELIVERIES)):
+            if key in brief and brief[key] not in allowed:
+                problems.append(f"brief.{key}={brief[key]!r} 不在 {list(allowed)}")
+        if not (brief.get("desiredAction") or brief.get("desiredBelief")):
+            problems.append("brief 缺 desiredAction / desiredBelief —— 先明确观众"
+                            "最终要做什么，再决定他需要相信什么（元规则 1）")
+        for key in ("targetSlides", "durationMinutes"):
+            v = brief.get(key)
+            if v is not None and (not isinstance(v, int) or isinstance(v, bool) or v < 1):
+                problems.append(f"brief.{key}={v!r} 应为正整数")
+
+    # ── v3.0 §11 / §59：Core Thesis 必须存在（阻断）───────────────
+    thesis = content.get("coreThesis")
+    stmt = thesis.get("statement") if isinstance(thesis, dict) else None
+    if not stmt:
+        problems.append("缺 coreThesis.statement —— 一份 deck 必须有一句统领全篇的"
+                        "论断（元规则 2）；没有它，每页各自为政")
+
+    # ── v3.0 §5.2：Claim 层（可选；判断基于事实，事实不许混进来）──
+    claim_ids = set()
+    for c in content.get("claims", []):
+        cid = c.get("id")
+        if not cid or not c.get("statement"):
+            problems.append(f"claim {cid or '?'} 缺 id / statement")
+            continue
+        claim_ids.add(cid)
+        if c.get("type") not in CLAIM_TYPES:
+            problems.append(f"claim {cid}.type={c.get('type')!r} "
+                            f"不在 {list(CLAIM_TYPES)}")
+        dangling = [d for d in c.get("derivedFrom", []) if d not in fact_ids]
+        if dangling:
+            problems.append(f"claim {cid}.derivedFrom {dangling} 指向不存在的 fact")
+        conf = c.get("confidence")
+        if conf is not None and (not isinstance(conf, (int, float))
+                                 or isinstance(conf, bool) or not 0 <= conf <= 1):
+            problems.append(f"claim {cid}.confidence={conf!r} 应在 [0,1]")
+
+    # v3.0 §21：message 可挂 claimId（挂了就要能解析）
+    for m in messages:
+        cid = m.get("claimId")
+        if cid is not None and cid not in claim_ids:
+            problems.append(f"message {m.get('id', '?')}.claimId={cid!r} "
+                            f"指向不存在的 claim")
     return problems, notes
 
 

@@ -105,7 +105,7 @@ python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸�
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 391 条，约 6 分钟（负载敏感）（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 402 条，约 6 分钟（负载敏感）（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时约 2.5 分钟，
@@ -156,7 +156,9 @@ python3 scripts/plan.py --check content.json storyline.json pageplan.json
 python3 scripts/plan.py --to-spec pageplan.json content.json -o deck.spec.json
 ```
 
-会失败的硬规矩：**悬空引用**（message 的证据指向不存在的 fact）、**事实与推断不分**
+会失败的硬规矩：**缺 coreThesis**（一份 deck 必须有一句统领论断）、**brief 缺
+desiredAction/desiredBelief**、**悬空引用**（message 的证据 / claim 的 derivedFrom
+指向不存在的 fact）、**事实与推断不分**
 （source_type 必须是 original/inferred/generated；高重要性结论只靠推断支撑会开口）、
 **骨架乱序**（先讲方案再讲问题不是自由是错）、**配额漂移**（sections 页数之和 ≠
 target_slide_count —— "15 页做成 28 页"就是这条漏的）、**复杂度爆表不拆页**
@@ -331,6 +333,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── grid.py              # 网格与间距：12 列 / 令牌 ramp / 关系规则（几何唯一来源）
 │   ├── chart.py             # 图表引擎：意图树 / 八类 SVG / muted+accent / 标注
 │   ├── plan.py              # 规划层：内容理解 / 叙事骨架 / 页型 / 到 spec 的桥
+│   │                          （brief / coreThesis / claims / 空话 / 重复也在这查）
 │   ├── brand.py             # 品牌资产：logo 内嵌 / 色板与字体合并 / SVG 栅格化
 │   ├── fit.py               # 试排：给定一页内容，实测哪些版式装得下（真渲真量）
 │   ├── style.py             # 风格层：列表 / 契约体检 / 摘要 / 联系表（八套拼一张图）
@@ -362,12 +365,19 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   └── stress.spec.json     # **压测**用：21 页真实形状（长标题/密页/疏页/全部版式）
 ├── evals/evals.json         # 行为评估用例
 └── references/
+    ├── pipeline.md             # **总链路**：九站怎么串、每站谁拦你、自由度表
     ├── style-architecture.md    # 多风格 seam、字段集
     ├── validation.md            # 校验的口径（阻塞 vs 提示）
     ├── delivery-formats.md      # HTML / PDF / PNG / PPTX / MP4 的取舍
-    ├── animation.md            # 运动设计、取帧的确定性、视频导出
-    ├── brand-assets.md         # 品牌资产协议：第三层、优先级、logo 与署名
-    └── content-design.md       # 内容设计：一页一个观点 / 容量估算 / 观众距离
+    ├── animation.md            # 运动规则与决策优先级、取帧的确定性、视频导出
+    ├── brand-assets.md         # 品牌与资产协议（v2.0）：四层、优先级链、v2 对照表
+    ├── content-design.md       # 内容设计（v3.0）：Brief / 论断 / 一页一 Takeaway
+    ├── planning.md             # 规划层模块：schema、骨架表、复杂度、到 spec 的桥
+    ├── layout-system.md        # 网格与间距令牌、层级三把尺、路线图
+    ├── charts.md               # 图表引擎：意图树、八类、弱化强调、消息先行
+    ├── color.md                # OKLCH 色彩结构、novelty、三方向
+    ├── fonts.md                # 126 字体库、风格映射、严格 A 级、用户缓存
+    └── images.md               # 图像契约：AI 出合同、人出图、--check 验收
 tests/deck-authoring/           # 测试住在仓库顶层（不在 skill 目录里）
 ├── test_ink.py
 ├── test_determinism.py

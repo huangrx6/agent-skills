@@ -1,6 +1,8 @@
 # 规划层：内容理解 → Storyline → Page Planner → Slide DSL
 
-这一层回答四个问题，**每层只回答一个**：
+这一层回答四个问题，**每层只回答一个**。说什么/为什么这样说的**规则**（Brief、
+Core Thesis、一页一 Takeaway、数字优先……）见 `content-design.md`；本篇是模块文档：
+schema、骨架表、检查与 CLI。
 
 ```text
 ① content.json   「我们知道什么」        事实 / 观点 / 数字 / 关系

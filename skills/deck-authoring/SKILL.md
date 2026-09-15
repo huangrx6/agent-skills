@@ -73,7 +73,7 @@ done
    公司有品牌资产（logo / 色号 / 字体 / 署名）就加一行 `deck.brand`，见
    `references/brand-assets.md` —— **品牌赢在"是谁"，风格赢在"怎么表达"**。
    字体与配色：字体清单/映射见 `references/fonts.md`（`fonts.py --fetch`）；色彩结构、novelty、三方向见 `references/color.md`（`palette.py --audit`）。
-3. **五道门**（顺序有意义：先验输入，再渲，再量，最后判）：
+3. **五道门**（顺序有意义：先验输入，再渲，再量，最后判；九站总图见 `references/pipeline.md`）：
    - 规格：`python3 scripts/validate_spec.py your.spec.json`（字段集封闭，未知键直接失败）
    - 墨色：`python3 scripts/ink.py styles/<style>/style.json`（任一色板不达标退出 1）
    - 渲染：`python3 scripts/render.py your.spec.json -o out.html`
