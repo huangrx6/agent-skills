@@ -167,7 +167,11 @@ def timeline(deck: dict, tokens: dict) -> list[dict]:
         # 首个非标题元素的延迟（与标题尾部重叠一点，避免中间出现空白段）
         first = enter_s * 0.55 + title_hold_s
         enter = first + (n - 1) * stagger_s + enter_s
-        hold = hold_s + n * read_per_item
+        # §32 阅读时间按内容复杂度：图表页比纯文本页多停（看懂一组柱比读一句
+        # 话慢）——每个数据项 +180ms，封顶 8 项；整页 hold 封 7s（clamp 上限）。
+        chart_items = len(slide.get("data") or []) if slide.get("chart") else 0
+        complexity_s = 0.18 * min(chart_items, 8)
+        hold = min(hold_s + n * read_per_item + complexity_s, 7.0)
         out.append({"slide": i, "start": round(t, 3),
                     "enter": round(enter, 3), "hold": round(hold, 3)})
         t += enter + hold
@@ -401,28 +405,53 @@ SHELL_JS = """
   var ROLE={}; var manEl=document.getElementById('__deck_manifest');
   if(manEl){ try{ JSON.parse(manEl.textContent).forEach(function(e){ ROLE[e.id]=e.role; }); }catch(err){} }
 
-  // 每页的编排表：DOM 顺序即编排顺序，角色决定节奏。
-  //
-  // 标题是**一组**不是单个元素：段式线往往画在标题块的边框上（swiss 的 2px 实线）、
-  // 或旁边一个 .rule 上。只动 <h1> 会得到「线已经在那、字还没到」的怪画面
-  // （抽帧检查当场看到的 ✗）。所以标题那组把父块与 .rule 一起收进来。
+  // 每页的编排表：DOM 顺序即编排顺序，角色决定**怎么上台**（§19 元素动画按
+  // 类型设计，禁止所有元素统一 opacity 0→1）：
+  //   title  → maskRevealY：遮罩从下揭开 + 落定（标题是视觉锚，要有重量）
+  //   rule   → growX：段式线从左**画**出来（线是画的，不是浮的）
+  //   image  → imageReveal：横向揭示（§20 左文右图 → 图在右侧揭开）+ 1.02→1 落定
+  //   chart  → 容器先行（§31），柱从基线生长 growY/growX、折线 pathDraw、点弹出
+  //   body   → fadeRise：淡入 + 小位移（不是纯 fade，也不是 0.4→1 —— 见 paint 里注）
+  //   chrome → 页码/壳：跟标题走，不排进正文队列
   var PLAN=slides.map(function(sec, si){
     var span=TL[si]||{enter:1,hold:1};
     var body=0;
     return [].slice.call(sec.querySelectorAll('[data-m]')).map(function(el){
       var role=ROLE[el.getAttribute('data-m')]||'bullet';
-      // 标题先行；页码算“壳”，跟标题一起出来，不该排在正文后面
-      var kind = role==='title' ? 'title' : (role==='foot' ? 'chrome' : 'body');
+      var kind = role==='title' ? 'title'
+               : (role==='foot'||role==='brandfoot') ? 'chrome'
+               : role==='image' ? 'image'
+               : role==='chart' ? 'chart'
+               : 'body';
       var delay = 0;
-      if(kind==='body'){
+      if(kind==='body'||kind==='image'||kind==='chart'){
         delay = span.enter*0.55 + (MO.titleHoldMs||0)/1000 + (body++)*(MO.staggerMs||90)/1000;
       }
       var els=[el];
+      var rules=[];
       if(kind==='title'){
+        // 标题是**一组**：父块（swiss 的 2px 边框常画在它身上）一起遮罩；
+        // .rule 不进组，单独 growX（否则线浮者出来，不是画的）。
         if(el.parentElement) els.push(el.parentElement);
-        [].slice.call(sec.querySelectorAll('.pad > .rule')).forEach(function(r){ els.push(r); });
+        rules=[].slice.call(sec.querySelectorAll('.pad > .rule'));
       }
-      return {els:els, kind:kind, delay:delay};
+      // 图表的一次性准备在 PLAN 里算完（确定性）：柱的朝向看宽高比，
+      // 折线长度 getTotalLength —— paint 每帧只做纯赋值。
+      var parts=null;
+      if(kind==='chart'){
+        var bars=[].slice.call(el.querySelectorAll('.bar')).map(function(r){
+          var w=parseFloat(r.getAttribute('width'))||1, h=parseFloat(r.getAttribute('height'))||1;
+          return {el:r, horiz: w>h};
+        });
+        var lines=[].slice.call(el.querySelectorAll('.line')).map(function(p){
+          var len=0; try{ len=p.getTotalLength(); }catch(err){ len=0; }
+          if(len){ p.style.strokeDasharray=len; p.style.strokeDashoffset=len; }
+          return {el:p, len:len};
+        }).filter(function(x){ return x.len>0; });
+        var dots=[].slice.call(el.querySelectorAll('.dot'));
+        parts={bars:bars, lines:lines, dots:dots};
+      }
+      return {els:els, rules:rules, kind:kind, delay:delay, parts:parts};
     });
   });
 
@@ -441,18 +470,76 @@ SHELL_JS = """
     PLAN[si].forEach(function(it){
       var p=(t-it.delay)/dur; p = p<0?0:(p>1?1:p);
       var e=ease(p);
-      // 标题移得多一点（它是视觉锚，要有“落下来”的重量），页码不动
-      var rise = it.kind==='title' ? 26 : (it.kind==='chrome' ? 0 : 16);
-      it.els.forEach(function(el){
-        el.style.opacity = e.toFixed(4);
-        el.style.translate = '0 ' + ((1-e)*rise).toFixed(2) + 'px';
-        el.style.scale = it.kind==='title' ? (1+(1-e)*0.012).toFixed(5) : '1';
+      // 段式线跟标题同拍，从左画出来（growX）
+      it.rules.forEach(function(r){
+        r.style.opacity='1';
+        r.style.scale=e.toFixed(4)+' 1';
+        r.style.transformOrigin='left center';
       });
+      if(it.kind==='title'){
+        // maskRevealY：遮罩从下揭开 + 26px 落定（视觉锚的重量）。
+        // 正文不用 0.4→1 的 ghost 起点：第 0 帧必须是干净空态（抽帧 QA 钉着）。
+        var m=(1-e)*100;
+        it.els.forEach(function(el){
+          el.style.opacity=e.toFixed(4);
+          el.style.clipPath='inset('+m.toFixed(2)+'% 0 0 0)';
+          el.style.translate='0 '+((1-e)*26).toFixed(2)+'px';
+          el.style.scale=(1+(1-e)*0.012).toFixed(5);
+        });
+      } else if(it.kind==='image'){
+        // imageReveal：从左向右揭开 + 1.02→1 萻定（§49 图片内容不得因动画变形，
+        // 只允许这种近 1 的 settlescale）
+        var w=(1-e)*100;
+        it.els.forEach(function(el){
+          el.style.opacity='1';
+          el.style.clipPath='inset(0 '+w.toFixed(2)+'% 0 0)';
+          el.style.scale=(1.02-0.02*e).toFixed(5);
+        });
+      } else if(it.kind==='chart'){
+        // 容器先行（§31）：壳淡入微升；数据稍后 6% 起步
+        it.els.forEach(function(el){
+          el.style.opacity=e.toFixed(4);
+          el.style.translate='0 '+((1-e)*10).toFixed(2)+'px';
+        });
+        var q=ease(Math.max(0,(p-0.06)/0.94));
+        it.parts.bars.forEach(function(b){
+          b.el.style.transformBox='fill-box';
+          b.el.style.transformOrigin= b.horiz ? 'left center' : 'bottom center';
+          b.el.style.scale= b.horiz ? q.toFixed(4)+' 1' : '1 '+q.toFixed(4);
+        });
+        it.parts.lines.forEach(function(l){
+          l.el.style.strokeDashoffset=(l.len*(1-q)).toFixed(1);
+        });
+        it.parts.dots.forEach(function(d){
+          d.style.transformBox='fill-box';
+          d.style.transformOrigin='center';
+          d.style.scale=q.toFixed(4);
+        });
+      } else {
+        // body：fadeRise（标题落定后 stagger 上来）；chrome（页码）不动只淡
+        var rise = it.kind==='chrome' ? 0 : 16;
+        it.els.forEach(function(el){
+          el.style.opacity=e.toFixed(4);
+          el.style.translate='0 '+((1-e)*rise).toFixed(2)+'px';
+          el.style.scale='1';
+        });
+      }
     });
   }
   function clearPaint(){
     PLAN.forEach(function(plan){ plan.forEach(function(it){
-      it.els.forEach(function(el){ el.style.opacity=''; el.style.translate=''; el.style.scale=''; }); }); });
+      it.els.forEach(function(el){ el.style.opacity=''; el.style.translate='';
+        el.style.scale=''; el.style.clipPath=''; });
+      it.rules.forEach(function(r){ r.style.opacity=''; r.style.scale='';
+        r.style.transformOrigin=''; });
+      if(it.parts){
+        it.parts.bars.forEach(function(b){ b.el.style.scale=''; b.el.style.transformBox='';
+          b.el.style.transformOrigin=''; });
+        it.parts.lines.forEach(function(l){ l.el.style.strokeDashoffset=''; });
+        it.parts.dots.forEach(function(d){ d.style.scale=''; d.el.style.transformBox='';
+          d.style.transformOrigin=''; });
+      }
+    }); });
   }
   function span(si){ var s=TL[si]||{start:0,enter:1,hold:1}; return s; }
   function slideAt(t){

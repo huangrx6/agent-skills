@@ -105,7 +105,7 @@ python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸�
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 402 条，约 6 分钟（负载敏感）（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 410 条，约 6 分钟（负载敏感）（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时约 2.5 分钟，
@@ -369,7 +369,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
     ├── style-architecture.md    # 多风格 seam、字段集
     ├── validation.md            # 校验的口径（阻塞 vs 提示）
     ├── delivery-formats.md      # HTML / PDF / PNG / PPTX / MP4 的取舍
-    ├── animation.md            # 运动规则与决策优先级、取帧的确定性、视频导出
+    ├── animation.md            # 运动规则 0-42 全文落地、按角色 preset、确定性、导出
     ├── brand-assets.md         # 品牌与资产协议（v2.0）：四层、优先级链、v2 对照表
     ├── content-design.md       # 内容设计（v3.0）：Brief / 论断 / 一页一 Takeaway
     ├── planning.md             # 规划层模块：schema、骨架表、复杂度、到 spec 的桥

@@ -1,175 +1,354 @@
-# 动画与视频导出
+# 动画与视频导出（高级动画设计规则全文落地）
 
-`animate.py` 把 deck 渲成 MP4 / GIF。这份文档说清**它是什么**、**运动为什么这么设计**、
-**运动设计的规则体系**（决策优先级 / 预算 / QA），以及**什么时候不该用它**。
+`animate.py` 把 deck 渲成 MP4 / GIF。本文 = **它是什么** + **运动规则体系（0–42 节全文）**
 
-## 它是什么：一次「有编排的走片」，不是产品宣传片
++ **确定性地基** + **导出**。每节标落地状态：【✅ 已实现】【约定=规则在、效果未接】。
 
-先把期待对齐：这个 skill 出的是**把 deck 逐页走一遍的视频**（每页入场编排 + 阅读停顿），
-不是那种 30 秒的多镜头 motion design 片。后者的分镜、运镜、音频是另一件事，
-本 skill 不做。
-
-它适合：
-
-- **发群里/邮件里让人看** —— HTML 要对方打开浏览器，MP4 双击就行
-- **归档** —— 内容不再变，一段视频比一堆文件直观
-- **贴在 Notion / 飞书 / 公众号** —— GIF 尤其（自动播放、无需点击）
-- **演示时的兜底** —— 现场电脑打不开 HTML 时，放视频照样能讲
-
-它不适合：
-
-- 要**互动**（点击、翻页、放大）→ 给对方 HTML，别给视频
-- 要**对方改字**→ 给可编辑 PPTX
-- 要**打印/存档矢量** → 给 PDF
+> 先对齐期待：这个 skill 出的是**把 deck 逐页走一遍的视频**（每页入场编排 + 阅读
+> 停顿），不是 30 秒多镜头 motion design 片。分镜、运镜、音频是另一件事，不做。
 
 ## 三种导出各自的运动
 
-**同一段画代码**（`paint()`）驱动三种场景，所以「讲出来的」和「录出来的」不会跑偏：
+**同一段画代码**（`paint()`）驱动三种场景，「讲出来的」和「录出来的」不会跑偏：
 
 | 场景 | 时钟 | 效果 |
 | --- | --- | --- |
 | 演示态（`?present`） | rAF（墙钟） | 翻到哪页，放哪页的入场 |
 | 取帧（`animate.py`） | `__deck.seek(t)`（纯函数） | 要哪帧给哪帧，可复现 |
-| 滚动态（默认） | 无 | 静态满态，给改稿/测量/截图用 |
+| 滚动态（默认） | 无 | 静态满态，给改稿/测量/截图/PDF 用 |
 
-## 运动参数在**风格**里，不在代码里
+适合：发群/邮件（MP4 双击就开）、归档、贴 Notion/飞书（GIF 自动播）、演示兜底。
+不适合：要互动（给 HTML）、要对方改字（给 PPTX）、要矢量存档（给 PDF）。
 
-`style.json` 的 `motion`：
+## 0. 目标
 
-```jsonc
-"motion": {
-  "easing":     "expoOut",                        // 或 overshoot
-  "cssEase":    "cubic-bezier(0.16, 1, 0.3, 1)",  // 对应曲线（CSS 侧用）
-  "enterMs":    520,      // 单个元素的入场时长
-  "staggerMs":  70,       // 元素之间的错开
-  "titleHoldMs":260,      // 标题落定到正文起步之间的**停顿**
-  "holdMs":     2600,     // 每页基础阅读时间
-  "readPerItemMs":760     // 每条内容加多少阅读时间
-}
-```
+核心不是"给元素套特效"，而是让动画服务**内容叙事、信息层级、页面风格、跨页连续性**。
 
-四种风格各一套，**故意不一样**（有测试钉着这一点）：
+## 1. 总体原则【✅】
 
-| 风格 | 性格 | enter | stagger | hold |
-| --- | --- | --- | --- | --- |
-| `keynote-dark` | 戏剧性：慢起、长尾、停顿大 | 900ms | 130ms | 2200ms |
-| `swiss-grid` | 精确：短、整齐、几乎无弹性 | 520ms | 70ms | 2600ms |
-| `billboard` | 脆：数字要「拍」上去 | 620ms | 90ms | 1800ms |
-| `notebook` | 软：像翻册子 | 700ms | 110ms | 2800ms |
+动画必须至少解决一个问题：引导注意力 / 解释结构或关系 / 强调数据或结论 / 建立页面
+节奏 / 增强风格表达 / 建立跨页连续性。禁止：为了炫而叠加效果；**所有页面/元素统一
+fade/slide/grow**；让每个元素单独表演；多个高强度效果同台。
 
-## 三条设计规矩（都是踩出来的）
+模块组成：Motion Tokens → Motion Profile → Effect Selection → Page Choreography →
+Timeline → Deterministic Runtime → Motion QA（Effect Registry 见 §5 的落地说明）。
 
-**1. 拒绝 `linear` / `ease`，用 `expoOut`。**
-`expoOut` 起步快、刹车长，给数字元素**物理重量感**；`linear`/`ease` 是「所有元素同速」，
-是 AI slop 的第一特征。曲线 `cubic-bezier(0.16, 1, 0.3, 1)`。
+## 2. 动画决策优先级【✅】
 
-**2. 标题落定后**停一下**再上正文（`titleHoldMs`）。**
-标题和条目一起涌上来，观众没有「看见」这个动作。这一停是「礼让观众」，不是拖时间。
+页面语义 > Page Type > 信息层级 > Style > Layout > Motion Intent > Effect Novelty >
+技术实现。先回答：这页讲什么、视觉焦点是谁、页面什么类型、内容怎么"讲出来"，
+最后才选效果。本仓库把这条路固化成**角色表**（manifest 的 role → 上台方式）。
 
-**3. 阅读时间按内容量给（`readPerItemMs`）。**
-5 条的页本来就该比 2 条的页多停一会儿。常数 hold 会让密页来不及看、疏页白等。
+## 3. Motion Intent【约定】
 
-## 运动决策优先级（规则体系）
+每页先定 intent：introduce / reveal / explain / compare / progress / focus /
+transform / connect / conclude / transition（如
+`{"motion_intent": "explain", "narrative_direction": "left_to_right", "energy": 0.55}`）。
+本仓库由 plan.py 的页型/图表 intent 承担其职，未单独建 intent 字段。
 
-动画必须至少解决一个问题：引导注意力 / 解释结构 / 强调数据 / 建立节奏 /
-表达风格。为了炫而叠加效果、所有页面统一 fade、多个高强度效果同台 —— 都禁止。
+## 4. 四类 Motion Role
 
-决策顺序（先回答前面的，再选后面的）：
++ **Signature Effect**（每页最多 1 个、封面优先、用了则其余降级）：【约定——本
+  零依赖确定性管线不接 Aurora/Liquid Chrome/Particle Text 这类 WebGL/Shader 效果；
+  要它们就换工具链，别在纯函数管线里塞】
++ **Semantic Motion**（数字 Count Up、柱图 Grow、折线 Path Draw、流程渐进）：
+  【✅ 柱 growY/growX、折线 pathDraw、点 pop、段式线 growX 已进 paint】
++ **Ambient Motion**（低幅低速氛围）：【约定——背景纹理静态；grain 在帧模式/
+  reduced-motion 下隐藏。"观众不该感觉背景在表演"由"背景根本不动"满足】
++ **Transition**（跨页）：【约定——当前是页内入场 + 切页；Shared Element/FLIP
+  见 §23】
 
-```text
-页面语义（这页讲什么）> 页型（cover/chart/timeline…）> 信息层级（标题/正文/页码）
-    > 风格（motion 参数在 style.json）> 效果选择 > 技术实现
-```
+## 5. Effect Registry【约定】
 
-本仓库的落地方式是**把自由度收到只剩参数**：
+规范要求所有 React Bits / Aceternity / Magic UI / GSAP / 自研 Shader 效果注册到
+统一 Registry（id/name/source/semantic_tags/page_types/energy/complexity/
+export/limits/incompatible_with…）。本仓库的效果面很小且全部自研在 `paint()` 里，
+**不需要注册表**；真要引入第三方效果的那天，先建 Registry + §27 的 Adapter。
 
-| 规则 | 本仓库现状 |
-| --- | --- |
-| 运动角色四类（Signature / Semantic / Ambient / Transition） | 只做 **Semantic 入场**一种；Signature/Shader/Ambient 背景动效**不做** —— 确定性纯函数与零依赖优先，氛围层属于另一个产品 |
-| 每页主要运动类型 ≤2 | 恰好 **1** 种（fadeRise：透明度 + 上浮），全套统一 |
-| 位移 4~16px（文字）/ 12~32px（主视觉） | 标题 26px、正文 16px、页码 0 —— 在带内 |
-| Motion Tokens（不许随手写毫秒） | `style.json` 的 `motion` 块 + `chart.py` 的 `MOTION_TOKENS`（duration 300/600/1000、stagger 40/80/120、`page_total_max` 1500ms） |
-| 层级越低动画越弱 | 标题先行落定（`titleHoldMs` 停顿）→ 正文 stagger → 页码跟壳走 |
-| 阅读时间 = base + 复杂度 | `hold = holdMs + n × readPerItemMs`；图表/架构复杂度项是**未实现的约定**（已知差距） |
-| 文字静区（Quiet Zone） | 背景无动效可穿正文 —— 纹理（grain）在 `@media (prefers-reduced-motion)` 与帧模式下隐藏 |
-| 每页都要有动画？ | 不是。无动画页（滚动态满态）本来就是默认交付形态 |
+## 6. Effect 分类【约定】
 
-## Motion QA（改动画参数时过一遍）
+Typography Reveal / Ambient Background / Shader Material / Grid Digital / Particle /
+Reveal / Spatial Layout / Card Effects / Border Effects / Diagram Motion / Data Motion /
+Interactive Motion —— 本仓库只实现其中 Data Motion（grow/draw/count 走语义）与
+Reveal（mask/wipe）两族；交互类（Magnet/Cursor）只可能出现在 HTML，视频导出必禁。
 
-1. 有没有至少解决一个问题（注意力 / 结构 / 数据 / 节奏 / 风格）？
-2. 标题落定后停了吗（`titleHoldMs`）？正文是不是同速漏上来（AI slop 第一特征）？
-3. 曲线是 `expoOut` / `overshoot`，不是 `linear` / `ease`？
-4. 密页来得及看、疏页不白等（`readPerItemMs` 起作用）？
-5. 渲染路径上没有 `transition`（测试有静态检查盯着）？
-6. 抽帧三看：第 0 帧干净空态 / 某页落定后内容都在 / 末帧停在终态？
+## 7. Page Type 与 Motion Budget【✅ 换算落地】
 
-修复顺序（别跳步）：先减 stagger / 位移，再降曲线强度，最后才关动画。
-加效果的方向反过来：先问语义，再问层级，最后才问效果本身。
+每页预算（Cover 80-100 … Table 10-25）：封面大胆、正文克制、表格代码最少。
+本仓库不用打分制，用**硬上限**达到同义约束：单页主要运动类型 ≤2（§17）、
+位移带（§18）、入场时长 enterMs 全套页共享一个刻度——预算超标的根源（多效果
+叠加）在结构上就不可能发生。
 
-## 确定性：为什么渲染路径上**不能**有 CSS transition
+## 8. Page Type 推荐效果【✅ 等价落地】
 
-这是整套东西的地基。`animate.py` 逐帧渲：每帧一次 `seek(t)` + 截一张图。所以
-「同一个 t 必须出同一帧」—— 它撑着三件事：
+Cover/Statement → 标题 maskRevealY + 正文 fadeRise；Chart → 容器先行 + 柱生长 +
+折线描画（**禁**大面积 glitch/粒子——本管线没有这些，等于结构性满足）；
+Cards → Cluster/近同时揭示（stagger 50-130ms，禁 card1→4 大间隔依次飞入
+—— stagger 由风格 token 统一，不会写出大间隔）。
 
-- **可回归**：不同时间渲的两支能逐帧对齐，才谈得上比对
-- **可局部重渲**：改一页不用重录整片
-- **可复现**：别人拿到 spec 能渲出一样的东西
+## 9. Style Motion Profile【✅】
 
-CSS `transition` 走的是**墙钟**，逐帧 seek 下每帧都是独立会话、独立时刻，中间态取决于
-「截这帧时真实过了多久」—— **不可复现，而且不报错**，画面只是慢慢偏掉。
-所以：
+Style 不绑定效果，定义**运动性格**。本仓库每个风格一套 `motion` 参数（enter/
+stagger/titleHold/hold/readPerItem/easing + note），这正是 motionProfile 的参数化：
+personality→easing 曲线，tempo→enter/stagger，continuity→titleHold。
 
-- 动画状态一律写成 **t 的纯函数**（`paint(si, t)`）
-- 动位移用**独立属性** `translate` / `scale`，不用 `transform`（skin 自己会用 transform，
-  两边都写会互相覆盖，且只在该元素动画期间覆盖 —— 最难查的那类 bug）
-- 测试里有一条静态检查盯着产物里有没有 `transition`（壳除外：页码/快捷键提示
-  录视频时是隐藏的，不进渲染路径）
+## 10. 常见 Style 推荐（八套，各一个性格）【✅】
+
+| 风格 | 性格 | enter | stagger | titleHold | hold | read/条 |
+| --- | --- | --- | --- | --- | --- | --- |
+| keynote-dark | 戏剧性：慢起长尾，讲台要留反应时间 | 900 | 130 | 420 | 2200 | 700 |
+| swiss-grid | 精确：短、整齐、无弹性 | 520 | 70 | 260 | 2600 | 760 |
+| billboard | 脆：数字要"拍"上去 | 620 | 90 | 300 | 1800 | 520 |
+| notebook | 软：像翻册子 | 700 | 110 | 300 | 2800 | 820 |
+| botanical-dark | 舒缓：急=便宜，停顿最长 | 820 | 110 | 420 | 3000 | 820 |
+| terminal | 快：输出不该有仪式感 | 420 | 50 | 180 | 2400 | 700 |
+| paper-ink | 翻书：正文是要读的句子 | 680 | 95 | 340 | 2900 | 900 |
+| pastel-geometry | 轻快：唯一允许 overshoot 回弹 | 560 | 80 | 240 | 2700 | 780 |
+
+## 11. Motion Tokens【✅】
+
+duration xs180/sm300/md520/lg800/xl1200、distance 4/6/12/24、stagger 35/70/120、
+ease enter=expoOut…**禁止每个元素随机写毫秒和位移**。落地：所有毫秒/位移来自
+`style.json` 的 `motion` 块（一套风格一份）+ `chart.py` 的 `MOTION_TOKENS`
+（duration 300/600/1000、stagger 40/80/120、page_total_max 1500ms）；代码里没有
+第二个写毫秒的地方。本页位移：标题 26px、正文 16px、图表容器 10px、页码 0。
+
+## 12. Motion Budget 规则【✅ 结构性满足】
+
+典型成本 Signature 40-60 / Semantic 20-40 / Ambient 10-20 / Transition 10-20，
+超预算必须降级。本仓库没有 Signature/Ambient（§4），页内成本 = 编排表长度 ×
+token，天然在预算内；"降级"表现为换更小的 preset（§40）。
+
+## 13. Motion Creativity【约定】
+
+0-0.25 Corporate / 0.25-0.5 Polished / 0.5-0.75 Creative / 0.75-1 Experimental；
+effective = creativity × page_type_factor（Cover×1.0 … Table×0.3）。本仓库把
+"创造力预算"固化为**风格人格差异**（8 套参数）+ overshoot 只有 pastel-geometry
+一套允许——一套风格只用一个性格。
+
+## 14. Motion Novelty【约定】
+
+fadeUp 0.05 / maskReveal 0.25 / sharedMove 0.45 / decryptedText 0.65 /
+liquidChrome 0.80…"Novelty 只影响候选排序，不得覆盖语义匹配"。本仓库效果面小，
+novelty 不参与选择；等效果多了再建表。
+
+## 15. Effect Selection Score【约定】
+
+Style Match×0.25 + Semantic×0.25 + PageType×0.15 + Hierarchy×0.10 + Novelty×0.10 +
+Export×0.10 + Perf×0.05 − 冲突/可读性/预算罚分。当前由**角色→preset 的查表**
+替代打分（语义匹配是第一且唯一的排序键——正是"不得覆盖语义匹配"的极端形式）。
+
+## 16. 信息层级与动画强度【✅】
+
+P1 主视觉（完整入场）/ P2 标题（mask+落定）/ P3 支撑（fadeRise）/ P4 正文
+（小位移淡入）/ P5 脚注页码（静态或跟壳）。落地：title→body→chrome 的编排表
+
++ titleHoldMs 停顿 = "Priority 越低动画越弱"。
+
+## 17. 单页主要运动限制【✅】
+
+max_primary_motion_types = 2。本页两族：**遮罩/淡入族**（title mask、body fade）
+
++ **结构生长族**（rule growX、chart grow/draw、image wipe 同属"揭示"一族的
+方向变体）——同页不会出现 Fade+Slide+Scale+Rotate+Blur+Bounce+Glow+Glitch
+同台（后四样本管线不存在，前几样按元素类型各归其位）。
+
+## 18. 位移规则【✅】
+
+文字 4-16px / 卡片 6-16 / 图标 4-12 / Hero 12-32；40px+ 只给大型转场。实测：
+正文 16、标题 26、图表容器 10、页码 0——全在带内。
+
+## 19. 元素动画应按类型设计【✅ 本轮落地】
+
+**禁止所有元素统一 opacity 0→1**。落地（`paint()` 按角色分派）：
+
+| 元素 | preset | 怎么动 |
+| --- | --- | --- |
+| 标题（含父块） | maskRevealY | clip-path inset 从下揭开 + 26px 落定 + 1.012 settle |
+| 段式线 .rule | growX | scaleX 0→1、origin left（线是"画"出来的） |
+| 图片 | imageReveal | 横向揭开（inset 右收）+ 1.02→1 settle |
+| 图表容器 | 容器先行 | 淡入 + 10px 微升 |
+| 柱 .bar | growY/growX | fill-box 原点从基线/左缘生长（宽高比判向） |
+| 折线 .line | pathDraw | stroke-dasharray/offset 沿线描画 |
+| 点 .dot | pop | fill-box 中心缩放 |
+| 正文/副题 | fadeRise | 0→1 + 16px（**不是** 0.4→1：第 0 帧必须是干净空态，ghost 起点会破坏抽帧 QA） |
+| 页码/壳 | chrome | 只淡入不位移，跟标题走 |
+
+## 20. Animation Direction【✅】
+
+阅读方向 + 布局方向 + 语义方向。左文右图 → 图从左向右揭开（imageReveal 的
+inset 方向）；时间线/流程按序 stagger（DOM 顺序即编排顺序）；标题自下揭开。
+禁随机方向——方向全部写死在 preset 里，没有随机。
+
+## 21. Visual Mass 与 Duration【✅ 等价】
+
+duration = base × visual_mass（Caption 0.5 / Body 0.7 / Card 0.9 / Title 1.0 /
+Hero 1.3 / Architecture 1.6）。落地为编排：标题先落定 → titleHold → 正文
+stagger → 图表容器先于数据 6%——重的东西晚、久，轻的东西早、快，同一 easing。
+
+## 22. Motion Quiet Zone【✅ 结构性满足】
+
+文字 bbox 外扩 10-20% 内降低动效强度/亮度方差/粒子密度。本管线背景不动、
+无粒子无 shader 穿过正文——quiet zone 由"不存在喧闹"满足。
+
+## 23. Shared Element / FLIP【约定】
+
+相邻页同一语义元素（标题换位、logo 跨页、排名变化）优先 FLIP 而不是
+淡出淡入。未实现：当前切页即换场。要做：相邻页同 role 元素的 bbox 插值
+（seek(t) 里可做，纯函数可行）——记在路线图。
+
+## 24. Scroll Effect 转换【✅ 天然满足】
+
+scroll_progress → page_timeline_progress，禁止依赖真实滚动。本仓库取帧态根本
+没有滚动（`data-view=frame` 只显当前页），演示态翻页走同一 `paint()`。
+
+## 25. Cursor Effect 转换【✅ 天然满足】
+
+视频模式 pointer 必须虚拟化或禁用。本仓库没有 cursor 效果（HTML 也没有），
+等于禁用。
+
+## 26. Deterministic Runtime【✅ 地基】
+
+**相同 t + 相同 seed = 相同画面**。`paint(si,t)` 纯函数；编排表（含折线长度
+`getTotalLength`）在渲染时算一次；禁 `Date.now()/performance.now()/Math.random()`
+进渲染路径（演示态 rAF 墙钟只驱动"何时调 paint"，不进画面状态）；
+seed 已显式进 spec（错位/颗粒按 (seed,元素) 派生）。
+
+## 27. Effect Adapter【约定】
+
+第三方效果必须经 Adapter（init(seed) + render({time,progress,w,h,pointer})），
+不得自控时钟。目前无第三方效果；引入之日即 Adapter 上线之日。
+
+## 28. Timeline DSL【✅ 等价】
+
+`window.__deck_timeline=[{slide,start,enter,hold}]` 由 Python 的 `timeline()`
+算出（总长/帧数/切点都是它的下游），JS 只按 t 画——结构同规范的
+`{target,preset,start,duration}`，target 换成了角色化编排表。
+
+## 29. Motion Graph【✅ 简化】
+
+after/before/with/sync/overlap —— 落地为编排表的 delay 数学：body 在 title
+之后（enter×0.55 + titleHold），图表数据在容器之后（+6%），页码与标题同拍。
+复杂依赖图未做（没有需要它的页面结构）。
+
+## 30. 基础 Preset Library【✅ 子集】
+
+规范第一版 15 个：fadeSoft fadeRise maskRevealX maskRevealY imageReveal
+scaleFocus growX growY pathDraw countUp highlight crossFade sharedMove
+blurToClear accentSweep。**已实现 7 个**：fadeRise、maskRevealY、imageReveal、
+growX（线）、growY/growX（柱）、pathDraw；countUp/highlight/sharedMove 等
+记在路线图。高级 Shader 效果不进 preset（见 §5）。
+
+## 31. Page Choreography【✅】
+
+Cover：Ambient（无）→ 主标题 maskReveal → 副题 → 稳定终态。
+Chart：结论标题 → 容器先行 → 柱生长/折线描画 → 标注/页码 → 稳定。
+Cards/正文：标题落定 → 停顿 → 条目近同时揭示（stagger 50-130ms）。
+每页进**稳定终态**（hold 段无动画）——末帧即终态。
+
+## 32. 阅读时间模型【✅ 本轮补齐】
+
+reading_time = base_hold + text_complexity + chart_complexity…
+落地：`hold = holdMs + n×readPerItemMs + 0.18×min(数据项,8)`，整页 clamp ≤7s
+（base 1800-3000ms 按风格；中文每条 520-900ms；图表页比同重量文本页多停）。
+已废弃"常数 hold"。
+
+## 33. Ambient Motion 参数【✅ 等价】
+
+幅度 2-5%、周期 10-30s、低透明度、低频——"观众不该感觉背景在表演"。
+本仓库取 0：背景完全静态（grain 静点阵）。要加漂移的那天按此带内调。
+
+## 34. Motion Density【✅ 等价】
+
+none/low/medium/high；Cover high、Content low、Table none。本仓库密度由页型
+结构决定：图表页 = 容器+数据两层，文本页 = 标题+条目，表格/代码页 = 静态满态
+（滚动态交付时零动画）。
+
+## 35. Typography Effect 等级【✅ 等价】
+
+L1 Readable（mask/淡入——本仓库标题用）/ L2 Expressive（只给标题数字——
+settle scale 1.012 只在标题）/ L3 Experimental（Particle/Decrypted…——没有，
+也不接）。正文 >40 字禁止实验性排版：正文只有 fadeRise，结构性满足。
+
+## 36. Signature Effect 降级规则【✅ 空集】
+
+用了 Liquid Chrome/Hyperspeed/Particle Text 等则标题降为简单 mask、正文 fadeSoft、
+转场 cut——本仓库没有 Signature，降级规则空转；"高级效果越强其余越克制"的
+精神体现在：图表页正文条目不与柱生长抢拍（titleHold 隔开）。
+
+## 37. 推荐 Effect Source Pool【约定】
+
+React Bits / Aceternity / Magic UI / Motion / GSAP / Codrops / 自研 Shader——
+零依赖管线一个都不引入；灵感池留给未来接 React 渲染器的那条线。
+
+## 38. Export Compatibility【✅】
+
+每个效果的导出面（html/mp4/gif/ppt_native/static_fallback）。本管线的全集：
+
+| 效果 | html | mp4/gif | pptx | pdf | 静态兜底 |
+| --- | --- | --- | --- | --- | --- |
+| 全部 preset（§19） | ✅ 演示态 | ✅ 逐帧 seek | ❌（原生 PPTX 无动画） | ❌（矢量静态） | ✅ 滚动态满态 |
+
+导出失败必有 static fallback = 滚动态的 CSS 满态（clearPaint 清掉内联态即回满态）。
+
+## 39. Motion QA【✅ 有测试钉】
+
+每页检查：有无明确意图（角色表）；是否超预算/超运动类型（§7/§17 结构性满足）；
+是否干扰文字（quiet zone §22）；**是否用了非确定性时钟**（测试静态扫
+`transition` 禁令 + determinism 逐帧回归）；**是否可 seek**（`__deck.seek`
+接口 + 同 t 同帧测试）；clearPaint 是否清干净（测试钉每个属性）；末帧是否
+稳定终态。改动后至少抽帧三看（见文末）。
+
+## 40. Motion Repair（按序修，别跳步）【✅】
+
+删次要 Ambient（没有）→ 删第二 Signature（没有）→ 降视觉强度 → 降密度 →
+减 stagger → 减位移 → 简化标题效果 → 高级换基础 preset → 复杂转场换
+cut/crossfade → 最后才全关。加效果反向：先语义、再层级、最后才效果本身。
+
+## 41. 推荐运行流程【✅ 对应】
+
+Page Planner（页型/层级/布局/风格）→ Motion Resolver（角色→preset 查表）→
+Page Choreography（编排表 + delay 数学）→ Timeline（Python `timeline()`）→
+Deterministic paint → Render → Motion QA（测试 + 抽帧）→ Repair →
+HTML/Present/MP4/GIF。
+
+## 42. 最终核心规则
+
+动画服务内容叙事；Style 定性格不定效果；Page Type 定编排；Semantic 优先于
+Decorative；每页最多 1 个 Signature（本库为 0）；主要运动类型 ≤2；Priority 越低
+动画越弱；一切 `state = f(t)`，同 t 同 seed 同帧；方向服从阅读/布局/语义；
+正文必须克制；**并非每页都必须有动画**（滚动态零动画是合法交付）；导出失败必有
+static fallback。最终目标不是"炫"，而是"让观众更自然地理解页面"。
+
+---
+
+## 确定性：渲染路径上不能有 CSS transition
+
+逐帧渲 = 每帧一次 `seek(t)` + 截一张图，"同一个 t 必须出同一帧"撑着可回归、
+可局部重渲、可复现。CSS `transition` 走墙钟，逐帧 seek 下中间态取决于"截这帧时
+真实过了多久"——不可复现且不报错（huashu 的坑 #18，实测同动画三次两种结果）。
+所以：动画状态一律 t 的纯函数；动位移用独立属性 `translate`/`scale`（不写
+`transform`——skin 自己会用它，写了互相覆盖）；`transform-origin/box` 只落在
+段式线与图表 SVG 内部（skin 不变换这些元素）。测试静态扫产物里有无 `transition`
+（壳除外：页码/提示录视频时隐藏，不进渲染路径）。
 
 ## 导出
 
 ```bash
-python3 scripts/animate.py out.html -o deck.mp4                  # MP4（默认 1920×1080 @24fps）
-python3 scripts/animate.py out.html -o deck.gif --width 960      # GIF（默认 960 宽）
+python3 scripts/animate.py out.html -o deck.mp4                  # MP4（1920×1080 @24fps）
+python3 scripts/animate.py out.html -o deck.gif --width 960      # GIF（960 宽）
 python3 scripts/animate.py out.html -o deck.mp4 --fps 60         # 60fps
-python3 scripts/animate.py out.html -o x.mp4 --stills 0,2.5,10   # 只抽几帧看，不编码
+python3 scripts/animate.py out.html -o x.mp4 --stills 0,2.5,10   # 只抽帧不编码
 ```
 
-### 依赖：不需要 ffmpeg
+依赖全在系统里：取帧 = 系统 Chrome + **CDP**（一次启动截几百帧；一帧一个
+`--screenshot` 要 15 分钟，CDP 70 秒，51 倍）；H.264 = **AVFoundation**
+（`swiftc` 现场编，`xcode-select --install`）；GIF = PIL。缺 `websockets` 会
+说清代价并降级，不静默变慢。
 
-三条腿都是系统里就有的：
+产物要验不能只看返回 0：MP4 查 `ftyp` 头 + `avconvert` 回读；GIF 查 `GIF89a`
+头 + **总时长**（Pillow 会把相同帧合并——实测 777 帧写出 160 帧而时长是对的，
+盯帧数只会得到假失败）。
 
-| 环节 | 用什么 | 备注 |
-| --- | --- | --- |
-| 取帧 | 系统 Chrome + **CDP** | 一次启动截几百帧 |
-| H.264 编码 | **AVFoundation**（`swiftc` 编一个小程序） | macOS 自带；`xcode-select --install` |
-| GIF 编码 | **PIL** | 已经因为制版在用 |
-
-**为什么必须走 CDP**（实测，同一个 1600×900 页面）：
-
-| 做法 | 单帧 | 777 帧 |
-| --- | --- | --- |
-| 一帧一个 `chrome --screenshot` | 2450 ms | ≈ 15 分钟 |
-| 一次启动 + CDP | 48 ms | ≈ 70 秒 |
-
-51 倍。所以 CDP 是主路径；缺 `websockets`（CDP 的传输层）会**说清代价并降级**，
-不静默变慢 —— 堵死用户的导出比慢一点更不可接受。
-
-### 产物要验，不能只看返回 0
-
-- MP4：查 `ftyp` 头 + **用系统 `avconvert` 回读一遍**（读得动 = 容器合法）
-- GIF：查 `GIF89a` 头 + **总时长**（不是帧数，见下）
-
-⚠️ **GIF 的帧数不等于标称帧数**：Pillow 会把连续相同的帧合成一帧并延长时长
-（停顿段帧帧一样，全并了）。实测 777 帧写出 160 帧，而**时长是对的**。
-所以检查的是总时长 —— 盯帧数只会得到一个假的失败。
-
-### 交付前抽帧
-
-`--stills` 走**同一条**取帧路径（所以「看到的」就是「录进去的」），只是不编码：
-
-```bash
-python3 scripts/animate.py out.html -o x.mp4 --stills 0,1.5,22.4,32.3
-```
-
-至少看三个点：**第 0 帧**（应该是干净的空态，不是残留）、**某页落定后**
-（内容都在）、**末帧**（停在终态，不是淡出/循环回去）。
+交付前抽帧三看（`--stills` 走同一条取帧路径，看到的即录到的）：**第 0 帧**
+干净空态、**某页落定后**内容都在、**末帧**停在终态。

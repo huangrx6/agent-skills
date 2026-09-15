@@ -99,6 +99,28 @@ class TestTimeline(unittest.TestCase):
         self.assertGreater(spans[1]["hold"], spans[0]["hold"],
                            "条目多的页阅读时间没有更长 —— hold 是按常数给的？")
 
+    def test_chart_pages_hold_longer_than_text(self) -> None:
+        """§32 阅读时间按复杂度：看懂一组柱比读一句话慢，图表页要多停。"""
+        deck = {"slides": [
+            {"type": "content-text", "title": "文本页", "bullets": ["a"]},
+            {"type": "chart", "title": "图表页", "chart": "bar", "data": [
+                {"label": "a", "value": 1}, {"label": "b", "value": 2},
+                {"label": "c", "value": 3}, {"label": "d", "value": 4},
+                {"label": "e", "value": 5}]},
+        ]}
+        spans = render.timeline(deck, self.tokens)
+        self.assertGreater(spans[1]["hold"], spans[0]["hold"],
+                           "图表页没有比同内容重量的文本页多停 —— 复杂度项没生效")
+
+    def test_hold_is_capped_at_seven_seconds(self) -> None:
+        """§32 clamp 上限：密页也不许停到观众走神。"""
+        deck = {"slides": [
+            {"type": "content-text", "title": "密", "bullets": [str(i) for i in range(10)]},
+        ]}
+        spans = render.timeline(deck, self.tokens)
+        self.assertLessEqual(spans[0]["hold"], 7.0 + 1e-9,
+                             "hold 超过 7s —— clamp 没生效")
+
     def test_total_duration_matches_the_product(self) -> None:
         """产物里写进去的时长必须等于 Python 算出来的 —— 两处不一致就是“看到的与录到的不是一回事”。"""
         html = render.render(self.spec, self.style)
@@ -136,6 +158,49 @@ class TestMotionTokens(unittest.TestCase):
                 css = render.load_style(name)["tokens"]["motion"]["cssEase"]
                 self.assertNotIn(css, ("linear", "ease", "ease-in-out"),
                                  f"{name} 用了 {css} —— 换成 expoOut 那类有阻尼的曲线")
+
+
+class TestMotionPresets(unittest.TestCase):
+    """§19 元素动画按类型设计：角色决定怎么上台，不是所有元素统一 opacity 0→1。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        with open(DEMO, encoding="utf-8") as fh:
+            cls.spec = json.load(fh)
+        cls.html = render.render(cls.spec, render.load_style(
+            cls.spec["deck"].get("style", render.DEFAULT_STYLE)))
+        cls.js = cls.html[cls.html.index("window.__deck_timeline="):]
+
+    def test_title_uses_mask_reveal(self) -> None:
+        """标题 = maskRevealY：遮罩从下揭开（clip-path inset），不是纯淡入。"""
+        self.assertIn("clipPath='inset('", self.js.replace('\"', "'"),
+                      "标题没有遮罩揭示")
+
+    def test_rules_grow_from_left(self) -> None:
+        """段式线 = growX：从左**画**出来（scale x + origin left），不是浮出来。"""
+        self.assertIn("transformOrigin='left center'", self.js.replace('\"', "'"))
+
+    def test_image_reveals_horizontally(self) -> None:
+        """图 = imageReveal：横向揭示（inset 右收）+ 近 1 的落定 scale。"""
+        self.assertIn("clipPath='inset(0 '", self.js.replace('\"', "'"))
+
+    def test_chart_bars_grow_from_baseline(self) -> None:
+        """图表 = 容器先行 + 柱从基线生长：.bar 拿到 fill-box 原点，横向竖向分开。"""
+        self.assertIn("querySelectorAll('.bar')", self.js)
+        self.assertIn("transformBox='fill-box'", self.js.replace('\"', "'"))
+        self.assertIn("'bottom center'", self.js.replace('\"', "'"))
+
+    def test_chart_lines_draw_along_the_path(self) -> None:
+        """折线 = pathDraw：stroke-dasharray/offset 沿线描画。"""
+        self.assertIn("strokeDasharray", self.js)
+        self.assertIn("strokeDashoffset", self.js)
+
+    def test_clear_paint_restores_everything_it_touches(self) -> None:
+        """滚动态要回到 CSS 满态：clearPaint 必须清掉 paint 碰过的每个属性。"""
+        for prop in ("clipPath", "transformOrigin", "transformBox",
+                     "strokeDashoffset"):
+            self.assertIn(f".{prop}=''", self.js.replace('\"', "'"),
+                          f"clearPaint 没清 {prop} —— 滚动态会残留入场中间态")
 
 
 class TestRenderPathIsSeekable(unittest.TestCase):
@@ -177,8 +242,12 @@ class TestRenderPathIsSeekable(unittest.TestCase):
         js = self.html[self.html.index("window.__deck_timeline"):]
         self.assertIn("style.translate", js, "动画没走 translate 独立属性")
         self.assertIn("style.scale", js, "动画没走 scale 独立属性")
-        self.assertNotIn("style.transform", js,
-                         "动画写了 style.transform —— 会覆盖 skin 自己的变换")
+        # 禁的是给 `transform` **属性赋值**（会和 skin 自己的变换互相覆盖）。
+        # transform-origin / transform-box 是伴生属性，不碰 transform 本身，
+        # 且只落在段式线与图表 SVG 内部（skin 不变换这些元素），安全。
+        self.assertNotRegex(
+            js, r"style\.transform\s*=",
+            "动画写了 style.transform —— 会覆盖 skin 自己的变换")
 
     def test_product_carries_motion_params(self) -> None:
         self.assertIn("window.__deck_motion=", self.html, "产物里没有运动参数")
