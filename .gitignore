@@ -34,8 +34,15 @@ file-only/
 skills/*.zip
 
 # deck-authoring 的 demo 产物（本地生成，不入库）。
-# 仓库只收文本 + assets/icons 下两个 SVG；见该 skill 的 README「跑法」第 2 步。
+# 仓库只收文本 + assets/icons 下两个 SVG；见该 skill 的 README「跑法」。
+# 这条清单要**跟着产出物的种类长** —— 新加一种导出就得补一行，
+# 漏一行就是让一个几 MB 的二进制摸进公共仓库（`out.pdf` / 两种 pptx 就是这么漏的）。
 skills/deck-authoring/sample-treated.png
 skills/deck-authoring/pages/
 skills/deck-authoring/out.html
+skills/deck-authoring/out.html.measured.json
+skills/deck-authoring/out.pdf
+skills/deck-authoring/out.png.pptx
+skills/deck-authoring/out.edit.pptx
 skills/deck-authoring/deck.pptx
+skills/deck-authoring/deck-editable.pptx

@@ -64,6 +64,12 @@ class TestPdfExport(unittest.TestCase):
         cls.good_html = os.path.join(td, "good.html")
         with open(cls.good_html, "w", encoding="utf-8") as fh:
             fh.write(html)
+        # 图页引用的那张图要放到位 —— 否则这条用例测的是“图不存在”的产物，
+        # 而照片本身就是位图，一缺就把位图那条断言变得毫无意义
+        # （实测踩过：测试绿了，真跑一遍却报“内嵌位图 1”）。
+        from PIL import Image
+        Image.new("RGB", (64, 48), (200, 40, 90)).save(os.path.join(td, "sample-treated.png"))
+        cls.photos = html.count("<img ")
         # 变异：拿掉 @page 尺寸规则 —— 打印就会退成 Letter，而 --print-to-pdf 照样返回 0
         cls.bad_html = os.path.join(td, "bad.html")
         with open(cls.bad_html, "w", encoding="utf-8") as fh:
@@ -82,16 +88,18 @@ class TestPdfExport(unittest.TestCase):
                          f"PDF 出了 {self.good['pages']} 页，产物里有 "
                          f"{self.good['expected_pages']} 页 —— 分页被撑破版面的元素推歪了")
 
-    def test_export_is_fully_vector(self) -> None:
-        """零内嵌位图。
+    def test_no_rasterization_beyond_the_photos(self) -> None:
+        """内嵌位图数 == 产物里的 `<img>` 数（照片本来就是位图，不能断言“零位图”）。
 
-        这条是**真的会退化**的：`<pattern>` 画的网点、feTurbulence 画的颗粒，都会让
-        Chrome 整页栅格化。实测退化版 7.5MB / 32 张位图，现在的 0.65MB / 0 张。
-        数字一旦回去，说明有人往页面里加了"只有合成器能算"的东西。
+        真正的回归是**除照片之外多出来**的位图：滤镜、`<pattern>`、大图层的合成
+        都会让 Chrome 把整页栅格化（实测退化版 6 页 32 张 / 7.5MB，现在是 1 张 / 0.66MB）。
+        断言写成“等于照片数”而不是“等于 0”，这条才有牙 —— 否则图一缺它就永远绿。
         """
-        self.assertEqual(self.good["images"], 0,
-                         f"PDF 里出现了 {self.good['images']} 张内嵌位图 —— "
-                         f"矢量性质退化了（滤镜 / <pattern> / 大位图 是常见原因）")
+        self.assertGreater(self.photos, 0, "demo 里本该有图文页 —— 这条用例的前提变了")
+        self.assertEqual(self.good["images"], self.photos,
+                         f"内嵌位图 {self.good['images']} 张，但产物里只有 "
+                         f"{self.photos} 张照片 —— 多出来的是被栅格化的图层"
+                         f"（滤镜 / <pattern> / 大图层 是常见原因）")
 
     def test_fonts_are_embedded(self) -> None:
         """字要嵌进去，否则对方机器缺字就换字体（排版会变）。"""
