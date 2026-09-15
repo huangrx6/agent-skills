@@ -109,5 +109,15 @@
     ],
     "blendMode": "normal"
   },
-  "viewerBackground": "#D8D8D8"
+  "viewerBackground": "#D8D8D8",
+  "motion": {
+    "easing": "expoOut",
+    "cssEase": "cubic-bezier(0.16, 1, 0.3, 1)",
+    "enterMs": 620,
+    "staggerMs": 90,
+    "titleHoldMs": 300,
+    "holdMs": 1800,
+    "readPerItemMs": 520,
+    "note": "运动性格＝脆：起快、停快（数字要“拍”上去，不是“滑”上去）。信息密度高，hold 短。"
+  }
 }

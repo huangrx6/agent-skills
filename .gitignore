@@ -46,3 +46,9 @@ skills/deck-authoring/out.png.pptx
 skills/deck-authoring/out.edit.pptx
 skills/deck-authoring/deck.pptx
 skills/deck-authoring/deck-editable.pptx
+# 视频导出（animate.py）：成片 + 抽帧目录 + 临时帧目录
+skills/deck-authoring/deck.mp4
+skills/deck-authoring/deck.gif
+skills/deck-authoring/*.mp4
+skills/deck-authoring/*.gif
+skills/deck-authoring/*.stills/

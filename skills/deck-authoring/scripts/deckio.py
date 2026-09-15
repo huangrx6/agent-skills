@@ -43,6 +43,17 @@ def ensure_dir(path: str) -> None:
         raise SystemExit(f"✗ 建不了目录 {path}：{exc}") from exc
 
 
+def remove(path: str) -> None:
+    """删文件，删不掉也不报（清理临时产物用的）。
+
+    “删不掉就算了”是这里的**意图**，不是捎过去 —— 临时文件清不掉不该让整件事失败。
+    """
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+
+
 def list_dirs(path: str) -> list[str]:
     """列出目录下的子目录名（已排序）。
 
@@ -67,6 +78,24 @@ def read_bytes(path: str) -> bytes:
             return fh.read()
     except OSError as exc:
         raise SystemExit(f"✗ 读不到 {path}：{exc}") from exc
+
+
+def write_bytes(path: str, data: bytes) -> None:
+    """写二进制（录制的帧、复制的图）。
+
+    录制一帧写一次，一录就是几百帧 —— 所以这里连目录都不建（目录由调用方建一次），
+    也不加多余判断。写不进去就报，不静默丢帧（丢帧 = 视频少几帧，最难发现）。
+    """
+    try:
+        with open(path, "wb") as fh:
+            fh.write(data)
+    except OSError as exc:
+        raise SystemExit(f"✗ 写不了 {path}：{exc}") from exc
+
+
+def copy(src: str, dst: str) -> None:
+    """复制文件（抽帧检查用：把某几帧拣出来另存）。"""
+    write_bytes(dst, read_bytes(src))
 
 
 def as_number(value, what: str) -> float:

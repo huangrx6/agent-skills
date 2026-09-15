@@ -3,12 +3,13 @@ name: deck-authoring
 description: >-
   Build slide decks from a structural spec, in one of four real visual styles
   (黑底剧场 keynote-dark / 瑞士栅格 swiss-grid / 大字报 billboard / 笔记本 notebook).
-  Pipeline: deck-spec.json → HTML (可演讲) → 矢量 PDF / 可编辑 PPTX / 每页 PNG. Use when
-  the user asks 做一份 deck / 做幻灯片 / 做个 PPT / 把这份内容做成演示 —— 包括有明确
+  Pipeline: deck-spec.json → HTML (可演讲) → 矢量 PDF / 可编辑 PPTX / 每页 PNG / MP4·GIF 动画.
+  Use when the user asks 做一份 deck / 做幻灯片 / 做个 PPT / 把这份内容做成演示 —— 包括有明确
   风格要求时（"做成苹果发布会那样"），也要先出多个风格方向让他选。The model writes only
   the spec content (titles, bullets, style, colorSet, seed); scripts compute every
   coordinate, font size, and contrast check. Do NOT use for editable-PowerPoint-only
-  jobs, for chart-only deliverables, or for one-off slide images with no deck structure.
+  jobs, for chart-only deliverables, for one-off slide images with no deck structure,
+  or for multi-shot motion-design films (本 skill 只做「逐页走片」的视频).
 ---
 
 # Deck authoring
@@ -81,9 +82,10 @@ done
    - PNG 截图：`python3 scripts/shots.py out.html --out-dir pages/ --count N`
    - PPTX（观感 100%）：`python3 scripts/make_pptx.py --png-dir pages/ -o deck.pptx`
    - PPTX（**对方要改字**）：`python3 scripts/pptx_native.py out.html -o deck-editable.pptx`
-5. **图页**：先 `python3 scripts/image_source.py --prompt "…" -o pic.png` 出图，
-   再把文件名写到 spec 的 `image` 字段。几何色块拼贴是默认（无 provider），
-   它本身就是版画式的拼贴，不是灰占位图。
+   - 视频：`python3 scripts/animate.py out.html -o deck.mp4`（GIF：`-o deck.gif --width 960`；
+     无需 ffmpeg）。运动设计与什么时候别用见 `references/animation.md`。
+5. **图页**：先 `image_source.py --prompt "…" -o pic.png` 出图，把文件名写进 spec 的
+   `image` 字段。几何色块拼贴是默认（无 provider）—— 它本身是版画式拼贴，不是灰占位图。
 
 ## 版式
 
@@ -100,16 +102,34 @@ done
 | `end` | 收尾 | 居中大字 |
 
 「装饰墨块」那一列已经删掉了：「放不放装饰」是**风格**的属性（token 的
-`decor.types` / `decor.kind`），不是版式的属性。现在四套风格里只有 `billboard`
-有（色场），其余三套完全没有 ——
+`decor.types` / `decor.kind`），不是版式的属性。四套风格里只有 `billboard` 有（色场）——
 拿一张写死的表去对版式，只会对出一个错的前提（测试里已经改成验契约）。
 
 版面判断**全部靠实测**（`measure.py` 开真浏览器量真盒子）：越出**该页**边界、或
 被自己会裁的容器切掉，都报。文字宽不再估算 —— 估算对同一行汉字会差 2 倍多，
 而且偏差随字体/字距/折行变，永远修不准。
 
+## 动画：同一段画代码，三种时钟
+
+演示态的入场和录进 MP4 的帧由**同一个纯函数** `paint(si,t)` 画 —— 「讲出来的」和
+「录出来的」不会跑偏。运动参数在**风格**里（`style.json` 的 `motion`），四种风格故意
+各不相同：keynote-dark 慢起长尾、swiss-grid 短而齐、billboard 拍上去、notebook 像翻册子。
+
+两条硬约束：
+
+- **渲染路径上不许有 CSS `transition`**：它走墙钟，逐帧 seek 下不可复现（不报错，画面
+  只是慢慢偏掉）。测试有静态检查盯着；壳（页码/提示）除外，它不录进视频。
+- **位移用 `translate`/`scale` 独立属性，不用 `transform`**：skin 自己会用 `transform`，
+  两边都写会在动画期间互相覆盖（最难查的那类 bug）。
+
+导出前抽帧看：`animate.py out.html -o x.mp4 --stills 0,1.5,22.4,32.3`（走同一条路径）。
+
 ## Do NOT
 
+- **不要用动画掩盖内容问题**：它只解决「怎么上台」，解决不了「一页装太多」。先过五道门
+  再谈动效；也别把 `motion` 调到眼花（停下来读的时间才是主体）。同样地，`animate.py`
+  不做转场花样 / 配乐 / 多镜头 —— 要那些是另一条产线。
+- **不要在内容元素上加 CSS `transition`**：见上面「动画」那节，会让录出来的帧不可复现。
 - **不要在贴图版 PPTX 里改字**：那种每页是一张贴图，改不了字；要改字回改 spec 再重出。
   要「能改字的 pptx」走 `pptx_native.py`（原生 shapes，字是真字）——代价是错位、
   颗粒、网点做不出来。两种 pptx 都有，**别拿一种的局限当成整个 skill 的局限**。

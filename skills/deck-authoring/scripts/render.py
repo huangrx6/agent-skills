@@ -113,6 +113,44 @@ def grain_opacity(tokens: dict, seed, *parts) -> float:
     return round(_rng(seed, "grain", *parts).uniform(*tokens["texture"]["grainOpacity"]), 3)
 
 
+# ── 时间轴：t（秒）→ 每页的位置与时长 ────────────────────────────────────────
+# 为什么时间轴算在 Python 里而不是 JS 里：**视频总长、帧数、每页切点都是它的下游产物**
+# （animate.py 要拿总长去分配帧），而“同一份 spec 两次渲出同一段时间轴”是可测的。
+# JS 只负责“给定 t 把 DOM 画成什么样”，不管时间轴本身。
+def timeline(deck: dict, tokens: dict) -> list[dict]:
+    """每页 [start, start+enter+hold)。
+
+    `enter` = 入场编排跑完要多久；`hold` = 让人看完的**阅读时间**。
+
+    hold 按内容量给，不是常数：5 条的页让观众读得比 2 条的久（“礼让观众”的量化）。
+    入场编排里**标题先落、停一下、正文再上**（huashu 的“关键结果前停 0.5s”）——
+    不停这一下，标题和条目一起涌上来，观众没有“看见”的动作。
+    """
+    mo = tokens["motion"]
+    enter_s, hold_s = mo["enterMs"] / 1000, mo["holdMs"] / 1000
+    stagger_s, title_hold_s = mo["staggerMs"] / 1000, mo["titleHoldMs"] / 1000
+    read_per_item = mo["readPerItemMs"] / 1000
+    out: list[dict] = []
+    t = 0.0
+    for i, slide in enumerate(deck["slides"], 1):
+        n = max(len(slide.get("bullets") or slide.get("nodes") or slide.get("columns") or []), 1)
+        # 首个非标题元素的延迟（与标题尾部重叠一点，避免中间出现空白段）
+        first = enter_s * 0.55 + title_hold_s
+        enter = first + (n - 1) * stagger_s + enter_s
+        hold = hold_s + n * read_per_item
+        out.append({"slide": i, "start": round(t, 3),
+                    "enter": round(enter, 3), "hold": round(hold, 3)})
+        t += enter + hold
+    return out
+
+
+def total_duration(deck: dict, tokens: dict) -> float:
+    """整段时长（秒）。"""
+    spans = timeline(deck, tokens)
+    last = spans[-1]
+    return round(last["start"] + last["enter"] + last["hold"], 3)
+
+
 # ── 装饰墨块：由 style.json 的 decor.kind 分派 ────────────────────────────────
 # 风格可以选一种装饰（或没有装饰）。加新装饰 = 在这里加一个分支 + 在 skin.css 里给样式。
 def decor(tokens: dict, seed, index: int, kind_slide: str) -> str:
@@ -257,6 +295,13 @@ html[data-view="present"] .slide.is-cur{display:block}
 .hint{left:26px;font-size:18px}
 html[data-view="present"] .hud{opacity:1}
 html[data-view="present"] .hint{opacity:1}
+/* 取帧态：只显当前页、**不缩放** —— 逐帧录制用。
+   与演示态的区别：演示态要缩放到视口（给人看），取帧态要 1:1（给机器截）。
+   壳隐藏：页码/快捷键提示是给人操作的，不该录进视频（huashu 坑 #9）。 */
+html[data-view="frame"] body{height:auto;overflow:hidden;display:block}
+html[data-view="frame"] .slide{display:none;margin:0}
+html[data-view="frame"] .slide.is-cur{display:block}
+html[data-view="frame"] .hud,html[data-view="frame"] .hint{display:none}
 /* 打印/导 PDF：一页一张 1600×900，不缩放、不留阴影 —— 演示态是给屏幕的，
    纸面要的是原件本身（矢量 PDF 导出走这条路）。
    @page 必须显式给：不给的话 Chrome 用 Letter/A4，deck 会被缩小 + 四周留白
@@ -275,40 +320,151 @@ html[data-view="present"] .hint{opacity:1}
 }
 """
 
-# 键盘翻页那点脚本。无依赖、不碰 DOM 结构（不包 wrapper）—— 演示态只用
-# html[data-view] + .is-cur 两个开关表达，量层和截层看到的 DOM 一字未变。
+# 键盘翻页 + **时间轴引擎**。无依赖、不碰 DOM 结构（不包 wrapper）。
+#
+# 两套时钟共用同一个 `paint()`：
+#   · 演示时走 rAF（墙钟）—— 翻到哪页就放哪页的入场
+#   · 取帧时走 `__deck.seek(t)`（纯函数）—— 同一个 t 必出同一帧
+# **同一段画代码**，所以“录出来”与“讲出来”不会跑偏。
+#
+# ⚠️ 这里绝不写 CSS transition：transition 走的是**墙钟**，逐帧 seek 渲染下每帧都是
+# 独立截图，中间态取决于“截这一帧时真实过了多久”，完全不可复现（huashu 的坑 #18，
+# 实测同一份动画三次能出两种结果）。动位移也用独立的 `translate`/`scale` 属性，
+# 不用 `transform` —— 免得跟 skin 自己的 transform（歪一点、倾斜之类）互相覆盖。
 SHELL_JS = """
 (function(){
   var doc=document.documentElement;
   var slides=[].slice.call(document.querySelectorAll('section.slide'));
   if(!slides.length) return;
+  var TL=window.__deck_timeline||[];
+  var MO=window.__deck_motion||{};
   var hud=document.getElementById('__deck_page');
-  var cur=0;
-  function view(){ return doc.getAttribute('data-view')==='present'?'present':'scroll'; }
+  var cur=0, raf=0;
+
+  // 角色表从语义清单读（不另拄一份 —— 改了渲染层这里自动跟上）
+  var ROLE={}; var manEl=document.getElementById('__deck_manifest');
+  if(manEl){ try{ JSON.parse(manEl.textContent).forEach(function(e){ ROLE[e.id]=e.role; }); }catch(err){} }
+
+  // 每页的编排表：DOM 顺序即编排顺序，角色决定节奏。
+  //
+  // 标题是**一组**不是单个元素：段式线往往画在标题块的边框上（swiss 的 2px 实线）、
+  // 或旁边一个 .rule 上。只动 <h1> 会得到「线已经在那、字还没到」的怪画面
+  // （抽帧检查当场看到的 ✗）。所以标题那组把父块与 .rule 一起收进来。
+  var PLAN=slides.map(function(sec, si){
+    var span=TL[si]||{enter:1,hold:1};
+    var body=0;
+    return [].slice.call(sec.querySelectorAll('[data-m]')).map(function(el){
+      var role=ROLE[el.getAttribute('data-m')]||'bullet';
+      // 标题先行；页码算“壳”，跟标题一起出来，不该排在正文后面
+      var kind = role==='title' ? 'title' : (role==='foot' ? 'chrome' : 'body');
+      var delay = 0;
+      if(kind==='body'){
+        delay = span.enter*0.55 + (MO.titleHoldMs||0)/1000 + (body++)*(MO.staggerMs||90)/1000;
+      }
+      var els=[el];
+      if(kind==='title'){
+        if(el.parentElement) els.push(el.parentElement);
+        [].slice.call(sec.querySelectorAll('.pad > .rule')).forEach(function(r){ els.push(r); });
+      }
+      return {els:els, kind:kind, delay:delay};
+    });
+  });
+
+  // 缓动。expoOut 是“起步快、刹车长”，给数字元素物理重量感；linear/ease 是 AI slop。
+  function expoOut(p){ return p>=1?1:1-Math.pow(2,-10*p); }
+  function overshoot(p){
+    if(p>=1) return 1;
+    var c=2.0, c3=c+1;
+    return 1 + c3*Math.pow(p-1,3) + c*Math.pow(p-1,2);
+  }
+  function ease(p){ return (MO.easing==='overshoot') ? overshoot(p) : expoOut(p); }
+
+  // 单页内 t（秒）→ DOM。**纯函数**：同一个 t 必出同一帧。
+  function paint(si, t){
+    var dur=(MO.enterMs||700)/1000;
+    PLAN[si].forEach(function(it){
+      var p=(t-it.delay)/dur; p = p<0?0:(p>1?1:p);
+      var e=ease(p);
+      // 标题移得多一点（它是视觉锚，要有“落下来”的重量），页码不动
+      var rise = it.kind==='title' ? 26 : (it.kind==='chrome' ? 0 : 16);
+      it.els.forEach(function(el){
+        el.style.opacity = e.toFixed(4);
+        el.style.translate = '0 ' + ((1-e)*rise).toFixed(2) + 'px';
+        el.style.scale = it.kind==='title' ? (1+(1-e)*0.012).toFixed(5) : '1';
+      });
+    });
+  }
+  function clearPaint(){
+    PLAN.forEach(function(plan){ plan.forEach(function(it){
+      it.els.forEach(function(el){ el.style.opacity=''; el.style.translate=''; el.style.scale=''; }); }); });
+  }
+  function span(si){ var s=TL[si]||{start:0,enter:1,hold:1}; return s; }
+  function slideAt(t){
+    for(var i=0;i<TL.length;i++){ if(t < TL[i].start+TL[i].enter+TL[i].hold) return i; }
+    return Math.max(TL.length-1,0);
+  }
+  function onlyShow(si){
+    slides.forEach(function(s,i){ s.classList.toggle('is-cur', i===si); });
+    if(hud) hud.textContent=(si+1)+' / '+slides.length;
+  }
+
+  // ── 取帧接口（animate.py 用它）──────────────────────────────────
+  function seek(t){
+    t = t<0?0:t;
+    var si=slideAt(t);
+    if(doc.getAttribute('data-view')!=='frame') doc.setAttribute('data-view','frame');
+    onlyShow(si);
+    paint(si, t-span(si).start);
+    cur=si;
+    return si;
+  }
+  var lastT = TL.length ? TL[TL.length-1].start+TL[TL.length-1].enter+TL[TL.length-1].hold : 0;
+  window.__deck = {duration: lastT, seek: seek};
+
+  // ── 演示态 ──────────────────────────────────────────────────────
   function fit(){
-    if(view()!=='present') return;
-    var k=Math.min(window.innerWidth/1600, window.innerHeight/900);
-    doc.style.setProperty('--k', k);
+    if(doc.getAttribute('data-view')!=='present') return;
+    doc.style.setProperty('--k', Math.min(window.innerWidth/1600, window.innerHeight/900));
+  }
+  // 入场走 rAF（墙钟）—— 只放“入场”段，不放 hold
+  function playEnter(si){
+    var t0=performance.now();
+    cancelAnimationFrame(raf);
+    function step(now){
+      var lt=(now-t0)/1000;
+      if(lt < span(si).enter){ paint(si,lt); raf=requestAnimationFrame(step); }
+      else { paint(si, span(si).enter); }
+    }
+    paint(si,0);
+    raf=requestAnimationFrame(step);
+  }
+  function toScroll(){
+    doc.setAttribute('data-view','scroll');
+    cancelAnimationFrame(raf);
+    clearPaint();                          // 清掉内联态，回到 CSS 的静态满态
+    // `.is-cur` 在滚动态也留着：滚动态的 CSS 不用它（只有 present/frame 用），
+    // 但它是“现在是第几页”的单一事实来源 —— 壳的页码与键盘导航都靠它对齐。
+    onlyShow(cur);
+    slides[cur].scrollIntoView({block:'center'});
   }
   function show(n,smooth){
-    n=Math.max(0, Math.min(slides.length-1, n));
+    n=Math.max(0,Math.min(slides.length-1,n));
     cur=n;
-    slides.forEach(function(s,i){ s.classList.toggle('is-cur', i===n); });
+    if(doc.getAttribute('data-view')==='present'){ onlyShow(n); fit(); playEnter(n); }
+    else { toScroll(); }
     if(hud) hud.textContent=(n+1)+' / '+slides.length;
-    if(view()==='present'){ fit(); }
-    else { slides[n].scrollIntoView({behavior:smooth?'smooth':'auto', block:'center'}); }
     try{ history.replaceState(null,'','#'+(n+1)); }catch(e){}
   }
   function setView(v){
-    doc.setAttribute('data-view', v);
-    show(cur,false);
+    if(v==='present'){ doc.setAttribute('data-view','present'); onlyShow(cur); fit(); playEnter(cur); }
+    else { toScroll(); }
   }
   function toggleFull(){
     if(document.fullscreenElement){ document.exitFullscreen(); }
     else if(doc.requestFullscreen){ doc.requestFullscreen(); }
   }
   document.addEventListener('keydown', function(e){
-    var k=e.key, p=view()==='present';
+    var k=e.key, p=doc.getAttribute('data-view')==='present';
     if(k===' '||k==='Enter'||k==='PageDown'||k==='ArrowRight'||k==='ArrowDown'){
       if(p) e.preventDefault(); show(cur+1,true);
     } else if(k==='PageUp'||k==='ArrowLeft'||k==='ArrowUp'){
@@ -320,10 +476,16 @@ SHELL_JS = """
     else if(k==='Escape'){ if(p) setView('scroll'); }
   });
   window.addEventListener('resize', fit);
-  // 开法：out.html?present 或 out.html#3
+
+  // 开法：out.html?present 或 out.html#3；__recording 由录制/取帧端注入
   var start=0, m=/^#(\\d+)$/.exec(location.hash);
   if(m) start=parseInt(m[1],10)-1;
-  if(/[?&]present\\b/.test(location.search)) doc.setAttribute('data-view','present');
+  if(window.__recording){
+    doc.setAttribute('data-view','frame');      // 取帧态：1:1、只显当前页、隐壳
+    seek(0);
+    return;
+  }
+  if(/[?&]present\\b/.test(location.search)){ doc.setAttribute('data-view','present'); }
   show(start,false);
 })();
 """
@@ -365,6 +527,10 @@ def _head(title: str, style: dict, seed: int, color_set: str) -> str:
     for key, value in tier.items():
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             vars_.append(f"--t-{key}:{value}px")
+    # 动画参数（时间轴本身另走 __deck_timeline，这里只给 JS 算单元素进度用）
+    mo = tokens["motion"]
+    vars_.append(f"--mo-enter:{mo['enterMs']}ms")
+    vars_.append(f"--mo-ease:{mo['cssEase']}")
     head = ("<!doctype html><html lang=\"zh\"><head><meta charset=\"utf-8\">"
             f"<title>{html.escape(title)}</title><style>\n"
             + SKELETON_CSS.replace("__VARS__", ";".join(vars_))
@@ -522,6 +688,16 @@ def render(deck_spec: dict, style: dict | None = None) -> str:
     # 清单随产物一起走（不另写文件）：渲染、测量、导出读的是同一份事实。
     payload = json.dumps(man, ensure_ascii=True, separators=(",", ":")).replace("<", "\\u003c")
     out.append(f'<script type="application/json" id="__deck_manifest">{payload}</script>')
+    # 时间轴与运动参数也随产物走：JS 引擎不自己算时间轴（那是 render.py 的职责，
+    # animate.py 还要拿它去分配帧）。ensure_ascii 保持产物是纯 ASCII，
+    # 免得编码问题在“另存/转发”环节冒出来。
+    spans = timeline(deck, tokens)
+    motion = {k: v for k, v in tokens["motion"].items() if k != "note"}
+    out.append("<script>window.__deck_timeline="
+               + json.dumps(spans, separators=(",", ":"))
+               + ";window.__deck_motion="
+               + json.dumps(motion, ensure_ascii=True, separators=(",", ":"))
+               + ";</script>")
     # 壳：页码 / 快捷键提示 / 翻页脚本。**不给它们打 data-m** ——
     # 它们是壳不是内容，进了清单就会污染“清单条数 == 实测元素数”那条不变量。
     total = len(deck["slides"])

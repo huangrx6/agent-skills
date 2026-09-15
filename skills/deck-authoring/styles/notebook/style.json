@@ -4,22 +4,42 @@
   "temperature": "中性",
   "reference": "Notebook Tabs（frontend-slides 预设）/ 方格本与活页夹 / 编辑部红边线稿纸",
   "note": "为什么是这个风格：前几套都在「讲台」上（远距离、大字、高对比），这一套是**摊在桌上**的 —— 培训、工作坊、复盘、读书笔记这类场景，读者会凑近看、会记笔记。它的识别点是纸的质感（暖白 + 横格 + 红边线）与右上角的索引标签，不是字体有多粗。",
-
   "colorSets": {
-    "rule":    { "primary": "#C8443C", "secondary": "#2F6FB0", "background": "#FBFAF6", "text": "#22201C" },
-    "marker":  { "primary": "#E0A400", "secondary": "#2F6FB0", "background": "#FBFAF6", "text": "#22201C" },
-    "inkpen":  { "primary": "#2F6FB0", "secondary": "#C8443C", "background": "#FBFAF6", "text": "#22201C" },
-    "mint":    { "primary": "#2F8F6B", "secondary": "#C8443C", "background": "#FBFAF6", "text": "#22201C" }
+    "rule": {
+      "primary": "#C8443C",
+      "secondary": "#2F6FB0",
+      "background": "#FBFAF6",
+      "text": "#22201C"
+    },
+    "marker": {
+      "primary": "#E0A400",
+      "secondary": "#2F6FB0",
+      "background": "#FBFAF6",
+      "text": "#22201C"
+    },
+    "inkpen": {
+      "primary": "#2F6FB0",
+      "secondary": "#C8443C",
+      "background": "#FBFAF6",
+      "text": "#22201C"
+    },
+    "mint": {
+      "primary": "#2F8F6B",
+      "secondary": "#C8443C",
+      "background": "#FBFAF6",
+      "text": "#22201C"
+    }
   },
-
   "ink": {
     "derivation": "explicit",
     "forText": "declared",
     "note": "文字是墨色（#22201C，不是纯黑 —— 活页纸上没有 100K 黑）。强调色分开管两件事：primary 做边线与标签，secondary 做次要标记。"
   },
-
-  "contrast": { "minBody": 4.5, "minLarge": 3.0, "largeTextPx": 32 },
-
+  "contrast": {
+    "minBody": 4.5,
+    "minLarge": 3.0,
+    "largeTextPx": 32
+  },
   "type": {
     "note": "字号整体收一档：这个风格的观众距离是**一臂之内**，字号大反而像海报贴错了地方。层级靠衬线/无衬线对比来做，不靠字号跨度。",
     "cover": 112,
@@ -38,34 +58,54 @@
     "caption": 22,
     "foot": 18
   },
-
   "fonts": {
     "display": "Songti SC, Georgia, serif",
     "body": "Helvetica Neue, Hiragino Sans GB, Arial, sans-serif",
     "note": "衬线标题（宋体）× 无衬线正文，这是「纸上的文字」最常见的搭配，也是这套风格里唯一的对比手段。"
   },
-
   "texture": {
-    "grainOpacity": [0, 0],
+    "grainOpacity": [
+      0,
+      0
+    ],
     "grainBaseFrequency": 0.9,
-    "halftoneDotSize": [2, 4],
+    "halftoneDotSize": [
+      2,
+      4
+    ],
     "note": "不用噪点颗粒 —— 纸的质感由 skin 里的**横格线与红边线**负责（它们是矢量，进 PDF 也是矢量）。"
   },
-
   "decor": {
     "kind": null,
     "types": [],
     "zones": [],
     "sizes": []
   },
-
   "misregistration": {
     "note": "不做错位。",
-    "offsetRangeX": [0, 0],
-    "offsetRangeY": [0, 0],
-    "rotationRange": [0, 0],
+    "offsetRangeX": [
+      0,
+      0
+    ],
+    "offsetRangeY": [
+      0,
+      0
+    ],
+    "rotationRange": [
+      0,
+      0
+    ],
     "blendMode": "normal"
   },
-
-  "viewerBackground": "#DEDBD3"
+  "viewerBackground": "#DEDBD3",
+  "motion": {
+    "easing": "expoOut",
+    "cssEase": "cubic-bezier(0.16, 1, 0.3, 1)",
+    "enterMs": 700,
+    "staggerMs": 110,
+    "titleHoldMs": 300,
+    "holdMs": 2800,
+    "readPerItemMs": 820,
+    "note": "运动性格＝软：位移小、时间长（像翻册子，不像发布会）。读者会停下来看，hold 最长。"
+  }
 }

@@ -15,196 +15,196 @@
 
 /* ── 两个免费的结构钩子（不需要加 DOM 元素） ───────────────────────────────── */
 .slide::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 12px;
-  background: var(--accent);
+ content: "";
+ position: absolute;
+ left: 0;
+ top: 0;
+ bottom: 0;
+ width: 12px;
+ background: var(--accent);
 }
 
 .slide::after {
-  content: attr(data-idx);
-  position: absolute;
-  right: 62px;
-  bottom: 26px;
-  font: 700 150px/0.8 var(--display);
-  color: var(--text);
-  opacity: 0.06;
-  letter-spacing: -0.05em;
-  font-variant-numeric: tabular-nums;
-  pointer-events: none;
+ content: attr(data-idx);
+ position: absolute;
+ right: 62px;
+ bottom: 26px;
+ font: 700 150px / 0.8 var(--display);
+ color: var(--text);
+ opacity: 0.06;
+ letter-spacing: -0.05em;
+ font-variant-numeric: tabular-nums;
+ pointer-events: none;
 }
 
 /* ── 标题：左对齐、紧字距、下面压一条实线 ────────────────────────────────── */
 .titleblock {
-  border-bottom: 2px solid var(--text);
+ border-bottom: 2px solid var(--text);
 }
 
 .title {
-  font: 700 var(--s-title, 128px)/1.06 var(--display);
-  letter-spacing: -0.03em;
-  color: var(--text);
-  white-space: nowrap;
-  margin: 0;
-  display: block;
+ font: 700 var(--s-title, 128px) / 1.06 var(--display);
+ letter-spacing: -0.03em;
+ color: var(--text);
+ white-space: nowrap;
+ margin: 0;
+ display: block;
 }
 
 .subtitle {
-  font: 400 var(--s-subtitle, 32px)/1.5 var(--body);
-  color: var(--text);
-  opacity: 0.72;
-  margin-top: 24px;
+ font: 400 var(--s-subtitle, 32px) / 1.5 var(--body);
+ color: var(--text);
+ opacity: 0.72;
+ margin-top: 24px;
 }
 
 /* 封面页的细线（其它版式的线在标题块底下） */
 .rule {
-  width: 100%;
-  height: 2px;
-  margin: 40px 0 0;
-  background: var(--text);
+ width: 100%;
+ height: 2px;
+ margin: 40px 0 0;
+ background: var(--text);
 }
 
 /* ── 条目：编号取代方点 ────────────────────────────────────────────────────
    编号同时给出**顺序感**和**对齐轴**，方点只给出"这是个列表"。
    编号用 accent，是这一页唯一的小面积彩色 —— 强调色的用量守住了，它才有力。 */
 .bullets {
-  counter-reset: swiss;
-  font: 400 var(--s-bullet, 32px)/1.62 var(--body);
-  color: var(--text);
-  margin: 0;
-  padding: 0;
-  list-style: none;
+ counter-reset: swiss;
+ font: 400 var(--s-bullet, 32px) / 1.62 var(--body);
+ color: var(--text);
+ margin: 0;
+ padding: 0;
+ list-style: none;
 }
 
 .bullets li {
-  counter-increment: swiss;
-  position: relative;
-  padding-left: 82px;
+ counter-increment: swiss;
+ position: relative;
+ padding-left: 82px;
 }
 
 .bullets li::before {
-  content: counter(swiss, decimal-leading-zero);
-  position: absolute;
-  left: 0;
-  top: 0.14em;
-  font: 700 21px/1 var(--body);
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
+ content: counter(swiss, decimal-leading-zero);
+ position: absolute;
+ left: 0;
+ top: 0.14em;
+ font: 700 21px / 1 var(--body);
+ color: var(--accent);
+ font-variant-numeric: tabular-nums;
+ letter-spacing: 0.02em;
 }
 
 .bullets i {
-  display: none;
+ display: none;
 }
 
 .bullets.small {
-  font-size: var(--s-bulletSmall, 26px);
-  line-height: 1.6;
+ font-size: var(--s-bulletSmall, 26px);
+ line-height: 1.6;
 }
 
 .bullets.small li {
-  padding-left: 68px;
+ padding-left: 68px;
 }
 
 .bullets.small li::before {
-  font-size: 18px;
+ font-size: 18px;
 }
 
 /* ── 双栏：靠 3px 色条分栏，不靠留白 ─────────────────────────────────────── */
 .col .band {
-  height: 3px;
-  margin-bottom: 22px;
-  background: var(--accent);
+ height: 3px;
+ margin-bottom: 22px;
+ background: var(--accent);
 }
 
 .col .band.b {
-  background: var(--text);
-  opacity: 0.3;
+ background: var(--text);
+ opacity: 0.3;
 }
 
 .col h3 {
-  font: 700 var(--s-colTitle, 40px)/1.2 var(--display);
-  color: var(--text);
-  margin: 0 0 16px;
-  letter-spacing: -0.02em;
+ font: 700 var(--s-colTitle, 40px) / 1.2 var(--display);
+ color: var(--text);
+ margin: 0 0 16px;
+ letter-spacing: -0.02em;
 }
 
 /* ── 时间线：实心方块 + 刻度感 ───────────────────────────────────────────── */
 .tl .dot {
-  display: block;
-  width: 16px;
-  height: 16px;
-  border-radius: 0;
-  background: var(--accent);
-  margin-bottom: 24px;
+ display: block;
+ width: 16px;
+ height: 16px;
+ border-radius: 0;
+ background: var(--accent);
+ margin-bottom: 24px;
 }
 
 .tl .dot::after {
-  display: none;
+ display: none;
 }
 
 .tl b {
-  display: block;
-  font: 700 var(--s-nodeLabel, 28px)/1.3 var(--display);
-  color: var(--text);
+ display: block;
+ font: 700 var(--s-nodeLabel, 28px) / 1.3 var(--display);
+ color: var(--text);
 }
 
 .tl em {
-  display: block;
-  font: 400 var(--s-nodeNote, 22px)/1.5 var(--body);
-  color: var(--text);
-  opacity: 0.62;
-  font-style: normal;
+ display: block;
+ font: 400 var(--s-nodeNote, 22px) / 1.5 var(--body);
+ color: var(--text);
+ opacity: 0.62;
+ font-style: normal;
 }
 
 /* ── 图表：去边框，只留一条基线 + 一档强调色 ─────────────────────────────── */
 .chartwrap {
-  background: transparent;
-  box-shadow: none;
-  transform: none;
-  padding: 34px 0;
+ background: transparent;
+ box-shadow: none;
+ transform: none;
+ padding: 34px 0;
 }
 
 .chartwrap .hf {
-  display: none;
+ display: none;
 }
 
 .chartwrap .bar {
-  fill: var(--accent);
+ fill: var(--accent);
 }
 
 .chartwrap .axis {
-  stroke: var(--text);
-  stroke-width: 1;
-  opacity: 0.32;
+ stroke: var(--text);
+ stroke-width: 1;
+ opacity: 0.32;
 }
 
 .chartwrap .val {
-  font: 600 var(--s-chartValue, 20px) var(--body);
-  fill: var(--text);
-  font-variant-numeric: tabular-nums;
+ font: 600 var(--s-chartValue, 20px) var(--body);
+ fill: var(--text);
+ font-variant-numeric: tabular-nums;
 }
 
 .chartwrap .lbl {
-  font: 400 var(--s-chartLabel, 18px) var(--body);
-  fill: var(--text);
-  opacity: 0.62;
+ font: 400 var(--s-chartLabel, 18px) var(--body);
+ fill: var(--text);
+ opacity: 0.62;
 }
 
 .chartcap {
-  font: 400 var(--s-caption, 24px)/1.5 var(--body);
-  color: var(--text);
-  opacity: 0.62;
-  margin-top: 24px;
+ font: 400 var(--s-caption, 24px) / 1.5 var(--body);
+ color: var(--text);
+ opacity: 0.62;
+ margin-top: 24px;
 }
 
 /* ── 页码：像出版物页脚，压在巨号页码上面一行 ────────────────────────────── */
 .foot {
-  font: 400 var(--s-foot, 20px)/1 var(--body);
-  color: var(--text);
-  opacity: 0.5;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.08em;
+ font: 400 var(--s-foot, 20px) / 1 var(--body);
+ color: var(--text);
+ opacity: 0.5;
+ font-variant-numeric: tabular-nums;
+ letter-spacing: 0.08em;
 }

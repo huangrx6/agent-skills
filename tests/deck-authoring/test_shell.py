@@ -160,9 +160,15 @@ class TestShell(unittest.TestCase):
     # ── 真开浏览器测行为 ────────────────────────────────────────────────
 
     def test_scroll_view_shows_every_slide(self) -> None:
-        """默认（滚动态）必须全显示 —— 度量层和截图层都吃这个几何。"""
+        """默认（滚动态）必须全显示 —— 度量层和截图层都吃这个几何。
+
+        断言的是「不是演示态」而不是「没有 data-view 属性」：滚动态现在会**显式**
+        写 `data-view="scroll"`（frame 态也是同一套机制的第三个值），
+        “没这个属性”是实现细节，不是意图。
+        """
         r = self.default
-        self.assertIsNone(r["view0"], "默认不该预设演示态（?present 才进）")
+        self.assertIn(r["view0"], (None, "scroll"),
+                      f"默认进了不该进的视图：{r['view0']}")
         self.assertEqual(r["vis0"], self.total, "默认态应显示全部页")
         self.assertEqual(r["hud0"], f"1 / {self.total}")
 
