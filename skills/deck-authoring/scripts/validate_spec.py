@@ -37,7 +37,11 @@ DEFAULT_TOKENS = os.path.join(STYLES_DIR, DEFAULT_STYLE, "style.json")
 
 # 封闭字段集。加字段要同时改这里与 `references/style-architecture.md` ——
 # 这正是设计意图：让"顺手加一个"变得有摩擦。
-DECK_FIELDS = {"colorSet", "seed", "title", "slides", "style", "brand", "note"}
+DECK_FIELDS = {"colorSet", "seed", "title", "slides", "style", "brand", "note",
+               "mood"}
+# mood 是 Theme Resolver 的语义输入（palette.MOOD_DIRECTIONS 一字不差）：
+# 方向决策的**第一优先级**，值封闭。
+MOODS = ("calm", "neutral", "bold", "experimental")
 SLIDE_FIELDS = {
     "title":         {"type", "title", "subtitle", "color"},
     "content-text":  {"type", "title", "bullets", "color"},
@@ -178,13 +182,20 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
         return issues
     _check_fields(deck, DECK_FIELDS, "deck", issues)
 
+    # mood 校验不依赖 token（枚举封闭在协议里），放到 color_sets 分支外 ——
+    # CLI 没带 token 时也要拦拼错的 mood。
+    mood = deck.get("mood")
+    if mood is not None and mood not in MOODS:
+        issues.error("UNKNOWN_MOOD", "deck.mood",
+                     f"未知 mood {mood!r}；可用 {list(MOODS)}")
+
     if color_sets is not None:
         chosen = deck.get("colorSet")
         if (isinstance(chosen, str) and chosen not in color_sets
                 and chosen != "auto"):
             issues.error("BAD_COLOR_SET", "deck.colorSet",
                          f"{chosen!r} 不在 token 的 colorSets 里，可用 "
-                         f"{sorted(color_sets) + ['auto']}（auto=按风格基准+seed 派生）")
+                         f"{sorted(color_sets) + ['auto']}（auto=语义决策方向：mood → 风格语法）")
 
     slides = deck.get("slides")
     if not isinstance(slides, list) or not slides:

@@ -366,12 +366,12 @@ if __name__ == "__main__":
 
 
 class TestAutoSet(unittest.TestCase):
-    """colorSet 省略 / auto：风格手调基准 + seed 确定性派生。
+    """colorSet 省略 / auto：方向由语义决定（mood → 风格语法 → safe）。
 
-    规则口径（总编排 §17 / 品牌协议 §5）：Style 出**语法与基准**，主题按 deck
-    实际情况（seed）派生——同 seed 同结果（可回归），不同 deck 落不同变体。
-    这条最容易出的错：派生动了纸色/文字 → 对比度结构悄悄坏掉。所以第二条
-    钉死：只有 primary/secondary 允许动。
+    规则口径（总编排 §17 / 品牌协议 §5）：Style 出**语法与基准**，方向决策
+    吃语义输入 —— seed 只管可复现，不做审美决策（"换 deck 换配色看 seed"
+    是已修掉的老根因）。这条最容易出的错：派生动了纸色/文字 → 对比度结构
+    悄悄坏掉。所以第二条钉死：只有 primary/secondary 允许动。
     """
 
     def setUp(self) -> None:
@@ -397,22 +397,25 @@ class TestAutoSet(unittest.TestCase):
 
     def test_only_primary_secondary_move(self) -> None:
         tokens = self._fresh()
-        seed = next(s for s in range(1, 30)
-                    if ["safe", "creative", "experimental"][
-                        zlib.crc32(f"auto:{s}".encode()) % 3] == "creative")
-        _, colors = palette.auto_set(tokens, seed)
+        _, colors = palette.auto_set(tokens, 1, mood="bold")   # bold → creative
         self.assertEqual(colors["background"], self.base["background"],
                          "纸色被动了 —— 对比度结构会悄悄坏")
         self.assertEqual(colors["text"], self.base["text"])
         self.assertNotEqual(colors["primary"], self.base["primary"],
                             "creative 方向没真的变 —— 派生是空转")
 
+    def test_direction_does_not_flip_with_seed(self) -> None:
+        """方向不随 seed 翻转 —— 审美决策不再看骰子。"""
+        for mood in ("calm", "bold", None):
+            a = palette.auto_set(self._fresh(), 1, mood=mood)[0]
+            b = palette.auto_set(self._fresh(), 42, mood=mood)[0]
+            self.assertEqual(a, b, f"mood={mood} 时方向随 seed 变了：{a} vs {b}")
+
     def test_safe_direction_is_identity(self) -> None:
+        """safe 档 = 手调基准原样（swiss 无 mood 时就是它，不用猎 seed）。"""
         tokens = self._fresh()
-        seed = next(s for s in range(1, 30)
-                    if ["safe", "creative", "experimental"][
-                        zlib.crc32(f"auto:{s}".encode()) % 3] == "safe")
-        name, colors = palette.auto_set(tokens, seed)
+        name, colors = palette.auto_set(tokens, 1)
+        self.assertEqual(name, "auto:safe")
         self.assertEqual(colors, self.base, "safe 桶应等于基准本身")
 
     def test_omitted_colorset_renders_reproducibly(self) -> None:
@@ -431,3 +434,29 @@ class TestAutoSet(unittest.TestCase):
         spec["deck"]["colorSet"] = "auto"
         self.assertEqual(validate.validate(spec).errors, [],
                          "显式 auto 应放行")
+
+
+class TestChooseDirection(unittest.TestCase):
+    """方向决策链：mood（显式语义）→ 风格语法（color_creativity）→ safe。"""
+
+    def test_mood_mapping(self) -> None:
+        for mood, want in (("calm", "safe"), ("neutral", "safe"),
+                           ("bold", "creative"), ("experimental", "experimental")):
+            pick, reasons = palette.choose_direction({}, mood)
+            self.assertEqual(pick, want)
+            self.assertTrue(any("mood=" in r for r in reasons))
+
+    def test_unknown_mood_raises(self) -> None:
+        with self.assertRaises(SystemExit):
+            palette.choose_direction({}, "vibrant")
+
+    def test_style_grammar_thresholds(self) -> None:
+        hi = {"colorStructure": {"color_creativity": 0.8}}
+        lo = {"colorStructure": {"color_creativity": 0.55}}
+        self.assertEqual(palette.choose_direction(hi)[0], "creative")
+        self.assertEqual(palette.choose_direction(lo)[0], "safe")
+
+    def test_no_semantic_input_defaults_to_safe(self) -> None:
+        pick, reasons = palette.choose_direction({})
+        self.assertEqual(pick, "safe")
+        self.assertTrue(any("手调基准原样" in r for r in reasons))

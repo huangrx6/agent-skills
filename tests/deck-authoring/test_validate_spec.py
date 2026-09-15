@@ -248,6 +248,15 @@ class TestImageVariants(unittest.TestCase):
         self.assertIn("UNKNOWN_VARIANT", self._codes(_spec(slides)),
                       "变体值不封闭 —— 拼错会一路漏到渲染器")
 
+    def test_mood_closed_enum(self) -> None:
+        """mood 是 Theme Resolver 的语义输入：合法值过，拼错的拦。"""
+        spec = _spec()
+        spec["deck"]["mood"] = "bold"
+        self.assertNotIn("UNKNOWN_MOOD", self._codes(spec))
+        spec["deck"]["mood"] = "vibrant"
+        self.assertIn("UNKNOWN_MOOD", self._codes(spec),
+                      "mood 不封闭 —— 拼错会漏进 palette 的 SystemExit")
+
     def test_auto_accepted_with_reminder(self) -> None:
         """auto 是合法值（意图：让实测来选），但门禁要提醒喂数据的链路。"""
         slides = [{"type": "content-image", "title": "图", "bullets": ["a"],

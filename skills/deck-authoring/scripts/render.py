@@ -798,15 +798,17 @@ def _apply_brand(style: dict, brand: dict) -> dict:
 
 
 def resolve_color_set(tokens: dict, deck: dict) -> str:
-    """colorSet 名；省略 / "auto" → 按风格基准 + deck.seed 确定性派生。
+    """colorSet 名；省略 / "auto" → 语义决策方向（mood → 风格语法 → safe）。
 
-    规则口径（总编排 §17 / 品牌协议 §5）：Style 出**语法与手调基准**，主题按
-    deck 实际情况（seed）派生 —— 同 seed 同结果（可回归），换 deck 自动换变体。
+    规则口径（总编排 §17 / 品牌协议 §5）：Style 出**语法与手调基准**，方向由
+    spec 的 mood 或风格的 color_creativity 决定 —— seed 只管可复现，不做
+    审美决策（"换 deck 换配色看 seed"是已修掉的老根因）。
     check.py 也用它，保证两边看到同一套色（几何唯一来源的同款纪律）。
     """
     name = deck.get("colorSet")
     if name in (None, "auto"):
-        name, _ = palette_module.auto_set(tokens, deck.get("seed", 1))
+        name, _ = palette_module.auto_set(tokens, deck.get("seed", 1),
+                                          deck.get("mood"))
     return name
 
 

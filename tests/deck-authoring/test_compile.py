@@ -111,16 +111,28 @@ class TestDecisionTrace(unittest.TestCase):
         self.assertIn("显式指定", "".join(entry["reason"]))
 
     def test_auto_color_set_trace_explains_derivation(self) -> None:
+        """无 mood → 风格语法决策（swiss color_creativity=0.55 < 0.66 → safe）。"""
         spec = _demo()
         spec["deck"]["colorSet"] = "auto"
         resolved = compile_mod.compile_spec(spec)
         entry = next(t for t in resolved["trace"]
                      if t["stage"] == "theme" and t["decision"].startswith("auto:"))
-        self.assertTrue(entry["decision"].startswith("auto:"),
-                        f"auto 的 trace 决策应是派生名，得到 {entry['decision']}")
+        self.assertEqual(entry["decision"], "auto:safe")
         joined = "".join(entry["reason"])
-        self.assertIn("seed", joined, "理由里没说按 seed 派生")
+        self.assertIn("color_creativity", joined, "理由里没说风格语法依据")
+        self.assertIn("不参与方向决策", joined, "没写明 seed 不做审美决策")
         self.assertIn("纸色文字不动", joined, "理由里没说对比度保证")
+
+    def test_mood_overrides_style_grammar(self) -> None:
+        """mood 是第一优先级：bold 压过风格的克制声明 → auto:creative。"""
+        spec = _demo()
+        spec["deck"]["colorSet"] = "auto"
+        spec["deck"]["mood"] = "bold"
+        resolved = compile_mod.compile_spec(spec)
+        entry = next(t for t in resolved["trace"]
+                     if t["stage"] == "theme" and t["decision"].startswith("auto:"))
+        self.assertEqual(entry["decision"], "auto:creative")
+        self.assertIn("mood=bold", "".join(entry["reason"]))
 
     def test_down_tier_reason_cites_repair_order(self) -> None:
         """降档（bulletSmall）的理由必须引用修复顺序第 13 位 —— 缩字号不许静默。"""

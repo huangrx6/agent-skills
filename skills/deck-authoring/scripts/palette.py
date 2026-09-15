@@ -358,18 +358,54 @@ def directions(colors: dict) -> dict[str, dict]:
     return out
 
 
-def auto_set(tokens: dict, seed: int) -> tuple[str, dict]:
-    """colorSet 省略 / "auto" 时的解析：风格第一套手调基准 + seed 选方向。
+# mood → 方向：spec 的**显式语义意图**（总编排 §17 Theme Resolver 的输入）。
+# 值封闭 —— validate_spec 同步校验。
+MOOD_DIRECTIONS = {
+    "calm": "safe",             # 克制、正式汇报
+    "neutral": "safe",          # 不表态：用风格的手调基准
+    "bold": "creative",         # 与常见解拉开距离但仍协调
+    "experimental": "experimental",
+}
 
-    规则口径：Style 出语法与手调基准，主题按 deck 实际情况（seed）派生。
-    同 seed 同结果（可回归）；不同 deck 自动落在不同变体上。只动 primary/
-    secondary（variant 的保证），纸色/文字不动，对比度结构原样保住。
-    派生结果注入 tokens.colorSets，消费方统一按名取（不留第二套取色路径）。
+
+def choose_direction(tokens: dict, mood: str | None = None) -> tuple[str, list[str]]:
+    """auto 主题的**方向决策**（§17 Theme Resolver 第一片）。
+
+    决策链（每步带理由；seed 不在其中）：
+      1. spec 的 mood（显式语义意图）→ 方向映射
+      2. 风格语法 colorStructure.color_creativity（风格声明的配色胆量）
+      3. 都没有 → safe（手调基准原样）
+
+    老根因：方向曾是 `crc32(seed) % 3` —— "换 deck 自动换配色"取决于 seed，
+    那是没有理由的掷骰子。seed 现在只负责可复现，不再做审美决策。
     """
+    if mood is not None:
+        pick = MOOD_DIRECTIONS.get(mood)
+        if pick is None:
+            raise SystemExit(f"✗ 不认识的 mood {mood!r}；可选 {sorted(MOOD_DIRECTIONS)}")
+        return pick, [f"spec mood={mood} → {pick} 档（语义意图，显式给定）",
+                      "seed 只管可复现，不参与方向决策"]
+    creativity = (tokens.get("colorStructure") or {}).get("color_creativity")
+    if isinstance(creativity, (int, float)):
+        pick = "creative" if creativity >= 0.66 else "safe"
+        tail = ("（≥0.66）→ creative 档" if pick == "creative"
+                else "（<0.66）→ safe 档：手调基准原样")
+        return pick, [f"风格语法 color_creativity={creativity}{tail}",
+                      "风格声明了自己的配色胆量；seed 不参与方向决策"]
+    return "safe", ["风格未声明 color_creativity → safe 档（手调基准原样）"]
+
+
+def auto_set(tokens: dict, seed: int, mood: str | None = None) -> tuple[str, dict]:
+    """colorSet 省略 / "auto" 时的解析：方向由语义决定（choose_direction），
+    变体是纯函数 —— 同输入同结果（可回归）。只动 primary/secondary
+    （variant 的保证），纸色/文字不动，对比度结构原样保住。
+    派生结果注入 tokens.colorSets，消费方统一按名取（不留第二套取色路径）。
+
+    （seed 参数保留在签名里是为了 API 稳定；它不再决定方向。）
+    """
+    pick, _reasons = choose_direction(tokens, mood)
     names = list(tokens["colorSets"])
     base = tokens["colorSets"][names[0]]
-    dirs = list(DIRECTIONS)
-    pick = dirs[zlib.crc32(f"auto:{seed}".encode()) % len(dirs)]
     label = f"auto:{pick}"
     tokens["colorSets"][label] = dict(base) if pick == "safe" else variant(base, pick)
     return label, tokens["colorSets"][label]

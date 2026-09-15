@@ -127,9 +127,11 @@ def compile_spec(deck_spec: dict, style: dict | None = None,
 
     color_set = r.resolve_color_set(tokens, deck)
     if deck.get("colorSet") in (None, "auto"):
+        # 方向决策的理由进 trace（与 auto_set 同一决策链，纯函数可重放）
+        palette_mod = _load_sibling("palette")
+        _pick, dir_reasons = palette_mod.choose_direction(tokens, deck.get("mood"))
         trace.append({"stage": "theme", "decision": color_set,
-                      "reason": ["spec 未指定 colorSet（auto）",
-                                 f"按 seed={seed} 从风格第一套基准确定性派生",
+                      "reason": ["spec 未指定 colorSet（auto）", *dir_reasons,
                                  "只动 primary/secondary，纸色文字不动（对比度保住）"]})
     else:
         trace.append({"stage": "theme", "decision": color_set,

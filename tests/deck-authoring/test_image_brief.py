@@ -392,15 +392,23 @@ class TestNoFullPageImage(unittest.TestCase):
                               "intendedText": "a.png"}]}
 
     def test_full_page_image_is_blocked(self) -> None:
-        out = self.check_mod._check_full_page_image(self._el(1560, 850))
+        out = self.check_mod._check_full_page_image(self._el(1560, 850), self._deck())
         self.assertEqual(len(out), 1, out)
         self.assertIn("盖住了整页", out[0])
         self.assertIn("不允许", out[0])
 
+    @staticmethod
+    def _deck() -> dict:
+        """非 hero 页的 deck（这些用例测的就是非主角图的守卫；hero 放行
+        在 test_check_mutations 的 TestFullPageImageRoleAware 里另有四面）。"""
+        return {"slides": [{"type": "content-image", "variant": "visual-right",
+                           "image": "x.png"}]}
+
     def test_ordinary_figure_is_fine(self) -> None:
         """反面对照：真实的配图（实测整页 17%）一条都不许报 ——
         否则上面那条可能只是"永远会报"。"""
-        self.assertEqual(self.check_mod._check_full_page_image(self._el(607, 404)), [])
+        self.assertEqual(self.check_mod._check_full_page_image(
+            self._el(607, 404), self._deck()), [])
 
     def test_threshold_has_margin_from_reality(self) -> None:
         """阈值必须离真实情况远 —— 差一点点就报错的守卫会被人一律忽略。"""
@@ -409,17 +417,20 @@ class TestNoFullPageImage(unittest.TestCase):
 
     def test_a_tall_banner_image_is_not_full_page(self) -> None:
         """按**面积**判，不是按宽度：一条通栏横幅没那么严重（占不满高）。"""
-        self.assertEqual(self.check_mod._check_full_page_image(self._el(1600, 300)), [])
+        self.assertEqual(self.check_mod._check_full_page_image(
+            self._el(1600, 300), self._deck()), [])
 
     def test_bad_measurements_do_not_raise(self) -> None:
         """`check()` 从不抛 —— 尺寸缺失就该跳过，不是崩掉整次校验。"""
         for w, h in ((None, None), ("", ""), (0, 0), ("a", "b")):
             with self.subTest(w=w, h=h):
-                self.assertEqual(self.check_mod._check_full_page_image(self._el(w, h)), [])
+                self.assertEqual(self.check_mod._check_full_page_image(
+                self._el(w, h), self._deck()), [])
 
     def test_error_says_where_the_information_should_live(self) -> None:
         """报错要给出路：信息由版面用**真文字**排，不是"别这么干"。"""
-        msg = self.check_mod._check_full_page_image(self._el(1600, 900))[0]
+        msg = self.check_mod._check_full_page_image(
+            self._el(1600, 900), self._deck())[0]
         self.assertIn("真文字", msg)
         self.assertIn("配图或点缀", msg)
 

@@ -47,11 +47,16 @@ python3 scripts/palette.py --roles swiss-grid blue                   # 13 个角
 
 1. **手调基准**：每套风格的 `colorSets` 是风格作者调好的家底 —— 显式指定
    `deck.colorSet` 就是选它（最稳，也是 demo/stress 的用法）。
-2. **auto 派生**：省略 `colorSet` 或写 `"auto"` → `palette.auto_set` 以风格的
-   第一套基准 + `deck.seed` 确定性选一个方向（safe / creative / experimental）
-   做 OKLCH 变体 —— **同 seed 同结果（可回归），换 deck 自动换变体**。只动
+2. **auto 派生**：省略 `colorSet` 或写 `"auto"` → `palette.auto_set` 对风格
+   第一套基准做 OKLCH 变体。**方向由语义决定**（`choose_direction`，§17
+   Theme Resolver 第一片）：spec 的 `mood`（calm/neutral/bold/experimental，
+   显式语义意图，第一优先级）→ 风格语法 `colorStructure.color_creativity`
+   （≥0.66 → creative，否则 safe）→ 都没有 → safe（手调基准原样）。
+   **seed 不参与方向决策** —— "换 deck 换配色看 seed"是没有理由的掷骰子
+   （已修掉的老根因）；变体是纯函数，同输入同结果（可回归）。只动
    primary / secondary（纸色与文字不动），对比度结构原样保住；派生结果注入
-   `tokens.colorSets`，渲染与检查统一按名取（不留第二套取色路径）。
+   `tokens.colorSets`，渲染与检查统一按名取（不留第二套取色路径）；
+   compile 的 theme trace 写明整条决策依据。
 
 所以 colorSets 不是与规则冲突的"硬编码颜色"，而是**派生的基准与人类手调的
 对照组**；品牌色仍经由 `merge_color_sets` 同名覆盖进入（品牌协议 §5）。从语法
