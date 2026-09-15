@@ -63,13 +63,26 @@ python3 scripts/fit.py --json '{"title":"结论","bullets":["…","…"]}'
 版式选择、观众距离）见 `references/content-design.md`。
 
 第 3 步是给 demo 的图文页造图：`demo.spec.json` 的 `image` 是个占位文件名，
-不先生成它就是一张裂图。要换成真照片走 `image_source.py`（再改 spec 里的文件名）。
-该产物**不入库**（见「已知限制」第 7 条）。
+不先生成它就是一张裂图。该产物**不入库**（见「已知限制」第 7 条）。
+
+**要换成真照片**（推荐路径，三条路里最正经的一条）：
+
+```bash
+python3 scripts/image_source.py --brief dev-tools/demo.spec.json   # → 图片提示词契约
+#   契约里逐张给了：文件名 / 实测尺寸 / 比例 / 透明通道 / 会被制版怎么处理 /
+#   可粘贴的中英提示词 / 负面清单。拿去出图，按文件名存到产物同目录。
+python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸与比例
+```
+
+分工是**脚本写契约 → 人出图 → 脚本验收**：脚本知道每张图进哪个槽位、那个槽位实测
+多少像素、会被双色调+半调怎么处理；而"出一张好看的图"这件事，人拿自己顺手的模型
+做得比脚本调一个陌生 API 好。`--brief` 会顺便放占位图，所以流水线不会因为等图停住。
+理由、契约字段与三个踩过的坑见 `references/images.md`。
 
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 158 条，约 2.5 分钟（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 173 条，约 2.5 分钟（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时约 2.5 分钟，
@@ -114,8 +127,9 @@ PDF 是矢量且页数/页尺寸对、可编辑 PPTX 的**字是真字**且坐�
 2. **图表只支持柱状图**：折线 / 饼 / 散点都没有；柱高必须与数据成比例是硬要求
    （由 `check.py` 第 ④ 条独立复核，不是渲染器自觉）。
 3. **错位只用在标题 / 时间点**：其他地方用错位会毁可读性（方案第 2 层）。
-4. **生图是可选**：`image_source.py` 默认走色块拼贴（它本身就是版画式的拼贴），
-   不配 `--provider-cmd` 永远不会调生图模型 —— 这是设计不是疏漏。
+4. **生图不由脚本做**：推荐路径是 `--brief` 写提示词契约、人出图、`--check` 验收
+   （见上）。另有色块拼贴（它本身就是版画式拼贴）与 `--provider-cmd`（有 API 的人用）。
+   不配 provider 就永远不会调生图模型 —— 这是设计不是疏漏，见 `references/images.md`。
 5. **缓存命中不等于可信**：缓存里的图也会过"只在色板三角形内"的不变量，
    塞彩图会被拒绝并丢弃重做。
 6. **同 spec + 同种子 = 字节级一致**：用 random.Random(seed, parts) 派生错位 / 颗粒，
@@ -136,7 +150,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── validate_spec.py     # 输入层校验：字段集封闭（坐标/字号/色值直接判失败）
 │   ├── ink.py               # 墨色推导 + 三色板门禁（唯一消费者）
 │   ├── plate.py             # 图片 → duotone + 半调（制版）
-│   ├── image_source.py      # 缓存 / 生图 / 几何色块拼贴
+│   ├── image_source.py      # 提示词契约(--brief) / 验收(--check) / 生图 / 色块拼贴
 │   ├── brand.py             # 品牌资产：logo 内嵌 / 色板与字体合并 / SVG 栅格化
 │   ├── fit.py               # 试排：给定一页内容，实测哪些版式装得下（真渲真量）
 │   ├── style.py             # 风格层：列表 / 契约体检 / 摘要 / 联系表（八套拼一张图）

@@ -77,8 +77,8 @@ done
    - 规格：`python3 scripts/validate_spec.py your.spec.json`（字段集封闭，未知键直接失败）
    - 墨色：`python3 scripts/ink.py styles/<style>/style.json`（任一色板不达标退出 1）
    - 渲染：`python3 scripts/render.py your.spec.json -o out.html`
-   - 实测：`python3 scripts/measure.py out.html`（真浏览器量版面；写 `out.html.measured.json`）
-   - 判定：`python3 scripts/check.py your.spec.json out.html`（内部会调实测层，全过退出 0）
+   - 实测+判定：`python3 scripts/check.py your.spec.json out.html`（真浏览器量完再判，全过退 0；
+     只想单独量就 `measure.py out.html`）
 4. **可选交付**：
    - 演示：直接把 `out.html` 给人（`out.html?present` 一页一屏、`←/→` 翻页、`F` 全屏）
    - PDF：`python3 scripts/pdf.py out.html -o deck.pdf`（矢量、能打印；脚本会验页数与页尺寸）
@@ -87,8 +87,8 @@ done
    - PPTX（**对方要改字**）：`python3 scripts/pptx_native.py out.html -o deck-editable.pptx`
    - 视频：`python3 scripts/animate.py out.html -o deck.mp4`（GIF：`-o deck.gif --width 960`；
      无需 ffmpeg）。运动设计与什么时候别用见 `references/animation.md`。
-5. **图页**：先 `image_source.py --prompt "…" -o pic.png` 出图，把文件名写进 spec 的
-   `image` 字段。几何色块拼贴是默认（无 provider）—— 它本身是版画式拼贴，不是灰占位图。
+5. **图页**：spec 里 `image` 只填**文件名**，用 `image_source.py --brief spec.json` 出**提示词
+   契约**（人拿它出图、存产物同目录，再 `--check` 验）—— 分工与理由见 `references/images.md`。
 
 ## 版式
 
@@ -156,9 +156,10 @@ done
 - **`... 越出版面：下缘 ... 越出该页下边界 ...`** → 内容真的撑出这一页了（实测量的，
   不是估的）。先跑 `fit.py --from-spec … --slide N` 看哪种版式装得下，再收字 / 拆页。
 - **`... 越出版面：右缘 ...`**（多半在标题）→ 标题是 `nowrap` 的，不折行、直接裁；改短。
-- **`图片没加载`** → 相对路径的产物挪个目录就全员裂图。同目录交付，或 base64 内嵌。
+- **`图片没加载`** → 相对路径的产物挪个目录就全员裂图；同目录交付，或 base64 内嵌
+  （图从哪来 / 怎么出 / 怎么验见 `references/images.md`）。
 - **字体回退提示** → 声明的族本机没有，栈里后面的族顶上了；不阻塞，交付前确认一下。
-- **错位值越界** → 检查 spec 里没硬塞 `--dx/--dy/--rot`；这些只能由脚本派生。
-- **装饰压文字** → `references/validation.md` 第 ⑤ 条；墨块必须落在右侧两角。
+- **错位值越界** → spec 里不能硬塞 `--dx/--dy/--rot`；这些只能由脚本派生。
+- **装饰压文字** → `references/validation.md` 第 ⑤ 条；墨块只落右侧两角。
 - **图表柱高不成比例** → 数据 `value` 是不是数字、是不是都被图渲染了；
   `references/validation.md` 第 ⑤ 条里"两两比例"那段解释了为什么不按峰值归一。

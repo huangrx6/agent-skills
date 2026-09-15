@@ -1,7 +1,7 @@
 {
   "skills": {
     "deck-authoring": {
-      "computedHash": "7d6d09e6f44159c2b0ac51fcae531d52718ca459b90e4fa1d1b2e9d1f93901c8",
+      "computedHash": "2376f287ceda00bfed9e3980164b1dd59db38fd464448b81fad7b0ab19e367c0",
       "skillPath": "skills/deck-authoring/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
