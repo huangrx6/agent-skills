@@ -74,7 +74,7 @@
   元素，它的 `font-family` 只是浏览器给 CJK 的 UA 默认值（实测报过一次
   `PingFang SC`，而页面上根本没写这个族）。现在只统计**真有文字**的元素。
 
-### 现有八套风格（对照）
+### 历史八套风格对照（内置已删 —— 表保留作自建参考）
 
 选风格看的是**画面**，不是这张表 —— 先跑 `python3 scripts/style.py --sheet -o s.png`
 把八套拼成一张图，再回来看哪个适合场合。
@@ -125,7 +125,7 @@ styles/<name>/
   skin.css     视觉层：颜色、字体、纹理、装饰观感
 ```
 
-**加一种风格 = 拷一份目录改内容，不碰任何 .py。** 现在八套风格全部是这样做出来的
+**加一种风格 = 拷一份目录改内容，不碰任何 .py。** 历史八套全部是这样做出来的（已移除；参考实现 dev-tools/style-fixture/swiss-grid）
 （`keynote-dark` / `swiss-grid` / `billboard` / `notebook` / `botanical-dark` /
 `terminal` / `paper-ink` / `pastel-geometry`），除了给 token 添了一个可选字段
 （`colorSets.*.text`，见下）以外，渲染/校验/导出的代码一行未改。

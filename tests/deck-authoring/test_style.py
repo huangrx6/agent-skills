@@ -31,7 +31,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
-STYLES = os.path.join(SKILL, "styles")
+STYLES = os.path.join(SKILL, "dev-tools", "style-fixture")
 DEMO = os.path.join(SKILL, "dev-tools", "demo.spec.json")
 STRESS = os.path.join(SKILL, "dev-tools", "stress.spec.json")
 
@@ -59,7 +59,9 @@ class TestEveryShippedStylePassesTheContract(unittest.TestCase):
     def test_all_styles_pass(self) -> None:
         """八套（或将来更多）全部过契约 —— 遍历目录，新增风格自动进覆盖。"""
         names = style.available()
-        self.assertGreaterEqual(len(names), 8, "风格数少于 8 —— 是不是有目录没被读到")
+        # styles/ 内置已删（用户要求）：可用面 = 用户自建 + 开发夹具（swiss-grid）。
+        # 不变量是"遍历目录自动进覆盖"，不是具体套数。
+        self.assertGreaterEqual(len(names), 1, "一套风格都没有 —— 夹具丢了？")
         for name in names:
             with self.subTest(style=name):
                 self.assertEqual(style.audit(name), [], f"{name} 没过契约")
@@ -209,7 +211,7 @@ class TestContactSheet(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             out = os.path.join(tmp, "sheet.png")
-            path = style.sheet(out, styles=["swiss-grid", "terminal"])
+            path = style.sheet(out, styles=["swiss-grid"])
             self.assertTrue(os.path.isfile(path))
             with Image.open(path) as im:
                 # 两套 × 两页拼在一起 → 比单页明显宽、明显高

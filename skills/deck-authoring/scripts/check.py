@@ -58,7 +58,7 @@ brand_mod = _load_sibling("brand")     # 品牌资产（logo / 色板 / 字体�
 hierarchy_mod = _load_sibling("hierarchy")   # 文本预算 / 视觉焦点 / 密度
 grid_mod = _load_sibling("grid")     # 网格与间距（版面几何唯一来源）
 
-TOKENS = os.path.join(HERE, "..", "styles", "swiss-grid", "style.json")
+TOKENS = os.path.join(HERE, "..", "dev-tools", "style-fixture", "swiss-grid", "style.json")
 
 # **两个不同的框，别混用**（我自己第一版就混了 ✗，导致正常产物被误判"溢出"）：
 #   内容区 = 版面减去内边距，量"放不放得下"（宽 1600-2×84 = 1432）

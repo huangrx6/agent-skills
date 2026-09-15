@@ -32,8 +32,8 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "styles", "swiss-grid", "style.json")
-STYLES = os.path.join(SKILL, "styles")
+TOKENS = os.path.join(SKILL, "dev-tools", "style-fixture", "swiss-grid", "style.json")
+STYLES = os.path.join(SKILL, "dev-tools", "style-fixture")
 SKILL_MD = os.path.join(SKILL, "SKILL.md")
 
 # 「| `type` | 用途 | 风险点 |」——只取版式名与用途两列；装饰那一列删了，

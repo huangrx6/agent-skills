@@ -118,7 +118,7 @@ process→timeline…）；**family/variant 两级中间层未建**（§15-18 �
 
 规范至少支持 single/split/stack/grid/hero/editorial/overlay/timeline/diagram/
 chart/table/dashboard/full-bleed。现状：7 种 slide type（title/content-text/
-content-image/two-column/timeline/chart/end）+ 8 套风格 = 事实上的变体池，但没有
+content-image/two-column/timeline/chart/end）+ 自建风格 = 事实上的变体池，但没有
 family 命名层。缺的表在路线图阶段 3。
 
 ## 16. Layout Variant【约定】
@@ -285,7 +285,7 @@ decor 类型与角位由风格 token 限定（版心已满的版式不放装饰�
 ## 42. Layout Novelty【约定】
 
 0..1；Corporate 0.2-0.4 / Technical 0.3-0.5 / Creative 0.5-0.8；Novelty 不得
-破坏可读性。由风格性格承担（8 套 = 8 档事实上的 novelty），无数值。
+破坏可读性。由风格性格承担（自建几套 = 几档事实上的 novelty），无数值。
 
 ## 43. Style 与 Layout【✅】
 

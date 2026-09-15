@@ -92,7 +92,7 @@ Style 不绑定效果，定义**运动性格**。本仓库每个风格一套 `mo
 stagger/titleHold/hold/readPerItem/easing + note），这正是 motionProfile 的参数化：
 personality→easing 曲线，tempo→enter/stagger，continuity→titleHold。
 
-## 10. 常见 Style 推荐（八套，各一个性格）【✅】
+## 10. 历史八套的 Motion 参数表（自建参考值；内置已删，参数仍适用）
 
 | 风格 | 性格 | enter | stagger | titleHold | hold | read/条 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -123,7 +123,7 @@ token，天然在预算内；"降级"表现为换更小的 preset（§40）。
 
 0-0.25 Corporate / 0.25-0.5 Polished / 0.5-0.75 Creative / 0.75-1 Experimental；
 effective = creativity × page_type_factor（Cover×1.0 … Table×0.3）。本仓库把
-"创造力预算"固化为**风格人格差异**（8 套参数）+ overshoot 只有 pastel-geometry
+"创造力预算"固化为**风格人格差异**（每套自建一份参数；历史八套中仅 pastel-geometry
 一套允许——一套风格只用一个性格。
 
 ## 14. Motion Novelty【约定】

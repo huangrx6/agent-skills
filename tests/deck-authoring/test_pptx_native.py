@@ -33,8 +33,8 @@ import zipfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "styles", "swiss-grid", "style.json")
-STYLES = os.path.join(SKILL, "styles")
+TOKENS = os.path.join(SKILL, "dev-tools", "style-fixture", "swiss-grid", "style.json")
+STYLES = os.path.join(SKILL, "dev-tools", "style-fixture")
 DEMO = os.path.join(SKILL, "dev-tools", "demo.spec.json")
 
 # 版面 1600×900px → EMU。1 CSS px = 9525 EMU（= 0.75pt）。
@@ -208,11 +208,19 @@ class TestPptxNative(unittest.TestCase):
         XML 里 `<a:pattFill>` 光秃秃，渲染出来是个空圈（实测踩过）。若哪天有风格
         重新用上 halftone-circle，这条会把它拉回来。
         """
+        # 内置风格已删（styles/ 移除），夹具 swiss 不声明装饰 —— 前提改为
+        # **构造**声明装饰的风格：这条守的是"declared ⊆ DECOR_SHAPES"的映射
+        # 完整性，不依赖哪套具体风格恰好用了装饰。
         declared = set()
         for name in _style_names():
             spec = self.render.load_style(name)["tokens"].get("decor") or {}
             if spec.get("kind"):
                 declared.add(spec["kind"])
+        base = self.render.load_style("swiss-grid")
+        for kind in ("accent-block", "halftone-circle"):
+            variant = dict(base, tokens=dict(base["tokens"],
+                                             decor={"kind": kind}))
+            declared.add(variant["tokens"]["decor"]["kind"])
         self.assertTrue(declared, "没有任何风格声明装饰 —— 这条用例的前提没了")
         self.assertTrue(
             declared <= self.native.DECOR_SHAPES,
@@ -220,9 +228,14 @@ class TestPptxNative(unittest.TestCase):
 
     def test_decor_lands_as_a_native_shape(self) -> None:
         """有装饰的风格，装饰要真的落成一个原生形状（不是被静默吞掉）。"""
-        style = self.render.load_style("billboard")
+        # billboard（自带 accent-block 装饰）已随 styles/ 删除：注入同款 token
+        # 驱动同一分支 —— 测的是"声明的装饰真的落成原生形状"，与哪套风格无关。
+        style = self.render.load_style("swiss-grid")
+        style = dict(style, tokens=dict(style["tokens"], decor={
+            "kind": "accent-block", "types": ["title"], "zones": ["br"],
+            "sizes": [400]}))
         deck = json.loads(json.dumps(json.load(open(DEMO, encoding="utf-8"))))
-        deck["deck"]["style"] = "billboard"
+        deck["deck"]["style"] = "swiss-grid"
         deck["deck"]["colorSet"] = next(iter(style["tokens"]["colorSets"]))
         with tempfile.TemporaryDirectory() as td:
             html = os.path.join(td, "out.html")
@@ -247,12 +260,12 @@ class TestPptxNative(unittest.TestCase):
         会被当成普通属性默默吞掉，XML 里 `<a:pattFill>` 光秃秃没有 prst，
         渲染出来是个空圈 —— 实测踩过，而且文件生成/页数全对，不查就发现不了。
         """
-        base = self.render.load_style("billboard")
+        base = self.render.load_style("swiss-grid")
         style = dict(base, tokens=copy.deepcopy(base["tokens"]))
         style["tokens"]["decor"] = {"kind": "halftone-circle", "types": ["title"],
                                     "zones": ["br"], "sizes": [400]}
         deck = json.loads(json.dumps(json.load(open(DEMO, encoding="utf-8"))))
-        deck["deck"]["style"] = "billboard"
+        deck["deck"]["style"] = "swiss-grid"
         deck["deck"]["colorSet"] = next(iter(style["tokens"]["colorSets"]))
         with tempfile.TemporaryDirectory() as td:
             html = os.path.join(td, "out.html")
@@ -341,29 +354,31 @@ class TestPptxNative(unittest.TestCase):
         统一 bold 就等于把这两套的标题设计抹掉 —— 而 XML 里读出来是 `b="1"`，
         文件照生成、页数照样对，只有把 PPTX 打开看才发现。
         """
+        # paper-ink（标题 400 字重）已随 styles/ 删除：受控实验改为同一套夹具的
+        # 两个变体 —— 原版（UA 默认 h1=700）与注入 h1{font-weight:400} 的变体。
+        # 同风格只动一个变量，"导出跟实测字重走、不按角色写死"测得更直接。
         demo = json.loads(json.dumps(self.demo))
+        base = self.render.load_style("swiss-grid")
+        light = dict(base, skin=base["skin"] + "\nh1.title{font-weight:400}\n")
         results = {}
-        for style_name in ("swiss-grid", "paper-ink"):
-            raw = json.loads(open(os.path.join(STYLES, style_name, "style.json"),
-                                  encoding="utf-8").read())
+        for tag, st in (("heavy", base), ("light", light)):
             spec = json.loads(json.dumps(demo))
-            spec["deck"]["style"] = style_name
-            spec["deck"]["colorSet"] = next(iter(raw["colorSets"]))
+            spec["deck"]["style"] = "swiss-grid"
             spec["deck"]["slides"] = [s for s in spec["deck"]["slides"]
                                       if s["type"] == "title"]
-            path = os.path.join(self._tmp.name, f"w-{style_name}.html")
+            path = os.path.join(self._tmp.name, f"w-{tag}.html")
             with open(path, "w", encoding="utf-8") as fh:
-                fh.write(self.render.render(spec))
-            out = os.path.join(self._tmp.name, f"w-{style_name}.pptx")
+                fh.write(self.render.render(spec, st))
+            out = os.path.join(self._tmp.name, f"w-{tag}.pptx")
             self.native.build(path, out)
             xmls = _slide_xmls(out)
             first = xmls["ppt/slides/slide1.xml"]
             m = re.search(r'<a:rPr[^>]*sz="(\d+)"[^>]*b="(\d)"', first)
-            self.assertIsNotNone(m, f"{style_name} 的标题 run 没读到字重")
+            self.assertIsNotNone(m, f"{tag} 的标题 run 没读到字重")
             assert m is not None
-            results[style_name] = m.group(2)
-        self.assertEqual(results["swiss-grid"], "1", "swiss-grid 的标题设计是 700，导出却是常规")
-        self.assertEqual(results["paper-ink"], "0", "paper-ink 的标题设计是 400，导出却被加粗了")
+            results[tag] = m.group(2)
+        self.assertEqual(results["heavy"], "1", "实测 700 的标题导出却是常规")
+        self.assertEqual(results["light"], "0", "实测 400 的标题导出却被加粗了")
 
 
     def test_skipped_elements_are_counted_not_hidden(self) -> None:

@@ -35,7 +35,7 @@ logging.getLogger("PIL").setLevel(logging.ERROR)
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "styles", "swiss-grid", "style.json")
+TOKENS = os.path.join(SKILL, "dev-tools", "style-fixture", "swiss-grid", "style.json")
 
 CACHE_ENV = "AGENT_SKILLS_CACHE_DIR"
 SIZE = (320, 200)

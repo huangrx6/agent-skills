@@ -67,7 +67,7 @@ VALID_EASING = ("expoOut", "overshoot")
 
 
 def available() -> list[str]:
-    return deckio.list_dirs(STYLES_DIR)
+    return render.style_names()          # 双根：用户 styles/ + 开发夹具
 
 
 def load(name: str) -> dict:
@@ -84,8 +84,10 @@ def audit(name: str) -> list[str]:
     至于"好不好看"不在这里 —— 那个只能看联系表。
     """
     problems: list[str] = []
-    path = os.path.join(STYLES_DIR, name, "style.json")
-    raw = deckio.read_json(path)
+    folder = render.style_folder(name)
+    if folder is None:
+        return [f"没有风格 {name!r}（现有：{available()}）"]
+    raw = deckio.read_json(os.path.join(folder, "style.json"))
     tokens = raw
     for key in REQUIRED_KEYS:
         if key not in raw:
@@ -147,7 +149,8 @@ def audit(name: str) -> list[str]:
 
 
 def summarize(name: str) -> str:
-    raw = deckio.read_json(os.path.join(STYLES_DIR, name, "style.json"))
+    raw = deckio.read_json(os.path.join(render.style_folder(name),
+                                         "style.json"))
     tokens = raw
     mo = raw["motion"]
     type_bits = " ".join(f"{k}={v}" for k, v in raw["type"].items()
@@ -195,7 +198,8 @@ def sheet(path: str, styles: list[str] | None = None, scale_pct: int = 42,
     tiles: list[tuple[str, list[str]]] = []
     tmp = tempfile.mkdtemp(prefix="deck-sheet-")
     for name in names:
-        raw = deckio.read_json(os.path.join(STYLES_DIR, name, "style.json"))
+        raw = deckio.read_json(os.path.join(render.style_folder(name),
+                                             "style.json"))
         probe = copy.deepcopy(spec)                 # 深拷（不用 JSON 绕一圈）
         probe["deck"]["style"] = name
         probe["deck"]["colorSet"] = next(iter(raw["colorSets"]))
@@ -254,13 +258,15 @@ def main(argv: list[str]) -> int:
     if args.name:
         print(summarize(args.name) if not args.json
               else json.dumps(deckio.read_json(
-                  os.path.join(STYLES_DIR, args.name, "style.json")),
+                  os.path.join(render.style_folder(args.name),
+                               "style.json")),
                   ensure_ascii=False, indent=2))
         return 0
 
     names = available()
     if not names:
-        raise SystemExit(f"✗ {STYLES_DIR} 下一套风格都没有")
+        raise SystemExit("✗ 一套风格都没有 —— styles/（用户）与 "
+                         "dev-tools/style-fixture/（夹具）都是空的")
     reports = {n: audit(n) for n in names}
     if args.json:
         print(json.dumps(reports, ensure_ascii=False, indent=2))
@@ -279,7 +285,8 @@ def main(argv: list[str]) -> int:
               f"装饰声明一致）")
         return 0
     for n in names:
-        raw = deckio.read_json(os.path.join(STYLES_DIR, n, "style.json"))
+        raw = deckio.read_json(os.path.join(render.style_folder(n),
+                                             "style.json"))
         problems = reports[n]
         mark = "✓" if not problems else "✗"
         print(f"  {mark} {n:<16}{raw['temperature']:<4}"

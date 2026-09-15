@@ -107,7 +107,7 @@ class TestMapping(unittest.TestCase):
 
     def test_every_style_is_covered(self) -> None:
         styles = set(render.available_styles()) if hasattr(render, "available_styles") \
-            else set(fonts.deckio.list_dirs(os.path.join(SKILL, "styles")))
+            else set(fonts.deckio.list_dirs(os.path.join(SKILL, "dev-tools", "style-fixture")))
         missing = styles - set(self.map["styles"])
         self.assertEqual(missing, set(), f"这些风格没有字体映射：{sorted(missing)}")
 
@@ -264,9 +264,9 @@ class TestRenderIntegration(unittest.TestCase):
         if entry is None:
             raise unittest.SkipTest("本地没有已下载的字体（先跑 fonts.py --fetch）")
         self.font_name = entry["name"]
-        self.style_dir = os.path.join(SKILL, "styles", self.STYLE)
+        self.style_dir = os.path.join(SKILL, "dev-tools", "style-fixture", self.STYLE)
         shutil.rmtree(self.style_dir, ignore_errors=True)
-        shutil.copytree(os.path.join(SKILL, "styles", "swiss-grid"), self.style_dir)
+        shutil.copytree(os.path.join(SKILL, "dev-tools", "style-fixture", "swiss-grid"), self.style_dir)
         self.addCleanup(shutil.rmtree, self.style_dir, True)
         path = os.path.join(self.style_dir, "style.json")
         payload = json.loads(open(path, encoding="utf-8").read())
@@ -447,12 +447,12 @@ class TestStylesUseFreeArtFonts(unittest.TestCase):
         cls.cat_fonts = list(cls.license)
 
     def _styles(self):
-        root = os.path.join(SKILL, "styles")
+        root = os.path.join(SKILL, "dev-tools", "style-fixture")
         return sorted(d for d in os.listdir(root) if not d.startswith("zz_")
                       and os.path.isfile(os.path.join(root, d, "style.json")))
 
     def _stack(self, style: str, slot: str) -> list[str]:
-        with open(os.path.join(SKILL, "styles", style, "style.json"), encoding="utf-8") as fh:
+        with open(os.path.join(SKILL, "dev-tools", "style-fixture", style, "style.json"), encoding="utf-8") as fh:
             return [s.strip() for s in json.load(fh)["fonts"][slot].split(",")]
 
     def test_every_style_leads_with_a_free_art_font(self) -> None:
@@ -497,12 +497,17 @@ class TestStylesUseFreeArtFonts(unittest.TestCase):
         """**回归**：terminal 的整套立论是**等宽**，而迁移脚本一度把
         `霞鹜文楷`（比例字体！）塞到了 `Menlo` 前面 —— 列对齐会立刻散掉。
 
-        正确的前缀是**等宽变体** `LXGW WenKai Mono`。
+        正确的前缀是**等宽变体** `LXGW WenKai Mono`。内置 terminal 风格已删
+        （styles/ 整目录移除），但映射表里保留着这套等宽字栈作为自建参考，
+        守护改在映射层继续。
         """
+        row = self.map["styles"]["terminal"]["roles"]
         for slot in ("display", "body"):
-            stack = self._stack("terminal", slot)
-            self.assertIn("Mono", stack[0], f"terminal.{slot} 打头的不是等宽字体：{stack}")
-            self.assertNotIn("霞鹜文楷", stack[0], "terminal 打头的不许是比例字体")
+            # 映射行是 "A（注）/ B" 形的字符串栈，取第一项
+            head = str(row[slot]).split("/")[0].strip()
+            self.assertIn("Mono", head, f"terminal.{slot} 打头的不是等宽字体：{row[slot]}")
+            if "霞鹜文楷" in head:
+                self.assertIn("等宽", head, "terminal 打头的中文是比例字体")
 
 if __name__ == "__main__":
     unittest.main()

@@ -55,7 +55,12 @@ def _load_sibling(name: str):
 
 deckio = _load_sibling("deckio")   # IO 收口：参数写错要报清楚，不甩 traceback
 
-STYLES_DIR = os.path.join(HERE, "..", "styles")
+# 风格解析根（顺序即优先级）：用户自建 styles/ 在前；dev-tools/style-fixture/
+# 是开发/测试夹具（demo、stress、测试套件用它跑通全链），**不是交付物**。
+# 发布的 skill 不内置任何风格 —— 每份 deck 的风格按规则自建，
+# 形状与自建指南见 references/style-architecture.md。
+STYLE_ROOTS = (os.path.join(HERE, "..", "styles"),
+               os.path.join(HERE, "..", "dev-tools", "style-fixture"))
 DEFAULT_STYLE = "swiss-grid"
 
 # ── 版面几何：壳里那些数字的**唯一出处** ─────────────────────────────
@@ -112,23 +117,49 @@ def _rng(seed, *parts) -> random.Random:
     return random.Random("|".join([str(seed)] + [str(p) for p in parts]))
 
 
+def style_names() -> list[str]:
+    """全部可用风格名（用户根在前，保持插入序去重）。"""
+    names: list[str] = []
+    for root in STYLE_ROOTS:
+        for n in deckio.list_dirs(root):
+            if n not in names:
+                names.append(n)
+    return names
+
+
+def style_folder(name: str) -> str | None:
+    """风格目录路径（含 style.json 的第一个根）；找不到返回 None。"""
+    for root in STYLE_ROOTS:
+        folder = os.path.join(root, name)
+        if os.path.isfile(os.path.join(folder, "style.json")):
+            return folder
+    return None
+
+
 def load_style(name: str = DEFAULT_STYLE) -> dict:
     """加载一个风格目录 → `{"name", "tokens", "skin"}`。
 
     两个文件都必须有：只有 token 没有 skin 会渲染出「有颜色没版式」的东西，
     只有 skin 没有 token 连色都没得填。缺一个就明确报出来，不猜。
     """
-    folder = os.path.join(STYLES_DIR, name)
-    tokens_path = os.path.join(folder, "style.json")
-    skin_path = os.path.join(folder, "skin.css")
-    for path in (tokens_path, skin_path):
-        if not os.path.isfile(path):
-            available = deckio.list_dirs(STYLES_DIR) or ["（styles/ 目录本身不存在）"]
-            raise SystemExit(f"✗ 风格 {name!r} 缺文件：{os.path.basename(path)}\n"
-                             f"  一个风格目录必须同时有 style.json + skin.css。\n"
-                             f"  现有风格：{available}")
-    return {"name": name, "tokens": deckio.read_json(tokens_path),
-            "skin": deckio.read_text(skin_path)}
+    for root in STYLE_ROOTS:
+        folder = os.path.join(root, name)
+        tokens_path = os.path.join(folder, "style.json")
+        skin_path = os.path.join(folder, "skin.css")
+        has_tokens = os.path.isfile(tokens_path)
+        has_skin = os.path.isfile(skin_path)
+        if has_tokens and has_skin:
+            return {"name": name, "tokens": deckio.read_json(tokens_path),
+                    "skin": deckio.read_text(skin_path)}
+        if has_tokens or has_skin:
+            raise SystemExit(f"✗ 风格 {name!r} 缺文件："
+                             f"{'skin.css' if has_tokens else 'style.json'}\n"
+                             f"  一个风格目录必须同时有 style.json + skin.css。")
+    raise SystemExit(
+        f"✗ 没有风格 {name!r}（现有：{style_names()}）\n"
+        f"  自建：styles/<名>/ 里放 style.json + skin.css（形状见 "
+        f"references/style-architecture.md）；\n"
+        f"  dev-tools/style-fixture/swiss-grid 是开发夹具，可作参考拷改。")
 
 
 def misregistration(tokens: dict, seed, *parts) -> tuple[float, float, float]:

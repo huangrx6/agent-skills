@@ -14,7 +14,7 @@
       "prompt": "标题字号我想大一点，120px。",
       "expected_output": "拒绝在 spec 层面改：字号、坐标、色值都不在 schema 里 —— 不存在，不是「不推荐填」。字号参与对比度分档（由 token.contrast.largeTextPx 判定），由 render.py 派生。允许的做法是改 style.json 的 fonts.display（字体族）或 contrast 阈值；不允许在 spec 里写 fontSize 字段。如果用户坚持要 120px 的视觉感受，那属于改渲染器行为，要在 references/style-architecture.md 里同步说明。",
       "files": [
-        "styles/swiss-grid/style.json"
+        "dev-tools/style-fixture/swiss-grid/style.json"
       ]
     },
     {
@@ -22,7 +22,7 @@
       "prompt": "对比度 4.5 太严了，能不能降到 3.5 让更多色板能用？",
       "expected_output": "**不调阈值**。4.5 是 WCAG AA 正文底线，3.0 是大字底线；降了等于让「荧光色当正文」那种事故合法化。正确做法：换色板 —— style.json 里 colorSets 新加一套，或改现有一整套让声明的文字色变深（ink.rule 已经写了「每套色板必须含一个深墨」）。跑 scripts/ink.py 自检。",
       "files": [
-        "styles/swiss-grid/style.json",
+        "dev-tools/style-fixture/swiss-grid/style.json",
         "references/validation.md"
       ]
     },

@@ -85,7 +85,7 @@ DECK_FONT_DIR=/tmp/f python3 scripts/fonts.py --fetch   # 指定任意位置
 ```bash
 python3 scripts/fonts.py --fetch                 # 默认就是严格 A（要 B/C 得 --tier all）
 python3 scripts/fonts.py --list --license A      # 只看纯 A 的
-python3 scripts/fonts.py --map --a-only          # 8 套风格各一整套纯 A 方案
+python3 scripts/fonts.py --map --a-only          # 映射表里每套风格各一整套纯 A 方案
 ```
 
 **`--map --a-only` 是一份完整的替代方案**，不是"删掉几款" —— 每套风格 × display /
@@ -113,7 +113,7 @@ body / numeral 三档都给齐，所以"只用免费的"不会变成"有几套�
 
 完整映射表在 `fonts/mapping.json`（`--map` 可打成人类可读的样式），分两层：
 
-- **styles**：8 套风格 × display / body / numeral 三档该配哪款字，以及为什么
+- **styles**：风格名 × display / body / numeral 三档该配哪款字（历史八套名保留作参考，自建同名即生效）
   （比如 `terminal` 必须锁死等宽、`swiss-grid` 只能用**中性到没有性格**的字、
   `paper-ink` 的 400 字重标题只有楷体/明朝体配得上）。
 - **categories**：六类艺术字各适合什么场合（国潮 / 毛笔 / 潮流 / 卡通 / 电商 / 科技），

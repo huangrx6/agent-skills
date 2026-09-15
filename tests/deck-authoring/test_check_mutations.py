@@ -40,7 +40,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "styles", "swiss-grid", "style.json")
+TOKENS = os.path.join(SKILL, "dev-tools", "style-fixture", "swiss-grid", "style.json")
 DEMO = os.path.join(SKILL, "dev-tools", "demo.spec.json")
 
 CHART_SLIDE = {
@@ -168,16 +168,20 @@ class TestCheckMutations(unittest.TestCase):
 
         ⚠️ 拿**有装饰的风格**测：默认的瑞士栅格没有装饰（`decor.kind = null`），
         产物里一个 data-zone 都不会有 —— 拿它跑这条只会得到“前提不成立”。
-        这条用例的真正含义是“有装饰时都得待在安全区”，所以必须挑一个有装饰的风格。
+        billboard（自带装饰）已随 styles/ 删除，改为给夹具注入同款 accent-block
+        token —— 驱动同一分支，与哪套风格自带装饰无关。
         """
-        style = render.load_style("billboard")
+        style = render.load_style("swiss-grid")
+        style = dict(style, tokens=dict(style["tokens"], decor={
+            "kind": "accent-block", "types": ["title"], "zones": ["tr", "br"],
+            "sizes": [400]}))
         deck = copy.deepcopy(self.demo)
         # 色板名是**每种风格各自**的 —— 拿 A 风格的 colorSet 去渲 B 风格会被拒。
         deck["deck"]["colorSet"] = next(iter(style["tokens"]["colorSets"]))
         html = render.render(deck, style)
         found = re.search(r'data-zone="(tr|br)"', html)
         if found is None:
-            self.fail("billboard 产物里没有 data-zone=tr|br —— 装饰版式或标记改了")
+            self.fail("注入的装饰产物里没有 data-zone=tr|br —— 装饰版式或标记改了")
         original = found.group(1)
         mutated, count = re.subn(rf'data-zone="{original}"', 'data-zone="center"',
                                  html, count=1)

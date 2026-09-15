@@ -110,7 +110,7 @@ def main(argv: list[str]) -> int:
     # 默认路径跟其它脚本一致（指向仓库那份 token）—— 原来写死的 "design-tokens.json"
     # 是原型期的文件名，在这个仓库里不存在，不传参数会直接 traceback。
     path = argv[1] if len(argv) > 1 else os.path.join(
-        HERE, "..", "styles", "swiss-grid", "style.json")
+        HERE, "..", "dev-tools", "style-fixture", "swiss-grid", "style.json")
     return check(deckio.read_json(path))
 
 

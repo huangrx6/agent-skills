@@ -132,7 +132,7 @@ def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="图片 → duotone + 半调（riso 制版）")
     ap.add_argument("src", nargs="?")
     ap.add_argument("-o", "--out", required=True)
-    ap.add_argument("--tokens", default=os.path.join(HERE, "..", "styles", "swiss-grid", "style.json"))
+    ap.add_argument("--tokens", default=os.path.join(HERE, "..", "dev-tools", "style-fixture", "swiss-grid", "style.json"))
     # 不写死色板名：写死会在换风格 / 改色板名时**静默过期**。
     # 实测踩过：risograph 风格连同它的 'vivid' 色板被删掉之后，这条默认值还在，
     # 于是 `plate.py --sample`（README 跑法第 3 步）直接 KeyError 崩了，而没人发现 ——

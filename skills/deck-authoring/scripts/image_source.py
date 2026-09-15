@@ -697,7 +697,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--dir", default=None,
                     help="图片所在的目录（缺省：spec 所在目录）")
     ap.add_argument("--style", default=None, help="风格（缺省读 spec 的 deck.style）")
-    ap.add_argument("--tokens", default=os.path.join(HERE, "..", "styles", "swiss-grid", "style.json"))
+    ap.add_argument("--tokens", default=os.path.join(HERE, "..", "dev-tools", "style-fixture", "swiss-grid", "style.json"))
     # 色板名不写死：写死会在换风格 / 改色板名时**静默过期**——实测踩过两次
     # （plate.py 与这里都留着 riso 时代那个已经删掉的 'vivid'，于是默认路径直接崩）。
     ap.add_argument("--color-set", default=None, help="色板（缺省用该 token 的第一个）")

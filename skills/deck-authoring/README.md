@@ -234,8 +234,8 @@ python3 scripts/palette.py --roles swiss-grid blue          # 13 个角色的推
 
 **俗套会被指出，而且说清是哪一条**（`tech_blue_purple_cyan` / `corporate_blue_white` /
 `premium_black_gold`…）。实测**本仓库 8 套风格里 5 套的某个色板正落在名单上**
-（`swiss-grid/blue` 同时命中前两条、`keynote-dark/blue`、`terminal/cyan`、
-`pastel-geometry/lilac`、`billboard/electric`）—— 所以它是**按主题条件的提示**而不是
+（历史内置期实测：`swiss-grid/blue` 同时命中前两条、`terminal/cyan`、
+`billboard/electric` 等 5 套 —— 现按同一判据对自建风格提示）—— 所以它是**按主题条件的提示**而不是
 阻塞（规范原文是"不得**自动**绑定"，不是"这个色不许用"）。
 
 配色规范里**大部分讲的是生成过程**（怎么想），代码只能负责结构与校验。哪些是代码强制、
@@ -348,21 +348,17 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── animate.py           # HTML → MP4 / GIF（逐帧 seek 录制，可复现）
 │   ├── h264_encode.swift    # 帧序列 → H.264（AVFoundation，无需 ffmpeg）
 │   └── deckio.py            # IO 收口（try/except 不散落）
-├── styles/                   # 风格目录：一种风格 = 一个目录（token + skin），不碰 .py
-│                             #   每个目录两件：style.json（token）+ skin.css（视觉层）
-│   ├── keynote-dark/         # 黑底剧场：纯黑底 + 巨号字 + 一屏一观点（大胆·冷）
-│   ├── botanical-dark/       # 植物暗房：近黑 + 暖白 + 衬线不加粗 + 描边圆环（大胆·暖）
-│   ├── billboard/            # 大字报：巨号数字 + 通栏色条 + 色场（大胆·亮）
-│   ├── paper-ink/            # 纸墨编辑：粗细线夹标题 + 段首悬挂短横 + 书眉（安静·暖）
-│   ├── swiss-grid/           # 瑞士栅格：白底 + 编号列表 + 左轨 + 巨号页码（安静·冷）
-│   ├── notebook/             # 笔记本：横格纸 + 红边线 + 侧边索引签（中性·暖）
-│   ├── terminal/             # 终端：全等宽 + `$` 提示符 + 右上状态行（中性·冷）
-│   └── pastel-geometry/      # 粉彩几何：页角圆角色块 + 竖药丸标记（中性·暖）
+├── styles/                   # 用户自建风格（**无内置**）：一种风格 = 一个目录
+│                             #   （style.json token + skin.css 视觉层），不碰 .py；
+│                             #   历史八套已整体移除，参数表留在文档里作自建参考
 ├── brands/                   # 品牌资产：一个品牌 = 一个目录，不碰 .py
 │   └── example/              #   示例品牌（logo 正版 + 反白版 + 署名）
 ├── dev-tools/
 │   ├── demo.spec.json       # 一份能跑的样例（已引用 example 品牌）
-│   └── stress.spec.json     # **压测**用：21 页真实形状（长标题/密页/疏页/全部版式）
+│   ├── stress.spec.json     # **压测**用：21 页真实形状（长标题/密页/疏页/全部版式）
+│   └── style-fixture/
+│       └── swiss-grid/      # 开发/测试夹具风格（demo、stress、测试套件走它；
+│                             #   不是交付物，自建风格时可拷改）
 ├── evals/evals.json         # 行为评估用例
 └── references/
     ├── pipeline.md             # **总编排协议 0-59 全文**：链路/五门/失效/可复现/交付

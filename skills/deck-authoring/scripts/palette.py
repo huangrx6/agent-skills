@@ -52,7 +52,6 @@ import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.dirname(HERE)
-STYLES = os.path.join(SKILL, "styles")
 
 
 def _load_sibling(name: str):
@@ -613,6 +612,8 @@ def audit(style: dict, topic: str = "", only: str | None = None,
 
 
 def main(argv: list[str]) -> int:
+    render = _load_sibling("render")
+
     ap = argparse.ArgumentParser(description="配色：结构 / 角色 / novelty / 三方向")
     ap.add_argument("--audit", action="store_true", help="审 8 套风格的配色")
     ap.add_argument("--style", default=None, help="只审这一套风格")
@@ -628,17 +629,19 @@ def main(argv: list[str]) -> int:
                     help="低于它就退出 1（当发布闸门用）")
     args = ap.parse_args(argv[1:])
 
-    names = [args.style] if args.style else deckio.list_dirs(STYLES)
+    names = [args.style] if args.style else render.style_names()
 
     if args.roles:
         style, set_name = args.roles
-        tokens = deckio.read_json(os.path.join(STYLES, style, "style.json"))
+        tokens = deckio.read_json(os.path.join(render.style_folder(style),
+                                             "style.json"))
         print(_dump(roles(tokens["colorSets"][set_name])))
         return 0
 
     if args.directions:
         style, set_name = args.directions
-        tokens = deckio.read_json(os.path.join(STYLES, style, "style.json"))
+        tokens = deckio.read_json(os.path.join(render.style_folder(style),
+                                             "style.json"))
         for name, row in directions(tokens["colorSets"][set_name]).items():
             print(f"── {name}（novelty {row['novelty']:.2f}）{row['why']}")
             print("   " + _dump(row["colors"]))
@@ -646,7 +649,8 @@ def main(argv: list[str]) -> int:
 
     if args.novelty:
         style, set_name = args.novelty
-        tokens = deckio.read_json(os.path.join(STYLES, style, "style.json"))
+        tokens = deckio.read_json(os.path.join(render.style_folder(style),
+                                             "style.json"))
         score, reasons = novelty(tokens["colorSets"][set_name], args.topic)
         print(f"{style} / {set_name}：novelty = {score:.2f}")
         for r in reasons:
@@ -657,7 +661,7 @@ def main(argv: list[str]) -> int:
 
     failed = 0
     for name in names:
-        path = os.path.join(STYLES, name, "style.json")
+        path = os.path.join(render.style_folder(name), "style.json")
         if not os.path.isfile(path):
             continue
         tokens = deckio.read_json(path)

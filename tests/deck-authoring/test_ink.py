@@ -25,7 +25,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # `skills/<skill>/` 那棵树，测试放在里面会被顺手读进去）。
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "styles", "swiss-grid", "style.json")
+TOKENS = os.path.join(SKILL, "dev-tools", "style-fixture", "swiss-grid", "style.json")
 
 
 def _load(name: str, path: str):

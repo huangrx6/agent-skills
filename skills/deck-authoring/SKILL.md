@@ -1,8 +1,8 @@
 ---
 name: deck-authoring
 description: >-
-  Build slide decks from a structural spec, in one of four real visual styles
-  (黑底剧场 keynote-dark / 瑞士栅格 swiss-grid / 大字报 billboard / 笔记本 notebook).
+  Build slide decks from a structural spec. Styles are authored per deck
+  (styles/<名>/ 自建，无内置；dev-tools/style-fixture/swiss-grid 为参考实现).
   Pipeline: deck-spec.json → HTML (可演讲) → 矢量 PDF / 可编辑 PPTX / 每页 PNG / MP4·GIF 动画.
   Brand assets are a third layer (brands/<name>/: logo 含反白版 / 色号 / 字体 / 署名) — 报出
   公司名就能套上，deck.brand 一个字段.
@@ -28,8 +28,9 @@ description: >-
 **不要把风格列表丢给对方当选择题。** 他没见过画面，选不了。做三版**真出图**给他看：
 
 ```bash
-# 同一份内容，三个风格各渲一遍（只改 deck.style + deck.colorSet）
-for s in keynote-dark swiss-grid billboard notebook; do
+# 同一份内容，三个风格方向各渲一遍（只改 deck.style + deck.colorSet）
+# 三个方向 = 三套自建风格（或对夹具做三档变体：colorSet 省略走 auto + 换 seed）
+for s in 风格A 风格B 风格C; do
   python3 scripts/render.py spec.json --style $s -o $s.html
   python3 scripts/shots.py $s.html --out-dir shots-$s --count 2   # 封面 + 一页内容页
 done
@@ -38,18 +39,15 @@ done
 然后并排摆出来（拼图或直接发三张），每版标：**风格名 + 温度 + 一句话适合什么场合**。
 摆完**停下等选择**，并把选择记进项目目录（后面所有页都按它出）。
 
-### 现有八种风格
+### 风格：自建，无内置
 
-完整对照（温度 / 适合 / 不适合 / 构图锚点）在 `references/style-architecture.md`；
-用 `python3 scripts/style.py` 看全部与它们的契约状态，`style.py --sheet -o s.png`
-把**所有风格 × 同一份 demo** 拼成一张图 —— 选风格要的是画面，不是对照表。
-
-一句话记住八个：**暗** `keynote-dark`（冷）/ `botanical-dark`（暖）；
-**亮** `swiss-grid`（安静）/ `billboard`（大字报）；**纸** `notebook`（横格）/
-`paper-ink`（编辑）；**另类** `terminal`（等宽）/ `pastel-geometry`（粉彩）。
-每个风格支持几个 `colorSet`（`ink.py` 会列出并逐个过对比度门槛）。
-**换风格/换色板只改 spec 的两个字段，内容一字不动**；改风格本身只动
-`styles/<style>/style.json`，渲染器零改动。
+**内置八套已整体移除**（styles/ 删除，按用户决定）——风格是每份 deck 的表达层，
+不该预置。自建：`styles/<名>/` 放 `style.json + skin.css`（形状与逐键说明见
+`references/style-architecture.md`；字栈参考 `fonts/mapping.json`）。参考实现：
+`dev-tools/style-fixture/swiss-grid`（demo/测试走它，可拷改）。`style.py` 列出
+全部（用户 + 夹具）并逐套过契约；`style.py --sheet -o s.png` 拼对照图。
+每个风格可带多个 `colorSet`；**省略 colorSet 或写 auto = 按风格基准 + seed
+确定性派生**（palette.auto_set）。换风格/换色板只改 spec 两个字段，内容一字不动。
 
 ## 为什么不能让你写坐标或色值
 
@@ -114,8 +112,8 @@ done
 ## 动画：同一段画代码，三种时钟
 
 演示态的入场和录进 MP4 的帧由**同一个纯函数** `paint(si,t)` 画 —— 「讲出来的」和
-「录出来的」不会跑偏。运动参数在**风格**里（`style.json` 的 `motion`），四种风格故意
-各不相同：keynote-dark 慢起长尾、swiss-grid 短而齐、billboard 拍上去、notebook 像翻册子。
+「录出来的」不会跑偏。运动参数在**风格**里（`style.json` 的 `motion`），每套自建
+风格一个性格（夹具 swiss-grid = 短而齐；历史八套的参数表在 animation.md 作参考）。
 
 两条硬约束：
 

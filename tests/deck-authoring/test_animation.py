@@ -34,7 +34,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
 DEMO = os.path.join(SKILL, "dev-tools", "demo.spec.json")
-STYLES = os.path.join(SKILL, "styles")
+STYLES = os.path.join(SKILL, "dev-tools", "style-fixture")
 
 
 def _style_names() -> list[str]:

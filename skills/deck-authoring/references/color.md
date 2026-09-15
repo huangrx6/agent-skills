@@ -14,7 +14,7 @@
 | "好看的配色" | **判断**（测不出来，不做假检查） | — |
 
 ```bash
-python3 scripts/palette.py --audit                                  # 8 套风格全审
+python3 scripts/palette.py --audit                                  # 全部风格（用户+夹具）全审
 python3 scripts/palette.py --audit --topic "AI 大模型架构"            # 带上主题判俗套
 python3 scripts/palette.py --novelty swiss-grid blue --topic "AI…"   # 一个色板的 novelty 与依据
 python3 scripts/palette.py --directions swiss-grid blue              # 三个方向
@@ -27,7 +27,7 @@ python3 scripts/palette.py --roles swiss-grid blue                   # 13 个角
 两边开始漂）。所以分工是：
 
 - `colorSets` 存四个角色的 HEX（仓库既有形状，没改）——**primary / secondary / background / text**
-- `colorStructure` 存结构（本次新增到 8 套风格里）
+- `colorStructure` 存结构（随历史八套建立；现存在于夹具与自建风格里）
 - 其余九个角色**推出来**（`surface` / `surface_alt` / `accent` / `highlight` /
   `text_primary|secondary|muted` / `border` / `chart_colors` / `gradient`）——
   手写会漂，推导可测，而且推出来的关系必然自洽（surface 永远比 background 偏一点）
@@ -95,7 +95,7 @@ python3 scripts/palette.py --roles swiss-grid blue                   # 13 个角
 
 加分项同理（非常规冷暖、低饱和+高纯度强调、中性+非典型强调）。
 
-**实测：本仓库 8 套风格里 5 套的某个色板正落在名单上** —— 所以这条**不能一律阻塞**，
+**实测：历史八套内置期，5 套的某个色板正落在名单上**（现为自建风格按同一判据提示） —— 所以这条**不能一律阻塞**，
 否则仓库自己的风格先挂。它只做两件事：按**主题条件**指出"这套色 + 这个主题正好落在
 最俗的组合上"，以及在你显式要求时（`--min-novelty`）当闸门。阈值按规范第 18 条：
 普通 PPT 0.45 / 设计型 0.65 / 创意封面 0.75。
@@ -161,7 +161,7 @@ unusual gradient palette             premium low-saturation palette
 规范里有几条**本流水线还没有对应能力**，列在这里而不是含糊带过：
 
 1. **渐变**。`palette.py::roles` 会推出 `gradient`（含非线性 stop：0 / 0.23 / 0.68 / 1.0），
-   但**渲染层没有用它** —— 8 套风格的 `gradient_strategy` 都是 `none`，外壳里没有渐变。
+   但**渲染层没有用它** —— 历史八套的 `gradient_strategy` 都是 `none`，外壳里没有渐变。
    规范第 13 条那十种渐变类型（mesh / aurora / glow / conic…）都还没做。
 2. **玻璃拟态 / Glow / Mesh**。规范第 12 条的背景策略里有这些，当前只支持
    `solid` 与 `texture`（颗粒）。
