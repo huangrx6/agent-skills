@@ -105,7 +105,7 @@ python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸�
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 358 条，约 5 分钟（负载敏感）（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 391 条，约 6 分钟（负载敏感）（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时约 2.5 分钟，
@@ -143,6 +143,29 @@ PDF 是矢量且页数/页尺寸对、可编辑 PPTX 的**字是真字**且坐�
   `swiftc` + AVFoundation（H.264）、Pillow（GIF）。CDP 的传输走 `websockets`（装了就走快
   路径；没装会说清代价后降级，不静默变慢）。
 - 不要装 Playwright —— `--headless=new --screenshot` 就够，多装一份纯属浪费
+
+## 规划层（内容 → Storyline → 页规划 → spec）
+
+渲染链之上是四层规划，**越靠近渲染 AI 自由度越低**：内容理解（中）→ Storyline（中）
+→ Page Planner（低~中）→ Slide DSL（很低，封闭字段集）→ 渲染（0）。
+
+```bash
+python3 scripts/plan.py --archetypes       # 十个叙事骨架（问题→方案 / SCR / 复盘 / …）
+python3 scripts/plan.py --page-types       # 页型 → 版式的确定性映射
+python3 scripts/plan.py --check content.json storyline.json pageplan.json
+python3 scripts/plan.py --to-spec pageplan.json content.json -o deck.spec.json
+```
+
+会失败的硬规矩：**悬空引用**（message 的证据指向不存在的 fact）、**事实与推断不分**
+（source_type 必须是 original/inferred/generated；高重要性结论只靠推断支撑会开口）、
+**骨架乱序**（先讲方案再讲问题不是自由是错）、**配额漂移**（sections 页数之和 ≠
+target_slide_count —— "15 页做成 28 页"就是这条漏的）、**复杂度爆表不拆页**
+（字符/节点/图表/图/层级加权 ≥0.70 必须标 split）、**页没有 message**（不知道自己
+在讲什么的页没法排版）。
+
+`--to-spec` 产出的 spec **必须过 validate_spec**（有测试钉死）—— 规划层产出的东西
+渲染器吃不下 = 全白写。分工、Schema 与还没做的部分（文档抽取、候选打分、架构图页型）
+见 `references/planning.md`。
 
 ## 字体
 
@@ -307,6 +330,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── hierarchy.py         # 信息层级：文本预算 / 视觉焦点 / 内容密度（全是提示级）
 │   ├── grid.py              # 网格与间距：12 列 / 令牌 ramp / 关系规则（几何唯一来源）
 │   ├── chart.py             # 图表引擎：意图树 / 八类 SVG / muted+accent / 标注
+│   ├── plan.py              # 规划层：内容理解 / 叙事骨架 / 页型 / 到 spec 的桥
 │   ├── brand.py             # 品牌资产：logo 内嵌 / 色板与字体合并 / SVG 栅格化
 │   ├── fit.py               # 试排：给定一页内容，实测哪些版式装得下（真渲真量）
 │   ├── style.py             # 风格层：列表 / 契约体检 / 摘要 / 联系表（八套拼一张图）
