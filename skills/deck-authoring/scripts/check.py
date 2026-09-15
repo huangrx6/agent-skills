@@ -42,6 +42,7 @@ def _load_sibling(name: str):
 
 ink = _load_sibling("ink")
 deckio = _load_sibling("deckio")   # IO 收口：读不到产物要报清楚，不甩 traceback
+measure_mod = _load_sibling("measure")   # 实测层：版面判断全部走它，不估算
 
 TOKENS = os.path.join(HERE, "..", "styles", "risograph", "style.json")
 
@@ -55,13 +56,6 @@ CORNER = {  # zone → (右偏移, 下/上偏移, 靠上?)
     "tr": (60.0, 40.0, True), "br": (130.0, 140.0, False),
     "tl": (60.0, 40.0, True), "bl": (130.0, 140.0, False),
 }
-
-
-def text_width(text: str, size: float) -> float:
-    """字宽估算：CJK/全角按 1em，ASCII 按 0.55em。是**估算**，不是度量表 ——
-    它只为挡住"明显放不下"，精确断行要靠浏览器（这一点写清楚，别让它看起来像精确值）。"""
-    wide = sum(1 for ch in text if ord(ch) > 0x2E80)
-    return (wide + (len(text) - wide) * 0.55) * size
 
 
 def _div_subtree(html: str, start: int) -> str:
@@ -102,7 +96,94 @@ def _num(raw: str, where: str, problems: list[str]) -> float | None:
         return None
 
 
-def check(spec: dict, html_path: str, tokens: dict) -> list[str]:
+def _check_layout(measured: dict) -> list[str]:
+    """② 版面越界 / 容器裁切 —— 全部来自**真浏览器实测**，不是估算。
+
+    为什么必须实测：原先靠 `text_width()` 估算（CJK 1em / ASCII 0.55em），对同一行
+    12 个汉字标题，估算给 1032px、真渲出来是 2124px —— **低估 2 倍多**，于是
+    end 页（180px 字号）越出版面 612px、被 `overflow:hidden` 静静裁掉，而校验说"全过"。
+
+    两条判据（都是"已经发生的事"，不是推测）：
+    甲・越出版面：`.slide` 是 overflow:hidden，元素盒子出去就是被裁。
+    乙・容器内裁切：元素自己会裁（overflow 不是 visible）且 scrollW/H > clientW/H。
+
+    ⚠️ 比的是**该元素所在那一页**的盒子，不是全局 1600×900 —— 产物是竖向堆叠的多页，
+    第 2 页的元素 y 本来就在 900 以下；拿全局边界比会把后面每页都误报（实测踩过）。
+
+    注意：装饰墨块**故意**溢出到版面外（right:-60px），但它们没有 `data-m`、
+    不进这份清单，所以不会误报。
+    """
+    out: list[str] = []
+    slides = measured.get("slides") or []
+    for el in measured.get("elements", []):
+        if not el.get("visible", True):
+            continue
+        mid = el.get("id", "?")
+        role = el.get("role") or "元素"
+        x, y, w, h = el["x"], el["y"], el["w"], el["h"]
+        # 元素属于清单里的哪一页（1-based）→ 取那一页的盒子
+        idx = el.get("slide")
+        if isinstance(idx, int) and 1 <= idx <= len(slides):
+            sl = slides[idx - 1]
+            sx, sy, sw, sh = sl["x"], sl["y"], sl["w"], sl["h"]
+        else:
+            sx, sy, sw, sh = 0.0, 0.0, SLIDE_W, SLIDE_H
+        right, bottom = x + w, y + h
+        box_r, box_b = sx + sw, sy + sh
+        overs = []
+        if right - box_r > 1:
+            overs.append(f"右缘 {right:.0f}px 越出该页右边界 {box_r:.0f}px（超出 {right - box_r:.0f}px）")
+        if bottom - box_b > 1:
+            overs.append(f"下缘 {bottom:.0f}px 越出该页下边界 {box_b:.0f}px（超出 {bottom - box_b:.0f}px）")
+        if x < sx - 1:
+            overs.append(f"左缘 {x:.0f}px 越出该页左边界 {sx:.0f}px")
+        if y < sy - 1:
+            overs.append(f"上缘 {y:.0f}px 越出该页上边界 {sy:.0f}px")
+        if overs:
+            out.append(f"{mid}（{role}）越出版面：" + "；".join(overs)
+                       + " —— 该页是 overflow:hidden，会被裁掉")
+            continue
+        if el.get("text"):
+            pass
+        # 容器内裁切：**只有元素自己会裁**（overflow 不是 visible）时才算数。
+        # `.foot` 这种 overflow:visible 的，scrollHeight 比 clientHeight 大 2px 是
+        # 行高与字面度的正常差 —— 没被裁，报它就是误报（实测踩过）。
+        clips = el.get("overflow") not in (None, "visible")
+        if clips and (el["scrollW"] - el["clientW"] > 1 or el["scrollH"] - el["clientH"] > 1):
+            out.append(f"{mid}（{role}）内容被容器裁切："
+                       f"scroll {el['scrollW']}×{el['scrollH']} > client {el['clientW']}×{el['clientH']}")
+    return out
+
+
+def _check_measured_health(measured: dict) -> list[str]:
+    """产物健康度：页面报错 / 图片没加载 —— 这两类以前根本没人看。"""
+    out: list[str] = []
+    for err in measured.get("errors", []):
+        out.append(f"产物里的脚本报错：{err}")
+    for im in measured.get("images", []):
+        if not (im.get("complete") and im.get("naturalW")):
+            out.append(f"图片没加载：{im.get('src')!r} —— "
+                       f"相对路径的产物挪个目录就会全员裂图（交付前要么同目录交付，要么 base64 内嵌）")
+    return out
+
+
+def _check_font_fallback(measured: dict) -> list[str]:
+    """字体回退**提示**（不判失败）。
+
+    启发式：拿一个一定不存在的族当基准比宽度，宽度一样 = 声明的族没生效。
+    已经排除了 serif/monospace 这类**通用族**（它们不是字体而是回退目标，
+    不排会误报"缺失"）。即便如此它仍可能误报（衬线撞衬线），所以只提示。 
+    """
+    out: list[str] = []
+    for fam, info in sorted(measured.get("fonts", {}).items()):
+        if not info.get("available") and not info.get("generic"):
+            out.append(f"字体回退（启发式提示）：声明的 {fam!r} 在本机不可用"
+                       f" —— 栈里后面的族会顶上；排版会随机器变，交付前确认一下")
+    return out
+
+
+def check(spec: dict, html_path: str, tokens: dict,
+          measured: dict | None = None) -> list[str]:
     problems: list[str] = []
     page = deckio.read_text(html_path)      # 读一次就够（以前读了三次）
     deck = spec["deck"]
@@ -110,47 +191,23 @@ def check(spec: dict, html_path: str, tokens: dict) -> list[str]:
     paper = colors["background"]
     ink_text = ink.overprint(colors["primary"], colors["secondary"])
     limits = tokens["contrast"]
-    x0, y0, x1, y1 = CONTENT
-    width = x1 - x0
+    # 文字栏（判"墨块进没进栏"用；版面越界那一套已经改成实测了，不再靠推算）
     bx0, by0, bx1, by1 = TEXT_BAND
-    # 每种版式的可用文字宽度**不一样**：图文页左栏 820、双栏每栏 660、时间线每格 300，
-    # 其余用满宽。用同一个宽度去判，必然一边误报一边漏报（我踩过一次同类错 ✗）。
-    LIMIT = {"title": width, "content-text": width, "end": width,
-             "content-image": 820.0, "two-column": 660.0, "timeline": 1320.0, "chart": width}
 
-    # ① 对比度 + ② 文字溢出
-    height = 0.0
+    # ① 对比度（解析式：叠印色相对纸色）—— 这条不需要测量，色值是推导出来的
+    ratio = ink.contrast(ink_text, paper)
+    if ratio < limits["minBody"]:
+        problems.append(f"叠印墨对比度 {ratio:.2f} < {limits['minBody']}（文字色不达标）")
+
+    # ② 版面越界 / 容器裁切 —— **实测**（不估）；同时看产物健康度
+    data: dict = measure_mod.measure(html_path) if measured is None else measured
+    problems.extend(_check_layout(data))
+    problems.extend(_check_measured_health(data))
+
     for i, slide in enumerate(deck["slides"], 1):
-        for key, size, factor in (("title", 152 if slide["type"] == "title" else 86, 1.15),):
-            text = slide.get(key, "")
-            if not text:
-                continue
-            w = text_width(text, size)
-            limit = LIMIT.get(slide["type"], width)
-            if w > limit:
-                problems.append(f"第 {i} 页 {key} 估算宽 {w:.0f}px > 该版式上限 {limit:.0f}px（文字溢出）")
-            height += size * factor
-            ratio = ink.contrast(ink_text, paper)
-            floor = limits["minLarge"] if size >= limits["largeTextPx"] else limits["minBody"]
-            if ratio < floor:
-                problems.append(f"第 {i} 页 {key} 对比度 {ratio:.2f} < {floor}（文字色不达标）")
-            declared = slide.get("color")
-            if declared and declared != "overprint":
-                problems.append(f"第 {i} 页 {key} 声明 color={declared!r} —— 主/副色不能承载文字，只允许 overprint")
-        items = list(slide.get("bullets", []))
-        items += [b for col in slide.get("columns", []) for b in col.get("bullets", [])]
-        items += [n.get("label", "") for n in slide.get("nodes", [])]
-        size = 40 if slide["type"] != "two-column" else 30
-        for bullet in items:
-            w = text_width(bullet, size)
-            limit = LIMIT.get(slide["type"], width)
-            if w > limit:
-                problems.append(f"第 {i} 页条目估算宽 {w:.0f}px > 该版式上限 {limit:.0f}px（文字溢出）")
-            height += 40 * 1.85
-        height += 64
-        if height > y1 - y0:
-            problems.append(f"第 {i} 页累计高 {height:.0f}px > 内容区 {y1 - y0:.0f}px（文字溢出）")
-        height = 0.0
+        declared = slide.get("color")
+        if declared and declared != "overprint":
+            problems.append(f"第 {i} 页 声明 color={declared!r} —— 主/副色不能承载文字，只允许 overprint")
 
     # ④ 图表：柱高必须与数据成比例（独立复核，不看渲染器自觉），且图表区不许带错位
     for i, slide in enumerate(deck["slides"], 1):
@@ -218,21 +275,37 @@ def check(spec: dict, html_path: str, tokens: dict) -> list[str]:
     return problems
 
 
+def advisories(measured: dict) -> list[str]:
+    """**不阻塞**的提示。
+
+    与 `check()` 的分工照仓库既有做法（同 `check_pointers.py` 的 broken / suspect）：
+    能确定性判定的才阻塞；启发式的只提示。字体那条是启发式 —— 拿一个一定不存在的
+    族当基准比宽度，衬线撞衬线时可能误报，拿它挡交付会把人逼到忽略整个检查。
+    """
+    return _check_font_fallback(measured)
+
+
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(description="deck 产物六项机械校验")
+    ap = argparse.ArgumentParser(description="deck 产物校验（版面靠真浏览器实测）")
     ap.add_argument("spec")
     ap.add_argument("html")
     ap.add_argument("--tokens", default=TOKENS)
     args = ap.parse_args(argv[1:])
     spec = deckio.read_json(args.spec)
     tokens = deckio.read_json(args.tokens)
-    problems = check(spec, args.html, tokens)
+    measured = measure_mod.measure(args.html)      # 只量一次，校验与提示共用
+    problems = check(spec, args.html, tokens, measured=measured)
     if problems:
         print(f"✗ {len(problems)} 个问题：")
         for p in problems:
             print("  ·", p)
+        for n in advisories(measured):
+            print("  ·", n)
         return 1
-    print("✓ 校验全过（对比度 / 文字溢出 / 错位区间 / 装饰不压文字 / 图表成比例 / 图表区无错位）")
+    print("✓ 校验全过（对比度 / 版面越界与裁切 / 错位区间 / 装饰不压文字 / "
+          "图表成比例 / 图表区无错位 / 图片加载 / 页面报错）")
+    for n in advisories(measured):
+        print("  ·", n)
     return 0
 
 

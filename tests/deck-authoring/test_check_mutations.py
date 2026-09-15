@@ -65,6 +65,17 @@ render = _load("_deck_test_render", os.path.join(SCRIPTS, "render.py"))
 check = _load("_deck_test_check", os.path.join(SCRIPTS, "check.py"))
 
 
+def _stub_image(directory: str) -> None:
+    """在产物旁边放一张 1×1 PNG。
+
+    demo spec 引用了 `sample-treated.png`；不把它放到产物同目录的话，
+    “图片没加载”这条**真实有效**的检查会（正确地）报出来 ——
+    那测试就测不成“干净产物”了。要的是一个真干净的产品，不是把检查关掉。
+    """
+    from PIL import Image
+    Image.new("RGB", (2, 2), (245, 239, 221)).save(os.path.join(directory, "sample-treated.png"))
+
+
 class TestCheckMutations(unittest.TestCase):
     """六项校验，每项都有一条干净基线 + 一条变异。"""
 
@@ -80,14 +91,12 @@ class TestCheckMutations(unittest.TestCase):
         cls.chart_html = render.render(cls.chart_spec, cls.tokens)
 
     def _problems(self, spec: dict, html_text: str, tokens: dict | None = None) -> list[str]:
-        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False,
-                                         encoding="utf-8") as fh:
-            path = fh.name
-            fh.write(html_text)
-        try:
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "out.html")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(html_text)
+            _stub_image(td)
             return check.check(spec, path, tokens or self.tokens)
-        finally:
-            os.unlink(path)
 
     def _assert_reports(self, problems: list[str], needle: str, what: str) -> None:
         self.assertTrue(problems, f"{what}：变异后本应报错却全过")
@@ -116,7 +125,12 @@ class TestCheckMutations(unittest.TestCase):
     # ── ② 文字溢出 ────────────────────────────────────────────────────────
 
     def test_overflow_mutation_is_caught(self) -> None:
-        """变异：把 content-image 页的第一条条目拉成 500 个字。"""
+        """变异：把 content-image 页的第一条条目拉成 500 个字。
+
+        它会被浏览器**真的**排成很多行 → li 盒子下缘冲出该页 → 报"越出版面"。
+        这正是估算法当年漏掉的那类（估宽会看到一个比上限大得多的数字，
+        但真因是高度而不是宽度）。
+        """
         bad = copy.deepcopy(self.demo)
         for slide in bad["deck"]["slides"]:
             if slide.get("type") == "content-image" and slide.get("bullets"):
@@ -125,7 +139,7 @@ class TestCheckMutations(unittest.TestCase):
         else:
             self.fail("demo 里没有 content-image 页 —— 这条用例的前提变了")
         problems = self._problems(bad, render.render(bad, self.tokens))
-        self._assert_reports(problems, "文字溢出", "② 文字溢出")
+        self._assert_reports(problems, "越出版面", "② 版面越界")
 
     # ── ③ 错位区间 ────────────────────────────────────────────────────────
 

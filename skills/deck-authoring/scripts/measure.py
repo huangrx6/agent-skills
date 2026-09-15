@@ -51,6 +51,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import importlib.util
 import json
 import os
@@ -81,6 +82,11 @@ def _load_sibling(name: str):
 
 
 deckio = _load_sibling("deckio")   # IO 收口：读不到要报清楚，不甩 traceback
+
+# 实测结果缓存：键 = 产物内容的 sha256。同一份 HTML 同一进程内只量一次。
+# 为什么需要：`check()` 每次调用都会量一遍，而测试里同一份基线被查好几次 ——
+# 不加缓存实测 36 条测试要 25 秒，全是重复开 Chrome。
+_CACHE: dict[str, dict] = {}
 
 # 探针：注入到 <head> 之后。先挂错误监听，再在 load 后量。
 PROBE_JS = r"""
@@ -141,6 +147,7 @@ PROBE_JS = r"""
         fontSize: parseFloat(cs.fontSize),
         fontFamily: cs.fontFamily,
         color: cs.color,
+        overflow: cs.overflow,
         visible: cs.visibility !== 'hidden' && cs.display !== 'none' && parseFloat(cs.opacity) > 0
       });
       cs.fontFamily.split(',').forEach(function (f) {
@@ -155,18 +162,40 @@ PROBE_JS = r"""
         naturalW: im.naturalWidth, naturalH: im.naturalHeight
       });
     });
+    // 每页版面**各自的盒子**。产物是竖向堆叠的多页，第 2 页的元素 y 本来就在 900 以下；
+    // 拿全局页面边界（1600×900）去比多页产物，会把后面每一页都误报成“越界”（实测踩过）。
+    out.slides = [];
+    document.querySelectorAll('section.slide').forEach(function (s) {
+      var r = s.getBoundingClientRect();
+      out.slides.push({
+        x: Math.round(r.x * 10) / 10, y: Math.round(r.y * 10) / 10,
+        w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10
+      });
+    });
     return out;
   }
 
   function emit() {
-    requestAnimationFrame(function () { requestAnimationFrame(function () {
-      var pre = document.getElementById('__probe');
-      if (!pre) { return; }
+    // **不能靠 rAF 触发**：在 `--virtual-time-budget` 下虚拟时间会直接跳到底，
+    // rAF 回调跟预算到期之间存在竞争 —— 实测同一份产物跑三次，两次拿到、一次是空
+    // （“探针没跑起来”）。改成 load 后**同步**采集：load 时 CSS 已应用、布局已完成，
+    // 量得到的就是终值。
+    var pre = document.getElementById('__probe');
+    if (!pre) { return; }
+    try {
       pre.textContent = btoa(unescape(encodeURIComponent(JSON.stringify(collect()))));
-    }); });
+    } catch (e) {
+      pre.textContent = btoa('{"fatal":"' + String(e) + '"}');
+    }
   }
   if (document.readyState === 'complete') { emit(); }
   else { window.addEventListener('load', emit); }
+  // 字体晚到的话再补一次（幂等覆盖）—— 系统字体场景下通常用不上
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () {
+      if (document.readyState === 'complete') { emit(); }
+    });
+  }
 })();
 """
 
@@ -208,15 +237,25 @@ def read_manifest(html: str) -> list[dict]:
 
 
 def measure(html_path: str, budget_ms: int = 2500, chrome: str = CHROME) -> dict:
-    """跑一次真浏览器，返回合并了语义清单的实测结果。"""
+    """跑一次真浏览器，返回合并了语义清单的实测结果。
+
+    同一份 HTML（按内容 sha256）在**同一进程内只量一次** —— 否则每个校验调用点
+    都会再开一次 Chrome（测试里同一份基线被查好几次，实测 36 条测试从 25 秒降到几秒）。
+    """
     if not os.path.isfile(chrome):
         raise SystemExit(f"✗ 找不到 Chrome：{chrome}\n"
                          f"  这一层靠真浏览器度量，估算是替代不了的。")
     html = deckio.read_text(html_path)
+    # 缓存键必须**带上产物所在目录**：同一份 HTML 放在不同目录，量出来的结果可能不同
+    # （相对路径的图片在不在旁边）。只拿 HTML 内容做键会把 A 目录的结果错给 B 目录 ——
+    # 实际上坑过：测试里先量了“图不存在”的目录，缓存在那里，后来把图放好了仍然报缺图。
+    directory = os.path.dirname(os.path.abspath(html_path)) or "."
+    cache_key = hashlib.sha256((directory + "\x00" + html).encode("utf-8")).hexdigest()
+    if cache_key in _CACHE:
+        return _CACHE[cache_key]
     manifest = {e["id"]: e for e in read_manifest(html)}
 
     # 副本必须落在**产物同目录** —— 换目录会让相对路径的图片全部裂掉（实测过）。
-    directory = os.path.dirname(os.path.abspath(html_path)) or "."
     fd, probe_path = tempfile.mkstemp(prefix=".__probe_", suffix=".html", dir=directory)
     os.close(fd)
     try:
@@ -246,6 +285,7 @@ def measure(html_path: str, budget_ms: int = 2500, chrome: str = CHROME) -> dict
     raw["source"] = os.path.abspath(html_path)
     raw["manifest_count"] = len(manifest)
     raw["measured_count"] = len(raw.get("elements", []))
+    _CACHE[cache_key] = raw
     return raw
 
 

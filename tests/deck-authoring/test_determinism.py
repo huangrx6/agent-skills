@@ -79,11 +79,19 @@ class TestDeterminism(unittest.TestCase):
             self.assertEqual(first, second, "check.py 对同一产物两次判定不同")
 
     def test_clean_product_passes_all_checks(self) -> None:
-        """demo spec 的产物必须过全部校验 —— 别的用例的 baseline。"""
+        """demo spec 的产物必须过全部校验 —— 别的用例的 baseline。
+
+        产物旁边要放上 `sample-treated.png`：demo 的图文页引用了它，
+        不放就是真·裂图，而“图片没加载”那条检查会（正确地）报出来。
+        要的是一个真的干净产物，不是把检查关掉。
+        """
+        from PIL import Image
         with tempfile.TemporaryDirectory() as td:
             html = os.path.join(td, "out.html")
             with open(html, "w", encoding="utf-8") as fh:
                 fh.write(self._render(self.spec))
+            Image.new("RGB", (2, 2), (245, 239, 221)).save(
+                os.path.join(td, "sample-treated.png"))
             problems = check.check(self.spec, html, self.tokens)
             self.assertEqual(problems, [], f"demo 产物本应干干净净：{problems}")
 
