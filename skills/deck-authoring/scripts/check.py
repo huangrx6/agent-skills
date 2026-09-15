@@ -74,6 +74,17 @@ SLIDE_W, SLIDE_H = 1600.0, 900.0
 # 密度这个量该在 fit.py 里看（那里是选版式的场景，旁边还带着“可以合页”的建议），
 # 不该在每次校验时拿一个不懂风格的阈值去喷人。
 DEAD_SPACE_NOTE = 0.28
+
+# **一张图覆盖整页** —— 禁止。
+#
+# 为什么是禁止而不是提示：一页的信息（标题 / 条目 / 数字 / 示意）一旦被画进图里，
+# 它就同时失去了可编辑、可搜索、可翻译、可被读屏器读这四件事；而"对方要改字"
+# 正是本 skill 出原生 PPTX 的理由。图在版面上的角色只有两种：**配图**（占一栏）
+# 或**点缀**（更小），背景那种大图也不承载这一页的信息。
+#
+# 阈值离真实情况很远，所以不会误伤：唯一带图的 content-image 版式，实测配图占
+# 整页 **17.0%**（607×404 / 1600×900）。取 0.60 是 3.5 倍余量。
+FULL_PAGE_IMAGE = 0.60
 CORNER = {  # zone → (右偏移, 下/上偏移, 靠上?)
     "tr": (60.0, 40.0, True), "br": (130.0, 140.0, False),
     "tl": (60.0, 40.0, True), "bl": (130.0, 140.0, False),
@@ -174,6 +185,37 @@ def _check_layout(measured: dict) -> list[str]:
         if clips and (el["scrollW"] - el["clientW"] > 1 or el["scrollH"] - el["clientH"] > 1):
             out.append(f"{mid}（{role}）内容被容器裁切："
                        f"scroll {el['scrollW']}×{el['scrollH']} > client {el['clientW']}×{el['clientH']}")
+    return out
+
+
+def _check_full_page_image(measured: dict) -> list[str]:
+    """一张图盖住整页 —— **阻塞**（见 FULL_PAGE_IMAGE 的注释）。
+
+    为什么这条要有牙：它是"不要把所有东西都生成到一张图上、再让图片覆盖整页"这条
+    硬规则的落点。今天是不可达的（没有整页图的版式），但**规则是被声明的**，
+    所以它需要一个能失败的守卫 —— 否则哪天有人加了个全幅版式、或者手改 skin，
+    这个禁止就会静默失效。
+    """
+    out: list[str] = []
+    total = render_mod.SLIDE_W * render_mod.SLIDE_H
+    if not total:
+        return out
+    for el in measured.get("elements", []):
+        if el.get("role") not in ("logo", "image"):
+            continue
+        # 尺寸由 measure.py 写成数字；不是数字就跳过，不抛（check() 从不抛）。
+        w = el.get("w")
+        h = el.get("h")
+        if not isinstance(w, (int, float)) or not isinstance(h, (int, float)):
+            continue
+        area = w * h
+        if area / total >= FULL_PAGE_IMAGE:
+            out.append(
+                f"第 {el.get('slide')} 页的图盖住了整页的 {area / total:.0%}"
+                f"（{w:.0f}×{h:.0f}px / "
+                f"{render_mod.SLIDE_W}×{render_mod.SLIDE_H}）—— **一张图覆盖整页是不允许的**："
+                f"这一页的信息（标题 / 条目 / 数字 / 示意）必须是版面里的**真文字**，"
+                f"图只能是配图或点缀。要那种观感就换版式，别把内容画进图里")
     return out
 
 
@@ -412,6 +454,7 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     data: dict = measure_mod.measure(html_path) if measured is None else measured
     problems.extend(_check_layout(data))
     problems.extend(_check_measured_health(data))
+    problems.extend(_check_full_page_image(data))
     brand_problems, _ = _check_brand(data, deck, tokens)
     problems.extend(brand_problems)
     # 空内容与品牌无关，但它和越界一样是“一页看着坏了”—— 所以也走阻塞

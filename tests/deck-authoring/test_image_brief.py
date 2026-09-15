@@ -374,5 +374,89 @@ class TestImageEconomy(unittest.TestCase):
         self.assertIn("要不要加图由内容定", msg)
         self.assertIn("content-image", msg)
 
+
+class TestNoFullPageImage(unittest.TestCase):
+    """**一张图盖住整页是不允许的。**
+
+    一页的信息（标题 / 条目 / 数字 / 示意）烘进图里之后，同时失去可编辑、可搜索、
+    可翻译、可被读屏器读这四件事 —— 而"对方要改字"正是这个 skill 能出原生 PPTX 的
+    理由。所以这条是**禁止**（阻塞级），不是提示。
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.check_mod = _load("check")
+
+    def _el(self, w, h, role="image", slide=2):
+        return {"elements": [{"role": role, "slide": slide, "w": w, "h": h,
+                              "intendedText": "a.png"}]}
+
+    def test_full_page_image_is_blocked(self) -> None:
+        out = self.check_mod._check_full_page_image(self._el(1560, 850))
+        self.assertEqual(len(out), 1, out)
+        self.assertIn("盖住了整页", out[0])
+        self.assertIn("不允许", out[0])
+
+    def test_ordinary_figure_is_fine(self) -> None:
+        """反面对照：真实的配图（实测整页 17%）一条都不许报 ——
+        否则上面那条可能只是"永远会报"。"""
+        self.assertEqual(self.check_mod._check_full_page_image(self._el(607, 404)), [])
+
+    def test_threshold_has_margin_from_reality(self) -> None:
+        """阈值必须离真实情况远 —— 差一点点就报错的守卫会被人一律忽略。"""
+        self.assertGreater(self.check_mod.FULL_PAGE_IMAGE, 0.4)
+        self.assertLess(self.check_mod.FULL_PAGE_IMAGE, 1.0)
+
+    def test_a_tall_banner_image_is_not_full_page(self) -> None:
+        """按**面积**判，不是按宽度：一条通栏横幅没那么严重（占不满高）。"""
+        self.assertEqual(self.check_mod._check_full_page_image(self._el(1600, 300)), [])
+
+    def test_bad_measurements_do_not_raise(self) -> None:
+        """`check()` 从不抛 —— 尺寸缺失就该跳过，不是崩掉整次校验。"""
+        for w, h in ((None, None), ("", ""), (0, 0), ("a", "b")):
+            with self.subTest(w=w, h=h):
+                self.assertEqual(self.check_mod._check_full_page_image(self._el(w, h)), [])
+
+    def test_error_says_where_the_information_should_live(self) -> None:
+        """报错要给出路：信息由版面用**真文字**排，不是"别这么干"。"""
+        msg = self.check_mod._check_full_page_image(self._el(1600, 900))[0]
+        self.assertIn("真文字", msg)
+        self.assertIn("配图或点缀", msg)
+
+
+class TestRoleStaysOutOfTheImage(unittest.TestCase):
+    """提示词要说清图的**角色**：配图 / 点缀，不是整页背景；信息不画进图里。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls._tmp.cleanup)
+        brief = image_source.build_brief(STRESS, cls._tmp.name)
+        cls.path = os.path.join(cls._tmp.name, "image-brief.md")
+        image_source.write_brief_md(brief, cls.path)
+        cls.md = deckio.read_text(cls.path)
+
+    def _block(self, lang: str) -> str:
+        head = "**中文提示词**" if lang == "zh" else "**English prompt**"
+        return self.md.split(head, 1)[1].split("```text", 1)[1].split("```", 1)[0]
+
+    def test_image_is_declared_a_column_not_a_background(self) -> None:
+        for lang, needle in (("zh", "只占一栏"), ("en", "ONE COLUMN")):
+            with self.subTest(lang=lang):
+                self.assertIn(needle, self._block(lang))
+        self.assertIn("不是整页背景", self._block("zh"))
+
+    def test_page_information_must_not_be_drawn_into_the_image(self) -> None:
+        """这条是用户明确禁掉的那件事的正面表述：信息由版面排，图只负责观感。"""
+        self.assertIn("不要把这一页的信息画进去", self._block("zh"))
+        self.assertIn("界面截图", self._block("zh"))     # 点名了不许装的几类东西
+        self.assertIn("real text", self._block("en"))
+
+    def test_contract_header_states_the_two_roles(self) -> None:
+        self.assertIn("两种角色", self.md)
+        self.assertIn("配图", self.md)
+        self.assertIn("点缀", self.md)
+        self.assertIn("盖住整页是不允许的", self.md)
+
 if __name__ == "__main__":
     unittest.main()

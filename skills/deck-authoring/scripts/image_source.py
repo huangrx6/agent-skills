@@ -443,8 +443,8 @@ def _field_values(slot: dict, brief: dict, lang: str) -> list[tuple[str, str]]:
     if zh:
         composition = (
             "**一个**主体，占画面 60~70%；轮廓干净、主体与背景分离明确；背景干净不杂。"
-            "这张图**独立成栏**，说明文字排在它旁边的另一栏、**不压在图上** —— "
-            "所以不要在图内为文字留白。")
+            "这张图在版面上**只占一栏** —— 它是配图 / 点缀，**不是整页背景**；"
+            "说明文字排在它旁边的另一栏、**不压在图上**，所以不要在图内为文字留白。")
         colour = (f"主色 {primary}、辅色 {secondary}、纸色 {paper}；{mood['色彩'][0]}。"
                   f"色系控制在 1~3 个；最终只保留两墨，**靠明暗层次而不靠色相**")
         # 风格那一栏只留"可执行的视觉语言"本身。第一版写了
@@ -452,8 +452,14 @@ def _field_values(slot: dict, brief: dict, lang: str) -> list[tuple[str, str]]:
         # 规则说明**，模型会把它当成画面要求，属于把两个读者混在一起。
         style = (f"纪实摄影；{mood['风格'][0]}；靠**大块明暗和强形状**立住"
                  f"（双色调下只有这些能活下来）")
-        text = ("画面里**不要出现任何文字、字母或数字**，也不要画任何 logo —— "
-                "说明文字与品牌标识都由版面另行排 / 叠")
+        # 用户明确禁掉的那件事写在这里：**这一页的信息不许被画进图里**。
+        # 一页的信息（标题/条目/数字/示意）一旦烘进图里，它就同时失去可编辑、
+        # 可搜索、可翻译、可被读屏器读 —— 而"对方要改字"正是本 skill 出原生
+        # PPTX 的理由。图只负责观感。
+        text = ("画面里**不要出现任何文字、字母或数字**，也**不要把这一页的信息画进去**"
+                "（标题、条目、数字、流程示意、界面截图都不算画面内容）—— "
+                "这一页的信息由版面用**真文字**排，图只负责观感；也不要画任何 logo —— "
+                "品牌标识由版面另行叠")
         if caption:
             text += f"（这一页的说明文字是「{caption}」，它是**排出来的**，不是画出来的）"
         limits = ("不要：细线、细密网格或织物纹理、柔和渐变、低对比平光"
@@ -462,8 +468,9 @@ def _field_values(slot: dict, brief: dict, lang: str) -> list[tuple[str, str]]:
     else:
         composition = (
             "ONE subject filling 60-70% of the frame; clean silhouette, clear "
-            "subject/background separation, uncluttered background. This photo "
-            "stands alone — its caption sits in a SEPARATE column beside it, never "
+            "subject/background separation, uncluttered background. On the slide it "
+            "occupies ONE COLUMN only — it is a supporting image, NOT a full-page "
+            "background. Its caption sits in a SEPARATE column beside it, never "
             "overlaid, so do NOT reserve space inside the frame for text.")
         colour = (f"primary {primary}, secondary {secondary}, paper {paper}; "
                   f"{mood['色彩'][1]}. Keep to 1-3 colour families. It ends up as two "
@@ -471,8 +478,11 @@ def _field_values(slot: dict, brief: dict, lang: str) -> list[tuple[str, str]]:
         style = (f"documentary photography; {mood['风格'][1]}; it must hold on large "
                  f"tonal masses and strong shapes (the only things that survive a "
                  f"duotone)")
-        text = ("No text, letters or numbers inside the image, and do not draw any "
-                "logo — captions and brand marks are placed by the layout")
+        text = ("No text, letters or numbers inside the image, and do NOT draw this "
+                "page's information into it (no titles, bullet text, numbers, flow "
+                "diagrams or UI screenshots) — the layout composes the page's "
+                "information as real text; the image only carries look and feel. Do "
+                "not draw any logo either — brand marks are placed by the layout")
         if caption:
             text += f" (this page's caption is \u300c{caption}\u300d \u2014 it is composed, " \
                     f"not drawn)"
@@ -554,6 +564,12 @@ def write_brief_md(brief: dict, out_path: str) -> str:
         "",
         "**尺寸 / 比例 / 数量这些不要写进提示词**：生图 API 有独立参数，"
         "prompt 里再写一遍只会和参数打架。它们单列在每张图的「参数」栏。",
+        "",
+        "**图在版面上只有两种角色**：**配图**（占一栏）或**点缀**（更小）；连背景那种"
+        "大图也不承载这一页的信息。**一页的信息（标题 / 条目 / 数字 / 示意）永远由版面用"
+        "真文字排**，不许烘进图里 —— 烘进去就同时失去可编辑、可搜索、可翻译、可被读屏器"
+        "读这四件事，而「对方要改字」正是这个 skill 能出原生 PPTX 的理由。"
+        "所以**一张图盖住整页是不允许的**（`check.py` 会拦）。",
         "",
         "**这些图会被压成两个墨色 + 半调网点**（见 `plate.py`）——这是为什么提示词里"
         "反复强调「靠大块明暗和强形状」：靠颜色、细密纹理、细线立住的图会糊成一团。"
