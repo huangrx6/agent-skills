@@ -43,6 +43,7 @@ description: >-
    - 实测：`python3 scripts/measure.py out.html`（真浏览器量版面；写 `out.html.measured.json`）
    - 判定：`python3 scripts/check.py your.spec.json out.html`（内部会调实测层，全过退出 0）
 4. **可选交付**：
+   - 演示：直接把 `out.html` 给人（`out.html?present` 一页一屏、`←/→` 翻页、`F` 全屏）
    - PNG 截图：`python3 scripts/shots.py out.html --out-dir pages/ --count N`
    - PPTX：`python3 scripts/make_pptx.py --png-dir pages/ -o deck.pptx`
 5. **图页**：先 `python3 scripts/image_source.py --prompt "…" -o pic.png` 出图，

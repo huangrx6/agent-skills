@@ -133,7 +133,96 @@ html,body{margin:0;background:var(--viewer)}
 .chartcap{font:400 26px/1.5 var(--mono);color:var(--ink-text);margin-top:26px}
 .end{position:absolute;left:84px;top:330px}
 .foot{position:absolute;left:84px;bottom:52px;font:400 26px/1 var(--mono);color:var(--ink-text)}
+__SHELL_CSS__
 </style></head><body>
+"""
+
+# ── deck 外壳：演示态（自动缩放 + letterbox + 键盘翻页 + 页码）──────────────
+# 刻意做成**运行时的视图**，不是产物本身的版式。
+#
+# 产物文件永远是 1600×900、未缩放的竖向堆叠 —— 测量层（measure.py）用
+# getBoundingClientRect 量真实像素，截图层（shots.py）按真实偏移滚屏，两者都依赖
+# 这个几何。演示态只额外叠一层**整体相似变换**：等比缩放不会引入裁切，所以
+# “量未缩放的原件”依然成立，不用为了演示能力推翻整个度量层。
+#
+# 这是从 huashu-design 的 deck_index.html 学来的一点：演示能力是**壳**，
+# 不该渗进内容版式。
+SHELL_CSS = """
+/* --k 由脚本按视口算；CSS 里算不出来 —— scale() 要的是无量纲数，
+   而 min(100vw/1600, 100vh/900) 得到的是长度，两者不能互转。 */
+html[data-view="present"] body{height:100%;overflow:hidden;display:grid;
+  place-items:center;gap:0}
+html[data-view="present"] .slide{display:none;margin:0;transform:scale(var(--k,1));
+  transform-origin:center center}
+html[data-view="present"] .slide.is-cur{display:block}
+.hud,.hint{position:fixed;bottom:20px;font:400 20px/1 var(--mono);color:var(--ink-text);
+  background:var(--paper);padding:10px 16px;letter-spacing:1px;opacity:0;
+  transition:opacity .2s;pointer-events:none;z-index:9}
+.hud{right:26px}
+.hint{left:26px;font-size:18px}
+html[data-view="present"] .hud{opacity:1}
+html[data-view="present"] .hint{opacity:1}
+/* 打印/导 PDF：一页一张 1600×900，不缩放、不留阴影 —— 演示态是给屏幕的，
+   纸面要的是原件本身（矢量 PDF 导出走这条路）。 */
+@media print{
+  html,body{background:#fff;height:auto;display:block;overflow:visible}
+  .slide{margin:0;transform:none;page-break-after:always;break-after:page;
+    box-shadow:none;display:block !important}
+  .hud,.hint{display:none !important}
+}
+"""
+
+# 键盘翻页那点脚本。无依赖、不碰 DOM 结构（不包 wrapper）—— 演示态只用
+# html[data-view] + .is-cur 两个开关表达，量层和截图层看到的 DOM 一字未变。
+SHELL_JS = """
+(function(){
+  var doc=document.documentElement;
+  var slides=[].slice.call(document.querySelectorAll('section.slide'));
+  if(!slides.length) return;
+  var hud=document.getElementById('__deck_page');
+  var cur=0;
+  function view(){ return doc.getAttribute('data-view')==='present'?'present':'scroll'; }
+  function fit(){
+    if(view()!=='present') return;
+    var k=Math.min(window.innerWidth/1600, window.innerHeight/900);
+    doc.style.setProperty('--k', k);
+  }
+  function show(n,smooth){
+    n=Math.max(0, Math.min(slides.length-1, n));
+    cur=n;
+    slides.forEach(function(s,i){ s.classList.toggle('is-cur', i===n); });
+    if(hud) hud.textContent=(n+1)+' / '+slides.length;
+    if(view()==='present'){ fit(); }
+    else { slides[n].scrollIntoView({behavior:smooth?'smooth':'auto', block:'center'}); }
+    try{ history.replaceState(null,'','#'+(n+1)); }catch(e){}
+  }
+  function setView(v){
+    doc.setAttribute('data-view', v);
+    show(cur,false);
+  }
+  function toggleFull(){
+    if(document.fullscreenElement){ document.exitFullscreen(); }
+    else if(doc.requestFullscreen){ doc.requestFullscreen(); }
+  }
+  document.addEventListener('keydown', function(e){
+    var k=e.key, p=view()==='present';
+    if(k===' '||k==='Enter'||k==='PageDown'||k==='ArrowRight'||k==='ArrowDown'){
+      if(p) e.preventDefault(); show(cur+1,true);
+    } else if(k==='PageUp'||k==='ArrowLeft'||k==='ArrowUp'){
+      if(p) e.preventDefault(); show(cur-1,true);
+    } else if(k==='Home'){ if(p) e.preventDefault(); show(0,true); }
+    else if(k==='End'){ if(p) e.preventDefault(); show(slides.length-1,true); }
+    else if(k==='p'||k==='P'){ setView(p?'scroll':'present'); }
+    else if(k==='f'||k==='F'){ toggleFull(); }
+    else if(k==='Escape'){ if(p) setView('scroll'); }
+  });
+  window.addEventListener('resize', fit);
+  // 开法：out.html?present 或 out.html#3
+  var start=0, m=/^#(\\d+)$/.exec(location.hash);
+  if(m) start=parseInt(m[1],10)-1;
+  if(/[?&]present\\b/.test(location.search)) doc.setAttribute('data-view','present');
+  show(start,false);
+})();
 """
 
 
@@ -223,6 +312,7 @@ def render(deck_spec: dict, tokens: dict) -> str:
     head = HEAD.replace("__TITLE__", html.escape(deck.get("title", "deck")))
     head = head.replace("__VARS__", variables)
     head = head.replace("__GRAIN_FREQ__", str(tokens["texture"]["grainBaseFrequency"]))
+    head = head.replace("__SHELL_CSS__", SHELL_CSS)
 
     man: list[dict] = []          # 语义清单：元素身份 + 意图（几何由 measure.py 量）
 
@@ -319,6 +409,12 @@ def render(deck_spec: dict, tokens: dict) -> str:
     # 清单随产物一起走（不另写文件）：渲染、测量、导出读的是同一份事实。
     payload = json.dumps(man, ensure_ascii=True, separators=(",", ":")).replace("<", "\\u003c")
     out.append(f'<script type="application/json" id="__deck_manifest">{payload}</script>')
+    # 壳：页码 / 快捷键提示 / 翻页脚本。**不给它们打 data-m** ——
+    # 它们是壳不是内容，进了清单就会污染“清单条数 == 实测元素数”那条不变量。
+    total = len(deck["slides"])
+    out.append(f'<div class="hud"><span id="__deck_page">1 / {total}</span></div>')
+    out.append('<div class="hint">← → 翻页 · F 全屏 · P 演示/滚动</div>')
+    out.append(f"<script>{SHELL_JS}</script>")
     out.append("</body></html>")
     return "\n".join(out)
 

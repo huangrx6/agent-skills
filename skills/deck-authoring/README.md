@@ -34,12 +34,13 @@ python3 scripts/make_pptx.py --png-dir pages/ -o deck.pptx          # 8) 出 PPT
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 36 条
+python3 -m unittest discover -s tests/deck-authoring -v     # 44 条
 ```
 
-钉住七项不变量：墨色推导 + 三套色板门禁、同 spec + 同种子字节一致、校验的
+钉住八项不变量：墨色推导 + 三套色板门禁、同 spec + 同种子字节一致、校验的
 变异验证（每项都造违规样例，且变异替换的是产物里**真实存在**的值）、半调墨覆盖率
-随灰度单调（100% → 0%）、缓存命中后仍过色板三角形不变量、SKILL.md 的版式表与
+随灰度单调（100% → 0%）、缓存命中后仍过色板三角形不变量、外壳行为（真开浏览器
+按键翻页 + letterbox 缩放比贴边不溢）、SKILL.md 的版式表与
 `render.py` 实测行为一致、规格字段集真的封闭（坐标/字号/色值必须被指名报出）。
 
 ## 依赖
@@ -103,7 +104,8 @@ tests/deck-authoring/           # 测试住在仓库顶层（不在 skill 目录
 ├── test_halftone_monotonic.py
 ├── test_cache_invariant.py
 ├── test_skill_md_consistency.py
-└── test_validate_spec.py
+├── test_validate_spec.py
+└── test_shell.py
 ```
 
 测试**刻意不放在 skill 目录里** —— AI 调用 skill 时读的是 `skills/deck-authoring/`
