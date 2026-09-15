@@ -105,7 +105,7 @@ python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸�
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 321 条，约 5 分钟（负载敏感）（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 358 条，约 5 分钟（负载敏感）（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时约 2.5 分钟，
@@ -271,8 +271,12 @@ Layout、Design Tokens、**IBCS + ISO 24896**、AntV）、缺什么、以及**�
 ## 已知限制
 
 1. **贴图版 PPTX 改不了字**：要能改字就走 `pptx_native.py`（原生 shapes）。两者取舍见 `references/delivery-formats.md`。
-2. **图表只支持柱状图**：折线 / 饼 / 散点都没有；柱高必须与数据成比例是硬要求
-   （由 `check.py` 第 ④ 条独立复核，不是渲染器自觉）。
+2. **图表八类**（`chart.py`）：bar / bar-horizontal / line / area / bar-stacked /
+   donut / scatter / combo。AI 只写 DSL（intent / message / emphasis / annotations），
+   图形类型按**意图树**确定性地映射，不随便选；**muted + 1 accent**（给了 emphasis
+   才启用）；**结论先行**（`message` 当大标题，`title` 降为数据集名小标签）；
+   不画图例/坐标轴数字/网格线（既定风格）。PPT 层按类型映射原生图表（环图/散点
+   各有坑，见 `references/charts.md`）。柱高/条宽与数据成比例由 `check.py` 独立复核。
 3. **错位只用在标题 / 时间点**：其他地方用错位会毁可读性（方案第 2 层）。
 4. **生图不由脚本做**：推荐路径是 `--brief` 写提示词契约、人出图、`--check` 验收
    （见上）。另有色块拼贴（它本身就是版画式拼贴）与 `--provider-cmd`（有 API 的人用）。
@@ -302,6 +306,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── palette.py           # 配色：OKLCH / 结构实测(--audit) / novelty / 三方向 / 角色
 │   ├── hierarchy.py         # 信息层级：文本预算 / 视觉焦点 / 内容密度（全是提示级）
 │   ├── grid.py              # 网格与间距：12 列 / 令牌 ramp / 关系规则（几何唯一来源）
+│   ├── chart.py             # 图表引擎：意图树 / 八类 SVG / muted+accent / 标注
 │   ├── brand.py             # 品牌资产：logo 内嵌 / 色板与字体合并 / SVG 栅格化
 │   ├── fit.py               # 试排：给定一页内容，实测哪些版式装得下（真渲真量）
 │   ├── style.py             # 风格层：列表 / 契约体检 / 摘要 / 联系表（八套拼一张图）

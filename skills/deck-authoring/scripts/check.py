@@ -517,7 +517,13 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
             continue
         block = sections[i - 1] if i - 1 < len(sections) else ""
         heights: list[float] = []
-        for raw in re.findall(r'class="bar"[^>]*height="([^"]+)"', block):
+        chart_kind = (re.search(r'data-chart="([\w-]+)"', block) or [None, "bar"])[1]
+        # 柱数/比例检查只对**有柱子的图**有效：line/area/donut/scatter 没有 bar
+        # 元素，套这条检查会报"柱子 0 根 ≠ 数据 N 条"（实测：line 页挂过）。
+        if chart_kind not in ("bar", "bar-horizontal", "bar-stacked", "combo"):
+            continue
+        dim = "width" if chart_kind == "bar-horizontal" else "height"
+        for raw in re.findall(r'class="bar"[^>]*' + dim + r'="([^"]+)"', block):
             num = _num(raw, f"第 {i} 页图表柱高", problems)
             if num is not None:
                 heights.append(num)

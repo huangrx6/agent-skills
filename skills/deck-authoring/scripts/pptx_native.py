@@ -46,9 +46,9 @@ import re
 import sys
 
 from pptx import Presentation
-from pptx.chart.data import CategoryChartData
+from pptx.chart.data import CategoryChartData, XyChartData
 from pptx.dml.color import RGBColor
-from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION
+from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION, XL_LEGEND_POSITION
 from pptx.enum.dml import MSO_PATTERN
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
@@ -283,49 +283,110 @@ def add_decor(slide, d: dict, slides: list[dict], vars_: dict[str, str]) -> None
     shape.fill.back_color.rgb = css_color(vars_["--paper"])
 
 
+def _mix(a: str, b: str, t: float) -> str:
+    """两个 CSS 颜色的线性混合（t=0 是 a，t=1 是 b）。系列深浅阶用。"""
+    def chan(c: str) -> tuple[int, int, int]:
+        c = c.lstrip("#")
+        return (int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16))
+    ea, eb = chan(a), chan(b)
+    return "#" + "".join(f"{round(x + (y - x) * t):02X}" for x, y in zip(ea, eb))
+
+
+def _style_labels(labels, vars_: dict[str, str]) -> None:
+    """数值标签的字体与单位 —— 字号 20px 换算、颜色跟 --text、单位跟数值走。"""
+    labels.font.size = Pt(round(20 * PX_TO_PT, 1))
+    labels.font.color.rgb = css_color(vars_["--text"])
+
+
+# DSL 的 chart 类型 → PowerPoint 原生图表类型。combo 在原生层退化成柱
+# （python-pptx 一个图表对象只能一个 plot；组合图是第二阶段的事，先如实降级）。
+_XL_KIND = {
+    "bar": XL_CHART_TYPE.COLUMN_CLUSTERED,
+    "bar-horizontal": XL_CHART_TYPE.BAR_CLUSTERED,
+    "line": XL_CHART_TYPE.LINE_MARKERS,
+    "area": XL_CHART_TYPE.AREA,
+    "bar-stacked": XL_CHART_TYPE.COLUMN_STACKED,
+    "donut": XL_CHART_TYPE.DOUGHNUT,
+    "scatter": XL_CHART_TYPE.XY_SCATTER,
+    "combo": XL_CHART_TYPE.COLUMN_CLUSTERED,
+}
+
+
 def add_chart(slide, el: dict, box: tuple[float, float, float, float],
               vars_: dict[str, str]) -> None:
     """图表 → **PowerPoint 原生图表**：数据可改才是重点。"""
     data = el.get("data") or []
-    if not data:
+    series = el.get("series") or []
+    if not data and not series:
         return
+    kind = el.get("chart") or ""
     x, y, w, h = box
-    chart_data = CategoryChartData()
-    chart_data.categories = [str(d.get("label", "")) for d in data]
-    chart_data.add_series(el.get("unit", "") or "值", [d.get("value", 0) for d in data])
+    if kind == "scatter":
+        # 散点要两个连续量：XyChartData，不是 CategoryChartData（类别轴画不了它）
+        chart_data = XyChartData()
+        for d in data:
+            chart_data.add_series(str(d.get("label", ""))).add_data_point(
+                d.get("x", 0), d.get("value", d.get("y", 0)))
+    else:
+        chart_data = CategoryChartData()
+        if series:
+            chart_data.categories = [str(d.get("label", ""))
+                                     for d in series[0].get("data", [])]
+            for s in series:
+                chart_data.add_series(str(s.get("name", "")) or "值",
+                                      [d.get("value", 0) for d in s.get("data", [])])
+        else:
+            chart_data.categories = [str(d.get("label", "")) for d in data]
+            chart_data.add_series(el.get("unit", "") or "值",
+                                  [d.get("value", 0) for d in data])
     frame = slide.shapes.add_chart(
-        XL_CHART_TYPE.COLUMN_CLUSTERED,
+        _XL_KIND.get(el.get("chart") or "", XL_CHART_TYPE.COLUMN_CLUSTERED),
         Emu(round(x * EMU_PER_PX)), Emu(round(y * EMU_PER_PX)),
         Emu(round(w * EMU_PER_PX)), Emu(round(h * EMU_PER_PX)), chart_data)
     chart = frame.chart
-    chart.has_legend = False
+    # 图例：**只在多系列时画**（不画分不开系列；单系列坚决不画 —— 那是噪音）。
+    # 这与 SVG 层"名字标在线尾"不同：原生层没有线尾可标。
+    chart.has_legend = len(series) > 1
+    if chart.has_legend:
+        chart.legend.position = XL_LEGEND_POSITION.BOTTOM
+        chart.legend.include_in_layout = False
     chart.has_title = False
     # 图标外观要**跟着我们的设计**，不是跟着宿主软件的默认模板。
     # 实测：不设这两项时 LibreOffice/PowerPoint 会画上网格线与左侧坐标轴数字，
     # 而柱子上**没有数值** —— 和我们设计的柱状图正好相反（我们的设计里数值在柱顶、
     # 只有一条基线）。
-    chart.value_axis.has_major_gridlines = False
-    chart.value_axis.visible = False          # 坐标轴数字是我们不画的
+    # 环图没有 value_axis（访问就抛）；散点的两轴我们同样不画数字
+    if kind not in ("donut", "scatter"):
+        chart.value_axis.has_major_gridlines = False
+        chart.value_axis.visible = False          # 坐标轴数字是我们不画的
     plot = chart.plots[0]
-    plot.gap_width = 60
-    plot.has_data_labels = True
-    labels = plot.data_labels
-    labels.show_value = True
-    labels.show_category_name = False
-    labels.show_series_name = False
-    labels.position = XL_LABEL_POSITION.OUTSIDE_END
-    labels.font.size = Pt(round(20 * PX_TO_PT, 1))
-    labels.font.color.rgb = css_color(vars_["--text"])
-    # 单位要跟着数值走：我们设计里的数值是 "31%"，而原生图表的标签默认只给数字。
-    # number_format_is_linked=False 是关键 —— 不设的话 PowerPoint 会把它当成
-    # "跟随数据源"而在打开时重新套一遍默认格式，单位就没了。
-    unit = str(el.get("unit", "") or "")
-    if unit:
-        labels.number_format = f'0"{unit}"'
-        labels.number_format_is_linked = False
-    for series in plot.series:
-        series.format.fill.solid()
-        series.format.fill.fore_color.rgb = css_color(vars_["--accent"])
+    if kind != "scatter":                        # 散点标数值会糊成一片
+        plot.gap_width = 60
+        plot.has_data_labels = True
+        labels = plot.data_labels
+        labels.show_value = True
+        labels.show_category_name = False
+        labels.show_series_name = False
+        # OUTSIDE_END 对环图非法（python-pptx 直接抛）—— 环图用 CENTER
+        labels.position = (XL_LABEL_POSITION.CENTER if kind == "donut"
+                           else XL_LABEL_POSITION.OUTSIDE_END)
+        _style_labels(labels, vars_)
+        unit = str(el.get("unit", "") or "")
+        if unit:
+            labels.number_format = f'0"{unit}"'
+            labels.number_format_is_linked = False
+    # 单位跟着数值走的理由见上面分支里的注释（number_format_is_linked=False
+    # 是关键：不设的话 PowerPoint 打开时会重新套默认格式，单位就没了）。
+    #
+    # 系列上色：**多系列不许同色**（分不开），也不许彩虹 —— 用 accent 向纸色
+    # 分档褪色，与 SVG 层 series_colors 同一条规则。这里曾用 `for series in …`
+    # 直接把外层的 `series`（数据系列表）遮蔽掉，多系列全被涂成同一种颜色。
+    n_series = max(1, len(series))
+    for si, s in enumerate(plot.series):
+        s.format.fill.solid()
+        s.format.fill.fore_color.rgb = css_color(
+            _mix(vars_["--accent"], vars_["--paper"], 0.62 * si / max(1, n_series - 1))
+            if n_series > 1 else vars_["--accent"])
 
 
 def build(html_path: str, out_path: str) -> dict:

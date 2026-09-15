@@ -44,7 +44,10 @@ SLIDE_FIELDS = {
     "content-image": {"type", "title", "bullets", "image", "caption", "color"},
     "two-column":    {"type", "title", "columns", "color"},
     "timeline":      {"type", "title", "nodes", "color"},
-    "chart":         {"type", "title", "data", "unit", "caption", "color"},
+    # 图表的 DSL：几何/样式/动画都不在 spec 里（chart.py 决定），AI 只写语义。
+    "chart":         {"type", "title", "data", "unit", "caption", "color",
+                      "chart", "intent", "message", "series", "emphasis",
+                      "annotations"},
     "end":           {"type", "title", "color"},
 }
 # **条件必填**：这个版式的全部内容就是那个字段，缺了它这一页不成立。
@@ -62,6 +65,9 @@ ITEM_FIELDS = {
     "columns": {"title", "bullets"},
     "nodes":   {"label", "note"},
     "data":    {"label", "value"},
+    # 散点要两个连续量：x/y（value 视同 y，向后兼容）
+    "series":      {"name", "data"},
+    "annotations": {"type", "target", "text", "value"},
 }
 
 # 刻意的空缺 —— 报错时给**专门**说明，而不是只说"未知字段"。这三个集合对应
@@ -128,14 +134,20 @@ def _check_fields(obj: dict, allowed: set[str], where: str, issues: Issues) -> N
 
 
 def _check_items(slide: dict, key: str, where: str, issues: Issues) -> None:
-    """校验嵌套列表（columns / nodes / data）的元素字段。"""
+    """校验嵌套列表（columns / nodes / data / series / annotations）的元素字段。"""
     items = slide.get(key)
     if items is None:
         return
     if not isinstance(items, list):
         issues.error("BAD_ITEMS", f"{where}.{key}", f"{key} 必须是数组")
         return
-    allowed = ITEM_FIELDS[key]
+    allowed = set(ITEM_FIELDS[key])
+    # **限定豁免**：散点图的 x/y 是**数据**（两个连续量），不是版式坐标。
+    # COORD_FIELDS 的禁令管的是"模型不许填版式坐标"；散点的 x/y 与 value 同类。
+    # 只在 chart 页的 data 项上豁免 —— 禁令在其他所有地方原样有效。
+    if (slide.get("type") == "chart" and key == "data"
+            and (slide.get("chart") == "scatter" or slide.get("intent") == "correlation")):
+        allowed |= {"x", "y"}
     for i, item in enumerate(items):
         if not isinstance(item, dict):
             issues.error("BAD_ITEM", f"{where}.{key}[{i}]", "每一项都必须是对象")

@@ -256,6 +256,8 @@ html,body{margin:0;background:var(--viewer)}
 .col{flex:1;min-width:0}
 .tl{display:flex;gap:var(--sp-item);list-style:none;padding:0;margin:var(--sp-group) 0 0}
 .tl li{flex:1;min-width:0;width:var(--tl-node,300px)}
+.chartsrc{margin:calc(var(--sp-inner) * -0.5) 0 0;color:var(--text);opacity:.55;
+  font:400 var(--s-caption,22px)/1.4 var(--body)}
 .chartwrap{margin-top:var(--sp-item);width:1432px;padding:var(--sp-item);position:relative}
 /* 图表的高度**由壳给死**（330px），宽度按 viewBox 比例自己算。
    为什么不能让它 width:100% 自己撑：那样高度会跟着容器宽度变 ——
@@ -617,6 +619,7 @@ def _grain_svg(tokens: dict) -> str:
 ink_module = _load_sibling("ink")  # 叠印与对比度只有一处定义，不重抄
 brand_module = _load_sibling("brand")
 fonts_module = _load_sibling("fonts")  # 字体清单与 @font-face（清单是数据，不是硬编码）
+chart_module = _load_sibling("chart")   # 图表引擎：DSL → 确定性 SVG（八类）
 
 
 def _apply_brand(style: dict, brand: dict) -> dict:
@@ -670,7 +673,8 @@ def render(deck_spec: dict, style: dict | None = None) -> str:
     # 所以整份 deck 只算一次。colorSet 名字对不上时不在这里报错：_head 会报得更好
     # （它会列出可用值），这里拿个安全的缺省继续走。
     cs_name = deck.get("colorSet") or next(iter(tokens["colorSets"]), "")
-    paper = tokens["colorSets"].get(cs_name, {}).get("background", "#FFFFFF")
+    colors = tokens["colorSets"].get(cs_name, {})          # 图表引擎直接吃这一份
+    paper = colors.get("background", "#FFFFFF")
     logo_file = brand_module.logo_file(brand, paper)
     logo_uri = brand_module.logo_data_uri(brand, logo_file)
     logo_ref = brand_module.logo_ref(brand, logo_file)
@@ -789,13 +793,30 @@ def render(deck_spec: dict, style: dict | None = None) -> str:
         elif kind == "end":
             out.append(f'<div class="end" style="--s-title:{tsize}px">{th}</div>')
         elif kind == "chart":
+            # **结论先行**（规范第 5 条）：写了 message 就让它当大标题 —— 图表的
+            # 标题该是"DeepSeek 调用量领先"，不是数据集名。原 title 降为小标签。
+            message = str(slide.get("message", "")).strip()
+            headline = message or th
             out.append(f'<div class="titleblock tb-{t_tier}" '
-                       f'style="--s-title:{tsize}px">{th}</div>')
+                       f'style="--s-title:{tsize}px">{html.escape(headline)}</div>')
+            if message and str(slide.get("title", "")).strip():
+                # ⚠️ 这里要用**原始标题文本**：th 是渲染好的 <h1> HTML，
+                # 直接塞会把整串标签转义后印在页上（实测踩过）。
+                out.append(f'<div class="chartsrc">'
+                           f'{html.escape(str(slide.get("title", "")))}</div>')
             # 图表把**数据本身**也带进清单：导出层要拿它建原生图表（数据可改），
             # 而数据不是几何 —— 几何仍旧只从 measure.py 来。
             chart_attrs = tag(f"s{i}.chart", i, "chart", "", None,
-                              data=slide.get("data", []), unit=slide.get("unit", ""))
-            out.append(chart_svg(slide.get("data", []), slide.get("unit", ""), chart_attrs))
+                              data=slide.get("data", []),
+                              series=slide.get("series", []),
+                              chart=chart_module.infer_chart_type(slide)[0],
+                              emphasis=slide.get("emphasis", {}),
+                              unit=slide.get("unit", ""))
+            # ⚠️ 外层 chartwrap 是**结构**：校验与测量的锚点（tag_attr 挂它身上），
+            # `.hf` 是给 skin 的半调钩子。旧 chart_svg() 自己包这层，换引擎时丢过
+            # 一次 —— check.py 两条图表检查都以它为锚，丢了就全部静默通过（实测）。
+            out.append(f'<div class="chartwrap" {chart_attrs}><div class="hf"></div>'
+                       + chart_module.svg(slide, colors) + "</div>")
             if slide.get("caption"):
                 cap_attrs = tag(f"s{i}.caption", i, "bullet", slide["caption"],
                                 tier["caption"])
