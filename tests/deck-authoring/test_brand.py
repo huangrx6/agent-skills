@@ -326,3 +326,28 @@ class TestLogoCheckHasTeeth(BrandCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestExampleBrandIsCalledOut(unittest.TestCase):
+    """example（ACME）是演示品牌：用在真实 deck 里 check 必须开口。
+
+    demo.spec 是 SKILL.md 让人抄的模板，抄完不删 brand 就把 ACME logo 带进了
+    真实交付 —— 这正是"示例被直接使用"的事故路径，所以提示要指名修法。
+    """
+
+    def test_advisory_fires_for_example_brand(self) -> None:
+        deck = {"brand": "example"}
+        tokens = render.load_style("swiss-grid")["tokens"]
+        problems, notes = check_mod._check_brand(
+            {"elements": [{"id": "lg", "slide": 1, "role": "logo", "x": 10,
+                           "y": 10, "w": 50, "h": 20, "intendedText": "logo.svg"}]},
+            deck, tokens)
+        self.assertEqual(problems, [])
+        self.assertTrue(any("演示品牌" in n for n in notes), notes)
+
+    def test_no_advisory_for_real_or_absent_brand(self) -> None:
+        tokens = render.load_style("swiss-grid")["tokens"]
+        element = {"id": "lg", "slide": 1, "role": "logo", "x": 10,
+                   "y": 10, "w": 50, "h": 20, "intendedText": "logo.svg"}
+        _p, notes = check_mod._check_brand({"elements": [element]}, {}, tokens)
+        self.assertFalse(any("演示品牌" in n for n in notes))

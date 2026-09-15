@@ -71,7 +71,7 @@ done
    （一页一个观点 / 容量估算 / 观众距离）。拿不准一页装不装得下就先跑 `fit.py`，别猜。
    `seed` 显式写（默认 1）：错位与颗粒按 (seed, 元素) 派生，不靠全局 random（否则没法回归）。
    公司有品牌资产（logo / 色号 / 字体 / 署名）就加一行 `deck.brand`，见
-   `references/brand-assets.md` —— **品牌赢在"是谁"，风格赢在"怎么表达"**。
+   `references/brand-assets.md` —— **品牌赢在"是谁"，风格赢在"怎么表达"**；demo 的 example/ACME 是演示品牌，抄模板记得删（check 会提醒）。
    字体与配色：字体清单/映射见 `references/fonts.md`（`fonts.py --fetch`）；色彩结构、novelty、三方向见 `references/color.md`（`palette.py --audit`）。
 3. **五道门**（顺序有意义：先验输入，再渲，再量，最后判；九站总图见 `references/pipeline.md`）：
    - 规格：`python3 scripts/validate_spec.py your.spec.json`（字段集封闭，未知键直接失败）

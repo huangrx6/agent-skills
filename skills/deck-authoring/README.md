@@ -105,7 +105,7 @@ python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸�
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 410 条，约 6 分钟（负载敏感）（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 416 条，约 6 分钟（负载敏感）（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时约 2.5 分钟，
@@ -375,7 +375,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
     ├── planning.md             # 规划层模块：schema、骨架表、复杂度、到 spec 的桥
     ├── layout-system.md        # 布局规则 0-87 全文落地：网格/令牌/层级/约束/路线图
     ├── charts.md               # 图表引擎：意图树、八类、弱化强调、消息先行
-    ├── color.md                # OKLCH 色彩结构、novelty、三方向
+    ├── color.md                # OKLCH 结构/novelty/三方向/auto 派生（省 colorSet）
     ├── fonts.md                # 126 字体库、风格映射、严格 A 级、用户缓存
     └── images.md               # 图像契约：AI 出合同、人出图、--check 验收
 tests/deck-authoring/           # 测试住在仓库顶层（不在 skill 目录里）

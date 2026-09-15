@@ -19,6 +19,7 @@ OKLab → 极坐标），算错了不会抛异常，只会让"结构分类"和"�
 from __future__ import annotations
 
 import importlib.util
+import zlib
 import json
 import os
 import sys
@@ -362,3 +363,71 @@ class TestAudit(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAutoSet(unittest.TestCase):
+    """colorSet 省略 / auto：风格手调基准 + seed 确定性派生。
+
+    规则口径（总编排 §17 / 品牌协议 §5）：Style 出**语法与基准**，主题按 deck
+    实际情况（seed）派生——同 seed 同结果（可回归），不同 deck 落不同变体。
+    这条最容易出的错：派生动了纸色/文字 → 对比度结构悄悄坏掉。所以第二条
+    钉死：只有 primary/secondary 允许动。
+    """
+
+    def setUp(self) -> None:
+        # style.json 是扁平的（load_style 才包成 {tokens, skin}）；auto_set 只
+        # 需要 colorSets，拿原文件即可。
+        with open(os.path.join(STYLES, "swiss-grid", "style.json"),
+                  encoding="utf-8") as fh:
+            self.tokens = json.load(fh)
+        self.base_name = list(self.tokens["colorSets"])[0]
+        self.base = self.tokens["colorSets"][self.base_name]
+
+    def _fresh(self) -> dict:
+        return json.loads(json.dumps(self.tokens))
+
+    def test_same_seed_same_result_and_injected_by_name(self) -> None:
+        a = palette.auto_set(self._fresh(), 1)
+        b = palette.auto_set(self._fresh(), 1)
+        self.assertEqual(a, b, "同 seed 派生两次不一样 —— 混进了随机性")
+        tokens = self._fresh()
+        name, colors = palette.auto_set(tokens, 1)
+        self.assertIn(name, tokens["colorSets"], "派生结果没注入 —— 消费方没名可取")
+        self.assertEqual(tokens["colorSets"][name], colors)
+
+    def test_only_primary_secondary_move(self) -> None:
+        tokens = self._fresh()
+        seed = next(s for s in range(1, 30)
+                    if ["safe", "creative", "experimental"][
+                        zlib.crc32(f"auto:{s}".encode()) % 3] == "creative")
+        _, colors = palette.auto_set(tokens, seed)
+        self.assertEqual(colors["background"], self.base["background"],
+                         "纸色被动了 —— 对比度结构会悄悄坏")
+        self.assertEqual(colors["text"], self.base["text"])
+        self.assertNotEqual(colors["primary"], self.base["primary"],
+                            "creative 方向没真的变 —— 派生是空转")
+
+    def test_safe_direction_is_identity(self) -> None:
+        tokens = self._fresh()
+        seed = next(s for s in range(1, 30)
+                    if ["safe", "creative", "experimental"][
+                        zlib.crc32(f"auto:{s}".encode()) % 3] == "safe")
+        name, colors = palette.auto_set(tokens, seed)
+        self.assertEqual(colors, self.base, "safe 桶应等于基准本身")
+
+    def test_omitted_colorset_renders_reproducibly(self) -> None:
+        """端到端：省略 colorSet 也能渲、同 seed 逐字节可复现、validate 放行。"""
+        render = _load("render")
+        validate = _load("validate_spec")
+        with open(os.path.join(SKILL, "dev-tools", "demo.spec.json"),
+                  encoding="utf-8") as fh:
+            spec = json.load(fh)
+        spec["deck"].pop("colorSet", None)
+        self.assertEqual(validate.validate(spec).errors, [])
+        html1 = render.render(json.loads(json.dumps(spec)))
+        html2 = render.render(json.loads(json.dumps(spec)))
+        self.assertIn("<section", html1)
+        self.assertEqual(html1, html2, "同 seed 渲两次不一样 —— auto 不确定")
+        spec["deck"]["colorSet"] = "auto"
+        self.assertEqual(validate.validate(spec).errors, [],
+                         "显式 auto 应放行")

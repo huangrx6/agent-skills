@@ -50,6 +50,11 @@ Hard Constraint > Semantic Requirement > Style Grammar > Creative Preference：
 `assets/product|screenshots|official`、`fonts/` 子目录按需自建）。品牌层可以
 不存在：`deck.brand` 不写就全走 Style + Color + Typography + Asset Rules。
 
+> ⚠️ **`example` 是演示品牌（ACME），不是素材库**：它只该出现在 dev-tools 的
+> demo/stress 里。demo 是 SKILL.md 让人抄的模板 —— 抄完不删 `deck.brand` 就把
+> ACME logo 带进了真实交付。`check.py` 现在会对 `brand: example` 出声提醒
+> （删这行，或建 `brands/<你的品牌>/`）。
+
 ## 4. brand.json 结构【✅ 封闭集；嵌套形=约定】
 
 字段集封闭，未知字段**直接报错**（`BRAND_FIELDS`，多一个键就失败，不是静默

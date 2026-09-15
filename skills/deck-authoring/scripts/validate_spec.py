@@ -170,9 +170,11 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
 
     if color_sets is not None:
         chosen = deck.get("colorSet")
-        if isinstance(chosen, str) and chosen not in color_sets:
+        if (isinstance(chosen, str) and chosen not in color_sets
+                and chosen != "auto"):
             issues.error("BAD_COLOR_SET", "deck.colorSet",
-                         f"{chosen!r} 不在 token 的 colorSets 里，可用 {sorted(color_sets)}")
+                         f"{chosen!r} 不在 token 的 colorSets 里，可用 "
+                         f"{sorted(color_sets) + ['auto']}（auto=按风格基准+seed 派生）")
 
     slides = deck.get("slides")
     if not isinstance(slides, list) or not slides:

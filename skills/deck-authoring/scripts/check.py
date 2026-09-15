@@ -312,6 +312,11 @@ def _check_brand(measured: dict, deck: dict, tokens: dict) -> tuple[list[str], l
     if not name:
         return problems, notes
     brand = brand_mod.load(name)
+    if name == "example":
+        notes.append(
+            "deck.brand=example 是**演示品牌**（ACME）——它只该出现在 dev-tools 的 "
+            "demo/stress 里。做自己的 deck 请删掉这行，或建 brands/<你的品牌>/"
+            "（见 references/brand-assets.md）。示例 logo 出现在真实交付里就是事故")
     els: list[dict] = measured.get("elements", [])
     logos = [e for e in els if e.get("role") == "logo"]
     if not logos:
@@ -334,7 +339,8 @@ def _check_brand(measured: dict, deck: dict, tokens: dict) -> tuple[list[str], l
                     f"{t['x']:.0f}..{t['x'] + t['w']:.0f} 相交 —— "
                     f"logo 换小一点、或让风格把它放到另一个角")
 
-    paper = tokens["colorSets"].get(deck.get("colorSet"), {}).get("background", "#FFFFFF")
+    paper = tokens["colorSets"].get(
+        render_mod.resolve_color_set(tokens, deck), {}).get("background", "#FFFFFF")
     if brand_mod.is_dark_paper(paper) and not brand.get("logoInverse"):
         notes.append(
             f"品牌 {name!r} 只给了一个 logo，而这张纸是深底（{paper}）—— "
@@ -479,7 +485,7 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     problems: list[str] = []
     page = deckio.read_text(html_path)      # 读一次就够（以前读了三次）
     deck = spec["deck"]
-    colors = tokens["colorSets"][deck["colorSet"]]
+    colors = tokens["colorSets"][render_mod.resolve_color_set(tokens, deck)]
     paper = colors["background"]
     ink_text = ink.text_color(colors)
     limits = tokens["contrast"]

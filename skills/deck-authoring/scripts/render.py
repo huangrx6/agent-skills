@@ -707,6 +707,7 @@ ink_module = _load_sibling("ink")  # 叠印与对比度只有一处定义，不�
 brand_module = _load_sibling("brand")
 fonts_module = _load_sibling("fonts")  # 字体清单与 @font-face（清单是数据，不是硬编码）
 chart_module = _load_sibling("chart")   # 图表引擎：DSL → 确定性 SVG（八类）
+palette_module = _load_sibling("palette")  # 色彩语法与派生（auto 主题从这里出）
 
 
 def _apply_brand(style: dict, brand: dict) -> dict:
@@ -728,6 +729,19 @@ def _apply_brand(style: dict, brand: dict) -> dict:
     return merged
 
 
+def resolve_color_set(tokens: dict, deck: dict) -> str:
+    """colorSet 名；省略 / "auto" → 按风格基准 + deck.seed 确定性派生。
+
+    规则口径（总编排 §17 / 品牌协议 §5）：Style 出**语法与手调基准**，主题按
+    deck 实际情况（seed）派生 —— 同 seed 同结果（可回归），换 deck 自动换变体。
+    check.py 也用它，保证两边看到同一套色（几何唯一来源的同款纪律）。
+    """
+    name = deck.get("colorSet")
+    if name in (None, "auto"):
+        name, _ = palette_module.auto_set(tokens, deck.get("seed", 1))
+    return name
+
+
 def render(deck_spec: dict, style: dict | None = None) -> str:
     """渲染。`style=None` 时按 `deck.style`（缺省 swiss-grid）从 styles/ 加载。"""
     deck = deck_spec["deck"]
@@ -737,7 +751,8 @@ def render(deck_spec: dict, style: dict | None = None) -> str:
     tokens = style["tokens"]
     tier = tokens["type"]
     seed = deck.get("seed", 1)
-    out = [_head(deck.get("title", "deck"), style, seed, deck.get("colorSet"))]
+    out = [_head(deck.get("title", "deck"), style, seed,
+                 resolve_color_set(tokens, deck))]
 
     man: list[dict] = []          # 语义清单：元素身份 + 意图（几何由 measure.py 量）
 

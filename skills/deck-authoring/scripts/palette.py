@@ -48,6 +48,7 @@ import importlib.util
 import math
 import os
 import sys
+import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.dirname(HERE)
@@ -356,6 +357,23 @@ def directions(colors: dict) -> dict[str, dict]:
         out[name] = {"colors": variant(colors, name), "why": DIRECTIONS[name]["why"],
                      "novelty": novelty(variant(colors, name))[0]}
     return out
+
+
+def auto_set(tokens: dict, seed: int) -> tuple[str, dict]:
+    """colorSet 省略 / "auto" 时的解析：风格第一套手调基准 + seed 选方向。
+
+    规则口径：Style 出语法与手调基准，主题按 deck 实际情况（seed）派生。
+    同 seed 同结果（可回归）；不同 deck 自动落在不同变体上。只动 primary/
+    secondary（variant 的保证），纸色/文字不动，对比度结构原样保住。
+    派生结果注入 tokens.colorSets，消费方统一按名取（不留第二套取色路径）。
+    """
+    names = list(tokens["colorSets"])
+    base = tokens["colorSets"][names[0]]
+    dirs = list(DIRECTIONS)
+    pick = dirs[zlib.crc32(f"auto:{seed}".encode()) % len(dirs)]
+    label = f"auto:{pick}"
+    tokens["colorSets"][label] = dict(base) if pick == "safe" else variant(base, pick)
+    return label, tokens["colorSets"][label]
 
 
 # ═══════════════════════════════════════════════════════════════════════════
