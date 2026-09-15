@@ -100,6 +100,66 @@
 - **单行角色保持不折行**（标题/页码）：对方机器缺字时字体会被替换，替换字体一变宽，
   `wrap` 一开就折行、把下面的元素整片压掉（实渲出来就是这个样子 ✗）。
 
+## 交付演练：一次把五种产物都过一遍
+
+单件都有测试，**但"串起来"是另一回事** —— 这条最贵的三次教训都来自同一个动作：
+**把产物打开看**，而不是只看命令返回 0。
+
+```bash
+cd 你的交付目录
+S=…/skills/deck-authoring/scripts
+python3 $S/validate_spec.py deck.spec.json          # 1 规格
+python3 $S/plate.py in.jpg -o sample-treated.png     # 2 造图（图文页要用）
+python3 $S/render.py deck.spec.json -o out.html      # 3 出 HTML
+python3 $S/check.py  deck.spec.json out.html         # 4 校验（真浏览器量）
+python3 $S/pdf.py    out.html -o deck.pdf            # 5 矢量 PDF
+python3 $S/shots.py  out.html --out-dir pages --count N   # 6 逐页 PNG
+python3 $S/make_pptx.py    --png-dir pages -o deck.pptx        # 7 贴图版
+python3 $S/pptx_native.py  out.html -o deck-editable.pptx      # 8 原生版
+python3 $S/animate.py      out.html -o deck.mp4                # 9 视频
+```
+
+### 实测代价（21 页真实 deck，本机）
+
+| 步骤 | 耗时 | 产物 |
+| --- | --- | --- |
+| 规格 / 渲染 | 0.1s / 0.14s | `out.html` 64KB |
+| 校验（真浏览器量） | 3s | — |
+| 矢量 PDF | 5s | 410KB / 21 页 / 1 位图 / 26 字体 |
+| 逐页 PNG | 5s | 21 张 |
+| 贴图版 PPTX | 11s | 4.6MB |
+| 原生 PPTX | 11s | 92KB（**字是真字**） |
+| **视频 MP4** | **5m10s** | **19.65MB / 3454 帧 / 144s** |
+
+视频是唯一"量大"的一步：帧数 ≈ 总时长 × fps，**线性于页数**（21 页 ≈ 3454 帧）。
+出片前先用 `--stills 0,44,120` 抽几帧看，比渲完 5 分钟再发现要改便宜得多。
+
+### 要看什么（不看不算交付）
+
+- **PDF**：Chrome 导的 PDF 应当与屏幕**逐像素一致**（同一个 DOM，只有打印 CSS 的差异：
+  颗粒关掉、页尺寸 1600×900px = 1200×675pt）。`sips -s format png deck.pdf --out p1.png`
+  只能出第一页 —— 要逐页看就造一份只含那几页的小 deck 再导。
+- **贴图版 PPTX**：应该和屏幕一致（它就是逐页位图）。
+- **原生 PPTX**：**这里最容易出偏差**（它是重画的，不是贴的）。转成图看：
+  `soffice --headless -env:UserInstallation=file:///tmp/lo --convert-to pdf x.pptx`
+- **视频**：抽帧看 **t=0**（干净空态）、**某页落定后**（内容都在）、**末帧**（停在终态）。
+  注意：抽到"只有标题、正文还没到"的帧是**正常的编排**（标题先落，隔
+  `titleHoldMs` 正文才错峰上）—— 想确认就去时间轴里查那一帧落在页内的第几秒。
+
+### 这条演练抓到的三个真 bug（都只在"打开看"时露出来）
+
+1. **原生 PPTX 没写 `<a:ea>`（东亚字体）** —— `font.name` 只写 `<a:latin>`，于是
+   **汉字全由宿主软件自选**。一份中文 deck 的字几乎全是汉字，等于整个风格被换掉
+   （实测：`paper-ink` 的宋体导出来变成一个加粗黑体）。而且 ea **不能拿栈首那个族**：
+   栈首往往是拉丁族（Georgia / Menlo），对汉字没有字形，写上去等于没写。
+2. **标题字重被写死成 bold** —— 八套风格里有**两套**的标题是 400 字重，统一 bold
+   就把那两套的标题设计抹掉了。字重改成跟着**实测**的 `fontWeight` 走。
+3. **原生图表跟着宿主模板画** —— 多了网格线与左侧坐标轴数字、柱子上**没有数值**，
+   和我们设计的柱状图正好相反。修法是把数值标签打开、网格线与坐标轴关掉，
+   并把单位写进 `number_format`（还要 `sourceLinked="0"`，否则打开时会被重套默认格式）。
+
+三条的共性：**文件生成成功、页数正确、文本数正确** —— 所有机器可判的东西都是绿的。
+
 ## 四种交付物的相互依赖
 
 ```text

@@ -127,8 +127,11 @@ class TestPptxNative(unittest.TestCase):
         cls.chart_pptx = os.path.join(td, "native-chart.pptx")
         cls.chart_counts = cls.native.build(cls.chart_html, cls.chart_pptx)
 
+        cls.chart_zip = zipfile.ZipFile(cls.chart_pptx)
+        cls.addClassCleanup(cls.chart_zip.close)
         cls.slides = _slide_xmls(cls.pptx)
         cls.chart_slides = _slide_xmls(cls.chart_pptx)
+        cls.demo = demo
         cls.manifest = cls.measure.read_manifest(cls.render.render(demo))
         cls.chart_manifest = cls.measure.read_manifest(
             cls.render.render(chart_deck))
@@ -278,6 +281,90 @@ class TestPptxNative(unittest.TestCase):
         self.assertEqual(self.chart_counts["chart"], 1)
 
     # ── 不静默：该跳过的要计数 ───────────────────────────────────────────
+
+    # ── 交付演练才发现的三个真 bug（都只在"打开 PPTX 看"时才露出来）──────────
+
+    def test_every_text_run_declares_an_east_asian_font(self) -> None:
+        """中文靠 `<a:ea>`，**不能只写 `<a:latin>`**。
+
+        `run.font.name` 只写 latin，于是宿主软件（PowerPoint / WPS / LibreOffice）会
+        自己挑一个东亚字体来画汉字 —— 一份中文 deck 的字几乎全是汉字，等于**整个风格
+        被换掉**。实测：`paper-ink`（宋体）导出来被 LibreOffice 画成一个加粗黑体。
+        """
+        cjk = set(self.native.CJK_FAMILIES)
+        checked = 0
+        for name, xml in list(self.slides.items()) + list(self.chart_slides.items()):
+            for m in re.finditer(r"<a:rPr[^>]*>(.*?)</a:rPr>", xml, re.S):
+                blk = m.group(1)
+                latin = re.search(r'<a:latin typeface="([^"]*)"', blk)
+                ea = re.search(r'<a:ea typeface="([^"]*)"', blk)
+                if latin is None:
+                    continue                     # 没有 latin 的 run 不是我们的文字
+                checked += 1
+                self.assertIsNotNone(ea, f"{name} 里有 run 没写 <a:ea>：{latin.group(1)}")
+                assert ea is not None
+                self.assertIn(ea.group(1), cjk,
+                              f"{name} 的 ea 写成了 {ea.group(1)!r} —— 那不是 CJK 族，"
+                              f"宿主照样会自己挑（等于没写）")
+        self.assertGreater(checked, 10, "一个文本 run 都没扫到 —— 这条用例失效了")
+
+    def test_chart_shows_values_and_hides_gridlines(self) -> None:
+        """原生图表要跟着**我们的设计**，不是跟着宿主软件的默认模板。
+
+        不设这两项时：LibreOffice/PowerPoint 会画上网格线与左侧坐标轴数字，
+        而柱子上**没有数值** —— 和我们的设计正好相反（我们数值在柱顶、只有一条基线）。
+        这是"打开看"才发现的：文件生成成功、页数也对，图却是另一个样子。
+        """
+        chart_xml = "".join(
+            self.chart_zip.read(n).decode()
+            for n in self.chart_zip.namelist() if re.search(r"ppt/charts/chart\d+\.xml$", n))
+        self.assertTrue(chart_xml, "原生 PPTX 里没有图表 XML")
+        self.assertIn("<c:dLbls>", chart_xml, "柱子上没有数值标签")
+        self.assertNotIn("majorGridlines", chart_xml, "还画着网格线")
+
+    def test_chart_labels_carry_the_unit(self) -> None:
+        """数值要带单位（我们设计里是 31%，不是 31）。
+
+        `sourceLinked="0"` 也要有：不设的话 PowerPoint 会当成"跟随数据源"
+        而在打开时重套一遍默认格式，单位就丢了。
+        """
+        chart_xml = "".join(
+            self.chart_zip.read(n).decode()
+            for n in self.chart_zip.namelist() if re.search(r"ppt/charts/chart\d+\.xml$", n))
+        self.assertIn('formatCode="0&quot;%&quot;"', chart_xml)
+        self.assertIn('sourceLinked="0"', chart_xml)
+
+    def test_title_weight_follows_the_style_not_a_hardcoded_bold(self) -> None:
+        """字重跟着**实测**走，不按角色写死。
+
+        八套风格里有**两套**（paper-ink / botanical-dark）的标题是 400 字重，
+        统一 bold 就等于把这两套的标题设计抹掉 —— 而 XML 里读出来是 `b="1"`，
+        文件照生成、页数照样对，只有把 PPTX 打开看才发现。
+        """
+        demo = json.loads(json.dumps(self.demo))
+        results = {}
+        for style_name in ("swiss-grid", "paper-ink"):
+            raw = json.loads(open(os.path.join(STYLES, style_name, "style.json"),
+                                  encoding="utf-8").read())
+            spec = json.loads(json.dumps(demo))
+            spec["deck"]["style"] = style_name
+            spec["deck"]["colorSet"] = next(iter(raw["colorSets"]))
+            spec["deck"]["slides"] = [s for s in spec["deck"]["slides"]
+                                      if s["type"] == "title"]
+            path = os.path.join(self._tmp.name, f"w-{style_name}.html")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(self.render.render(spec))
+            out = os.path.join(self._tmp.name, f"w-{style_name}.pptx")
+            self.native.build(path, out)
+            xmls = _slide_xmls(out)
+            first = xmls["ppt/slides/slide1.xml"]
+            m = re.search(r'<a:rPr[^>]*sz="(\d+)"[^>]*b="(\d)"', first)
+            self.assertIsNotNone(m, f"{style_name} 的标题 run 没读到字重")
+            assert m is not None
+            results[style_name] = m.group(2)
+        self.assertEqual(results["swiss-grid"], "1", "swiss-grid 的标题设计是 700，导出却是常规")
+        self.assertEqual(results["paper-ink"], "0", "paper-ink 的标题设计是 400，导出却被加粗了")
+
 
     def test_skipped_elements_are_counted_not_hidden(self) -> None:
         """量不到几何、或图不在旁边时**跳过并计数**，不猜一个位置静静画上去。"""

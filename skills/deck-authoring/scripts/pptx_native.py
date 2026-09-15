@@ -48,10 +48,11 @@ import sys
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
 from pptx.dml.color import RGBColor
-from pptx.enum.chart import XL_CHART_TYPE
+from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION
 from pptx.enum.dml import MSO_PATTERN
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
+from pptx.oxml.ns import qn
 from pptx.util import Emu, Pt
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -85,10 +86,14 @@ PX_TO_PT = 0.75
 # test_pptx_native 里有一条用例拿所有风格声明的 kind 来对这里。
 DECOR_SHAPES = {"accent-block", "halftone-circle"}
 
-# 角色 → 用哪套字。/ 是否加粗。字体族本身从产物里的 --display / --body 取。
+# 角色 → 用哪套字。字体族本身从产物里的 --display / --body 取。
 SERIF_ROLES = {"title"}
-BOLD_ROLES = {"title"}
 MONO_ROLES = {"subtitle", "bullet", "foot", "caption"}
+# 量不到字重时的兜底（老产物没有 fontWeight 字段）。
+# **正常路径不看它** —— 字重由实测决定，见 add_text：八套风格里有**两套**
+# （paper-ink / botanical-dark）的标题是 400 字重，写死 bold 就直接和设计相反了。
+BOLD_ROLES_FALLBACK = {"title"}
+BOLD_WEIGHT = 600
 
 # 在浏览器里就是**单行不折**的（`.riso b{white-space:nowrap}`；`.foot` 是一行页码）。
 # PPT 里必须同样 nowrap：对方机器没有声明的字时会被替换，**替换字体一旦变宽就折行**，
@@ -164,6 +169,42 @@ def rel_box(el: dict, slides: list[dict]) -> tuple[float, float, float, float]:
     return el["x"] - sx, el["y"] - sy, el["w"], el["h"]
 
 
+# 我们出货的风格里出现过的 CJK 族。加新风格时如果用了新的中文字体，**这里要补**
+# （不补的话 ea 不会被写进去，中文就退回宿主自选 —— 不会报错，只会悄悄换字体）。
+CJK_FAMILIES = ("Hiragino Sans GB", "Songti SC", "Heiti SC", "PingFang SC",
+                "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC",
+                "Source Han Serif SC")
+
+
+def east_asian_family(stack: str) -> str | None:
+    """从 CSS 字体栈里挑第一个**能画汉字**的族（给 `<a:ea>` 用）。挑不到返回 None。"""
+    for raw in stack.split(","):
+        fam = raw.strip().strip('"').strip("'")
+        if fam in CJK_FAMILIES:
+            return fam
+    return None
+
+
+def set_east_asian_font(run, typeface: str) -> None:
+    """把**东亚字体**写进 `<a:ea>`（`font.name` 只写 `<a:latin>`）。
+
+    为什么这条对中文 deck 是要害：一份中文 deck 的字**绝大多数是 CJK**，
+    而宿主软件（PowerPoint / WPS / LibreOffice）对 CJK 用的是 `<a:ea>` 指定的族；
+    没写就由它自己挑 —— 实测：LibreOffice 渲出来是一个加粗的黑体，
+    而 paper-ink 的设计是宋体，等于导出把整个风格换掉了。
+
+    OOXML 的 schema 规定 `<a:latin>` → `<a:ea>` → `<a:cs>` 的顺序，
+    所以插在 latin 之后，不是直接 append（顺序错了 PowerPoint 会拒绝整个文件）。
+    """
+    rPr = run._r.get_or_add_rPr()          # noqa: SLF001 —— python-pptx 没有公开的 ea 接口
+    ea = rPr.makeelement(qn("a:ea"), {"typeface": typeface})
+    latin = rPr.find(qn("a:latin"))
+    if latin is not None:
+        latin.addnext(ea)
+    else:
+        rPr.append(ea)
+
+
 def add_text(slide, el: dict, box: tuple[float, float, float, float],
              vars_: dict[str, str]) -> None:
     """一个元素 → 一个文本框。**一个元素一个框**是可编辑性的底线。"""
@@ -185,8 +226,21 @@ def add_text(slide, el: dict, box: tuple[float, float, float, float],
     fam = first_family(vars_.get("--display", "") if role in SERIF_ROLES
                        else vars_.get("--body", ""))
     run.font.name = fam
+    # 中文靠 `<a:ea>`；**但不能拿栈首那个族给它** —— 栈首往往是拉丁族
+    # （Georgia / Helvetica Neue / Menlo），对汉字没有字形，宿主照样自己去挑，
+    # 等于没写（实测：ea 写成 Georgia 之后，LibreOffice 渲出来的中文还是个加粗黑体）。
+    # 所以从栈里挑一个**声明过的 CJK 族**；挑不到就不写 ea（让宿主决定，
+    # 比写一个错的强 —— 错的会让人以为我们指定了）。
+    ea_fam = east_asian_family(vars_.get("--display", "") if role in SERIF_ROLES
+                               else vars_.get("--body", ""))
+    if ea_fam:
+        set_east_asian_font(run, ea_fam)
     run.font.size = Pt(round((el.get("fontSize") or 24) * PX_TO_PT, 1))
-    run.font.bold = role in BOLD_ROLES
+    # 字重**跟着实测走**，不按角色写死：paper-ink / botanical-dark 的标题是 400 字重，
+    # 统一 bold 就等于把这两套风格的标题设计抹掉了（XML 里读出来是 b="1" ✗）。
+    weight = el.get("fontWeight")
+    run.font.bold = ((weight >= BOLD_WEIGHT) if isinstance(weight, (int, float))
+                     else role in BOLD_ROLES_FALLBACK)
     # 标题取叠印色（单层替代双墨错位）；其余用**实测到的**计算色 —— 又是"量不是猜"
     color = vars_["--text"] if role in SERIF_ROLES else (el.get("measuredColor")
                                                          or vars_["--text"])
@@ -246,8 +300,29 @@ def add_chart(slide, el: dict, box: tuple[float, float, float, float],
     chart = frame.chart
     chart.has_legend = False
     chart.has_title = False
+    # 图标外观要**跟着我们的设计**，不是跟着宿主软件的默认模板。
+    # 实测：不设这两项时 LibreOffice/PowerPoint 会画上网格线与左侧坐标轴数字，
+    # 而柱子上**没有数值** —— 和我们设计的柱状图正好相反（我们的设计里数值在柱顶、
+    # 只有一条基线）。
+    chart.value_axis.has_major_gridlines = False
+    chart.value_axis.visible = False          # 坐标轴数字是我们不画的
     plot = chart.plots[0]
     plot.gap_width = 60
+    plot.has_data_labels = True
+    labels = plot.data_labels
+    labels.show_value = True
+    labels.show_category_name = False
+    labels.show_series_name = False
+    labels.position = XL_LABEL_POSITION.OUTSIDE_END
+    labels.font.size = Pt(round(20 * PX_TO_PT, 1))
+    labels.font.color.rgb = css_color(vars_["--text"])
+    # 单位要跟着数值走：我们设计里的数值是 "31%"，而原生图表的标签默认只给数字。
+    # number_format_is_linked=False 是关键 —— 不设的话 PowerPoint 会把它当成
+    # "跟随数据源"而在打开时重新套一遍默认格式，单位就没了。
+    unit = str(el.get("unit", "") or "")
+    if unit:
+        labels.number_format = f'0"{unit}"'
+        labels.number_format_is_linked = False
     for series in plot.series:
         series.format.fill.solid()
         series.format.fill.fore_color.rgb = css_color(vars_["--accent"])
@@ -263,11 +338,22 @@ def build(html_path: str, out_path: str) -> dict:
         raise SystemExit("✗ 测量结果里没有页盒子 —— 产物里没有 section.slide？")
 
     boxes = {e["id"]: e for e in measured.get("elements", [])}
-    # 实测的计算色并进清单：导出时直接用，比从 token 猜准（又是“量不是猜”）
+    # 导出要用的**实测**字段显式并进清单条目（比从 token 猜准 —— 又是"量不是猜"）。
+    #
+    # 显式列出而不是整包 update：整包会把 x/y/w/h 也塞进清单条目，之后再用
+    # `rel_box()` 算相对坐标时，读的人分不清手上那个是文档坐标还是页内坐标。
+    # 但**漏一个字段就是静默走兜底值** —— 实测就漏过 `fontWeight`：
+    # 于是 paper-ink / botanical-dark 那两套 400 字重的标题在 PPTX 里被强制加粗，
+    # 而文件照生成、页数照样对，只有把 PPTX 打开看才发现。
+    MERGE_MEASURED = {"color": "measuredColor", "fontWeight": "fontWeight"}
     manifest = measure_mod.read_manifest(html)
     for entry in manifest:
-        if entry["id"] in boxes:
-            entry["measuredColor"] = boxes[entry["id"]].get("color")
+        m = boxes.get(entry["id"])
+        if not m:
+            continue
+        for src_key, dst_key in MERGE_MEASURED.items():
+            if m.get(src_key) is not None:
+                entry[dst_key] = m[src_key]
 
     prs = Presentation()
     prs.slide_width = Emu(1600 * EMU_PER_PX)
