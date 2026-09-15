@@ -69,10 +69,10 @@ done
 2. **写 spec**：每页只有 `type` + 内容（标题 / 条目 / 时间点 / 数据），见
    `references/style-architecture.md`；**写什么内容**见 `references/content-design.md`
    （一页一个观点 / 容量估算 / 观众距离）。拿不准一页装不装得下就先跑 `fit.py`，别猜。
-   `seed` 建议显式写（不写默认 1）—— 错位与颗粒
-   按 (seed, 元素) 派生，不靠全局 random（两次渲染不重 = 没法回归、也没法复现）。
+   `seed` 显式写（默认 1）：错位与颗粒按 (seed, 元素) 派生，不靠全局 random（否则没法回归）。
    公司有品牌资产（logo / 色号 / 字体 / 署名）就加一行 `deck.brand`，见
    `references/brand-assets.md` —— **品牌赢在"是谁"，风格赢在"怎么表达"**。
+   字体：126 款商免清单 + 字体↔风格映射表见 `references/fonts.md`（`fonts.py --fetch` 取字体）。
 3. **五道门**（顺序有意义：先验输入，再渲，再量，最后判）：
    - 规格：`python3 scripts/validate_spec.py your.spec.json`（字段集封闭，未知键直接失败）
    - 墨色：`python3 scripts/ink.py styles/<style>/style.json`（任一色板不达标退出 1）

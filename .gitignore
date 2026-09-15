@@ -38,6 +38,10 @@ skills/*.zip
 # 这条清单要**跟着产出物的种类长** —— 新加一种导出就得补一行，
 # 漏一行就是让一个几 MB 的二进制摸进公共仓库（`out.pdf` / 两种 pptx 就是这么漏的）。
 skills/deck-authoring/sample-treated.png
+# 字体文件**不进仓库**：单款 CJK 字体 5–28MB，126 款就是 1–2GB。
+# 仓库只存清单（fonts/catalog.json）与映射表（fonts/mapping.json），
+# 换台机器跑 `python3 scripts/fonts.py --fetch` 自动取回来。
+skills/deck-authoring/fonts/ttf/
 _brief-probe.html
 image-brief.md
 skills/deck-authoring/pages/

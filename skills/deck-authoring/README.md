@@ -105,7 +105,7 @@ python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸�
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 199 条，约 2.5 分钟（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 220 条，约 3 分钟（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时约 2.5 分钟，
@@ -144,6 +144,40 @@ PDF 是矢量且页数/页尺寸对、可编辑 PPTX 的**字是真字**且坐�
   路径；没装会说清代价后降级，不静默变慢）。
 - 不要装 Playwright —— `--headless=new --screenshot` 就够，多装一份纯属浪费
 
+## 字体
+
+内置 **126 款免费商用中文字体清单**（六类各 21 款）+ **字体 ↔ 风格映射表**。
+仓库里只有清单与映射（纯文本）—— 字体文件 5–28MB 一款，**不进仓库**，换台机器跑一次
+`python3 scripts/fonts.py --fetch` 就回来了。
+
+```bash
+python3 scripts/fonts.py --list --urls        # 126 款 + 来源页
+python3 scripts/fonts.py --fetch --tier A     # 取 OFL/开源那批（直链已验证）
+python3 scripts/fonts.py --map               # 8 套风格 × display/body/numeral 该配哪款
+```
+
+样式里直接写清单名就生效（渲染时自动注入 `@font-face`，**不靠把字体装进系统** ——
+实测 macOS 字体缓存不刷新：装对了、名字也对，Chrome 仍然回退）：
+
+```json
+"fonts": { "display": "得意黑 Smiley Sans, sans-serif", "body": "霞鹜文楷, sans-serif" }
+```
+
+**"分享出去对方没字体"影响什么 —— 逐格式不同，都是实测的**：
+
+| 交付格式 | 对方没装字体 | 依据 |
+| --- | --- | --- |
+| **PDF** | **没事** | Chrome 把用到的字形子集内嵌（`AAAAAA+SmileySans-Oblique` + `/FontFile2`）；另一款走 **Type3**（12 个 `/CharProcs`，字形是 PDF 内部绘图指令，同样自包含）。25MB 的霞鹜文楷出成 PDF 总共 113KB |
+| PNG / 贴图 PPTX / MP4 / GIF | **没事** | 已栅格化 |
+| **原生 PPTX** | **有事** ⚠️ | python-pptx 只写字体名（`<a:latin>` / `<a:ea>`），不嵌字体文件 —— 对方没装就由宿主替换 |
+| HTML | **有事** | 用读者的字体；`--embed` 可把字体内联成单文件（CJK 太大会拒绝并建议走 PDF） |
+
+授权标了 A/B/C，但**标了不等于没事**：免费字体的授权会调整，而把字体嵌进交付物属于
+再分发，比"自己用"敏感。正式上线前请把每款的授权页面 / License 存下来。
+四个实测踩过的坑（`.otf` 那份 Chrome 完全不嵌所以要优先 `.ttf`、`format()` 写错会**静默
+不用这款字**、字族真名与清单中文名不是一回事、短记号子串匹配必然误报）见
+`references/fonts.md`。
+
 ## 已知限制
 
 1. **贴图版 PPTX 改不了字**：要能改字就走 `pptx_native.py`（原生 shapes）。两者取舍见 `references/delivery-formats.md`。
@@ -174,6 +208,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── ink.py               # 墨色推导 + 三色板门禁（唯一消费者）
 │   ├── plate.py             # 图片 → duotone + 半调（制版）
 │   ├── image_source.py      # 提示词契约(--brief) / 验收(--check) / 生图 / 色块拼贴
+│   ├── fonts.py             # 字体库：清单(--list) / 取字体(--fetch) / 映射(--map) / 内嵌
 │   ├── brand.py             # 品牌资产：logo 内嵌 / 色板与字体合并 / SVG 栅格化
 │   ├── fit.py               # 试排：给定一页内容，实测哪些版式装得下（真渲真量）
 │   ├── style.py             # 风格层：列表 / 契约体检 / 摘要 / 联系表（八套拼一张图）

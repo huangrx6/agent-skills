@@ -1,0 +1,1122 @@
+{
+ "version": 1,
+ "generated_by": "scripts/fonts.py（清单来自用户提供的 126 款免费商用字体整理）",
+ "notice": "授权标记：A = OFL / 开源或官方明确广泛免费商用，优先用；B = 免费商用但有署名 / 地区 / Logo / 商标 / 嵌入等限制；C = 当前被免费字体平台收录为商免，正式上线前请再保存一次授权页面。**免费字体的授权会调整** —— 用于嵌入 / 打包分发之前，请以各字体最新的授权条款为准，并把 License 文件一起存下来。",
+ "license_classes": {
+  "A": "OFL / 开源或官方明确广泛免费商用 —— 可以下载、安装、嵌入交付物",
+  "B": "免费商用但有限制（署名 / 地区 / 禁商标 / 禁嵌入）—— 用之前读一遍条款",
+  "C": "平台收录为商免，授权未经一手确认 —— 正式商用前自行复核"
+ },
+ "sources": {
+  "S1": {
+   "name": "阿里巴巴字体",
+   "url": "https://www.alibabafonts.com/"
+  },
+  "S2": {
+   "name": "站酷字库",
+   "url": "https://www.zcool.com.cn/specials/zcoolfont/"
+  },
+  "S3": {
+   "name": "猫啃网",
+   "url": "https://www.maoken.com/"
+  },
+  "S4": {
+   "name": "字库星球",
+   "url": "https://www.zikuxingqiu.com/"
+  },
+  "S5": {
+   "name": "100font",
+   "url": "https://www.100font.com/"
+  },
+  "S6": {
+   "name": "中文开源字体总索引",
+   "url": "https://github.com/wordshub/free-font"
+  },
+  "S7": {
+   "name": "500+ 商免字体索引",
+   "url": "https://github.com/wordshub/free-font"
+  },
+  "S8": {
+   "name": "清松手写体",
+   "url": "https://github.com/jasonhandwriting/JasonHandwriting"
+  },
+  "S9": {
+   "name": "霞鹜文楷",
+   "url": "https://github.com/lxgw/LxgwWenKai"
+  },
+  "S10": {
+   "name": "得意黑",
+   "url": "https://github.com/atelier-anchor/smiley-sans"
+  },
+  "S11": {
+   "name": "Fusion Pixel",
+   "url": "https://github.com/TakWolf/fusion-pixel-font"
+  },
+  "小米官方": {
+   "name": "MiSans",
+   "url": "https://hyperos.mi.com/font/"
+  },
+  "华为官方": {
+   "name": "HarmonyOS Sans",
+   "url": "https://developer.huawei.com/consumer/cn/design/resource/"
+  },
+  "OPPO官方": {
+   "name": "OPPO Sans",
+   "url": "https://www.oppo.com/cn/branding/font/"
+  },
+  "vivo官方": {
+   "name": "vivo Sans",
+   "url": "https://www.vivosans.com/"
+  },
+  "字节官方": {
+   "name": "ByteDance Fonts",
+   "url": "https://fonts.bytedance.com/"
+  },
+  "GitHub": {
+   "name": "GitHub 上作者的仓库（直链可验证）",
+   "url": "https://github.com/search?q=%E5%83%8F%E7%B4%A0+font"
+  }
+ },
+ "categories": {
+  "guochao": {
+   "label": "国潮 / 古风 / 东方艺术字",
+   "count": 21
+  },
+  "brush": {
+   "label": "毛笔 / 行书 / 楷书 / 手写书法",
+   "count": 21
+  },
+  "trend": {
+   "label": "潮流 / 创意 / 海报标题",
+   "count": 21
+  },
+  "cute": {
+   "label": "卡通 / 可爱 / 手绘",
+   "count": 21
+  },
+  "ecom": {
+   "label": "电商 / 综艺 / 营销海报",
+   "count": 21
+  },
+  "tech": {
+   "label": "科技 / AI / 未来 / 像素",
+   "count": 21
+  }
+ },
+ "fonts": [
+  {
+   "i": 1,
+   "name": "阿里妈妈刀隶体",
+   "for": "国潮、酒类、文化海报",
+   "source": "S1",
+   "license": "A",
+   "category": "guochao"
+  },
+  {
+   "i": 2,
+   "name": "阿里妈妈东方大楷",
+   "for": "东方、武侠、节庆",
+   "source": "S1",
+   "license": "A",
+   "category": "guochao"
+  },
+  {
+   "i": 3,
+   "name": "庞门正道粗书体",
+   "for": "国潮、电商大标题",
+   "source": "S5/S7",
+   "license": "A/B",
+   "category": "guochao"
+  },
+  {
+   "i": 4,
+   "name": "仓耳周珂正大榜书",
+   "for": "大气书法标题",
+   "source": "S4/S7",
+   "license": "A",
+   "category": "guochao"
+  },
+  {
+   "i": 5,
+   "name": "字库星球飞扬体",
+   "for": "豪放中国风",
+   "source": "S4",
+   "license": "A",
+   "category": "guochao"
+  },
+  {
+   "i": 6,
+   "name": "黄令东齐伋体",
+   "for": "明代木刻、复古",
+   "source": "S6/S7",
+   "license": "A",
+   "category": "guochao"
+  },
+  {
+   "i": 7,
+   "name": "黄令东齐伋复刻体",
+   "for": "古籍、传统文化",
+   "source": "S6/S7",
+   "license": "A",
+   "category": "guochao"
+  },
+  {
+   "i": 8,
+   "name": "源界明朝 Genkai Mincho",
+   "for": "古典、旧报刊",
+   "source": "S6",
+   "license": "A",
+   "category": "guochao"
+  },
+  {
+   "i": 9,
+   "name": "康熙字典体",
+   "for": "古籍、历史设计",
+   "source": "S6",
+   "license": "B",
+   "category": "guochao"
+  },
+  {
+   "i": 10,
+   "name": "问藏书房体",
+   "for": "艺术宋体、文化",
+   "source": "S7",
+   "license": "B，注意地域",
+   "category": "guochao"
+  },
+  {
+   "i": 11,
+   "name": "润植家刻本简体",
+   "for": "古籍刻本",
+   "source": "S7",
+   "license": "B，需获取授权",
+   "category": "guochao"
+  },
+  {
+   "i": 12,
+   "name": "润植家如印奏章楷",
+   "for": "奏章、古风",
+   "source": "S7",
+   "license": "B，需获取授权",
+   "category": "guochao"
+  },
+  {
+   "i": 13,
+   "name": "字库江湖古风体",
+   "for": "武侠、仙侠",
+   "source": "S4/S7",
+   "license": "C",
+   "category": "guochao"
+  },
+  {
+   "i": 14,
+   "name": "峄山碑篆体",
+   "for": "篆书、传统文化",
+   "source": "S4/S7",
+   "license": "C",
+   "category": "guochao"
+  },
+  {
+   "i": 15,
+   "name": "京华老宋体",
+   "for": "民国、老上海",
+   "source": "S6",
+   "license": "B",
+   "category": "guochao"
+  },
+  {
+   "i": 16,
+   "name": "汇文明朝体（修正版）",
+   "for": "旧报刊、复古",
+   "source": "S6",
+   "license": "A",
+   "category": "guochao"
+  },
+  {
+   "i": 17,
+   "name": "南西初夏宋",
+   "for": "文艺、东方女性",
+   "source": "S4/S7",
+   "license": "C",
+   "category": "guochao"
+  },
+  {
+   "i": 18,
+   "name": "一点颜体",
+   "for": "颜体、古典标题",
+   "source": "S6",
+   "license": "B",
+   "category": "guochao"
+  },
+  {
+   "i": 19,
+   "name": "猫啃网风雅宋",
+   "for": "高级东方、杂志",
+   "source": "S3",
+   "license": "A/B",
+   "category": "guochao"
+  },
+  {
+   "i": 20,
+   "name": "猫啃网烟波宋",
+   "for": "国风、诗词",
+   "source": "S3",
+   "license": "A/B",
+   "category": "guochao"
+  },
+  {
+   "i": 21,
+   "name": "猫啃文明宋",
+   "for": "古典又现代",
+   "source": "S3",
+   "license": "A/B",
+   "category": "guochao"
+  },
+  {
+   "i": 22,
+   "name": "钟齐志莽行书",
+   "for": "草行书",
+   "source": "S4/S7",
+   "license": "A",
+   "category": "brush"
+  },
+  {
+   "i": 23,
+   "name": "钟齐流江毛草",
+   "for": "毛草书",
+   "source": "S4/S7",
+   "license": "A",
+   "category": "brush"
+  },
+  {
+   "i": 24,
+   "name": "钟齐马善政毛笔楷书",
+   "for": "毛笔楷书",
+   "source": "S4/S7",
+   "license": "A",
+   "category": "brush"
+  },
+  {
+   "i": 25,
+   "name": "钟齐翰墨毛笔",
+   "for": "豪放毛笔",
+   "source": "S4/S7",
+   "license": "A/B",
+   "category": "brush"
+  },
+  {
+   "i": 26,
+   "name": "字体传奇南安体",
+   "for": "现代书法",
+   "source": "S4/S5",
+   "license": "A",
+   "category": "brush"
+  },
+  {
+   "i": 27,
+   "name": "演示佛系体",
+   "for": "禅意手写",
+   "source": "S4",
+   "license": "A/B",
+   "category": "brush"
+  },
+  {
+   "i": 28,
+   "name": "演示夏行楷",
+   "for": "行楷",
+   "source": "S4",
+   "license": "A/B",
+   "category": "brush"
+  },
+  {
+   "i": 29,
+   "name": "演示秋鸿楷",
+   "for": "文人楷书",
+   "source": "S4",
+   "license": "A/B",
+   "category": "brush"
+  },
+  {
+   "i": 30,
+   "name": "演示悠然小楷",
+   "for": "小楷",
+   "source": "S4",
+   "license": "A/B",
+   "category": "brush"
+  },
+  {
+   "i": 31,
+   "name": "演示春风楷",
+   "for": "清秀楷体",
+   "source": "S4",
+   "license": "A/B",
+   "category": "brush"
+  },
+  {
+   "i": 32,
+   "name": "演示魁本楷书",
+   "for": "传统楷书",
+   "source": "S4",
+   "license": "A/B",
+   "category": "brush"
+  },
+  {
+   "i": 33,
+   "name": "江西拙楷 2.0",
+   "for": "拙朴手写",
+   "source": "S5/S7",
+   "license": "B，只用免费版本",
+   "category": "brush"
+  },
+  {
+   "i": 34,
+   "name": "霞鹜文楷",
+   "for": "文艺楷体",
+   "source": "S9",
+   "license": "A",
+   "category": "brush",
+   "match": "lxgwwenkai"
+  },
+  {
+   "i": 35,
+   "name": "霞鹜文楷 TC",
+   "for": "传统字形",
+   "source": "S9",
+   "license": "A",
+   "category": "brush",
+   "match": "lxgwwenkaitc"
+  },
+  {
+   "i": 36,
+   "name": "芫荽 Coriander",
+   "for": "人文楷体",
+   "source": "S6",
+   "license": "A",
+   "category": "brush"
+  },
+  {
+   "i": 37,
+   "name": "自由香港楷书",
+   "for": "繁中楷体",
+   "source": "S6",
+   "license": "A",
+   "category": "brush"
+  },
+  {
+   "i": 38,
+   "name": "cwTeX 中楷体",
+   "for": "古典楷体",
+   "source": "S6",
+   "license": "A/B",
+   "category": "brush"
+  },
+  {
+   "i": 39,
+   "name": "AR PL UKai",
+   "for": "开源楷体",
+   "source": "S6",
+   "license": "A",
+   "category": "brush"
+  },
+  {
+   "i": 40,
+   "name": "汇文正楷",
+   "for": "端正规范",
+   "source": "S6",
+   "license": "B",
+   "category": "brush"
+  },
+  {
+   "i": 41,
+   "name": "全字库楷体 TW-Kai",
+   "for": "台湾标准楷体",
+   "source": "S6",
+   "license": "B",
+   "category": "brush"
+  },
+  {
+   "i": 42,
+   "name": "一点钢笔鹤体",
+   "for": "钢笔艺术字",
+   "source": "S6",
+   "license": "B",
+   "category": "brush"
+  },
+  {
+   "i": 43,
+   "name": "得意黑 Smiley Sans",
+   "for": "斜体、潮牌感",
+   "source": "S10",
+   "license": "A",
+   "category": "trend",
+   "match": "smileysans"
+  },
+  {
+   "i": 44,
+   "name": "站酷庆科黄油体",
+   "for": "圆润潮流",
+   "source": "S2",
+   "license": "A",
+   "category": "trend"
+  },
+  {
+   "i": 45,
+   "name": "站酷文艺体",
+   "for": "简洁文艺",
+   "source": "S2",
+   "license": "A",
+   "category": "trend"
+  },
+  {
+   "i": 46,
+   "name": "站酷酷黑",
+   "for": "粗黑冲击",
+   "source": "S2",
+   "license": "A",
+   "category": "trend"
+  },
+  {
+   "i": 47,
+   "name": "站酷高端黑",
+   "for": "品牌、高级",
+   "source": "S2",
+   "license": "A/B",
+   "category": "trend"
+  },
+  {
+   "i": 48,
+   "name": "站酷小薇 LOGO 体",
+   "for": "Logo、标题",
+   "source": "S2",
+   "license": "A",
+   "category": "trend"
+  },
+  {
+   "i": 49,
+   "name": "站酷快乐体",
+   "for": "活泼潮流",
+   "source": "S2",
+   "license": "A",
+   "category": "trend"
+  },
+  {
+   "i": 50,
+   "name": "庞门正道标题体",
+   "for": "万能海报标题",
+   "source": "S5/S7",
+   "license": "A",
+   "category": "trend"
+  },
+  {
+   "i": 51,
+   "name": "庞门正道轻松体",
+   "for": "轻松创意",
+   "source": "S5/S7",
+   "license": "B",
+   "category": "trend"
+  },
+  {
+   "i": 52,
+   "name": "胡晓波男神体 2.0",
+   "for": "粗方黑",
+   "source": "S5/S7",
+   "license": "B",
+   "category": "trend"
+  },
+  {
+   "i": 53,
+   "name": "胡晓波真帅体 2.0",
+   "for": "圆角潮流",
+   "source": "S5/S7",
+   "license": "B",
+   "category": "trend"
+  },
+  {
+   "i": 54,
+   "name": "胡晓波骚包体",
+   "for": "个性创意",
+   "source": "S5/S7",
+   "license": "B",
+   "category": "trend"
+  },
+  {
+   "i": 55,
+   "name": "优设标题黑",
+   "for": "倾斜冲击",
+   "source": "S7",
+   "license": "A/B",
+   "category": "trend"
+  },
+  {
+   "i": 56,
+   "name": "优设标题圆",
+   "for": "圆角标题",
+   "source": "S7",
+   "license": "A/B",
+   "category": "trend"
+  },
+  {
+   "i": 57,
+   "name": "斗鱼追光体",
+   "for": "游戏、直播、综艺",
+   "source": "S4/S7",
+   "license": "B",
+   "category": "trend"
+  },
+  {
+   "i": 58,
+   "name": "锐字真言体",
+   "for": "粗标题",
+   "source": "S4/S7",
+   "license": "B",
+   "category": "trend"
+  },
+  {
+   "i": 59,
+   "name": "联盟起艺卢帅正锐黑体",
+   "for": "电商标题",
+   "source": "S4/S7",
+   "license": "B",
+   "category": "trend"
+  },
+  {
+   "i": 60,
+   "name": "字体传奇特战体",
+   "for": "军事、电竞",
+   "source": "S4/S7",
+   "license": "B",
+   "category": "trend"
+  },
+  {
+   "i": 61,
+   "name": "字体传奇雪家黑",
+   "for": "复古潮流",
+   "source": "S4/S7",
+   "license": "B",
+   "category": "trend"
+  },
+  {
+   "i": 62,
+   "name": "摄图摩登小方体",
+   "for": "方形现代",
+   "source": "S4/S7",
+   "license": "B",
+   "category": "trend"
+  },
+  {
+   "i": 63,
+   "name": "标小智龙珠体",
+   "for": "个性、综艺",
+   "source": "S4/S7",
+   "license": "B",
+   "category": "trend"
+  },
+  {
+   "i": 64,
+   "name": "清松手写体 1",
+   "for": "圆润",
+   "source": "S8",
+   "license": "A",
+   "category": "cute",
+   "match": "jasonhandwriting"
+  },
+  {
+   "i": 65,
+   "name": "清松手写体 2",
+   "for": "秀气",
+   "source": "S8",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 66,
+   "name": "清松手写体 3",
+   "for": "呆萌",
+   "source": "S8",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 67,
+   "name": "清松手写体 4",
+   "for": "POP",
+   "source": "S8",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 68,
+   "name": "清松手写体 5",
+   "for": "行楷",
+   "source": "S8",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 69,
+   "name": "清松手写体 6",
+   "for": "Q萌",
+   "source": "S8",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 70,
+   "name": "清松手写体 7",
+   "for": "飘逸",
+   "source": "S8",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 71,
+   "name": "清松手写体 8",
+   "for": "随性",
+   "source": "S8",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 72,
+   "name": "清松手写体 9",
+   "for": "文青",
+   "source": "S8",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 73,
+   "name": "小赖字体 Xiaolai",
+   "for": "日系手写",
+   "source": "S6",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 74,
+   "name": "悠哉字体 Yozai",
+   "for": "卡通手写",
+   "source": "S6",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 75,
+   "name": "内海字体 NaikaiFont",
+   "for": "自然手写",
+   "source": "S6",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 76,
+   "name": "何某手写体 NaniFont",
+   "for": "生活手写",
+   "source": "S6/S7",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 77,
+   "name": "辰宇落雁体",
+   "for": "温柔手写",
+   "source": "S6",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 78,
+   "name": "晓声通秋茄体",
+   "for": "俏皮手写",
+   "source": "S6",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 79,
+   "name": "CEF Fonts CJK「快去写作业」",
+   "for": "学生、卡通",
+   "source": "S6",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 80,
+   "name": "随峰体 SuiFeng",
+   "for": "自然随写",
+   "source": "S6",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 81,
+   "name": "851 手书杂字体",
+   "for": "日系手绘",
+   "source": "S6",
+   "license": "B",
+   "category": "cute"
+  },
+  {
+   "i": 82,
+   "name": "WD-XL 滑油字",
+   "for": "圆滑可爱",
+   "source": "S6",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 83,
+   "name": "星光小熊猫体",
+   "for": "儿童、萌系",
+   "source": "S6",
+   "license": "A",
+   "category": "cute"
+  },
+  {
+   "i": 84,
+   "name": "素材集市康康体 3.0",
+   "for": "可爱手写",
+   "source": "S4/S7",
+   "license": "B",
+   "category": "cute"
+  },
+  {
+   "i": 85,
+   "name": "阿里妈妈数黑体",
+   "for": "大促数字、标题",
+   "source": "S1",
+   "license": "A",
+   "category": "ecom"
+  },
+  {
+   "i": 86,
+   "name": "阿里妈妈方圆体",
+   "for": "食品、美妆、电商",
+   "source": "S1",
+   "license": "A",
+   "category": "ecom"
+  },
+  {
+   "i": 87,
+   "name": "阿里妈妈灵动体",
+   "for": "活动、促销",
+   "source": "S1",
+   "license": "A",
+   "category": "ecom"
+  },
+  {
+   "i": 88,
+   "name": "优设字由棒棒体",
+   "for": "儿童、电商标题",
+   "source": "S7",
+   "license": "A/B",
+   "category": "ecom"
+  },
+  {
+   "i": 89,
+   "name": "猫啃什锦黑",
+   "for": "马克笔促销",
+   "source": "S3",
+   "license": "A",
+   "category": "ecom"
+  },
+  {
+   "i": 90,
+   "name": "猫啃什锦黑繁体版",
+   "for": "港澳台宣传",
+   "source": "S3",
+   "license": "A",
+   "category": "ecom"
+  },
+  {
+   "i": 91,
+   "name": "猫啃网扛重族黑",
+   "for": "超粗大标题",
+   "source": "S3",
+   "license": "A/B",
+   "category": "ecom"
+  },
+  {
+   "i": 92,
+   "name": "猫啃网糖圆体",
+   "for": "食品、饮料",
+   "source": "S3",
+   "license": "A",
+   "category": "ecom"
+  },
+  {
+   "i": 93,
+   "name": "猫啃网秀雅圆",
+   "for": "美妆、生活",
+   "source": "S3",
+   "license": "A/B",
+   "category": "ecom"
+  },
+  {
+   "i": 94,
+   "name": "猫啃忘形圆",
+   "for": "趣味营销",
+   "source": "S3",
+   "license": "A/B",
+   "category": "ecom"
+  },
+  {
+   "i": 95,
+   "name": "猫啃珠圆体",
+   "for": "可爱产品",
+   "source": "S3",
+   "license": "A/B",
+   "category": "ecom"
+  },
+  {
+   "i": 96,
+   "name": "仓耳非白",
+   "for": "趣味、电商",
+   "source": "S4/S7",
+   "license": "B",
+   "category": "ecom"
+  },
+  {
+   "i": 97,
+   "name": "仓耳与墨 W03",
+   "for": "手作、文创",
+   "source": "S4/S7",
+   "license": "B",
+   "category": "ecom"
+  },
+  {
+   "i": 98,
+   "name": "乐米沐和圆体",
+   "for": "母婴、食品",
+   "source": "S4/S7",
+   "license": "C",
+   "category": "ecom"
+  },
+  {
+   "i": 99,
+   "name": "也字工厂小石头",
+   "for": "个性标题",
+   "source": "S4/S7",
+   "license": "C",
+   "category": "ecom"
+  },
+  {
+   "i": 100,
+   "name": "也字工厂柳叶体",
+   "for": "时尚、女性",
+   "source": "S4/S7",
+   "license": "C",
+   "category": "ecom"
+  },
+  {
+   "i": 101,
+   "name": "重庆山城棒棒体",
+   "for": "地域、餐饮",
+   "source": "S4/S7",
+   "license": "C",
+   "category": "ecom"
+  },
+  {
+   "i": 102,
+   "name": "飞波正点体",
+   "for": "电商、综艺",
+   "source": "S4/S7",
+   "license": "C",
+   "category": "ecom"
+  },
+  {
+   "i": 103,
+   "name": "小城拉风体",
+   "for": "年轻化活动",
+   "source": "S4/S7",
+   "license": "C",
+   "category": "ecom"
+  },
+  {
+   "i": 104,
+   "name": "山字瓜子体",
+   "for": "食品、休闲",
+   "source": "S4/S7",
+   "license": "C",
+   "category": "ecom"
+  },
+  {
+   "i": 105,
+   "name": "自由理想体",
+   "for": "文创、活动",
+   "source": "S4/S7",
+   "license": "C",
+   "category": "ecom"
+  },
+  {
+   "i": 106,
+   "name": "MiSans",
+   "for": "AI、科技、UI",
+   "source": "小米官方",
+   "license": "A",
+   "category": "tech"
+  },
+  {
+   "i": 107,
+   "name": "HarmonyOS Sans",
+   "for": "UI、科技平台",
+   "source": "华为官方",
+   "license": "B",
+   "category": "tech"
+  },
+  {
+   "i": 108,
+   "name": "OPPO Sans 4.0",
+   "for": "数字科技",
+   "source": "OPPO官方",
+   "license": "B",
+   "category": "tech"
+  },
+  {
+   "i": 109,
+   "name": "vivo Sans",
+   "for": "UI、数字产品",
+   "source": "vivo官方",
+   "license": "B",
+   "category": "tech"
+  },
+  {
+   "i": 110,
+   "name": "抖音美好体",
+   "for": "新媒体、互联网",
+   "source": "字节官方",
+   "license": "A",
+   "category": "tech"
+  },
+  {
+   "i": 111,
+   "name": "钉钉进步体",
+   "for": "SaaS、企业科技",
+   "source": "S1",
+   "license": "A/B",
+   "category": "tech"
+  },
+  {
+   "i": 112,
+   "name": "阿里巴巴普惠体 3.0",
+   "for": "企业、云平台",
+   "source": "S1",
+   "license": "A/B",
+   "category": "tech"
+  },
+  {
+   "i": 113,
+   "name": "源泉圆体 GenSenRounded",
+   "for": "友好科技",
+   "source": "S6",
+   "license": "A",
+   "category": "tech"
+  },
+  {
+   "i": 114,
+   "name": "资源圆体 Resource Han Rounded",
+   "for": "AI、Dashboard",
+   "source": "S6",
+   "license": "A",
+   "category": "tech"
+  },
+  {
+   "i": 115,
+   "name": "有爱圆体 Nowar Rounded",
+   "for": "网络、二次元",
+   "source": "S6",
+   "license": "A",
+   "category": "tech"
+  },
+  {
+   "i": 116,
+   "name": "寒蝉全圆体 ChillRound",
+   "for": "科技、年轻化",
+   "source": "S6",
+   "license": "A",
+   "category": "tech"
+  },
+  {
+   "i": 117,
+   "name": "源柔黑体 GenJyuuGothic",
+   "for": "UI、科技",
+   "source": "S6",
+   "license": "A",
+   "category": "tech"
+  },
+  {
+   "i": 118,
+   "name": "圆构黑体 Geource Sans",
+   "for": "几何科技",
+   "source": "S4/S7",
+   "license": "A",
+   "category": "tech"
+  },
+  {
+   "i": 119,
+   "name": "檎风黑体",
+   "for": "极简科技",
+   "source": "S4/S7",
+   "license": "A",
+   "category": "tech"
+  },
+  {
+   "i": 120,
+   "name": "豹变信息体",
+   "for": "信息流、数据可视化",
+   "source": "S4/S7",
+   "license": "C",
+   "category": "tech"
+  },
+  {
+   "i": 121,
+   "name": "Fusion Pixel Font",
+   "for": "像素、游戏、AI",
+   "source": "S11",
+   "license": "A",
+   "category": "tech",
+   "match": "fusionpixel"
+  },
+  {
+   "i": 122,
+   "name": "Z 工坊像素圆体 16px",
+   "for": "像素 UI",
+   "source": "GitHub/S6",
+   "license": "A",
+   "category": "tech"
+  },
+  {
+   "i": 123,
+   "name": "俐方体 11 号 Cubic 11",
+   "for": "复古像素",
+   "source": "S6",
+   "license": "A",
+   "category": "tech"
+  },
+  {
+   "i": 124,
+   "name": "精品点阵体 7×7",
+   "for": "小尺寸像素",
+   "source": "S6",
+   "license": "A",
+   "category": "tech"
+  },
+  {
+   "i": 125,
+   "name": "精品点阵体 9×9",
+   "for": "游戏、终端",
+   "source": "S6",
+   "license": "A",
+   "category": "tech"
+  },
+  {
+   "i": 126,
+   "name": "未来荧黑",
+   "for": "未来、赛博科技",
+   "source": "S4/S7",
+   "license": "A",
+   "category": "tech"
+  }
+ ],
+ "match_note": "match = 字体文件里稳定出现的拉丁记号（family 名或文件名）。只有**验证过**的才写；没写的就是无法自动识别，`--installed` 会漏掉它 —— 宁可漏也不要误报"
+}

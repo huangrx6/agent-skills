@@ -1,0 +1,227 @@
+{
+ "version": 1,
+ "note": "字体 ↔ 风格映射表。两问：这套风格该配哪款字（styles），以及某类艺术字该用在什么场合（categories）。**每一款字体都必须在 fonts/catalog.json 里**（有测试把关）—— 映射到查不到的字体等于给了一条走不通的路。",
+ "how_to_read": "roles 里的 display/body/numeral 对应版面上的三档字：标题档、正文档、数字档（有的风格还有 opening 开场页档）。写 `A / B` 表示 A 优先、装不到就退到 B。",
+ "licensed_note": "带 ⓑ 的是清单里授权的 B 级（有署名/地区/禁嵌入等限制）——**要嵌进交付物之前先读条款**；A 级可以直接用。",
+ "styles": {
+  "keynote-dark": {
+   "label": "Keynote 暗色",
+   "temperature": "大胆 · 冷",
+   "roles": {
+    "display": "得意黑 Smiley Sans / 庞门正道标题体",
+    "body": "MiSans / 资源圆体 Resource Han Rounded",
+    "numeral": "得意黑 Smiley Sans"
+   },
+   "fits": [
+    "trend",
+    "tech",
+    "ecom"
+   ],
+   "avoid": [
+    "cute",
+    "guochao"
+   ],
+   "why": "暗底 + 高对比，标题要斜着有冲击力（得意黑的斜体自带）；正文用中性无衬线，圆体在黑底上会显得软。"
+  },
+  "botanical-dark": {
+   "label": "植物暗色",
+   "temperature": "大胆 · 暖",
+   "roles": {
+    "display": "霞鹜文楷 / 京华老宋体ⓑ",
+    "body": "霞鹜文楷 / 汇文明朝体（修正版）",
+    "numeral": "霞鹜文楷"
+   },
+   "fits": [
+    "brush",
+    "guochao"
+   ],
+   "avoid": [
+    "tech",
+    "ecom"
+   ],
+   "why": "这套风格标题是 400 字重的衬线 —— 配毛笔/楷体类才顺；换成粗黑会立刻变成另一套风格。"
+  },
+  "billboard": {
+   "label": "广告牌",
+   "temperature": "大胆 · 亮",
+   "roles": {
+    "display": "阿里妈妈数黑体 / 站酷酷黑 / 庞门正道粗书体",
+    "body": "MiSans / 阿里巴巴普惠体 3.0",
+    "numeral": "阿里妈妈数黑体"
+   },
+   "fits": [
+    "ecom",
+    "trend"
+   ],
+   "avoid": [
+    "brush",
+    "cute"
+   ],
+   "why": "大字压满版，字本身就得是图形；数黑/酷黑这类超粗黑是唯一能扛住的。"
+  },
+  "swiss-grid": {
+   "label": "瑞士栅格",
+   "temperature": "安静 · 冷",
+   "roles": {
+    "display": "MiSans / HarmonyOS Sansⓑ / 阿里巴巴普惠体 3.0",
+    "body": "MiSans / 资源圆体 Resource Han Rounded",
+    "numeral": "MiSans"
+   },
+   "fits": [
+    "tech"
+   ],
+   "avoid": [
+    "cute",
+    "brush",
+    "guochao"
+   ],
+   "why": "栅格派要的是**中性到没有性格**的字 —— 字一旦有表情，栅格的克制就散了。所以这一类只用中性无衬线。"
+  },
+  "paper-ink": {
+   "label": "纸墨",
+   "temperature": "安静 · 暖",
+   "roles": {
+    "display": "霞鹜文楷 / 汇文明朝体（修正版）",
+    "body": "霞鹜文楷 / 芫荽 Coriander",
+    "numeral": "霞鹜文楷"
+   },
+   "fits": [
+    "brush",
+    "guochao",
+    "cute"
+   ],
+   "avoid": [
+    "tech",
+    "ecom"
+   ],
+   "why": "标题 400 字重的衬线 + 双横线夹击，配楷体/明朝体是它的本意；这是唯一适合长篇正文用艺术字的风格。"
+  },
+  "notebook": {
+   "label": "笔记本",
+   "temperature": "中性 · 暖",
+   "roles": {
+    "display": "猫啃网糖圆体 / 内海字体 NaikaiFont",
+    "body": "霞鹜文楷 / 内海字体 NaikaiFont",
+    "numeral": "猫啃网糖圆体"
+   },
+   "fits": [
+    "cute",
+    "brush"
+   ],
+   "avoid": [
+    "tech",
+    "trend"
+   ],
+   "why": "手写感是这套的全部；但要**干净的手写**（内海、悠哉），不是毛笔那种有情绪的。"
+  },
+  "terminal": {
+   "label": "终端",
+   "temperature": "中性 · 冷",
+   "roles": {
+    "display": "霞鹜文楷（等宽版 LXGWWenKai-Mono）/ Menlo",
+    "body": "霞鹜文楷（等宽版 LXGWWenKai-Mono）/ Menlo",
+    "numeral": "Menlo"
+   },
+   "fits": [
+    "tech"
+   ],
+   "avoid": [
+    "brush",
+    "cute",
+    "guochao",
+    "ecom"
+   ],
+   "why": "整套是等宽的 —— 换任何非等宽字体，列对齐和 `$` 提示符的位置立刻散掉。这是唯一必须锁死字族的风格。"
+  },
+  "pastel-geometry": {
+   "label": "粉彩几何",
+   "temperature": "中性 · 暖",
+   "roles": {
+    "display": "站酷庆科黄油体 / 猫啃珠圆体ⓑ",
+    "body": "资源圆体 Resource Han Rounded / 源泉圆体 GenSenRounded",
+    "numeral": "站酷庆科黄油体"
+   },
+   "fits": [
+    "cute",
+    "ecom"
+   ],
+   "avoid": [
+    "guochao",
+    "brush"
+   ],
+   "why": "圆头圆脑的几何色块，字也得是圆的；这里放衬线或毛笔会打架。"
+  }
+ },
+ "categories": {
+  "guochao": {
+   "label": "国潮 / 古风 / 东方艺术字",
+   "use": "文化类封面、节庆、酒茶餐饮、非遗/文博 —— 用在**标题档**，正文不要用",
+   "styles": [
+    "botanical-dark",
+    "paper-ink"
+   ],
+   "note": "这一层里 B/C 级最多（古籍复刻类常有地区或授权限制），商用前逐款复核"
+  },
+  "brush": {
+   "label": "毛笔 / 行书 / 楷书 / 手写书法",
+   "use": "文化叙事、引言页、品牌署名 —— 大字号单行最好看，多行会乱",
+   "styles": [
+    "botanical-dark",
+    "paper-ink"
+   ],
+   "note": "楷体（霞鹜文楷/芫荽）是唯一能扛正文的；草行书只适合短标题"
+  },
+  "trend": {
+   "label": "潮流 / 创意 / 海报标题",
+   "use": "封面主标题、活动主题字、电商大促 —— 只用标题档",
+   "styles": [
+    "keynote-dark",
+    "billboard"
+   ],
+   "note": "这一层最'吵'，一页只用一款；和中性正文搭档反差最大"
+  },
+  "cute": {
+   "label": "卡通 / 可爱 / 手绘",
+   "use": "儿童、食品、萌系、生活方式 —— 标题 + 少量强调",
+   "styles": [
+    "pastel-geometry",
+    "notebook"
+   ],
+   "note": "清松 1-9 是同一款字的九个变体，选一款用到底比混用更好"
+  },
+  "ecom": {
+   "label": "电商 / 综艺 / 营销海报",
+   "use": "促销数字、价格、倒计时 —— 数字档是主场，配超粗黑标题",
+   "styles": [
+    "billboard",
+    "keynote-dark"
+   ],
+   "note": "**数字档优先**：这一层要的是'数字要跳出来'，标题反而可以让位"
+  },
+  "tech": {
+   "label": "科技 / AI / 未来 / 像素",
+   "use": "产品发布、数据面板、开发者内容 —— 正文档为主，像素字只做点缀",
+   "styles": [
+    "swiss-grid",
+    "terminal"
+   ],
+   "note": "像素字（Fusion Pixel / 俐方体 / 点阵体）字号必须落在整数倍，否则点会糊"
+  }
+ },
+ "system_fonts": {
+  "note": "这几个是**系统自带**字体，不是清单里的商免艺术字 —— 列在映射里当回退项。它们跟着操作系统走，所以对方机器上一定有（只是版本/字形可能有差）。",
+  "list": [
+   "Helvetica Neue",
+   "Helvetica",
+   "Arial",
+   "Georgia",
+   "Times New Roman",
+   "Menlo",
+   "Courier New",
+   "Futura",
+   "Songti SC",
+   "Hiragino Sans GB",
+   "Heiti SC"
+  ]
+ }
+}

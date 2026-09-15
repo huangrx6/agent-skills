@@ -67,6 +67,21 @@ def list_dirs(path: str) -> list[str]:
         return []
 
 
+def list_files(path: str, suffix: str = "") -> list[str]:
+    """列出目录下的文件名（已排序），可按后缀过滤。
+
+    与 `list_dirs` 同一套理由：目录不存在时返回空表 —— 调用方要的是"能写进报错里的
+    候选表"，不是一个 traceback。
+    """
+    try:
+        names = os.listdir(path)
+    except OSError:
+        return []
+    return sorted(f for f in names
+                  if os.path.isfile(os.path.join(path, f))
+                  and (not suffix or f.lower().endswith(suffix)))
+
+
 def read_bytes(path: str) -> bytes:
     """读二进制（PDF / PNG 之类）。
 

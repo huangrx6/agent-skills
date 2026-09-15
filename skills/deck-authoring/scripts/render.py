@@ -588,7 +588,13 @@ def _head(title: str, style: dict, seed: int, color_set: str) -> str:
             + SKELETON_CSS.replace("__VARS__", ";".join(vars_))
             + "\n/* ── 风格 skin：" + style["name"] + " ── */\n"
             + style["skin"].replace("__GRAIN_SVG__", _grain_svg(tokens))
-            + "\n" + SHELL_CSS + "\n</style></head><body>\n")
+            + "\n" + SHELL_CSS + "\n"
+            # 字体：样式栈里出现的清单字体，本地有就注入 @font-face。
+            # 为什么不靠"装进系统"：实测 macOS 的字体缓存不会因为 cp 一个文件就刷新 ——
+            # 字体装对了、名字也写对了，Chrome 仍然回退。@font-face 立刻生效，
+            # 而且顺带让 Chrome 出 PDF 时把字形子集嵌进去（读者不需要装字体）。
+            + fonts_module.face_css([tokens['fonts']['display'], tokens['fonts']['body']])
+            + "\n</style></head><body>\n")
     return head
 
 
@@ -605,6 +611,7 @@ def _grain_svg(tokens: dict) -> str:
 
 ink_module = _load_sibling("ink")  # 叠印与对比度只有一处定义，不重抄
 brand_module = _load_sibling("brand")
+fonts_module = _load_sibling("fonts")  # 字体清单与 @font-face（清单是数据，不是硬编码）
 
 
 def _apply_brand(style: dict, brand: dict) -> dict:
