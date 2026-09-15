@@ -43,6 +43,19 @@ def ensure_dir(path: str) -> None:
         raise SystemExit(f"✗ 建不了目录 {path}：{exc}") from exc
 
 
+def read_bytes(path: str) -> bytes:
+    """读二进制（PDF / PNG 之类）。
+
+    为什么要单独一个：验 PDF 要看文件里的字节标记，而 `read_text` 会在非 UTF-8
+    上抛 UnicodeDecodeError —— 那不属于 OSError，会被它漏过去。
+    """
+    try:
+        with open(path, "rb") as fh:
+            return fh.read()
+    except OSError as exc:
+        raise SystemExit(f"✗ 读不到 {path}：{exc}") from exc
+
+
 def as_number(value, what: str) -> float:
     """把可能是字符串/None 的值转成数字；转不了就如实报错，不甩 traceback。"""
     try:

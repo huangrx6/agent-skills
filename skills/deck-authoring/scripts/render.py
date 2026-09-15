@@ -73,13 +73,35 @@ def halftone(tokens: dict, seed, index: int) -> str:
 
     第一版是四象限随便挑 —— 视觉检查当场抓到它压在标题上 ✗（#76 记下了这件事）。
     现在收成右半边的两个角：左栏是文字栏，墨块永不进栏。
+
+    **画成 SVG，而且网点用「虚线网格」而不是 `<pattern>`**：
+    1. 网点是**规则点阵**，本来就属于矢量世界。原来用 `radial-gradient` 画，整块在
+       PDF 里变位图。
+    2. 换 `<pattern>` 后屏幕好了，但 Chrome 导 PDF 时**把 `<pattern>` 整块栅格化**
+       —— 实测 4 块半调 → 4 张 ~1035×1014 位图，1.49MB。把 `mix-blend-mode` 和
+       `opacity` 都去掉也治不好，栅格化的是 pattern 本身。
+    3. 换成一条**虚线描边路径**（横向线 + `stroke-dasharray`）后它留在矢量里：
+       全 PDF 0.24MB、零位图。方点占 2.5²/25 ≈ 25%，圆点 r=1.4 占 6.16/25 ≈ 25%，
+       面积对齐，而 5px 尺度下方点与圆点肉眼分不出。
     """
     r = _rng(seed, "half", index)
     size = r.choice([480, 560, 620])
     zone = r.choice(["tr", "br"])          # 只用右侧两角：文字栏在左
     css = {"tr": "right:-60px;top:-40px", "br": "right:-130px;bottom:-140px"}[zone]
-    return (f'<div class="halftone" data-zone="{zone}" data-size="{size}" '
-            f'style="{css};width:{size}px;height:{size}px;border-radius:50%"></div>')
+    step, half = 5, size / 2          # step 是 int：行数用整除算，不需要强制转换
+    # 一行一条横虚线；dasharray 把每行切成方点。相位不重要（重复纹理）。
+    dashes = "".join(f"M0 {y * step + step / 2:.1f}H{size}"
+                     for y in range(size // step + 1))
+    # 必须 clip 成圆 —— 虚线是**通栏**画的，不裁就是一块方底（视觉检查当场抓到 ✗）。
+    cid = f"hc{index}"
+    return (f'<svg class="halftone" data-zone="{zone}" data-size="{size}" '
+            f'style="{css};width:{size}px;height:{size}px" '
+            f'viewBox="0 0 {size} {size}" aria-hidden="true">'
+            f'<defs><clipPath id="{cid}">'
+            f'<circle cx="{half}" cy="{half}" r="{half}"/></clipPath></defs>'
+            f'<circle cx="{half}" cy="{half}" r="{half}" fill="var(--ink-a)"/>'
+            f'<path clip-path="url(#{cid})" d="{dashes}" fill="none" '
+            f'stroke="var(--paper)" stroke-width="2.5" stroke-dasharray="2.5 2.5"/></svg>')
 
 
 HEAD = """<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>__TITLE__</title><style>
@@ -90,8 +112,7 @@ html,body{margin:0;background:var(--viewer)}
 .slide{position:relative;width:1600px;height:900px;background:var(--paper);overflow:hidden;margin:0 auto 36px}
 .grain{position:absolute;inset:0;pointer-events:none;opacity:var(--grain-op);
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='__GRAIN_FREQ__' numOctaves='2'/><feColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0'/></filter><rect width='220' height='220' filter='url(%23n)'/></svg>")}
-.halftone{position:absolute;background:var(--ink-a);mix-blend-mode:multiply;opacity:.55;
-  background-image:radial-gradient(circle,var(--paper) 1.4px,transparent 1.4px);background-size:5px 5px}
+.halftone{position:absolute;display:block;mix-blend-mode:multiply;opacity:.55}
 .pad{padding:132px 84px}
 .riso{position:relative;display:block}
 .riso b{position:absolute;top:0;left:0;font:900 var(--riso-size,152px)/1.02 var(--serif);
@@ -163,12 +184,20 @@ html[data-view="present"] .slide.is-cur{display:block}
 html[data-view="present"] .hud{opacity:1}
 html[data-view="present"] .hint{opacity:1}
 /* 打印/导 PDF：一页一张 1600×900，不缩放、不留阴影 —— 演示态是给屏幕的，
-   纸面要的是原件本身（矢量 PDF 导出走这条路）。 */
+   纸面要的是原件本身（矢量 PDF 导出走这条路）。
+   @page 必须显式给：不给的话 Chrome 用 Letter/A4，deck 会被缩小 + 四周留白
+   （实测：6 页能出，但页尺寸是 Letter 的）。 */
 @media print{
+  @page{size:1600px 900px;margin:0}
   html,body{background:#fff;height:auto;display:block;overflow:visible}
   .slide{margin:0;transform:none;page-break-after:always;break-after:page;
     box-shadow:none;display:block !important}
   .hud,.hint{display:none !important}
+  /* 纸面不留颗粒：颗粒是 feTurbulence，导 PDF 时整页会被栅格化成多张
+     ~1366×769 位图（实测一页多 ~0.8MB），而它本身只有 0.08~0.15 不透明度、
+     栅格化后还不到 1:1 —— 又大又糊。纸上本来就有纸纹。
+     （这是**屏幕/纸面的有意差异**，不是漏了一句。屏幕上看得到颗粒。） */
+  .grain{display:none !important}
 }
 """
 

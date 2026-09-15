@@ -1,7 +1,7 @@
 # 交付格式的取舍
 
-一条流水线，三种交付物：`out.html` / `pages/*.png` / `deck.pptx`。
-这条决策线是 #77 拍下来的，写在这里给后人读。
+一条流水线，四种交付物：`out.html` / `deck.pdf` / `pages/*.png` / `deck.pptx`。
+这条决策线是 #77 拍下来的，写在这里给后人读（PDF 是后来补的，那节的账已重算）。
 
 ## HTML
 
@@ -72,28 +72,51 @@
 这个 skill 选了"视觉做到极近真实孔版"。如果某个 deck 真的需要对方改字，
 那它就不该用这个 skill 出 —— 用 PowerPoint 自己做一个普通的。
 
-## 三种交付物的相互依赖
+## 四种交付物的相互依赖
 
-```
+```text
 deck-spec.json ─┐
-                ├──→ render.py ──→ out.html ──→ shots.py ──→ pages/*.png ──→ make_pptx.py ──→ deck.pptx
-style.json  ───┘            │
-                            └──→ check.py（验 HTML，对 PNG 产物里读 HTML 已有
-                                          的字段再核一次 —— 同一份事实两个视角）
+                ├─→ render.py ─→ out.html ─┬─→ shots.py ───→ pages/*.png ─→ make_pptx.py ─→ deck.pptx
+style.json  ───┘        │                 └─→ pdf.py ──────→ deck.pdf（矢量）
+                        │
+                        └─→ check.py（验 HTML；内部调 measure.py 实测真盒子）
 ```
 
-`check.py` 是**对 HTML 跑的**，不是对 PNG 跑的。但它会从 PNG 的产物上下文里读
-（错位区间从 HTML 里读，柱高从 HTML 里读）—— 同一份事实两个视角，避免
-"渲染器自觉"导致的自检失效。
+`check.py` 是**对 HTML 跑的**，不是对 PNG / PDF 跑的 —— 错位区间、柱高都从 HTML 里读，
+同一份事实两个视角，避免"渲染器自觉"导致的输出自检失效。
+PDF 与 PPTX 都从同一份 HTML 出，所以两者不会跑偏。
 
-## 关于"为什么不直接给 PDF"
+## PDF（矢量）
 
-PPT 想要 + Web 想要 + 打印想要，加 PDF 听起来对。但：
+**是什么**：`python3 scripts/pdf.py out.html -o deck.pdf` —— 走 Chrome 的打印管线
+（`render.py` 的 `@media print` 已把版面调成"一页一张 1600×900、不缩放、隐壳"）。
 
-- PDF 是**静态**的 —— 客户不能像看 PPT 那样切页看（演示用 PPT 顺手）
-- PDF **改版式**要重出（演示者改不了字号），同上 PNG 的局限
-- PDF 在飞书 / Notion / Slack 里要预览，**没有 PPTX 顺手**
+**关键性质：全矢量**。文字是嵌入字体（可选可搜、放大不糊），网点、错位、色块都是路径。
+实测 6 页 **0.65MB / 零内嵌位图 / 7 个嵌入字体**。
 
-PPT + Web（HTML / Notion 嵌入）覆盖了 90% 的实际使用场景。
-如果某天真的需要 PDF，`make_pptx.py` 之后接 `libreoffice --headless --convert-to pdf`
-就够 —— 但目前没有真实需求驱动这个加法，**别为了"完整性"加**。
+这一点不是白来的 —— 页面里凡是"只有合成器能算"的东西，Chrome 就会把整页栅格化。
+实测踩过两次：
+
+| 元素 | 后果（都是实测值） |
+| --- | --- |
+| `.grain` 的 `feTurbulence` 颗粒 | 每页多 ~0.8MB 位图，而且栅格化后不到 1:1（又大又糊）。打印态**关掉**它 |
+| 网点用 `radial-gradient` 或 SVG `<pattern>` 画 | 每块半调退化成一张 ~1035×1014 位图（1.49MB）。改用**虚线路径**画网点后归零 |
+
+不写 `@page{size:...}` 也不行：Chrome 会用 Letter，deck 被缩小加留白，
+**而 `--print-to-pdf` 照样返回 0**。所以 `pdf.py` 会验页数、页尺寸、位图数、字体嵌入，
+不对就退 1。
+
+**什么时候用**：
+
+- **打印 / 进印刷**：矢量、尺寸精确（一页 1200×675pt）
+- **归档**：不依赖浏览器版本，五年前的文件今天打开还是那个样子
+- **要"一个文件"的地方**：邮件附件、飞书/Notion 预览都比 HTML 顺手
+- **体积敏感**：同一份 deck，PDF 0.65MB，PPTX 10.1MB（每页一张 2x 贴图）—— **小 15 倍**
+
+**什么时候不用**：
+
+- 对方要**改字 / 改版式**：PDF 与 PPTX 贴图版一样改不了
+- 要**现场演示**：HTML 演示态更灵活（`F` 全屏 + 键盘翻页），PDF 全屏得靠阅读器的简报模式
+
+**与屏幕的唯一有意差异**：纸面没有颗粒（`.grain` 在打印态关掉）。
+它是 0.08~0.15 不透明度的噪点，屏幕上看得见，而纸上本来就有纸纹。
