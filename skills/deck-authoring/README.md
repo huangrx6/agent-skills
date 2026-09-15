@@ -105,7 +105,7 @@ python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸�
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 269 条，约 5 分钟（负载敏感）（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 299 条，约 5 分钟（负载敏感）（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时约 2.5 分钟，
@@ -217,6 +217,36 @@ python3 scripts/palette.py --roles swiss-grid blue          # 13 个角色的推
 哪些是流程判断、哪些**还没实现**（渐变渲染、玻璃拟态、强调色占比实测），
 逐条列在 `references/color.md`。
 
+## 布局与信息层级
+
+**我们的布局不是模板系统，也不是约束系统** —— 是**固定画布 + 7 种手写版式 + 真浏览器
+实测校验 + 试排**。画布 1600×900、`PAD 84/132`、正文带 132→824 是几何常量的唯一来源。
+
+**规范里最核心的那条原则（"不要让 LLM 决定 x=327，程序负责精确布局"）从第一版就是
+那样做的**：spec 里根本没有 x/y —— `validate_spec.py` 把 `x`/`y`/`dx`/`dy`/`rot`/
+`width`/`height` 直接判错。所以那是**加法**，不是重构。
+
+新加的 `hierarchy.py` 只做三件事，**全是提示级**（阈值取决于语境：封面就该空、
+看板就该满）：
+
+- **文本预算** —— 封面标题 ≤12 字、内页标题 ≤24、单条 ≤60…；超了不是只说"超了"，
+  而是把**修复顺序**写进报错：删字 → 拆信息 → 换版式 → 拆页 → **最后才允许缩字号**
+  （规范第 22 条。本仓库的 `bullet_tier()` 是"缩字号第一"，这条提示是为了在它之前
+  把话说完）
+- **视觉焦点** —— 给每个元素算视觉权重（文字用**墨迹宽** `textW` × 高度，不是整栏宽
+  —— 实测标题的 `w` 是 1432px 而墨迹只占一小块），要求第一名领先第二名 ≥25%，
+  且达首名 60% 权重的元素不超过 3 个（规范第 8 条）。实测我们的版式稳定领先 **90%+**
+- **内容密度** —— 占正文带的百分比，按 Minimal 35~50% / Normal 45~65% /
+  Information 55~75% / Dashboard 65~82% 分档
+
+**硬约束与软约束是分开的**（规范第 21 条）：越界 / 重叠 / 文字溢出 / 图被放大 →
+`check.py` **阻塞**；焦点 / 密度 / 预算 / 对齐 / 平衡 → **提示**。混淆的后果是第一份
+正常的 deck 就被挡住，然后所有人开始忽略检查。
+
+五块（布局 / 层级 / 留白 / 图形 / 图表）的现状、该借谁的规则（Fluent 2、Figma Auto
+Layout、Design Tokens、**IBCS + ISO 24896**、AntV）、缺什么、以及**分四步的路线图**
+（哪步是加法、哪步要动 8 套 skin、风险在哪）见 `references/layout-system.md`。
+
 ## 已知限制
 
 1. **贴图版 PPTX 改不了字**：要能改字就走 `pptx_native.py`（原生 shapes）。两者取舍见 `references/delivery-formats.md`。
@@ -249,6 +279,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── image_source.py      # 提示词契约(--brief) / 验收(--check) / 生图 / 色块拼贴
 │   ├── fonts.py             # 字体库：清单(--list) / 取字体(--fetch) / 映射(--map) / 内嵌
 │   ├── palette.py           # 配色：OKLCH / 结构实测(--audit) / novelty / 三方向 / 角色
+│   ├── hierarchy.py         # 信息层级：文本预算 / 视觉焦点 / 内容密度（全是提示级）
 │   ├── brand.py             # 品牌资产：logo 内嵌 / 色板与字体合并 / SVG 栅格化
 │   ├── fit.py               # 试排：给定一页内容，实测哪些版式装得下（真渲真量）
 │   ├── style.py             # 风格层：列表 / 契约体检 / 摘要 / 联系表（八套拼一张图）

@@ -55,6 +55,7 @@ deckio = _load_sibling("deckio")   # IO 收口：读不到产物要报清楚，�
 measure_mod = _load_sibling("measure")   # 实测层：版面判断全部走它，不估算
 render_mod = _load_sibling("render")   # 只为拿“同一个风格”的 token（单一来源）
 brand_mod = _load_sibling("brand")     # 品牌资产（logo / 色板 / 字体）
+hierarchy_mod = _load_sibling("hierarchy")   # 文本预算 / 视觉焦点 / 密度
 
 TOKENS = os.path.join(HERE, "..", "styles", "swiss-grid", "style.json")
 
@@ -551,6 +552,13 @@ def advisories(measured: dict, spec: dict | None = None,
         notes.extend(brand_notes)
         _, shape_notes = _check_deck_shape(measured, spec.get("deck", {}))
         notes.extend(shape_notes)
+        # 信息层级那三条（预算 / 焦点 / 密度）**全是提示**，理由见 hierarchy.py：
+        # 它们的阈值取决于语境（封面就该空、看板就该满），做成阻塞的话第一份正常的
+        # deck 就被挡住，然后所有人开始忽略检查。这里只把结论并进提示流。
+        deck = spec.get("deck", {})
+        notes.extend(hierarchy_mod.budget_issues(deck))
+        notes.extend(hierarchy_mod.focal_issues(measured, deck))
+        notes.extend(hierarchy_mod.density_issues(measured, deck))
     return notes
 
 
