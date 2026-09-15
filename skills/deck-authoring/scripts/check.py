@@ -301,6 +301,28 @@ def _check_deck_shape(measured: dict, deck: dict) -> tuple[list[str], list[str]]
             f"{len(content_kinds)} 页内容全是一种版式（{content_kinds[0]}）—— "
             f"构图没有变化。用 fit.py 试排一下别的版式，或把其中几页拆/并")
 
+    # 图量：**全篇一张图都没有**时提示，并点名最该加图的那几页。
+    #
+    # 为什么要有这一条：用户明确要求「图片该要就要，别因为嫌麻烦就少要，多了也没事」。
+    # 而在那之前，这条流水线对"少要"是完全沉默的 —— 一份 20 页全文字的 deck
+    # 能一路绿灯到底。沉默就是默认，默认就是少要。
+    #
+    # 为什么仍是**提示**而不是阻塞："这份 deck 该有几张图"取决于内容（讲现场、
+    # 讲对比、讲某个东西长什么样，就该有图；讲三条结论，就不必有），像素判不出来。
+    # 所以这里只做一件事：在**一张图都没有**时开口，并指出位置。
+    # 只在 0 张时响，避免对已有图的 deck 反复唠叨 —— 唠叨会让人整体忽略提示。
+    if slides and not any(s.get("image") for s in slides):
+        text_only = [(i, s) for i, s in enumerate(slides, 1)
+                     if s.get("type") == "content-text" and len(s.get("bullets", [])) >= 4]
+        notes.append(
+            f"全篇 {len(slides)} 页**没有一张图** —— 一页在讲「某个东西长什么样 / "
+            f"现场 / 对比」就该有图（用 content-image 版式）；讲「三条结论」不必有。"
+            f"图多一点没坏处，少要才是问题")
+        for i, s in text_only[:3]:
+            notes.append(
+                f"第 {i} 页「{s.get('title', '')}」是 {len(s.get('bullets', []))} 条纯文字 —— "
+                f"想加图的话这一页最容易加")
+
     # 逐页密度：只对“承载内容”的版式判 —— 封面/收尾页本来就该稀疏。
     for i, slide in enumerate(slides, 1):
         if slide.get("type") in ("title", "end"):

@@ -84,7 +84,12 @@ python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸�
 主体 → 场景 → 构图 → 镜头 → 光线 → 色彩 → 风格 → 细节 → 文字 → 限制
 ```
 
-先"画什么"、再"怎么画"、最后"绝对不能错"。**「主体 / 场景 / 细节」留空给人填**
+先"画什么"、再"怎么画"、最后"绝对不能错"。**图片该要就要，别嫌麻烦少要，多了也没事**：`content-image` 版式**必须**给 `image`
+（缺了渲染器会崩，`validate_spec.py` 拦）；全篇一张图都没有时 `check.py` 会开口并点名
+最容易加图的那几页。什么时候该有图、什么时候版式本身已经承担了视觉功能，见
+`references/content-design.md`。
+
+**「主体 / 场景 / 细节」留空给人填**
 （写作 `〈…〉`）—— 工具只看得见 spec 里的文字，读不到你脑子里的画面，就不该替你编。
 脚本填的是它真知道的部分：构图来自实测槽位与版式（图独立成栏、文字在旁边），
 色彩来自该风格的色板，光线与风格来自气质档，限制来自制版管线。
@@ -94,7 +99,7 @@ python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸�
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 180 条，约 3 分钟（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 190 条，约 2.5 分钟（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时约 2.5 分钟，

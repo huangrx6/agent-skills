@@ -172,5 +172,52 @@ class TestValidateSpec(unittest.TestCase):
         self.assertNotIn("BAD_COLOR_SET", codes)
 
 
+
+class TestRequiredFields(unittest.TestCase):
+    """条件必填：版式已经说了要图，就不许把图省掉。
+
+    **实测撞到的**：字段集只查"允许哪些键"，不查"哪些键必需" —— 所以
+    `content-image` 不给 `image` 能一路过校验，然后渲染器直接
+    `KeyError: 'image'` 崩栈。一个未处理的栈，不是一句人话。
+
+    这条与"图片该要就要，别为了省事少要"是同一件事：版式选了要图的那一种，
+    图就不该是可省的。
+    """
+
+    def setUp(self) -> None:
+        with open(TOKENS, encoding="utf-8") as fh:
+            self.color_sets = set(json.load(fh)["colorSets"])
+
+    def _codes(self, spec: dict) -> set[str]:
+        return {i["code"] for i in vs.validate(spec, self.color_sets).errors}
+
+    def test_content_image_without_image_is_blocked(self) -> None:
+        self.assertIn("MISSING_FIELD",
+                      self._codes(_spec([{"type": "content-image", "title": "没图"}])))
+
+    def test_content_image_with_image_passes(self) -> None:
+        self.assertEqual(
+            self._codes(_spec([{"type": "content-image", "title": "有图",
+                                "image": "x.png"}])), set())
+
+    def test_empty_image_name_is_also_blocked(self) -> None:
+        """空字符串不算给了图 —— 它照样会渲出一张裂图。"""
+        self.assertIn("MISSING_FIELD",
+                      self._codes(_spec([{"type": "content-image", "title": "空",
+                                          "image": ""}])))
+
+    def test_error_says_what_to_do_instead(self) -> None:
+        """报错必须给出路，否则读者只知道"错了"、不知道"那我怎么办"。"""
+        issues = vs.validate(_spec([{"type": "content-image", "title": "没图"}]),
+                             self.color_sets)
+        msg = " ".join(i["message"] for i in issues.items)
+        self.assertIn("content-text", msg)
+
+    def test_only_the_layouts_that_need_it_are_required(self) -> None:
+        """别的版式不许被顺手要求填图 —— 误伤会把"必填"变成噪音。"""
+        self.assertEqual(
+            self._codes(_spec([{"type": "content-text", "title": "纯文字",
+                                "bullets": ["a", "b"]}])), set())
+
 if __name__ == "__main__":
     unittest.main()

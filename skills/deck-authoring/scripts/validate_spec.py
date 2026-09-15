@@ -47,6 +47,16 @@ SLIDE_FIELDS = {
     "chart":         {"type", "title", "data", "unit", "caption", "color"},
     "end":           {"type", "title", "color"},
 }
+# **条件必填**：这个版式的全部内容就是那个字段，缺了它这一页不成立。
+#
+# 字段集是"封闭"的（只查允许哪些键），不是"必填"的 —— 所以 `content-image`
+# 不给 `image` 会一路放行到渲染器，然后 `KeyError: 'image'` 崩栈。实测撞到过。
+# 与"图片该要就要，别为了省事少要"是同一条：这一页的版式已经说了要图，
+# 就不该把它省掉。
+REQUIRED_SLIDE_FIELDS = {
+    "content-image": {"image"},
+}
+
 # 嵌套列表的元素字段（两栏 / 时间点 / 柱子）
 ITEM_FIELDS = {
     "columns": {"title", "bullets"},
@@ -168,6 +178,12 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
                          f"未知版式 {kind!r}；支持 {sorted(SLIDE_FIELDS)}")
             continue
         _check_fields(slide, SLIDE_FIELDS[kind], where, issues)
+        for need in REQUIRED_SLIDE_FIELDS.get(kind, ()):
+            if not slide.get(need):
+                issues.error("MISSING_FIELD", f"{where}.{need}",
+                             f"{kind} 版式必须有 {need!r} —— 这一页的全部内容就是它。"
+                             f"缺了不是「少一张图」，是渲染器会直接崩；"
+                             f"这一页不需要图就换成 content-text 版式")
         # color 只允许 "overprint"（主/副色载不住正文 —— 见 ink.py）
         declared = slide.get("color")
         if declared is not None and declared != "overprint":

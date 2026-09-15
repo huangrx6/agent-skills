@@ -308,5 +308,71 @@ class TestPlaceholderPath(unittest.TestCase):
                                 f"没放占位图：{s['file']}")
 
 
+
+class TestImageEconomy(unittest.TestCase):
+    """「图片该要就要，别因为嫌麻烦就少要，多了也没事」——
+
+    这条准则在两处落地：**输入门**（版式要图就必须给图）与**产物提示**
+    （全篇一张图都没有时开口）。前者阻塞、后者提示，因为"该有几张图"取决于内容。
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.check_mod = _load("check")
+        cls.stress = deckio.read_json(STRESS)
+
+    def _deck(self, strip_images: bool):
+        deck = json.loads(json.dumps(self.stress["deck"]))
+        for s in deck["slides"]:
+            if strip_images:
+                s.pop("image", None)
+                s.pop("caption", None)
+                if s.get("type") == "content-image":
+                    s["type"] = "content-text"
+        return deck
+
+    def _notes(self, strip_images: bool) -> str:
+        # 只给 {} 当 measured：内容跨度取不到就是 None，于是这里只会跑
+        # deck 级那几条（图量 / 版式单一 / 缺封面），不必真渲一遍。
+        _problems, notes = self.check_mod._check_deck_shape({}, self._deck(strip_images))
+        return " / ".join(notes)
+
+    def test_zero_images_is_called_out(self) -> None:
+        self.assertIn("没有一张图", self._notes(strip_images=True))
+
+    def test_a_deck_with_images_is_not_nagged(self) -> None:
+        """已有图的 deck 不许被唠叨 —— 唠叨会让人整体忽略提示。"""
+        self.assertNotIn("没有一张图", self._notes(strip_images=False))
+
+    def test_note_names_where_to_add_one(self) -> None:
+        """光说"没图"没有用，得指出最容易加图的那几页。"""
+        notes = self._notes(strip_images=True)
+        self.assertIn("纯文字", notes)
+
+    def test_slot_suggestions_point_at_text_only_pages(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            deck = self._deck(strip_images=True)
+            path = os.path.join(tmp, "noimg.spec.json")
+            deckio.write_text(path, json.dumps({"deck": deck}, ensure_ascii=False))
+            hints = image_source.suggest_image_slots(path)
+        self.assertTrue(hints, "全文字 deck 本该给出建议")
+        self.assertTrue(any("纯文字页" in h for h in hints), hints)
+
+    def test_brief_without_slots_suggests_instead_of_refusing(self) -> None:
+        """**回归**：一张图都没有时 `--brief` 不再甩一句"没有要出图的地方"就完事。
+
+        那是把"少要"做成了默认。现在它指出哪几页可能该有图，由内容定要不要加。
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            deck = self._deck(strip_images=True)
+            path = os.path.join(tmp, "noimg.spec.json")
+            deckio.write_text(path, json.dumps({"deck": deck}, ensure_ascii=False))
+            with self.assertRaises(SystemExit) as ctx:
+                image_source.build_brief(path, tmp)
+        msg = str(ctx.exception)
+        self.assertIn("没有任何 image 槽位", msg)
+        self.assertIn("要不要加图由内容定", msg)
+        self.assertIn("content-image", msg)
+
 if __name__ == "__main__":
     unittest.main()

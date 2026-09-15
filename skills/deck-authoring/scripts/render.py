@@ -713,7 +713,14 @@ def render(deck_spec: dict, style: dict | None = None) -> str:
                 f'<li {tag(f"s{i}.bullet.{bi}", i, "bullet", b, bsize)}>'
                 f'<i>■</i>{html.escape(b)}</li>'
                 for bi, b in enumerate(slide.get("bullets", [])))
-            src = slide["image"]
+            # 干净报错，不要甩一个 KeyError 栈：validate_spec.py 本该先拦住
+            # （它现在有 REQUIRED_SLIDE_FIELDS），但 render 也可能被别的入口直接调。
+            src = slide.get("image")
+            if not src:
+                raise SystemExit(
+                    f"✗ 第 {i} 页（content-image）没有 image —— 这个版式的全部内容"
+                    f"就是那张图；请补上文件名，或把这一页换成 content-text。"
+                    f"（validate_spec.py 会在渲染之前拦住这种 spec）")
             img_attrs = tag(f"s{i}.image", i, "image", src)
             # 图注放在 <figure> 里的 <figcaption>，不是另外挂一个 div：
             # 语义上它属于这张图（读屏器会念成图的一部分），样式上它跟着图的宽度

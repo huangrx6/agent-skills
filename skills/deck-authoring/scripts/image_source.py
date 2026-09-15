@@ -241,6 +241,40 @@ def _slot_geometry(spec_path: str, style: str | None, out_dir: str,
     return (info, style_name)
 
 
+# 哪些版式**天生带视觉锚点**（图表 / 时间线 / 两栏对比）—— 不缺图也立得住。
+# 反过来，`content-text` 是纯文字页：它是**最可能该加图**的地方。
+# 这只是一条按版式猜的启发式，所以它只用来**提示**，最终判断在人。
+VISUAL_LAYOUTS = ("content-image", "chart", "timeline")
+
+
+def suggest_image_slots(spec_path: str) -> list[str]:
+    """一份 spec 一张图都没有时，指出哪几页该考虑加图。
+
+    为什么不是直接报"没有要出图的地方"：那是把"少要"做成了默认。用户明确要的是
+    **图片该要就要，别因为嫌麻烦就少要，多了也没事**。所以工具在这里的角色是
+    提醒 + 指出位置，不是拒绝服务。
+    """
+    deck = deckio.read_json(spec_path).get("deck", {})
+    slides = deck.get("slides", [])
+    out = []
+    for i, slide in enumerate(slides, 1):
+        kind = slide.get("type", "")
+        # 只有纯文字页会被列出来：图表 / 时间线本身就带视觉锚点，不缺图也立得住
+        # （它们由 `VISUAL_LAYOUTS` 声明，见那里的注释）。
+        if kind == "content-text":
+            bullets = slide.get("bullets", [])
+            if len(bullets) >= 3:
+                out.append(f"第 {i} 页「{slide.get('title', '')}」是纯文字页、"
+                           f"{len(bullets)} 条 —— 全篇最容易加图的地方")
+    # 封面：主视觉通常在这里，但 title 版式**没有** image 字段
+    for i, slide in enumerate(slides, 1):
+        if slide.get("type") == "title":
+            out.append(f"第 {i} 页是封面 —— `title` 版式不带 image 字段；要主视觉得"
+                       f"用整幅色块或换版式（这一条是版式的限制，不是没要图）")
+            break
+    return out
+
+
 def _aspect_box(w: int, h: int) -> str:
     return f"{w}:{h}（≈{w / h:.2f}:1）"
 
@@ -249,7 +283,18 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None) -> dict:
     """产出提示词契约（人读的 markdown + 机读的 JSON 一起给）。"""
     info, style_name = _slot_geometry(spec_path, style, out_dir)
     if not info:
-        raise SystemExit("✗ 这份 spec 里没有任何 image 槽位 —— 没有要出图的地方")
+        # 不直接失败：先说清"你这份 spec 一张图都没有"，再指出哪几页可能该有 ——
+        # 工具按版式只能猜到这一步，要不要加由内容定。
+        lines = ["✗ 这份 spec 里没有任何 image 槽位 —— 没有要出图的地方。", ""]
+        hints = suggest_image_slots(spec_path)
+        if hints:
+            lines.append("  要不要加图由内容定（工具只能按版式猜）：")
+            lines += [f"    · {h}" for h in hints]
+            lines += ["", "  一页在讲「某个东西长什么样 / 现场 / 对比」，就该有图；",
+                      "  在讲「三条结论」，就不必有。加图用 `content-image` 版式"]
+        else:
+            lines.append("  这份 spec 里也没有明显该加图的位置（页数少 / 都是短页）。")
+        raise SystemExit("\n".join(lines))
     tokens = _load_sibling("render").load_style(style_name)["tokens"]
     label = tokens.get("label", style_name)
     temperature = tokens.get("temperature", "")
