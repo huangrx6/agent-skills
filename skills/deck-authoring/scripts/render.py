@@ -62,11 +62,14 @@ deckio = _load_sibling("deckio")   # IO 收口：参数写错要报清楚，不�
 STYLE_ROOTS = (os.path.join(HERE, "..", "styles"),
                os.path.join(HERE, "..", "dev-tools", "style-fixture"))
 DEFAULT_STYLE = "swiss-grid"
-# content-image 的变体（Family × Variant 第一片，值封闭 —— validate_spec 同步）：
+# content-image 的变体（Family × Variant，值封闭 —— validate_spec 同步）：
 #   visual-right = 文 7 栅 + 图 5 栅（默认，历史上唯一的那一种）
 #   visual-left  = 图先文后（镜像，宽度不动 —— 阅读从图开始/连续图页换侧换节奏）
 #   even         = 6+6 均分（图与文等权，statement 用）
-IMAGE_VARIANTS = ("visual-right", "visual-left", "even")
+#   hero         = 图就是这一页的主角：满幅 12 栅 + 底部实心标题条
+#                 （check 的全页图禁令对 hero role-aware 放行 —— 标题/条目
+#                  仍是真 DOM 文本，"信息烤进图里"的禁止不适用）
+IMAGE_VARIANTS = ("visual-right", "visual-left", "even", "hero")
 
 # ── 版面几何：壳里那些数字的**唯一出处** ─────────────────────────────
 # `SHELL_CSS` 里的 `.pad{padding:132px 84px}` 与 `.footrow{bottom:52px}` 是这几个值；
@@ -295,6 +298,17 @@ html,body{margin:0;background:var(--viewer)}
    v-left 只换 DOM 顺序（宽度不动），类名留给 skin 做侧别微调的钩子。 */
 .two.v-even .main{width:704px}
 .two.v-even .imgwrap{width:704px}
+/* hero：图是这一页的主角 —— 满幅 12 栅 + 底部**实心**标题条。
+   条用 --text 底 / --paper 字的反转色对：对比度与正文是同一个 token 保证
+   （≥4.5 自动成立）。刻意不做半透明渐变 scrim —— 渐变透明端的文字对比度
+   估不出来，实心条才可被门禁证明。 */
+.herofig{position:relative;width:1432px;margin:0;overflow:hidden}
+.herofig img{display:block;width:100%;height:100%;object-fit:cover}
+.herofig .herobar{position:absolute;left:0;right:0;bottom:0;
+  padding:18px 30px 18px 0;background:var(--text);color:var(--paper)}
+.herofig .herobar .title{color:var(--paper);
+  font-size:var(--s-colTitle,40px);line-height:1.3;white-space:normal}
+.hero-bullets{margin-top:24px}
 .imgwrap img{width:100%;display:block}
 .cols{display:flex;gap:var(--sp-item);margin-top:var(--sp-item)}
 .col{flex:1;min-width:0}
@@ -879,8 +893,16 @@ def render_resolved(resolved: dict) -> str:
                 for bi, b in enumerate(slide.get("bullets", [])))
             out.append(f'<ul class="bullets" style="--s-bullet:{bsize}px">{items}</ul>')
         elif kind == "content-image":
-            out.append(f'<div class="titleblock tb-{t_tier}" '
-                       f'style="--s-title:{tsize}px">{th}</div>')
+            # variant 判定要在 titleblock 之前：hero 的标题只住 herobar，
+            # 顶部再立一个 titleblock 就是双标题（而且把 648px 的图顶出正文带）。
+            variant = slide.get("variant") or "visual-right"
+            if variant not in IMAGE_VARIANTS:
+                raise SystemExit(
+                    f"✗ 第 {i} 页（content-image）未知变体 {variant!r}；"
+                    f"支持 {list(IMAGE_VARIANTS)}（validate_spec.py 会先拦住）。")
+            if variant != "hero":
+                out.append(f'<div class="titleblock tb-{t_tier}" '
+                           f'style="--s-title:{tsize}px">{th}</div>')
             items = "".join(
                 f'<li {tag(f"s{i}.bullet.{bi}", i, "bullet", b, bsize)}>'
                 f'<i>■</i>{html.escape(b)}</li>'
@@ -906,11 +928,7 @@ def render_resolved(resolved: dict) -> str:
                        f'{html.escape(slide["caption"])}</figcaption>')
             # Family(content-image) × Variant：spec/compile 决定文图栅格分配，
             # 渲染只执行。默认 visual-right 必须**逐字节**等于旧输出（重构不改像素）。
-            variant = slide.get("variant") or "visual-right"
-            if variant not in IMAGE_VARIANTS:
-                raise SystemExit(
-                    f"✗ 第 {i} 页（content-image）未知变体 {variant!r}；"
-                    f"支持 {list(IMAGE_VARIANTS)}（validate_spec.py 会先拦住）。")
+            # （variant 已在 titleblock 之前判定 —— hero 不立独立标题块。）
             main_html = (f'<div class="main"><ul class="bullets" '
                          f'style="--s-bullet:{bsize}px">{items}</ul></div>')
             img_html = (f'<figure class="imgwrap" {img_attrs}>'
@@ -919,6 +937,19 @@ def render_resolved(resolved: dict) -> str:
                 out.append(f'<div class="two v-left">{img_html}{main_html}</div>')
             elif variant == "even":            # 6+6 均分
                 out.append(f'<div class="two v-even">{main_html}{img_html}</div>')
+            elif variant == "hero":            # 图为主角：满幅 + 实心标题条
+                # 无条目 648px（占整页 64% —— check 对 hero 放行，标题仍是
+                # 真 DOM 文本）；带条目压到 520px 给正文留位。caption/条目
+                # 跟在图后的普通流里（对比度走纸面，不走图上）。
+                hero_h = 520 if items else 648
+                bullets_html = (f'<ul class="bullets small hero-bullets" '
+                                f'style="--s-bullet:{bsize}px">{items}</ul>'
+                                ) if items else ""
+                out.append(f'<figure class="herofig" {img_attrs} '
+                           f'style="height:{hero_h}px">'
+                           f'<img src="{html.escape(src)}" alt="">'
+                           f'<div class="herobar">{th}</div></figure>'
+                           f'{bullets_html}{cap}')
             else:                              # 默认：文 7 + 图 5，图在右
                 out.append(f'<div class="two">{main_html}{img_html}</div>')
         elif kind == "two-column":

@@ -58,11 +58,12 @@ SLIDE_FIELDS = {
 # 与"图片该要就要，别为了省事少要"是同一条：这一页的版式已经说了要图，
 # 就不该把它省掉。
 # content-image 变体的值集（与 render.IMAGE_VARIANTS 一字不差）：
-# visual-right（默认）/ visual-left（图先文后，镜像）/ even（6+6 均分）。
+# visual-right（默认）/ visual-left（图先文后，镜像）/ even（6+6 均分）/
+# hero（图为主角：满幅 + 实心标题条；check 的全页图禁令对它 role-aware）。
 # spec 还可以写 "auto" —— 意思是"让实测来选"（fit --recommend 落盘 →
 # compile --fit-variants 喂入；没数据回退默认）。auto 是意图不是几何，
 # 不许漏进 resolved。
-IMAGE_VARIANTS = ("visual-right", "visual-left", "even")
+IMAGE_VARIANTS = ("visual-right", "visual-left", "even", "hero")
 IMAGE_VARIANT_INPUTS = IMAGE_VARIANTS + ("auto",)
 
 REQUIRED_SLIDE_FIELDS = {

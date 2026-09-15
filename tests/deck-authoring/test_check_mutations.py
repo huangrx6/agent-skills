@@ -216,3 +216,43 @@ class TestCheckMutations(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFullPageImageRoleAware(unittest.TestCase):
+    """全页图禁令的 role-aware：hero 放行（信息没烤进图里），其余照堵。"""
+
+    @staticmethod
+    def _measured(w: float, h: float, slide: int = 1, role: str = "image") -> dict:
+        return {"elements": [{"role": role, "slide": slide, "w": w, "h": h}]}
+
+    HERO_DECK = {"slides": [{"type": "content-image", "variant": "hero",
+                             "image": "x.png"}]}
+    PLAIN_DECK = {"slides": [{"type": "content-image", "variant": "visual-right",
+                              "image": "x.png"}]}
+
+    def test_non_hero_giant_image_still_blocks(self) -> None:
+        """非 hero 版式图盖满整页：照旧阻塞 —— 守卫没有失牙。"""
+        problems = check._check_full_page_image(
+            self._measured(1600, 900), self.PLAIN_DECK)
+        self.assertTrue(problems, "全页图禁令被静默解除了")
+
+    def test_hero_giant_image_passes(self) -> None:
+        """hero 变体：图是主角、标题/条目仍是真 DOM 文本 —— 放行。"""
+        self.assertEqual(
+            check._check_full_page_image(self._measured(1600, 900), self.HERO_DECK),
+            [])
+
+    def test_hero_does_not_excuse_logo(self) -> None:
+        """logo 永不放行：品牌标盖满整页没有合法场景。"""
+        problems = check._check_full_page_image(
+            self._measured(1600, 900, role="logo"), self.HERO_DECK)
+        self.assertTrue(problems, "hero 页的 logo 盖满整页居然过了")
+
+    def test_hero_on_other_page_does_not_excuse(self) -> None:
+        """hero 声明只豁免自己那页 —— 别页的大图不受牵连。"""
+        deck = {"slides": [
+            {"type": "content-image", "variant": "hero", "image": "x.png"},
+            {"type": "content-image", "variant": "even", "image": "y.png"}]}
+        problems = check._check_full_page_image(
+            self._measured(1600, 900, slide=2), deck)
+        self.assertTrue(problems)

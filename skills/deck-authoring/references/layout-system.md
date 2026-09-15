@@ -122,14 +122,18 @@ content-image/two-column/timeline/chart/end）+ 自建风格。**content-image �
 成为显式家族**：`variant` 字段进 spec（封闭值集），其余 type 仍是单版式 ——
 family 命名层全量铺开在路线图阶段 3。
 
-## 16. Layout Variant【✅ 第一片已落地（3 变体）】
+## 16. Layout Variant【✅ 已落地（4 变体，含 hero）】
 
 每个 Family 多 Variant（split_40_60 / split_50_50 / split_left_visual / …；
 hero_center / hero_left / hero_full_bleed / …）。**content-image 已有显式变体**：
 `visual-right`（文 7 栅 + 图 5 栅，默认）/ `visual-left`（图先文后，镜像换节奏）/
-`even`（6+6 均分）——键值双封闭（validate_spec），显式即进 Decision Trace
-（compile layout 段），fit 探针把三变体摆进同一份产物供评分。其余 type
-（两栏 6+6、时间线）仍隐式 —— 等候选实测铺开。
+`even`（6+6 均分）/ `hero`（满幅 12 栅 + 底部实心标题条 —— 图就是主角：
+无条目 648px 占整页 64%，check 的全页图禁令对它 role-aware，因为标题/条目
+仍是真 DOM 文本，"信息烤进图里"的禁止不适用；hierarchy 的密度四档同样跳过
+hero —— 满图是特性，fit 对 hero 用 _hero_whitespace 另一把留白尺子）——
+键值双封闭（validate_spec），显式/auto 均进 Decision Trace（compile layout 段），
+fit 探针把四变体摆进同一份产物供评分（实测：图即陈述的页面 hero 0.45 胜
+分栏 0.40）。其余 type（两栏 6+6、时间线）仍隐式 —— 等候选实测铺开。
 
 ## 17. Variant 选择依据【✅ 第一片已落地（content-image）】
 

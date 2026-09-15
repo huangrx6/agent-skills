@@ -215,6 +215,23 @@ class TestVariantRendering(unittest.TestCase):
     def test_explicit_default_equals_implicit(self) -> None:
         self.assertEqual(self._page_html(None), self._page_html("visual-right"))
 
+    def test_hero_renders_single_title_in_bar(self) -> None:
+        """hero：标题只住 herobar，顶部不许再立 titleblock（双标题 = 溢出元凶）。"""
+        seg = self._page_html("hero")
+        self.assertIn('class="herofig"', seg)
+        self.assertIn('class="herobar"', seg)
+        self.assertEqual(seg.count('class="titleblock'), 0,
+                         "hero 页还有独立标题块 —— 标题会被渲染两次")
+        self.assertIn("height:520px", seg)   # demo 第 3 页带 2 条条目 → 520
+        # 无条目形态才是 648（占整页 64%，role-aware 放行的那档）；
+        # 实心标题条的反转色对 CSS 在壳的 <style> 里，断言要看整份产物
+        no_bullets = _demo()
+        no_bullets["deck"]["slides"][2].pop("bullets", None)
+        no_bullets["deck"]["slides"][2]["variant"] = "hero"
+        full = render.render(no_bullets)
+        self.assertIn("height:648px", full)
+        self.assertIn("background:var(--text)", full)   # --text 底 / --paper 字
+
 
 class TestAutoVariant(unittest.TestCase):
     """variant:"auto"：吃实测数据选变体；没数据回退默认 —— 都不猜。"""

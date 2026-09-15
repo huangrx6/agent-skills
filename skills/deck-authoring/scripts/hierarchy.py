@@ -283,6 +283,10 @@ def density_issues(measured: dict, deck: dict, band: str | None = None) -> list[
     for i, slide in enumerate(deck.get("slides", []), 1):
         if slide.get("type") in ("title", "end"):
             continue
+        # hero 变体：图就是主角，墨面 90%+ 是设计不是"太满"—— 这把四档尺子
+        # 是给文字主导页的（fit 对 hero 用 _hero_whitespace 那把，两处同一道理）。
+        if slide.get("type") == "content-image" and slide.get("variant") == "hero":
+            continue
         share = density_share(measured, i)
         if share is None:
             continue

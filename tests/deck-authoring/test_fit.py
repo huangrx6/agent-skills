@@ -260,6 +260,7 @@ class TestFitEndToEnd(unittest.TestCase):
         kinds = [v["kind"] for v in labels.values()]
         self.assertIn("content-image:visual-left", kinds)
         self.assertIn("content-image:even", kinds)
+        self.assertIn("content-image:hero", kinds)
 
 
 class TestFitCli(unittest.TestCase):
@@ -421,12 +422,13 @@ class TestRecommend(unittest.TestCase):
         spec = {"deck": {"slides": [{"type": "content-image", "title": "t",
                                      "bullets": ["a"], "image": "img.png"}]}}
         probe, labels = fit.build_variant_probe(spec, self.tmp)
-        self.assertEqual(len(probe["deck"]["slides"]), 3)
+        self.assertEqual(len(probe["deck"]["slides"]), 4)   # 三分栏变体 + hero
         self.assertEqual(probe["deck"]["slides"][0]["image"],
                          os.path.join(self.tmp, "img.png"))
         kinds = [m["kind"] for m in labels.values()]
         self.assertIn("content-image:even", kinds)
         self.assertIn("content-image:visual-left", kinds)
+        self.assertIn("content-image:hero", kinds)
 
     def test_probe_empty_without_image_pages(self) -> None:
         probe, _labels = fit.build_variant_probe(
@@ -448,10 +450,43 @@ class TestRecommend(unittest.TestCase):
         rec = recs[0]
         self.assertEqual(rec["page"], 1)
         self.assertIn(rec["variant"], fit.render.IMAGE_VARIANTS)
-        self.assertEqual(len(rec["alternatives"]), 2)
+        self.assertEqual(len(rec["alternatives"]), 3)   # 四变体：最佳 + 三个对手
         for alt in rec["alternatives"]:
             self.assertGreaterEqual(rec["score"], alt["score"],
                                     "最佳变体分数反而落后 —— 排序坏了")
         # 纯函数：同一份测量再算一遍必须恒等；重测一次也恒等（确定性链路）
         again = fit.recommend(fit.measure_mod.measure(html_path), labels, spec)
         self.assertEqual(recs, again)
+
+
+class TestHeroScoring(unittest.TestCase):
+    """hero 的评分维度：满图是特性不是拥挤 —— 与文字主导页用不同的留白尺子。"""
+
+    def test_hero_whitespace_peaks_when_full(self) -> None:
+        self.assertEqual(fit._hero_whitespace(0.94), 1.0)
+        self.assertEqual(fit._hero_whitespace(1.0), 1.0)
+        self.assertLess(fit._hero_whitespace(0.4), 0.6)
+
+    def test_hero_scores_fullness_as_feature(self) -> None:
+        """占带 93% 的 hero：留白满分、不吃拥挤惩罚（同数字的文字页会吃）。"""
+        score, parts, pens = fit.score_candidate(
+            {"kind": "content-image:hero", "fits": True, "density": 0.93},
+            {"title": "t", "bullets": ["a"], "image": "x.png"})
+        self.assertEqual(parts["whitespace"], 1.0)
+        self.assertEqual(pens, [])
+
+    def test_hero_semantic_wants_few_bullets(self) -> None:
+        """图即陈述：≤2 条满分，≥3 条降分（该用带正文的变体）。"""
+        two = fit._semantic_score("content-image:hero",
+                                  {"bullets": ["a", "b"], "image": "x"})
+        many = fit._semantic_score("content-image:hero",
+                                   {"bullets": ["a", "b", "c"], "image": "x"})
+        self.assertEqual(two, 1.0)
+        self.assertEqual(many, 0.2)
+
+    def test_text_page_still_gets_crowding_penalty(self) -> None:
+        """同一数字 93%：文字主导页照吃拥挤惩罚 —— role-aware 不是放水。"""
+        _s, _p, pens = fit.score_candidate(
+            {"kind": "content-text", "fits": True, "density": 0.93},
+            {"title": "t", "bullets": ["a"]})
+        self.assertTrue(any("拥挤" in p for p in pens))

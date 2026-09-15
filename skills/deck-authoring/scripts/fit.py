@@ -91,11 +91,22 @@ def _whitespace_score(density: float) -> float:
     return max(0.0, 1.0 - (density - 0.75) / 0.25)
 
 
+def _hero_whitespace(density: float) -> float:
+    """hero 的留白维度：图为主角的页面，"呼吸感"来自图**完整占据**版面，
+    不是文字密度。≥80% 满分，以下线性 —— 与 _whitespace_score 是两种
+    同样诚实的主张：文字主导页要舒适带，图像主导页要完整。"""
+    return min(1.0, max(0.0, density / 0.80))
+
+
 def _semantic_score(kind: str, content: dict) -> float:
     """语义匹配：内容形状与版式的契合（不是"哪个装得多"）。"""
     n = len(content.get("bullets") or [])
     has_image = bool(content.get("image"))
+    variant = kind.split(":")[1] if ":" in kind else None
     kind = kind.split(":")[0]          # "content-image:even" → 家族语义同默认
+    if variant == "hero":
+        # 图即陈述：条目越少越对（≥3 条就该用带正文的变体）
+        return 1.0 if (has_image and n <= 2) else 0.2
     if kind == "content-image":
         return 1.0 if has_image else 0.0
     if kind == "two-column":
@@ -106,12 +117,14 @@ def _semantic_score(kind: str, content: dict) -> float:
 
 def score_candidate(c: dict, content: dict) -> tuple[float, dict, list[str]]:
     """一个候选的多目标得分（0~0.45 满分基准）+ 分项 + 惩罚名。纯函数。"""
+    is_hero = c["kind"].split(":")[-1] == "hero"
     parts = {"fit": 1.0 if c["fits"] else 0.0,
-             "whitespace": round(_whitespace_score(c["density"]), 3),
+             "whitespace": round(
+                 (_hero_whitespace if is_hero else _whitespace_score)(c["density"]), 3),
              "semantic": round(_semantic_score(c["kind"], content), 3)}
     score = sum(parts[k] * SCORE_WEIGHTS[k] for k in SCORE_WEIGHTS)
     penalties: list[str] = []
-    if c["density"] > CROWDING_ABOVE:
+    if not is_hero and c["density"] > CROWDING_ABOVE:
         score -= CROWDING_PENALTY
         penalties.append(f"拥挤（占带 {c['density']:.0%} > 85%）")
     n_total = len(content.get("bullets") or [])

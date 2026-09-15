@@ -235,11 +235,12 @@ class TestImageVariants(unittest.TestCase):
         return {i["code"] for i in vs.validate(spec, self.color_sets).errors}
 
     def test_known_variant_passes(self) -> None:
-        slides = [{"type": "content-image", "title": "图", "bullets": ["a"],
-                   "image": "x.png", "variant": "visual-left"}]
-        codes = self._codes(_spec(slides))
-        self.assertNotIn("UNKNOWN_VARIANT", codes, "合法变体被拒")
-        self.assertNotIn("UNKNOWN_FIELD", codes, "variant 不在封闭字段集里")
+        for variant in ("visual-left", "even", "hero"):
+            slides = [{"type": "content-image", "title": "图", "bullets": ["a"],
+                       "image": "x.png", "variant": variant}]
+            codes = self._codes(_spec(slides))
+            self.assertNotIn("UNKNOWN_VARIANT", codes, f"合法变体 {variant} 被拒")
+            self.assertNotIn("UNKNOWN_FIELD", codes, "variant 不在封闭字段集里")
 
     def test_unknown_variant_is_rejected(self) -> None:
         slides = [{"type": "content-image", "title": "图", "bullets": ["a"],

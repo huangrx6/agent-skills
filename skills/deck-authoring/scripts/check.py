@@ -85,8 +85,9 @@ DEAD_SPACE_NOTE = 0.28
 #
 # 为什么是禁止而不是提示：一页的信息（标题 / 条目 / 数字 / 示意）一旦被画进图里，
 # 它就同时失去了可编辑、可搜索、可翻译、可被读屏器读这四件事；而"对方要改字"
-# 正是本 skill 出原生 PPTX 的理由。图在版面上的角色只有两种：**配图**（占一栏）
-# 或**点缀**（更小），背景那种大图也不承载这一页的信息。
+# 正是本 skill 出原生 PPTX 的理由。图在版面上的角色有三种：**配图**（占一栏）、
+# **点缀**（更小）、**主角**（hero 变体：满幅图 + 标题/条目仍是真 DOM 文本 ——
+# "信息烤进图里"的禁止不适用，见 _check_full_page_image 的 role-aware 分支）。
 #
 # 阈值离真实情况很远，所以不会误伤：唯一带图的 content-image 版式，实测配图占
 # 整页 **17.0%**（607×404 / 1600×900）。取 0.60 是 3.5 倍余量。
@@ -194,21 +195,27 @@ def _check_layout(measured: dict) -> list[str]:
     return out
 
 
-def _check_full_page_image(measured: dict) -> list[str]:
-    """一张图盖住整页 —— **阻塞**（见 FULL_PAGE_IMAGE 的注释）。
+def _check_full_page_image(measured: dict, deck: dict) -> list[str]:
+    """一张图盖住整页 —— **阻塞**，但对 hero 变体 role-aware（见注释）。
 
     为什么这条要有牙：它是"不要把所有东西都生成到一张图上、再让图片覆盖整页"这条
-    硬规则的落点。今天是不可达的（没有整页图的版式），但**规则是被声明的**，
-    所以它需要一个能失败的守卫 —— 否则哪天有人加了个全幅版式、或者手改 skin，
-    这个禁止就会静默失效。
+    硬规则的落点。**role-aware 之后它可达了**：hero 变体的无条目形态图占整页 64%
+    —— 那一页图就是主角，且标题/条目仍是真 DOM 文本，四失禁止不适用。但守卫
+    对其余一切照旧：手改 skin 把配图撑到全页、或者哪个新变式忘了声明角色，
+    这条会失败。logo 永远不放行（品牌标盖满整页没有合法场景）。
     """
     out: list[str] = []
     total = render_mod.SLIDE_W * render_mod.SLIDE_H
     if not total:
         return out
+    hero_pages = {
+        i for i, s in enumerate(deck.get("slides", []), 1)
+        if s.get("type") == "content-image" and s.get("variant") == "hero"}
     for el in measured.get("elements", []):
         if el.get("role") not in ("logo", "image"):
             continue
+        if el.get("role") == "image" and el.get("slide") in hero_pages:
+            continue          # hero：图是主角，信息没烤进图里
         # 尺寸由 measure.py 写成数字；不是数字就跳过，不抛（check() 从不抛）。
         w = el.get("w")
         h = el.get("h")
@@ -525,7 +532,7 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     data: dict = measure_mod.measure(html_path) if measured is None else measured
     problems.extend(_check_layout(data))
     problems.extend(_check_measured_health(data))
-    problems.extend(_check_full_page_image(data))
+    problems.extend(_check_full_page_image(data, deck))
     brand_problems, _ = _check_brand(data, deck, tokens)
     problems.extend(brand_problems)
     # 空内容与品牌无关，但它和越界一样是“一页看着坏了”—— 所以也走阻塞
