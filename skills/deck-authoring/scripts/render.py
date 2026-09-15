@@ -38,6 +38,7 @@ def _load_sibling(name: str):
 
 
 ink = _load_sibling("ink")  # 叠印与对比度只有一处定义，不重抄
+deckio = _load_sibling("deckio")   # IO 收口：参数写错要报清楚，不甩 traceback
 
 TOKENS = os.path.join(HERE, "..", "styles", "risograph", "style.json")
 
@@ -56,6 +57,15 @@ def misregistration(tokens: dict, seed, *parts) -> tuple[float, float, float]:
 
 def grain_opacity(tokens: dict, seed, *parts) -> float:
     return round(_rng(seed, "grain", *parts).uniform(*tokens["texture"]["grainOpacity"]), 3)
+
+
+def _entry(mid: str, slide: int, role: str, text: str = "", size: float | None = None) -> dict:
+    """语义清单的一条。几何不在里面 —— 几何由 measure.py 从真浏览器拿。
+
+    这里只记“事实”：这个元素是什么、写了什么字、设计意图用多大字号。
+    职责划得很清：**意图在渲染层，几何在测量层**。两者对不上就是 bug。
+    """
+    return {"id": mid, "slide": slide, "role": role, "text": text, "fontSize": size}
 
 
 def halftone(tokens: dict, seed, index: int) -> str:
@@ -127,15 +137,21 @@ html,body{margin:0;background:var(--viewer)}
 """
 
 
-def _riso(text: str, tokens: dict, seed, *parts) -> str:
+def _riso(text: str, tokens: dict, seed, mid: str, *parts) -> str:
+    """两遍错位叠印的标题。`mid` 是给测量层与导出层用的身份（`data-m`）。
+
+    **为什么要打身份**：布局是浏览器算的，我们拿不到真实几何 —— 只能量。
+    量完还得知道“这个盒子是什么”（标题？条目？图表？），否则导出 PPTX 时只能逆向猜。
+    我们的 HTML 是自己生成的，结构本来就知道，所以渲染时标好就行。
+    """
     dx, dy, rot = misregistration(tokens, seed, *parts)
     style = f"--dx:{dx}px;--dy:{dy}px;--rot:{rot}deg"
     body = html.escape(text)
-    return (f'<div class="riso" style="{style}">'
+    return (f'<div class="riso" data-m="{mid}" style="{style}">'
             f'<b class="a">{body}</b><b class="b">{body}</b></div>')
 
 
-def chart_svg(data: list[dict], unit: str = "") -> str:
+def chart_svg(data: list[dict], unit: str = "", tag_attr: str = "") -> str:
     """柱状图：**几何全部由脚本算**，模型只出数据。
 
     方案里的规矩（第 2 层）：数据图表页 riso 效果适用度低 —— 错位会毁掉可读性。
@@ -146,15 +162,19 @@ def chart_svg(data: list[dict], unit: str = "") -> str:
         raise SystemExit("✗ chart 页需要 data: [{label, value}, …]")
     w, h, pad = 1100, 380, 40
     top, base = pad + 46, h - pad - 26
-    values = [float(d["value"]) for d in data]
+    values = [deckio.as_number(d.get("value"), f"chart data[{i}].value")
+              for i, d in enumerate(data)]
     peak = max(values + [1e-9])
     span = (w - 2 * pad) / len(data)
     bar_w = span * 0.52
+    # 注意：这里**不能**放 <div class="hf"> —— HTML 解析规则遇到非 SVG 元素
+    # （<div>）会直接结束 svg 上下文，导致后面的 line/rect/text 全变成普通 HTML
+    # 行内元素：柱高消失、标签挤成一行、caption 与页脚重叠（实测踩过）。
+    # 半调底纹由外层 wrapper 的 <div class="hf"> 提供，不需要放进 svg 里。
     parts = [f'<svg viewBox="0 0 {w} {h}" role="img">',
-             f'<div class="hf"></div>',
              f'<line class="axis" x1="{pad}" y1="{base}" x2="{w - pad}" y2="{base}"/>']
     for i, d in enumerate(data):
-        height = (base - top) * float(d["value"]) / peak           # 按峰值归一
+        height = (base - top) * values[i] / peak                  # 按峰值归一
         x = pad + span * i + (span - bar_w) / 2
         y = base - height
         parts.append(f'<rect class="bar" x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="{height:.1f}"/>')
@@ -163,14 +183,29 @@ def chart_svg(data: list[dict], unit: str = "") -> str:
         parts.append(f'<text class="lbl" x="{x + bar_w / 2:.1f}" y="{base + 26:.1f}" '
                      f'text-anchor="middle">{html.escape(str(d["label"]))}</text>')
     parts.append("</svg>")
-    return '<div class="chartwrap"><div class="hf"></div>' + "".join(parts) + "</div>"
+    return f'<div class="chartwrap" {tag_attr}><div class="hf"></div>' + "".join(parts) + "</div>"
 
+
+
+# 字号表 —— **单一来源**。渲染、清单、导出都读这一份。
+#
+# 以前 check.py 自己另写了一份（非 title 一律 86），于是 end 页（真实 180）被当成 86 判，
+# 12 个汉字的标题：估算 12×86=1032 < 1432 判“过”，实际 12×180=2160 塞进 1600 版面被裁掉。
+# 两份表就是 bug 的温床，收成一份。
+TITLE_SIZE = {"title": 152, "content-text": 86, "content-image": 72,
+              "two-column": 72, "timeline": 72, "chart": 72, "end": 180}
+DEFAULT_BULLET_SIZE = 40
+BULLET_SIZE = {"two-column": 30}      # 其余用 DEFAULT_BULLET_SIZE
 
 
 def render(deck_spec: dict, tokens: dict) -> str:
     deck = deck_spec["deck"]
     seed = deck.get("seed", 1)
-    colors = tokens["colorSets"][deck["colorSet"]]
+    name = deck.get("colorSet")
+    if name not in tokens["colorSets"]:
+        raise SystemExit(f"✗ colorSet={name!r} 不在 token 里"
+                         f"（可用：{sorted(tokens['colorSets'])}）—— 跑 validate_spec.py 能提前拦住这个")
+    colors = tokens["colorSets"][name]
     ink_text = ink.overprint(colors["primary"], colors["secondary"])
     variables = ";".join([
         f"--paper:{colors['background']}", f"--ink-a:{colors['primary']}",
@@ -183,63 +218,100 @@ def render(deck_spec: dict, tokens: dict) -> str:
     head = head.replace("__VARS__", variables)
     head = head.replace("__GRAIN_FREQ__", str(tokens["texture"]["grainBaseFrequency"]))
 
+    man: list[dict] = []          # 语义清单：元素身份 + 意图（几何由 measure.py 量）
+
+    def tag(mid: str, slide_no: int, role: str, text: str = "", size: float | None = None) -> str:
+        """登记一条并返回 `data-m` 属性串。"""
+        man.append(_entry(mid, slide_no, role, text, size))
+        return f'data-m="{mid}"'
+
     out = [head]
     for i, slide in enumerate(deck["slides"], 1):
         kind = slide.get("type")
+        tsize = TITLE_SIZE.get(kind, 86)
+        bsize = BULLET_SIZE.get(kind, DEFAULT_BULLET_SIZE)
         out.append('<section class="slide">')
-        if kind in ("title", "content-text", "end", "chart"):   # 图文/双栏/时间线页自带色彩，不加装饰墨块
+        if kind in ("title", "content-text", "end", "chart"):
             out.append(halftone(tokens, seed, i))
         out.append('<div class="pad">')
         if kind == "title":
-            out.append(f'<div style="--riso-size:152px;height:158px">{_riso(slide["title"], tokens, seed, "t", i)}</div>')
+            out.append(f'<div style="--riso-size:{tsize}px;height:158px">'
+                       f'{_riso(slide["title"], tokens, seed, tag(f"s{i}.title", i, "title", slide["title"], tsize), "t", i)}</div>')
             if slide.get("subtitle"):
-                out.append(f'<div class="sub">{html.escape(slide["subtitle"])}</div>')
+                out.append(f'<div class="sub" {tag(f"s{i}.subtitle", i, "subtitle", slide["subtitle"], 34)}>'
+                           f'{html.escape(slide["subtitle"])}</div>')
             out.append('<div class="rule"></div>')
         elif kind == "content-text":
-            out.append(f'<div style="--riso-size:86px;height:104px;margin-bottom:64px">'
-                       f'{_riso(slide["title"], tokens, seed, "t", i)}</div>')
-            items = "".join(f'<li><i>■</i>{html.escape(b)}</li>' for b in slide.get("bullets", []))
+            out.append(f'<div style="--riso-size:{tsize}px;height:104px;margin-bottom:64px">'
+                       f'{_riso(slide["title"], tokens, seed, tag(f"s{i}.title", i, "title", slide["title"], tsize), "t", i)}</div>')
+            items = "".join(
+                f'<li {tag(f"s{i}.bullet.{bi}", i, "bullet", b, bsize)}>' f'<i>■</i>{html.escape(b)}</li>'
+                for bi, b in enumerate(slide.get("bullets", [])))
             out.append(f'<ul class="bullets">{items}</ul>')
         elif kind == "content-image":
-            out.append(f'<div style="--riso-size:72px;height:88px">{_riso(slide["title"], tokens, seed, "t", i)}</div>')
-            items = "".join(f'<li><i>■</i>{html.escape(b)}</li>' for b in slide.get("bullets", []))
+            out.append(f'<div style="--riso-size:{tsize}px;height:88px">'
+                       f'{_riso(slide["title"], tokens, seed, tag(f"s{i}.title", i, "title", slide["title"], tsize), "t", i)}</div>')
+            items = "".join(
+                f'<li {tag(f"s{i}.bullet.{bi}", i, "bullet", b, bsize)}>' f'<i>■</i>{html.escape(b)}</li>'
+                for bi, b in enumerate(slide.get("bullets", [])))
+            src = slide["image"]
             out.append('<div class="two"><div class="main">'
                        f'<ul class="bullets">{items}</ul></div>'
-                       f'<figure class="imgwrap"><img src="{html.escape(slide["image"])}" alt=""></figure></div>')
+                       f'<figure class="imgwrap" {tag(f"s{i}.image", i, "image", src)}>'
+                       f'<img src="{html.escape(src)}" alt=""></figure></div>')
         elif kind == "two-column":
-            out.append(f'<div style="--riso-size:72px;height:88px">{_riso(slide["title"], tokens, seed, "t", i)}</div>')
+            out.append(f'<div style="--riso-size:{tsize}px;height:88px">'
+                       f'{_riso(slide["title"], tokens, seed, tag(f"s{i}.title", i, "title", slide["title"], tsize), "t", i)}</div>')
             cols = []
             for ci, col in enumerate(slide.get("columns", [])[:2]):
-                li = "".join(f'<li><i>■</i>{html.escape(b)}</li>' for b in col.get("bullets", []))
-                band = "ink-a" if ci == 0 else "ink-b"   # 两专色只做栏标色带；正文仍用叠印墨（荧光色载不住文字）
+                li = "".join(
+                    f'<li {tag(f"s{i}.col{ci}.bullet.{bi}", i, "bullet", b, bsize)}>'
+                    f'<i>■</i>{html.escape(b)}</li>'
+                    for bi, b in enumerate(col.get("bullets", [])))
+                band = "ink-a" if ci == 0 else "ink-b"
+                coltitle = col.get("title", "")
                 cols.append(f'<div class="col"><div class="band {band}"></div>'
-                            f'<h3>{html.escape(col.get("title", ""))}</h3>'
+                            f'<h3 {tag(f"s{i}.col{ci}.title", i, "subtitle", coltitle, 44)}>'
+                            f'{html.escape(coltitle)}</h3>'
                             f'<ul class="bullets small">{li}</ul></div>')
             out.append('<div class="cols">' + "".join(cols) + "</div>")
         elif kind == "timeline":
-            out.append(f'<div style="--riso-size:72px;height:88px">{_riso(slide["title"], tokens, seed, "t", i)}</div>')
+            out.append(f'<div style="--riso-size:{tsize}px;height:88px">'
+                       f'{_riso(slide["title"], tokens, seed, tag(f"s{i}.title", i, "title", slide["title"], tsize), "t", i)}</div>')
             nodes = []
             for ni, node in enumerate(slide.get("nodes", []), 1):
-                dx, dy, _ = misregistration(tokens, seed, "dot", i, ni)   # 每个时间点独立错位
+                dx, dy, _ = misregistration(tokens, seed, "dot", i, ni)
+                label, note = node.get("label", ""), node.get("note", "")
                 nodes.append(f'<li><span class="dot" style="--ddx:{dx}px;--ddy:{dy}px"></span>'
-                             f'<b>{html.escape(node.get("label", ""))}</b>'
-                             f'<em>{html.escape(node.get("note", ""))}</em></li>')
+                             f'<b {tag(f"s{i}.node{ni}.label", i, "subtitle", label, 30)}>'
+                             f'{html.escape(label)}</b>'
+                             f'<em {tag(f"s{i}.node{ni}.note", i, "bullet", note, 24)}>'
+                             f'{html.escape(note)}</em></li>')
             out.append('<ol class="tl">' + "".join(nodes) + "</ol>")
         elif kind == "end":
-            out.append(f'<div class="end" style="--riso-size:180px">'
-                       f'{_riso(slide["title"], tokens, seed, "t", i)}</div>')
+            out.append(f'<div class="end" style="--riso-size:{tsize}px">'
+                       f'{_riso(slide["title"], tokens, seed, tag(f"s{i}.title", i, "title", slide["title"], tsize), "t", i)}</div>')
         elif kind == "chart":
-            out.append(f'<div style="--riso-size:72px;height:88px">{_riso(slide["title"], tokens, seed, "t", i)}</div>')
-            out.append(chart_svg(slide.get("data", []), slide.get("unit", "")))
+            out.append(f'<div style="--riso-size:{tsize}px;height:88px">'
+                       f'{_riso(slide["title"], tokens, seed, tag(f"s{i}.title", i, "title", slide["title"], tsize), "t", i)}</div>')
+            out.append(chart_svg(slide.get("data", []), slide.get("unit", ""),
+                                 tag(f"s{i}.chart", i, "chart", "", None)))
             if slide.get("caption"):
-                out.append(f'<div class="chartcap">{html.escape(slide["caption"])}</div>')
+                out.append(f'<div class="chartcap" {tag(f"s{i}.caption", i, "bullet", slide["caption"], 26)}>'
+                           f'{html.escape(slide["caption"])}</div>')
         else:
             raise SystemExit(f"✗ 未知版式 type={kind!r}（支持 title / content-text / content-image / "
                              f"two-column / timeline / chart / end）")
         out.append("</div>")
-        out.append(f'<div class="foot">{html.escape(deck.get("title", ""))} / {i:02d}</div>')
+        foot_text = f'{deck.get("title", "")} / {i:02d}'
+        out.append(f'<div class="foot" {tag(f"s{i}.foot", i, "foot", foot_text, 26)}>'
+                   f'{html.escape(foot_text)}</div>')
         out.append('<div class="grain"></div>')
         out.append("</section>")
+
+    # 清单随产物一起走（不另写文件）：渲染、测量、导出读的是同一份事实。
+    payload = json.dumps(man, ensure_ascii=True, separators=(",", ":")).replace("<", "\\u003c")
+    out.append(f'<script type="application/json" id="__deck_manifest">{payload}</script>')
     out.append("</body></html>")
     return "\n".join(out)
 
@@ -250,13 +322,10 @@ def main(argv: list[str]) -> int:
     ap.add_argument("-o", "--out", required=True)
     ap.add_argument("--tokens", default=TOKENS)
     args = ap.parse_args(argv[1:])
-    with open(args.spec, encoding="utf-8") as fh:
-        deck_spec = json.load(fh)
-    with open(args.tokens, encoding="utf-8") as fh:
-        tokens = json.load(fh)
+    deck_spec = deckio.read_json(args.spec)
+    tokens = deckio.read_json(args.tokens)
     page = render(deck_spec, tokens)
-    with open(args.out, "w", encoding="utf-8") as fh:
-        fh.write(page)
+    deckio.write_text(args.out, page)
     print(f"✓ 已写出 {args.out}（{len(page)} 字节 / {len(deck_spec['deck']['slides'])} 页）")
     return 0
 

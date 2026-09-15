@@ -169,7 +169,7 @@ class TestCheckMutations(unittest.TestCase):
     def test_chart_riso_mutation_is_caught(self) -> None:
         """变异：往真实的 chartwrap 容器里塞一个 riso 元素。"""
         mutated, count = re.subn(
-            r'(<div class="chartwrap">)',
+            r'(<div class="chartwrap"[^>]*>)',
             r'\1<div class="riso"><b class="a">X</b></div>', self.chart_html, count=1)
         self.assertEqual(count, 1, "产物里没找到 chartwrap —— render.py 改格式了")
         problems = self._problems(self.chart_spec, mutated)

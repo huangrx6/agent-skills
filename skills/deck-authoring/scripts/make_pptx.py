@@ -22,12 +22,15 @@ from pptx.util import Emu, Inches
 
 
 def build(png_paths: list[str], out: str, width: int, height: int) -> None:
+    if width <= 0 or height <= 0:
+        raise SystemExit(f"✗ 版心必须是正数，收到 {width}x{height}")
     prs = Presentation()
-    ratio = width / height
-    # 先落到局部变量：`prs.slide_width` 的类型是 `Optional[Length]`，直接拿来算除法
-    # 在 Pyright 眼里是「None 不支持 /」。赋值之后再读也一样，所以用局部量。
+    # 用整数运算算高度：`Emu(int(slide_width / ratio))` 先转 float 再取整，是多余的
+    # 精度往返，且 height=0 时会 ZeroDivisionError（前面已拦住）。
+    # `slide_width * height // width` 结果一样、全整数 —— 与 layout.py 同一手法：
+    # 遇到不需要转换的地方就换个写法，而不是加一个永远不会触发的 try。
     slide_width = Inches(13.333)
-    slide_height = Emu(int(slide_width / ratio))
+    slide_height = Emu(slide_width * height // width)
     prs.slide_width = slide_width
     prs.slide_height = slide_height
     blank = prs.slide_layouts[6]                       # 空白版式，不放任何占位符

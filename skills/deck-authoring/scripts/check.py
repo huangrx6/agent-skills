@@ -41,6 +41,7 @@ def _load_sibling(name: str):
 
 
 ink = _load_sibling("ink")
+deckio = _load_sibling("deckio")   # IO 收口：读不到产物要报清楚，不甩 traceback
 
 TOKENS = os.path.join(HERE, "..", "styles", "risograph", "style.json")
 
@@ -63,8 +64,47 @@ def text_width(text: str, size: float) -> float:
     return (wide + (len(text) - wide) * 0.55) * size
 
 
+def _div_subtree(html: str, start: int) -> str:
+    """从 `start` 处的 `<div` 开始，逐层配对，返回那个 div 的整段 HTML。
+
+    为什么不用 `.*?</div>`：那是**非贪婪**的，遇到容器里第一个 `</div>` 就停。
+    图表容器里有 `.hf` 那一层，于是正则实际只扫了最外面一层 —— 把 riso 塞到
+    更深处（比如 svg 区域里）旧写法直接放行。这是真实漏报，不是杞人忧天。
+    """
+    depth = 0
+    i = start
+    while i < len(html):
+        nxt_open = html.find("<div", i)
+        nxt_close = html.find("</div>", i)
+        if nxt_close == -1:
+            return html[start:]
+        if nxt_open != -1 and nxt_open < nxt_close:
+            depth += 1
+            i = nxt_open + 4
+        else:
+            depth -= 1
+            i = nxt_close + 6
+            if depth == 0:
+                return html[start:i]
+    return html[start:]
+
+
+def _num(raw: str, where: str, problems: list[str]) -> float | None:
+    """转 float；转不了就**报成问题**，不抛异常。
+
+    `check()` 是库函数，契约是「返回问题清单」，不是「甩 traceback」。而且产物里
+    的数字读不出来本身就是一种产物损坏 —— 应该被报出来，而不是静默跳过或炸掉。
+    """
+    try:
+        return float(raw)
+    except ValueError:
+        problems.append(f"{where} 不是合法数字：{raw!r}（产物损坏？）")
+        return None
+
+
 def check(spec: dict, html_path: str, tokens: dict) -> list[str]:
     problems: list[str] = []
+    page = deckio.read_text(html_path)      # 读一次就够（以前读了三次）
     deck = spec["deck"]
     colors = tokens["colorSets"][deck["colorSet"]]
     paper = colors["background"]
@@ -116,8 +156,16 @@ def check(spec: dict, html_path: str, tokens: dict) -> list[str]:
     for i, slide in enumerate(deck["slides"], 1):
         if slide.get("type") != "chart":
             continue
-        heights = [float(v) for v in re.findall(r'class="bar"[^>]*height="([\d.]+)"', open(html_path, encoding="utf-8").read())]
-        values = [float(d["value"]) for d in slide.get("data", [])]
+        heights: list[float] = []
+        for raw in re.findall(r'class="bar"[^>]*height="([^"]+)"', page):
+            num = _num(raw, f"第 {i} 页图表柱高", problems)
+            if num is not None:
+                heights.append(num)
+        values: list[float] = []
+        for k, d in enumerate(slide.get("data", [])):
+            num = _num(str(d.get("value")), f"第 {i} 页图表 data[{k}].value", problems)
+            if num is not None:
+                values.append(num)
         if len(heights) != len(values):
             problems.append(f"第 {i} 页图表：柱子 {len(heights)} 根 ≠ 数据 {len(values)} 条")
         elif values:
@@ -134,28 +182,33 @@ def check(spec: dict, html_path: str, tokens: dict) -> list[str]:
                 if abs(h - want) > 1.5:
                     problems.append(f"第 {i} 页图表第 {k + 1} 根柱高 {h:.1f}px 与数据 {v} 不成比例"
                                     f"（按最高那根的长度换算应为 {want:.1f}px）")
-    chart_html = open(html_path, encoding="utf-8").read()
-    for block in re.findall(r'<div class="chartwrap".*?</div>', chart_html, re.S):
+    # ④ 图表区无错位：**逐层配对**扫整个容器，不是扫到第一个 </div> 就停。
+    for hit in re.finditer(r'<div class="chartwrap"', page):
+        block = _div_subtree(page, hit.start())
         if "riso" in block:
             problems.append("图表容器里出现了错位叠印元素（riso 只允许做容器与背景，不能进图表区）")
-
-    page = open(html_path, encoding="utf-8").read()
 
     # ③ 错位区间：读产物里真正写进去的值
     m = tokens["misregistration"]
     for dx, dy, rot in re.findall(r"--dx:([-\d.]+)px;--dy:([-\d.]+)px;--rot:([-\d.]+)deg", page):
-        for value, (lo, hi), name in ((float(dx), m["offsetRangeX"], "dx"),
-                                      (float(dy), m["offsetRangeY"], "dy"),
-                                      (float(rot), m["rotationRange"], "rot")):
+        for raw, (lo, hi), name in ((dx, m["offsetRangeX"], "dx"),
+                                    (dy, m["offsetRangeY"], "dy"),
+                                    (rot, m["rotationRange"], "rot")):
+            value = _num(raw, f"错位参数 {name}", problems)
+            if value is None:
+                continue
             if not (lo <= value <= hi):
                 problems.append(f"错位参数 {name}={value} 越出 token 区间 [{lo}, {hi}]")
 
     # ④ 装饰不压文字
-    for zone, size in re.findall(r'data-zone="(\w+)" data-size="(\d+)"', page):
+    for zone, raw_size in re.findall(r'data-zone="(\w+)" data-size="([^"]*)"', page):
         if zone not in CORNER:
-            problems.append(f"未知装饰 zone={zone!r}"); continue
+            problems.append(f"未知装饰 zone={zone!r}")
+            continue
         right_off, top_off, up = CORNER[zone]
-        s = float(size)
+        s = _num(raw_size, f"装饰墨块 zone={zone} 的 data-size", problems)
+        if s is None:
+            continue
         left = SLIDE_W + right_off - s if "r" in zone else -right_off
         top = -top_off if up else SLIDE_H + top_off - s
         rect = (left, top, left + s, top + s)
@@ -171,8 +224,8 @@ def main(argv: list[str]) -> int:
     ap.add_argument("html")
     ap.add_argument("--tokens", default=TOKENS)
     args = ap.parse_args(argv[1:])
-    spec = json.load(open(args.spec, encoding="utf-8"))
-    tokens = json.load(open(args.tokens, encoding="utf-8"))
+    spec = deckio.read_json(args.spec)
+    tokens = deckio.read_json(args.tokens)
     problems = check(spec, args.html, tokens)
     if problems:
         print(f"✗ {len(problems)} 个问题：")
