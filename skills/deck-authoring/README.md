@@ -69,7 +69,7 @@ python3 scripts/fit.py --json '{"title":"结论","bullets":["…","…"]}'
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 147 条，约 2.5 分钟（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 158 条，约 2.5 分钟（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时约 2.5 分钟，
@@ -77,7 +77,7 @@ python3 -m unittest discover -s tests/deck-authoring -v     # 147 条，约 2.5 
     **压测回归**（每套风格 × 真实形状的 deck 各开一次 Chrome）。改了风格或渲染层就跑全量；
     只改文档可以只跑相关的那个文件。
 
-钉住十九项不变量：同 spec + 同种子字节一致（带随机区间的风格；确定性风格本就与 seed 无关）、
+钉住二十项不变量：同 spec + 同种子字节一致（带随机区间的风格；确定性风格本就与 seed 无关）、
 色板门禁 + 两墨乘叠印的数学、校验的变异验证（每项都造违规样例）、半调墨覆盖率随灰度单调、
 缓存命中后仍过色板三角不变量、外壳行为（真开浏览器按键翻页 + letterbox 缩放比贴边不溢）、
 PDF 是矢量且页数/页尺寸对、可编辑 PPTX 的**字是真字**且坐标是页内坐标、
@@ -93,7 +93,9 @@ PDF 是矢量且页数/页尺寸对、可编辑 PPTX 的**字是真字**且坐�
 **压测**（每套风格 × 真实形状的 deck 过 check：7 条密页 / 5+5 两栏 / 6 节点时间线 /
 6 柱图表 / 带图注的图文页 / 18 字长标题 / 收尾页）、
 **原生 PPTX 的三个交付级偏差**（`<a:ea>` 东亚字体 / 标题字重不写死 / 原生图表的
-数值与网格线 —— 三条都只在"把 PPTX 转成图看"时才露出来）。
+数值与网格线 —— 三条都只在"把 PPTX 转成图看"时才露出来）、
+**交付演练工具**（逐像素差对"一样/不一样"都要给对答案；"只打印第 N 页"要真的只出一页
+且页码保持原样 —— 后者错了会让对比图说谎，而差异只有 0.3% 不会报警）。
 
 ## 依赖
 
@@ -130,7 +132,7 @@ PDF 是矢量且页数/页尺寸对、可编辑 PPTX 的**字是真字**且坐�
 skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是这棵树的这部分
 ├── SKILL.md                 # 给模型看的触发条件 + 流程
 ├── README.md                # 给"想跑一下"的人看的
-├── scripts/                 # 流水线十六件（另有 1 个 Swift 编码器）
+├── scripts/                 # 流水线十七件（另有 1 个 Swift 编码器）
 │   ├── validate_spec.py     # 输入层校验：字段集封闭（坐标/字号/色值直接判失败）
 │   ├── ink.py               # 墨色推导 + 三色板门禁（唯一消费者）
 │   ├── plate.py             # 图片 → duotone + 半调（制版）
@@ -138,6 +140,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── brand.py             # 品牌资产：logo 内嵌 / 色板与字体合并 / SVG 栅格化
 │   ├── fit.py               # 试排：给定一页内容，实测哪些版式装得下（真渲真量）
 │   ├── style.py             # 风格层：列表 / 契约体检 / 摘要 / 联系表（八套拼一张图）
+│   ├── deliver.py           # 交付演练：整条链跑一遍 + 画面与逐像素比对
 │   ├── render.py            # deck-spec.json → HTML（语义骨架 + 风格 skin + 演示壳 + 运动引擎）
 │   ├── measure.py           # 实测层：真浏览器量真盒子（不估算）
 │   ├── check.py             # 校验：越界/裁切/对比度/图表/图片/报错
@@ -186,7 +189,8 @@ tests/deck-authoring/           # 测试住在仓库顶层（不在 skill 目录
 ├── test_animation.py
 ├── test_brand.py
 ├── test_fit.py
-└── test_style.py
+├── test_style.py
+└── test_deliver.py
 ```
 
 测试**刻意不放在 skill 目录里** —— AI 调用 skill 时读的是 `skills/deck-authoring/`
