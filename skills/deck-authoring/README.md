@@ -21,9 +21,10 @@ python3 scripts/validate_spec.py dev-tools/demo.spec.json           # 1) 规格�
 python3 scripts/ink.py styles/risograph/style.json                  # 2) 墨色门禁
 python3 scripts/plate.py --sample -o sample-treated.png             # 3) 造演示图
 python3 scripts/render.py dev-tools/demo.spec.json -o out.html      # 4) 出 HTML
-python3 scripts/check.py dev-tools/demo.spec.json out.html          # 5) 六项校验
-python3 scripts/shots.py out.html --out-dir pages/ --count 6        # 6) 截图（要 Chrome）
-python3 scripts/make_pptx.py --png-dir pages/ -o deck.pptx          # 7) 出 PPTX
+python3 scripts/measure.py out.html                                 # 5) 实测（真浏览器）
+python3 scripts/check.py dev-tools/demo.spec.json out.html          # 6) 校验
+python3 scripts/shots.py out.html --out-dir pages/ --count 6        # 7) 截图（要 Chrome）
+python3 scripts/make_pptx.py --png-dir pages/ -o deck.pptx          # 8) 出 PPTX
 ```
 
 第 3 步是给 demo 的图文页造图：`demo.spec.json` 的 `image` 是个占位文件名，
@@ -36,7 +37,7 @@ python3 scripts/make_pptx.py --png-dir pages/ -o deck.pptx          # 7) 出 PPT
 python3 -m unittest discover -s tests/deck-authoring -v     # 36 条
 ```
 
-钉住七项不变量：墨色推导 + 三套色板门禁、同 spec + 同种子字节一致、六项校验的
+钉住七项不变量：墨色推导 + 三套色板门禁、同 spec + 同种子字节一致、校验的
 变异验证（每项都造违规样例，且变异替换的是产物里**真实存在**的值）、半调墨覆盖率
 随灰度单调（100% → 0%）、缓存命中后仍过色板三角形不变量、SKILL.md 的版式表与
 `render.py` 实测行为一致、规格字段集真的封闭（坐标/字号/色值必须被指名报出）。
@@ -74,13 +75,14 @@ python3 -m unittest discover -s tests/deck-authoring -v     # 36 条
 skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是这棵树的这部分
 ├── SKILL.md                 # 给模型看的触发条件 + 流程
 ├── README.md                # 给"想跑一下"的人看的
-├── scripts/                 # 流水线九件
+├── scripts/                 # 流水线十件
 │   ├── validate_spec.py     # 输入层校验：字段集封闭（坐标/字号/色值直接判失败）
 │   ├── ink.py               # 墨色推导 + 三色板门禁（唯一消费者）
 │   ├── plate.py             # 图片 → duotone + 半调（riso 制版）
 │   ├── image_source.py      # 缓存 / 生图 / 几何色块拼贴
-│   ├── render.py            # deck-spec.json → HTML
-│   ├── check.py             # 六项机械校验
+│   ├── render.py            # deck-spec.json → HTML（并嵌入语义清单）
+│   ├── measure.py           # 实测层：真浏览器量真盒子（不估算）
+│   ├── check.py             # 校验：越界/裁切/对比度/图表/图片/报错
 │   ├── shots.py             # HTML → PNG（系统 Chrome 截图）
 │   ├── make_pptx.py         # PNG → PPTX
 │   └── deckio.py            # IO 收口（try/except 不散落）
@@ -91,7 +93,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 ├── evals/evals.json         # 行为评估用例
 └── references/
     ├── style-architecture.md    # 多风格 seam、字段集
-    ├── validation.md            # 六项校验的口径
+    ├── validation.md            # 校验的口径（阻塞 vs 提示）
     └── delivery-formats.md      # HTML / PNG / PPTX 的取舍
 
 tests/deck-authoring/           # 测试住在仓库顶层（不在 skill 目录里）
@@ -99,7 +101,9 @@ tests/deck-authoring/           # 测试住在仓库顶层（不在 skill 目录
 ├── test_determinism.py
 ├── test_check_mutations.py
 ├── test_halftone_monotonic.py
-└── test_cache_invariant.py
+├── test_cache_invariant.py
+├── test_skill_md_consistency.py
+└── test_validate_spec.py
 ```
 
 测试**刻意不放在 skill 目录里** —— AI 调用 skill 时读的是 `skills/deck-authoring/`

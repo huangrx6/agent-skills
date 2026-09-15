@@ -36,11 +36,12 @@ description: >-
 2. **写 spec**：每页只有 `type` + 内容（标题 / 条目 / 时间点 / 数据），见
    `references/style-architecture.md`。`seed` 建议显式写（不写默认 1）—— 错位与颗粒
    按 (seed, 元素) 派生，不靠全局 random（两次渲染不重 = 没法回归、也没法复现）。
-3. **四道门**（顺序有意义：先验输入，再渲，最后验产物）：
+3. **五道门**（顺序有意义：先验输入，再渲，再量，最后判）：
    - 规格：`python3 scripts/validate_spec.py your.spec.json`（字段集封闭，未知键直接失败）
    - 墨色：`python3 scripts/ink.py styles/risograph/style.json`（任一色板不达标退出 1）
    - 渲染：`python3 scripts/render.py your.spec.json -o out.html`
-   - 产物：`python3 scripts/check.py your.spec.json out.html`（六项机械校验全过退出 0）
+   - 实测：`python3 scripts/measure.py out.html`（真浏览器量版面；写 `out.html.measured.json`）
+   - 判定：`python3 scripts/check.py your.spec.json out.html`（内部会调实测层，全过退出 0）
 4. **可选交付**：
    - PNG 截图：`python3 scripts/shots.py out.html --out-dir pages/ --count N`
    - PPTX：`python3 scripts/make_pptx.py --png-dir pages/ -o deck.pptx`
@@ -55,15 +56,16 @@ description: >-
 | type | 用途 | 装饰墨块 | 风险点 |
 | --- | --- | --- | --- |
 | `title` | 封面 | ✓ | 副标题一行内 |
-| `content-text` | 全文页 | ✓ | 条目估算宽 > 内容区会判溢出 |
+| `content-text` | 全文页 | ✓ | 条目太多会撞出该页下缘（实测判） |
 | `content-image` | 图文页（左文右图） | ✗ | 图必须是 duotone + 半调产物 |
 | `two-column` | 双栏 | ✗ | 每栏 660px；栏标色带是专色，正文仍叠印 |
 | `timeline` | 时间线 | ✗ | 每格 300px；时间点独立错位 |
 | `chart` | 柱状图 | ✓ | **柱与刻度不带错位**（riso 只做容器与页角墨块） |
 | `end` | 收尾 | ✓ | 居中大字 |
 
-`check.py` 按版式给不同的可用宽度上限（标题 / 全文用满宽，图左 820、双栏 660、
-时间线 1320）—— 用同一个宽度判，必然一边误报一边漏报。
+版面判断**全部靠实测**（`measure.py` 开真浏览器量真盒子）：越出**该页**边界、或
+被自己会裁的容器切掉，都报。文字宽不再估算 —— 估算对同一行汉字会差 2 倍多，
+而且偏差随字体/字距/折行变，永远修不准。
 
 ## Do NOT
 
@@ -86,9 +88,14 @@ description: >-
   **别把字段删了就交差** —— 先想清楚本来想表达什么。
 - **对比度不达标** → `python3 scripts/ink.py styles/risograph/style.json` 看三套色板
   各自的叠印墨对比度；不达标的换色板，不要改 `contrast.minBody`。
-- **"第 N 页 X 估算宽 > 该版式上限"** → `references/validation.md` 第 ② 条，
-  按版式上限收字 / 拆行 / 缩字号。
+- **`... 越出版面：下缘 ... 越出该页下边界 ...`** → 内容真的撑出这一页了（实测量的，
+  不是估的）。按 `references/validation.md` 第 ② 条：收字 / 拆行 / 缩字号 / 拆成两页。
+- **`... 越出版面：右缘 ...`**（多半在标题）→ 标题是 `white-space:nowrap` 的，
+  不折行、直接裁。标题太长就改短。
+- **`图片没加载`** → 相对路径的产物挪个目录就全员裂图。同目录交付，或 base64 内嵌。
+- **字体回退提示** → 声明的族本机没有，栈里后面的族顶上了 —— 排版会随机器变。
+  不阻塞，但交付前确认一下。
 - **错位值越界** → 检查 spec 里没硬塞 `--dx/--dy/--rot`；这些只能由脚本派生。
-- **装饰压文字** → `references/validation.md` 第 ④ 条；墨块必须落在右侧两角。
+- **装饰压文字** → `references/validation.md` 第 ⑤ 条；墨块必须落在右侧两角。
 - **图表柱高不成比例** → 数据 `value` 是不是数字、是不是都被图渲染了；
-  `references/validation.md` 第 ④ 条里"两两比例"那段解释了为什么不按峰值归一。
+  `references/validation.md` 第 ⑤ 条里"两两比例"那段解释了为什么不按峰值归一。
