@@ -812,17 +812,78 @@ def resolve_color_set(tokens: dict, deck: dict) -> str:
     return name
 
 
-def render(deck_spec: dict, style: dict | None = None) -> str:
+# ── 资产清单（§12 统一 Asset Pipeline 的入口，v1）───────────────────────
+# schema 封闭：{"schemaVersion": 1, "assets": {id: {"file", "source", "note"}}}
+# file 相对 assets/ 目录；解析后的最终 src = "assets/<file>"（相对 spec 目录
+# = 相对产物 HTML）。没有 manifest 时 image 走旧的"相对路径"语义（全兼容）。
+ASSET_MANIFEST_KEYS = frozenset({"schemaVersion", "assets"})
+ASSET_ENTRY_KEYS = frozenset({"file", "source", "note"})
+
+
+def load_assets_at(directory: str) -> dict | None:
+    """读 <directory>/assets/manifest.json；没有 → None（旧路径语义）。
+
+    schema 违规 = ERROR（封闭字段集，不静默猜意图）。
+    """
+    path = os.path.join(directory, "assets", "manifest.json")
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"✗ 读不了资产清单 {path}：{exc}") from exc
+    if not isinstance(data, dict) or set(data) != set(ASSET_MANIFEST_KEYS):
+        raise SystemExit(f"✗ {path} 的顶层字段应为 {sorted(ASSET_MANIFEST_KEYS)}"
+                         f"（封闭），实际 "
+                         f"{sorted(data) if isinstance(data, dict) else type(data)}")
+    if data.get("schemaVersion") != 1:
+        raise SystemExit(f"✗ {path} 的 schemaVersion 只支持 1，"
+                         f"实际 {data.get('schemaVersion')!r}")
+    entries = data.get("assets")
+    if not isinstance(entries, dict):
+        raise SystemExit(f"✗ {path} 的 assets 应是 {{id: {{file, …}}}}")
+    for aid, entry in entries.items():
+        if not isinstance(entry, dict) or set(entry) - set(ASSET_ENTRY_KEYS):
+            raise SystemExit(f"✗ {path} 的资产 {aid!r} 字段应为 "
+                             f"{sorted(ASSET_ENTRY_KEYS)} 的子集（封闭）")
+        if not isinstance(entry.get("file"), str) or not entry["file"]:
+            raise SystemExit(f"✗ {path} 的资产 {aid!r} 缺必填 file")
+    return data
+
+
+def load_assets(spec_path: str) -> dict | None:
+    return load_assets_at(os.path.dirname(os.path.abspath(spec_path)))
+
+
+def resolve_asset(assets: dict | None, image_value: str) -> str | None:
+    """assetId → "assets/<file>"；不是清单里的 id → None（按旧路径语义走）。
+
+    §14 优先级链 v1：manifest 即选择（selected 的落点）；generated/provided
+    的区分由 entry.source 记录。禁止缺图联网找图 —— 这里只做映射，不碰网络。
+    """
+    entry = ((assets or {}).get("assets") or {}).get(image_value)
+    if entry is None:
+        return None
+    return f"assets/{entry['file']}"
+
+
+def render(deck_spec: dict, style: dict | None = None,
+           assets: dict | None = None) -> str:
     """渲染。输入两种都认（第三代链路：`Slide DSL → compile → resolved → Renderer 只画`）：
 
     - 语义 spec：先经 `compile.compile_spec` 决策（风格/品牌合并、色板、字号档、
-      时间轴都在那边定，带 trace），再面 `render_resolved`；
+      时间轴、assetId 解析都在那边定，带 trace），再面 `render_resolved`；
     - resolved.deck（`kind: "resolved.deck"`）：**直面，不做任何决策** ——
       不加载风格、不合并品牌、不算档位。
+
+    assets：`load_assets` 的产物（spec 同目录 assets/manifest.json）——
+    assetId → 文件的映射只发生在 compile（决策层），渲染器只见最终路径。
     """
     if compile_module.is_resolved(deck_spec):
         return render_resolved(deck_spec)
-    return render_resolved(compile_module.compile_spec(deck_spec, style))
+    return render_resolved(compile_module.compile_spec(deck_spec, style,
+                                                       assets=assets))
 
 
 def render_resolved(resolved: dict) -> str:
@@ -1102,9 +1163,10 @@ def main(argv: list[str]) -> int:
                     help=f"风格目录名（缺省读 spec 的 deck.style，再缺省 {DEFAULT_STYLE}）")
     args = ap.parse_args(argv[1:])
     deck_spec = deckio.read_json(args.spec)
+    assets = load_assets(args.spec)      # assets/manifest.json（§12 管线入口）
     name = args.style or deck_spec["deck"].get("style", DEFAULT_STYLE)
     style = load_style(name)
-    page = render(deck_spec, style)
+    page = render(deck_spec, style, assets=assets)
     deckio.write_text(args.out, page)
     print(f"✓ 已写出 {args.out}（风格 {style['name']} / {len(page)} 字节 / "
           f"{len(deck_spec['deck']['slides'])} 页）")

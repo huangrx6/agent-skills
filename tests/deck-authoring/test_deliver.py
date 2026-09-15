@@ -159,16 +159,32 @@ class TestPrintOnePage(unittest.TestCase):
 
 
 class TestImagePlaceholder(unittest.TestCase):
-    def test_missing_image_is_created_and_flagged(self) -> None:
-        """图文页引用的图不在，就造一张合成图 —— 但必须**说清是占位图**。"""
+    """缺必需图 = ERROR（§14/§15：静默造占位禁止），--allow-placeholder 显式选入。"""
+
+    def test_missing_image_is_an_error_by_default(self) -> None:
+        """默认不再造合成测试卡 —— 占位图滑进交付是迟早的事。"""
         spec = deckio.read_json(DEMO)
         with tempfile.TemporaryDirectory() as tmp:
             names = {s.get("image") for s in spec["deck"]["slides"] if s.get("image")}
             self.assertTrue(names, "demo 里本该有图文页 —— 这条用例的前提变了")
-            deliver.ensure_images(spec, tmp)
+            with self.assertRaises(SystemExit) as ctx:
+                deliver.ensure_images(spec, tmp)
+            msg = str(ctx.exception)
             for name in names:
-                self.assertTrue(os.path.isfile(os.path.join(tmp, str(name))),
-                                f"{name} 没被造出来 —— 校验会在「图片没加载」那关停住")
+                self.assertIn(str(name), msg, "报错没点名缺哪张图")
+            self.assertIn("allow-placeholder", msg, "报错没教空跑的显式选入口")
+                # 默认路径一个文件都不造
+            for name in names:
+                self.assertFalse(os.path.isfile(os.path.join(tmp, str(name))))
+
+    def test_placeholder_only_with_explicit_flag(self) -> None:
+        """显式选入才造，且造的是**说清自己是占位**的合成图（老行为收进门内）。"""
+        spec = deckio.read_json(DEMO)
+        with tempfile.TemporaryDirectory() as tmp:
+            deliver.ensure_images(spec, tmp, allow_placeholder=True)
+            for s in spec["deck"]["slides"]:
+                if s.get("image"):
+                    self.assertTrue(os.path.isfile(os.path.join(tmp, str(s["image"]))))
 
     def test_existing_image_is_left_alone(self) -> None:
         """已经有了就不该覆盖 —— 真照片不能被一张合成图顶掉。"""
@@ -177,7 +193,7 @@ class TestImagePlaceholder(unittest.TestCase):
             name = next(s["image"] for s in spec["deck"]["slides"] if s.get("image"))
             target = os.path.join(tmp, name)
             deckio.write_bytes(target, b"KEEP-ME")
-            deliver.ensure_images(spec, tmp)
+            deliver.ensure_images(spec, tmp, allow_placeholder=True)
             self.assertEqual(deckio.read_bytes(target), b"KEEP-ME")
 
 

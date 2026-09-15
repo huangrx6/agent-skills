@@ -77,6 +77,23 @@
    ],
    "why": "栅格派要的是**中性到没有性格**的字 —— 字一旦有表情，栅格的克制就散了。所以这一类只用中性无衬线。"
   },
+  "minimal-baseline": {
+   "label": "极简基线",
+   "temperature": "安静 · 中",
+   "roles": {
+    "display": "MiSans / 资源圆体 Resource Han Rounded",
+    "body": "MiSans / 资源圆体 Resource Han Rounded",
+    "numeral": "MiSans"
+   },
+   "fits": [
+    "tech"
+   ],
+   "avoid": [
+    "cute",
+    "brush"
+   ],
+   "why": "最小契约的活参照：中性无衬线打底，没有性格就是它的性格 —— 自建风格从这里改起。"
+  },
   "paper-ink": {
    "label": "纸墨",
    "temperature": "安静 · 暖",
@@ -244,6 +261,11 @@
     "numeral": "阿里妈妈数黑体"
    },
    "swiss-grid": {
+    "display": "MiSans / 资源圆体 Resource Han Rounded",
+    "body": "MiSans / 资源圆体 Resource Han Rounded",
+    "numeral": "MiSans"
+   },
+   "minimal-baseline": {
     "display": "MiSans / 资源圆体 Resource Han Rounded",
     "body": "MiSans / 资源圆体 Resource Han Rounded",
     "numeral": "MiSans"

@@ -139,7 +139,9 @@ python3 scripts/deliver.py your.spec.json --video      # 连 MP4 一起（慢，
 cd 你的交付目录
 S=…/skills/deck-authoring/scripts
 python3 $S/validate_spec.py deck.spec.json          # 1 规格
-python3 $S/plate.py in.jpg -o sample-treated.png     # 2 造图（图文页要用）
+python3 $S/plate.py in.jpg -o sample-treated.png     # 2 造图（图文页要用；
+                                                     #   或给 deliver 加 --allow-placeholder
+                                                     #   让它造占位测试卡空跑）
 python3 $S/render.py deck.spec.json -o out.html      # 3 出 HTML
 python3 $S/check.py  deck.spec.json out.html         # 4 校验（真浏览器量）
 python3 $S/pdf.py    out.html -o deck.pdf            # 5 矢量 PDF

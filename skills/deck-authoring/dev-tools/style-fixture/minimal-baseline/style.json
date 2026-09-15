@@ -62,12 +62,12 @@
   "motion": {
     "easing": "expoOut",
     "cssEase": "cubic-bezier(0.16, 1, 0.3, 1)",
-    "enterMs": 520,
-    "staggerMs": 70,
-    "titleHoldMs": 260,
-    "holdMs": 2600,
-    "readPerItemMs": 760,
-    "note": "运动性格＝精确：时间短、间隔整齐、几乎不带弹性（带弹性就不是瑞士了）。留白多，所以 hold 长。"
+    "enterMs": 420,
+    "staggerMs": 60,
+    "titleHoldMs": 200,
+    "holdMs": 2200,
+    "readPerItemMs": 640,
+    "note": "基线档：比瑞士更快更平（运动只是过场，不是表达）——自建风格的起点，想有性格就改这里。"
   },
   "colorStructure": {
     "note": "**存结构，不存 HEX**（规范第 21 条）：色板仍是 colorSets 里的四个角色，其余九个角色由 palette.py 从这四个推导。下面这些值不是写死的愿望 ——色相结构 / 数量 / 明度 / 饱和度 / 冷暖是从 OKLCH 实测出来的，`palette.py --audit` 会拿声明和实测对。",

@@ -339,6 +339,9 @@ def build_variant_probe(spec: dict, spec_dir: str | None = None) -> tuple[dict, 
         if s.get("type") != "content-image" or not s.get("image"):
             continue
         img = str(s["image"])
+        assets = render.load_assets_at(base)
+        if assets and img in (assets.get("assets") or {}):
+            img = render.resolve_asset(assets, img)   # assetId → assets/<file>
         if not os.path.isabs(img):
             cand = os.path.abspath(os.path.join(base, img))
             img = cand if os.path.exists(cand) else img

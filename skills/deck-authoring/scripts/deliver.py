@@ -103,20 +103,25 @@ def one_page_spec(spec: dict, page: int, tmp: str) -> str:
     return path
 
 
-def ensure_images(spec: dict, tmp: str) -> None:
-    """图文页引用的图不在产物目录里 → 造一张合成图，并**说清它是占位图**。
+def ensure_images(spec: dict, tmp: str, allow_placeholder: bool = False) -> None:
+    """缺必需图 = **ERROR**（required asset missing），不再默认造合成测试卡。
 
-    这是文档里「交付演练」第 2 步（`plate.py --sample`）的位置 —— 没有它，
-    凡是有图文页的 deck 都会在校验那关被“图片没加载”停下（实测踩过）。
-
-    为什么要提醒：合成图是一张抽象的测试卡，**不是内容**。真做 deck 时它应该
-    被真照片替掉 —— 不提醒的话它很容易被当成“图已经有了”而滑到交付里。
+    规则口径（总编排 §14/§15）：缺图联网找图禁止、静默造占位同样禁止 ——
+    "占位图滑进最终交付"是迟早的事。补图三选一：真照片放进产物目录 /
+    `image_source.py` 按槽位出图合同再生成 / 演练空跑显式 `--allow-placeholder`
+    （造出来的测试卡仍会大声提醒"这不是内容"）。
     """
     needed = {s.get("image") for s in spec["deck"].get("slides", []) if s.get("image")}
-    for name in sorted(needed):
+    missing = sorted(str(n) for n in needed
+                     if not os.path.isfile(os.path.join(tmp, str(n))))
+    if missing and not allow_placeholder:
+        raise SystemExit(
+            "✗ 缺必需图片（required asset missing = ERROR，不造占位）：\n"
+            + "".join(f"    · {n}\n" for n in missing)
+            + "  补图：真照片放进产物目录，或 image_source.py 按槽位出图合同生成；\n"
+            + "  交付演练要空跑流程，显式加 --allow-placeholder（合成测试卡会大声提醒）")
+    for name in missing:
         target = os.path.join(tmp, str(name))
-        if os.path.isfile(target):
-            continue
         print(f"\n──── 造图（占位）：{name}")
         proc = subprocess.run(
             [sys.executable, os.path.join(SCRIPTS, "plate.py"), "--sample", "-o", target],
@@ -284,6 +289,9 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--pages", default="1", help="要比对画面的页，逗号分隔（缺省 1）")
     ap.add_argument("--video", action="store_true", help="连 MP4 一起出（慢，几分钟）")
     ap.add_argument("--json", action="store_true", help="末尾输出机读小结")
+    ap.add_argument("--allow-placeholder", action="store_true",
+                    help="缺图时造合成测试卡继续演练（默认：缺图 = ERROR —— "
+                         "占位图滑进交付是迟早的事，要空跑就显式选入）")
     args = ap.parse_args(argv[1:])
 
     spec = deckio.read_json(args.spec)
@@ -299,7 +307,7 @@ def main(argv: list[str]) -> int:
     if code != 0:
         return 1
     html = os.path.join(tmp, "out.html")
-    ensure_images(spec, tmp)
+    ensure_images(spec, tmp, allow_placeholder=args.allow_placeholder)
     code, _ = run_step("渲染", [os.path.join(SCRIPTS, "render.py"), args.spec, "-o", html], tmp)
     if code != 0:
         return 1

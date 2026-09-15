@@ -25,6 +25,24 @@ python3 scripts/image_source.py --check your.spec.json      # 验尺寸 / 比例
 `--brief` 会**顺便放一张占位图**：出图要时间，而流水线不该因此停住 —— 先跑通整条链，
 图回来再替换。
 
+### 资产清单（manifest，§12 统一 Asset Pipeline 的入口 · v1）
+
+spec 同目录放 `assets/manifest.json` 时，图文页的 `image` 写的是 **assetId**
+（语义引用），compile 按 §14 的优先级链把它解析成 `assets/<file>`（manifest 即
+选择；generated / provided 的区分由 `source` 记录），Decision Trace 留痕，页对象
+携带最终路径 —— 渲染器不见 assetId。没有 manifest 时 `image` 走旧的相对路径
+语义（demo/stress 全兼容）。清单 schema 封闭，违规即 ERROR：
+
+```json
+{"schemaVersion": 1,
+ "assets": {"cover-photo": {"file": "generated/cover.png",
+                            "source": "generated", "note": "主视觉"}}}
+```
+
+两条铁律的落点：**缺文件由 check 的「图片加载」门实测拦**（不猜存在性）；
+**联网找图与静默造占位都禁止** —— `deliver.py` 缺必需图默认 ERROR，要空跑演练
+显式 `--allow-placeholder`（合成测试卡会大声提醒"这不是内容"）。
+
 **该要就要，别嫌麻烦少要，多了也没事。** 这条在这里的含义是：`--brief` 不该因为
 "图少"而显得多余 —— 一份 spec 有多少图位，就出多少份契约，逐张写全。反过来，遇到
 **一张图都没有**的 spec，`--brief` 也不会甩一句"没有要出图的地方"就完事：它按版式

@@ -92,11 +92,16 @@ _TIER_REASON = "条目数超过 5 条档上限 → 降为 {tier}。缩字号是�
 
 
 def compile_spec(deck_spec: dict, style: dict | None = None,
-                 fit_variants: dict | list | None = None) -> dict:
-    """spec → resolved（决策层）。纯函数：同 spec + 同 seed（+ 同实测数据）恒等。
+                 fit_variants: dict | list | None = None,
+                 assets: dict | None = None) -> dict:
+    """spec → resolved（决策层）。纯函数：同 spec + 同 seed（+ 同实测数据
+    + 同资产清单）恒等。
 
     fit_variants：`fit --recommend` 的产物（list 或 {页码: rec}），只喂给
     variant:"auto" 的页 —— 显式 variant 永远赢，实测数据不越权改内容决策。
+    assets：`render.load_assets` 的产物 —— assetId → "assets/<file>" 的映射
+    只在这里发生（§14 Asset Resolver v1：manifest 即选择），页对象携带
+    解析后的最终路径，渲染器不见 assetId。
     """
     r = _render()
     brand_mod = r.brand_module
@@ -172,6 +177,21 @@ def compile_spec(deck_spec: dict, style: dict | None = None,
         # variant 本身在 spec 里，{**slide} 合并页对象时自动带进 resolved ——
         # compile 的职责是**留痕**：谁选的变体、为什么。自动选变体（按内容形状
         # 派生）要等 fit 的候选实测给数据，现在是显式才记、默认静默。
+        # ── Asset：assetId → 最终路径（§14 优先级链 v1：manifest 即选择）────
+        # spec 里的 image 写 assetId（语义引用）；清单里的 id → "assets/<file>"，
+        # 不在清单里 → 原样（旧路径语义，demo/stress 全兼容）。
+        image_val = slide.get("image")
+        if image_val and assets:
+            resolved_img = r.resolve_asset(assets, str(image_val))
+            if resolved_img is not None:
+                slide = {**slide, "image": resolved_img}
+                entry = assets["assets"][str(image_val)]
+                trace.append({"stage": "asset", "slide": i,
+                              "decision": f"{image_val} → {resolved_img}",
+                              "reason": [f"manifest 选中（source="
+                                         f"{entry.get('source', '未标')}）",
+                                         "assetId 是语义引用，路径只在 resolved 里出现；"
+                                         "缺文件由 check 的「图片加载」门实测拦"]})
         variant = slide.get("variant")
         if variant == "auto":
             # auto：吃 fit --recommend 的实测分数（同内容同图，可复现）。
@@ -262,7 +282,8 @@ def main(argv: list[str]) -> int:
                 f"✗ 读不了变体实测产物 {args.fit_variants}：{exc}\n"
                 f"  先跑：fit.py --from-spec <spec> --recommend --json-out "
                 f"> {args.fit_variants}") from exc
-    resolved = compile_spec(spec, fit_variants=fit_variants)
+    resolved = compile_spec(spec, fit_variants=fit_variants,
+                            assets=_render().load_assets(args.spec))
 
     if args.out:
         deckio.write_json(args.out, resolved)
