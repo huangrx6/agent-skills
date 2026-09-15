@@ -181,13 +181,50 @@ class TestFitEndToEnd(unittest.TestCase):
         self.assertNotIn("content-text", self.result["capped"],
                          "content-text 报到了扫描上限 —— 那个数字就不再是上限了")
 
-    def test_report_suggests_the_fullest_fitting_layout(self) -> None:
-        """有装得下的版式时，建议的是**最满**那个 —— 能装满却不满 = 这页没做完。"""
+    def test_report_ranks_by_score_not_fullness(self) -> None:
+        """建议按**多目标评分**给 —— 密度只是留白维度的输入，不是优化目标。
+
+        反面钉住旧病：不再出现"把正文带用得最满"这种奖励拥挤的措辞，
+        也不再给"两页合一 / 写长一点"这种消灭留白的建议。
+        """
         text = fit.report(self.result, self.CONTENT, render.DEFAULT_STYLE, None)
         fitting = [c for c in self.result["candidates"] if c["fits"]]
-        best = sorted(fitting, key=lambda c: c["density"])[-1]
-        self.assertIn(best["kind"], text)
+        self.assertTrue(fitting)
+        self.assertIn("candidate score", text)
+        self.assertNotIn("用得最满", text, "还在按密度最大化建议 —— 旧目标函数没死透")
         self.assertNotIn("拆页", text, "有装得下的版式却建议拆页")
+
+    def test_crowded_candidate_loses_to_comfort_band(self) -> None:
+        """占带 >85% 的拥挤候选要输给舒适带候选 —— 惩罚真实生效。"""
+        result = {"candidates": [
+            {"kind": "content-text", "bottom": 820.0, "fits": True,
+             "overflow": 0.0, "density": 0.94},
+            {"kind": "two-column", "bottom": 640.0, "fits": True,
+             "overflow": 0.0, "density": 0.62}],
+            "max_items": {}, "capped": []}
+        content = {"title": "T", "bullets": [f"条目{i}" for i in range(7)]}
+        text = fit.report(result, content, render.DEFAULT_STYLE, None)
+        self.assertIn("two-column", text.split("建议")[1],
+                      "拥挤候选（94%）赢了舒适带候选（62%）—— 惩罚没生效")
+        self.assertIn("拥挤", text)
+
+    def test_whitespace_score_peaks_in_comfort_band(self) -> None:
+        """留白分：舒适带 45-75% 满分；稀按比例衰减；挤到 100% 归零。"""
+        self.assertEqual(fit._whitespace_score(0.60), 1.0)
+        self.assertLess(fit._whitespace_score(0.30), 0.7)
+        self.assertEqual(fit._whitespace_score(1.0), 0.0)
+
+    def test_sparse_advice_never_says_fill_the_page(self) -> None:
+        """全偏稀时的建议：不许出现"填满/写长/合成一页"这类消灭留白的话。"""
+        result = {"candidates": [
+            {"kind": "content-text", "bottom": 400.0, "fits": True,
+             "overflow": 0.0, "density": 0.40}],
+            "max_items": {}, "capped": []}
+        text = fit.report(result, {"title": "T", "bullets": ["a", "b"]},
+                          render.DEFAULT_STYLE, None)
+        self.assertIn("不要为填满页面加内容", text)
+        self.assertNotIn("写长", text)
+        self.assertNotIn("合成一页", text)
 
     def test_report_says_split_when_nothing_fits(self) -> None:
         """全都装不下时才说拆页，且要带“单页最多几条”。

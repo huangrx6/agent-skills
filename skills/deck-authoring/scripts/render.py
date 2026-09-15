@@ -739,6 +739,7 @@ brand_module = _load_sibling("brand")
 fonts_module = _load_sibling("fonts")  # 字体清单与 @font-face（清单是数据，不是硬编码）
 chart_module = _load_sibling("chart")   # 图表引擎：DSL → 确定性 SVG（八类）
 palette_module = _load_sibling("palette")  # 色彩语法与派生（auto 主题从这里出）
+compile_module = _load_sibling("compile")  # 决策层：spec→resolved（render 只画）
 
 
 def _apply_brand(style: dict, brand: dict) -> dict:
@@ -774,16 +775,32 @@ def resolve_color_set(tokens: dict, deck: dict) -> str:
 
 
 def render(deck_spec: dict, style: dict | None = None) -> str:
-    """渲染。`style=None` 时按 `deck.style`（缺省 swiss-grid）从 styles/ 加载。"""
-    deck = deck_spec["deck"]
-    style = style or load_style(deck.get("style", DEFAULT_STYLE))
-    brand = brand_module.load(deck.get("brand"))
-    style = _apply_brand(style, brand)
+    """渲染。输入两种都认（第三代链路：`Slide DSL → compile → resolved → Renderer 只画`）：
+
+    - 语义 spec：先经 `compile.compile_spec` 决策（风格/品牌合并、色板、字号档、
+      时间轴都在那边定，带 trace），再面 `render_resolved`；
+    - resolved.deck（`kind: "resolved.deck"`）：**直面，不做任何决策** ——
+      不加载风格、不合并品牌、不算档位。
+    """
+    if compile_module.is_resolved(deck_spec):
+        return render_resolved(deck_spec)
+    return render_resolved(compile_module.compile_spec(deck_spec, style))
+
+
+def render_resolved(resolved: dict) -> str:
+    """直渲 resolved.deck.json。**只画，不想**：所有输入都在 resolved 里。
+
+    决策（色板/档位/错位/时间轴/logo 选版）由 compile.py 定并记 trace；
+    本函数不加载风格、不合并品牌、不调用 bullet_tier/misregistration/timeline
+    —— 渲染器里没有第二套决策，是"去决策化"的物理保证。
+    """
+    deck = resolved["deck"]
+    style = resolved["style"]
+    brand = resolved["brand"]
     tokens = style["tokens"]
     tier = tokens["type"]
-    seed = deck.get("seed", 1)
-    out = [_head(deck.get("title", "deck"), style, seed,
-                 resolve_color_set(tokens, deck))]
+    seed = resolved["seed"]
+    out = [_head(resolved["title"], style, seed, resolved["colorSet"])]
 
     man: list[dict] = []          # 语义清单：元素身份 + 意图（几何由 measure.py 量）
 
@@ -802,13 +819,10 @@ def render(deck_spec: dict, style: dict | None = None) -> str:
         if s.get("type") == "end":
             end_slide = k
             break
-    # 品牌 logo 选哪个文件要**看纸色**（深底上用反白版）—— 纸色是每套 colorSet 定死的，
-    # 所以整份 deck 只算一次。colorSet 名字对不上时不在这里报错：_head 会报得更好
-    # （它会列出可用值），这里拿个安全的缺省继续走。
-    cs_name = deck.get("colorSet") or next(iter(tokens["colorSets"]), "")
-    colors = tokens["colorSets"].get(cs_name, {})          # 图表引擎直接吃这一份
-    paper = colors.get("background", "#FFFFFF")
-    logo_file = brand_module.logo_file(brand, paper)
+    # 品牌 logo 选哪个文件由 compile 按纸色定好（resolved["logoFile"]）——
+    # 这里只把文件变成内嵌 URI 与导出路径引用，不做选择。
+    logo_file = resolved["logoFile"]
+    colors = resolved["colors"]
     logo_uri = brand_module.logo_data_uri(brand, logo_file)
     logo_ref = brand_module.logo_ref(brand, logo_file)
 
@@ -819,15 +833,15 @@ def render(deck_spec: dict, style: dict | None = None) -> str:
 
     for i, slide in enumerate(deck["slides"], 1):
         kind = slide.get("type")
-        t_tier = TITLE_TIER.get(kind, DEFAULT_TITLE_TIER)
-        tsize = tier[t_tier]
-        # 两栏页永远是窄栏，不参与自适应
-        b_tier = "bulletSmall" if kind == "two-column" else bullet_tier(
-            len(slide.get("bullets", [])))
-        bsize = tier[b_tier]
-        # 错位是**整页一个值**，不是每个元素一个 —— 真实孔版里一张纸过一次滚筒，
-        # 整张的偏移是同一个。按元素随机在物理上是错的，看着也更乱。
-        dx, dy, rot = misregistration(tokens, seed, "page", i)
+        # 档位与错位是 compile 的决策（带 trace），这里只读 —— 渲染器不“想”。
+        t_tier = slide["tTier"]
+        tsize = slide["tSize"]
+        # 两栏页永远是窄栏，不参与自适应（compile 已定，含理由）
+        b_tier = slide["bTier"]
+        bsize = slide["bSize"]
+        # 错位是**整页一个值**（真实孔版一张纸过一次滚筒）；按 seed 派生，
+        # 在 compile 里算好，这里只读。
+        dx, dy, rot = slide["dx"], slide["dy"], slide["rot"]
         # data-idx：给 skin 一个**零成本的页码钩子**（.slide::after{content:attr(data-idx)}）。
         # 用属性而不是再加一个元素：安静派风格的构图需要一个字号锚点，但为此往每页
         # 塞一个 div、还得同步进清单和测量层，不值。
@@ -993,7 +1007,7 @@ def render(deck_spec: dict, style: dict | None = None) -> str:
     # ensure_ascii 只针对**这两个内嵌 JSON 载荷**（正文里的中文当然是 UTF-8 原文）——
     # 载荷走 \uXXXX 转义，是为了它在任何转存/重编码环节都不会被改坏。
     # （早先这里写成“保持产物是纯 ASCII”，不实：`<title>` 与正文本来就是 UTF-8。）
-    spans = timeline(deck, tokens)
+    spans = resolved["timeline"]            # compile 已定（Python 算，可测可回归）
     motion = {k: v for k, v in tokens["motion"].items() if k != "note"}
     out.append("<script>window.__deck_timeline="
                + json.dumps(spans, separators=(",", ":"))

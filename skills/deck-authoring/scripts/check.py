@@ -363,6 +363,26 @@ def _check_brand(measured: dict, deck: dict, tokens: dict) -> tuple[list[str], l
     return problems, notes
 
 
+def _tier_notes(deck: dict) -> list[str]:
+    """字号降档提示：content-text 页条目 >5 会触发 bullet_tier 自动降档。
+
+    此前它是**静默**的 —— 内容多→字变小→装得下→check 全绿，视觉质量下降
+    没人拦（hierarchy.py 注释里自己都写了这是"绝对不要第一步缩字号"的反例）。
+    compile 的 trace 记了决策，这里是门禁处的第二声：缩字号是修复顺序
+    第 13 位（先删条目 / 拆页 / 换变式）。纯函数：只看 spec，不碰测量。
+    """
+    out: list[str] = []
+    for i, s in enumerate(deck.get("slides", []), 1):
+        if s.get("type") != "content-text":
+            continue
+        n = len(s.get("bullets") or [])
+        if n > 5:
+            out.append(f"第 {i} 页 {n} 条将触发最小字号档（bulletSmall 自动降档）——"
+                       f"缩字号是修复顺序第 13 位：先删条目 / 拆页 / 换变式"
+                       f"（compile --trace 有同一决策的完整理由）")
+    return out
+
+
 def _check_deck_shape(measured: dict, deck: dict) -> tuple[list[str], list[str]]:
     """deck 级：**半页死白**（提示）+ 版式单一（提示）+ 没有封面（提示）。
 
@@ -382,6 +402,10 @@ def _check_deck_shape(measured: dict, deck: dict) -> tuple[list[str], list[str]]
     # 没有封面：不是硬错（有人就把第一页当正文页），但很难是个有意的选择。
     if slides and "title" not in kinds:
         notes.append("这份 deck 没有封面页（没有 type=title）—— 是漏了，还是有意？")
+
+    # 字号降档可见化（纯函数抽出，便于单测）：compile 的 trace 是第一声，
+    # 这里是门禁处的第二声。
+    notes.extend(_tier_notes(deck))
 
     # 版式单一：全是一种版式时，视线没有落点变化。
     content_kinds = [k for k in kinds if k not in ("title", "end")]

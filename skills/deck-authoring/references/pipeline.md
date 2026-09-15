@@ -50,8 +50,9 @@ Page Message；Motion Engine 改变信息层级；Brand 覆盖整个 Style；Con
 
 本仓库的站合并：①-⑤ = `plan.py --check`（三份 JSON 一次过检）；⑥ =
 `--to-spec`+`validate_spec`；⑦⑧ = `image_source --brief/--check`；⑨ =
-`render.py`（编译即渲染：theme=色板并入、typography=字栈合并、chart=SVG、
-layout=grid+CSS、motion=timeline——决策都在这层做完）；⑩⑫ = `check.py`
+`compile.py`+`render.py`（**决策与绘制已分家**：compile 出 resolved.deck.json
+——主题/字号档/错位/logo/时间轴全在它定，每条决策带 trace；render_resolved
+只画不想；`render(spec)` 仍是 compile→draw 一步到位，字节级不变）；⑩⑫ = `check.py`
 （Layout QA 与 Visual QA 都在实测 DOM 上做，因为 resolved 层就是 DOM）；
 ⑬⑭ = `deliver.py` + 各导出的回读验证。
 
@@ -204,14 +205,15 @@ Effect Registry/Motion Creativity → Resolved Timeline（`timeline()` + 编排�
 
 系统核心：语义 DSL 编译为可直接渲染的 Resolved Deck，含 resolver decisions/
 fallback decisions/warnings/geometry/theme/typography/assets/charts/motion。
-本仓库 = `render.py` 一次编译出含全部 tokens/timeline/manifest 的自包含 HTML；
-decision trace 未系统化（§26）。
+本仓库 = `compile.py` 把语义 spec 编译成 `resolved.deck.json`（v1：内容与决策
+合并的自足层——`resolved = read_json(...); html = render(resolved)`），再由
+`render_resolved` 直渲；**决策 trace 已系统化**（§26 第一版）。
 
 ## 26. Decision Trace【约定】
 
 每个 Resolver 的关键决策可追踪（`{"decision":"split_40_60","reason":[…]}`
 式）。现状：决策理由写在代码注释与各规则文档（"为什么这样设计"人可查）；
-机器可读 trace 未建——等 Layout Candidate（§22）一起做才有消费者。
+第一版已落：`compile --trace` 输出每条决策与理由（auto 派生/升降档/logo 选版）；消费者是人和 check 门禁（降档在门禁处再响一声）。
 
 ## 27. Layout QA【✅】
 

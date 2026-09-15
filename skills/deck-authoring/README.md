@@ -105,7 +105,7 @@ python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸�
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 416 条，约 6 分钟（负载敏感）（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 431 条，约 6 分钟（负载敏感）（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时约 2.5 分钟，
@@ -333,6 +333,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── grid.py              # 网格与间距：12 列 / 令牌 ramp / 关系规则（几何唯一来源）
 │   ├── chart.py             # 图表引擎：意图树 / 八类 SVG / muted+accent / 标注
 │   ├── plan.py              # 规划层：内容理解 / 叙事骨架 / 页型 / 到 spec 的桥
+│   ├── compile.py           # 决策层：spec → resolved.deck.json（色板/档位/时间轴 + trace）
 │   │                          （brief / coreThesis / claims / 空话 / 重复也在这查）
 │   ├── brand.py             # 品牌资产：logo 内嵌 / 色板与字体合并 / SVG 栅格化
 │   ├── fit.py               # 试排：给定一页内容，实测哪些版式装得下（真渲真量）

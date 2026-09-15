@@ -65,6 +65,60 @@ BAND_TOP = render.CONTENT_TOP
 BAND_BOTTOM = render.CONTENT_BOTTOM
 DEAD_SPACE = 0.55          # 内容高度不足正文带的这个比例 → 半页空
 
+# ── CandidateScore：多目标，**不再"越满越好"** ──────────────────────────
+# 规则侧完整公式：Fit .20 + Hierarchy .15 + Whitespace .15 + FocalClarity .15
+#   + Balance .10 + SemanticFit .10 + StyleMatch .075 + DeckRhythm .075
+#   − 惩罚（Overflow / SmallFont / Crowding / Repetition / FocalConflict / Cards）。
+# 本工具现在**量得到**的维度：Fit / Whitespace / SemanticFit + 拥挤与最小字号
+# 两项惩罚；其余维度未接入（要等 Layout Variant 候选并测 —— 同一份测量服务
+# 多个候选时，Hierarchy/Focal/Balance 才有输入），report 里如实标注。
+SCORE_WEIGHTS = {"fit": 0.20, "whitespace": 0.15, "semantic": 0.10}
+CROWDING_ABOVE = 0.85      # 占正文带超过这个比例 → 拥挤惩罚
+CROWDING_PENALTY = 0.10
+SMALLFONT_PENALTY = 0.10
+
+
+def _whitespace_score(density: float) -> float:
+    """留白分：舒适带 45%~75%（hierarchy 密度带的 Normal~Information）。
+
+    带内 1.0；带外线性衰减 —— **稀不是满分也不是零分**（留白是构图），
+    挤到 100% 是明确的坏（信息板化）。
+    """
+    if 0.45 <= density <= 0.75:
+        return 1.0
+    if density < 0.45:
+        return max(0.0, density / 0.45)
+    return max(0.0, 1.0 - (density - 0.75) / 0.25)
+
+
+def _semantic_score(kind: str, content: dict) -> float:
+    """语义匹配：内容形状与版式的契合（不是"哪个装得多"）。"""
+    n = len(content.get("bullets") or [])
+    has_image = bool(content.get("image"))
+    if kind == "content-image":
+        return 1.0 if has_image else 0.0
+    if kind == "two-column":
+        return 1.0 if n >= 6 else (0.5 if n >= 4 else 0.2)
+    # content-text：少条数大字页是它的主场（statement 的气质来源）
+    return 1.0 if n <= 4 else (0.5 if n <= 5 else 0.2)
+
+
+def score_candidate(c: dict, content: dict) -> tuple[float, dict, list[str]]:
+    """一个候选的多目标得分（0~0.45 满分基准）+ 分项 + 惩罚名。纯函数。"""
+    parts = {"fit": 1.0 if c["fits"] else 0.0,
+             "whitespace": round(_whitespace_score(c["density"]), 3),
+             "semantic": round(_semantic_score(c["kind"], content), 3)}
+    score = sum(parts[k] * SCORE_WEIGHTS[k] for k in SCORE_WEIGHTS)
+    penalties: list[str] = []
+    if c["density"] > CROWDING_ABOVE:
+        score -= CROWDING_PENALTY
+        penalties.append(f"拥挤（占带 {c['density']:.0%} > 85%）")
+    n_total = len(content.get("bullets") or [])
+    if c["kind"] == "content-text" and n_total > 5:
+        score -= SMALLFONT_PENALTY
+        penalties.append("最小字号档（缩字号是修复顺序第 13 位）")
+    return round(score, 3), parts, penalties
+
 # 试排哪些版式（只有能承载条目列表的才参与）
 CANDIDATES = ("content-text", "two-column", "content-image")
 MAX_SWEEP = 16             # 条目数上限的扫描范围（再多就是内容该拆页了）
@@ -205,14 +259,24 @@ def report(result: dict, content: dict, style: str, brand: str | None) -> str:
     fits = [c for c in cands if c["fits"]]
     out.append("")
     if fits:
-        # 建议给**最满**的那个：留白是构图，但能装满却不满 = 这页没做完
-        best = sorted(fits, key=lambda c: c["density"])[-1]
-        out.append(f"  建议：用 {best['kind']}（占 {best['density']:.0%}）——"
-                   f" 它把正文带用得最满。")
+        # 建议按**多目标评分**给（不再"越满越好"）：留白在舒适带、语义匹配、
+        # 不触发拥挤/最小字号惩罚的候选赢。密度只是 Whitespace 维度的输入。
+        scored = sorted(((*score_candidate(c, content), c) for c in fits),
+                        key=lambda t: t[0], reverse=True)
+        (score, parts, penalties, best) = scored[0]
+        why = f"留白 {parts['whitespace']:.2f} · 语义 {parts['semantic']:.2f}"
+        extra = f"；惩罚：{'、'.join(penalties)}" if penalties else ""
+        out.append(f"  建议：用 {best['kind']}（candidate score {score:.2f} ——"
+                   f" {why}{extra}；占正文带 {best['density']:.0%}）。")
+        out.append("  （已接入维度：Fit .20 + 留白 .15 + 语义 .10 − 拥挤/最小字号"
+                   "惩罚；Hierarchy/Focal/Balance/StyleMatch/Rhythm 未接入 ——"
+                   " 等 Layout Variant 候选并测）")
         if all(c["density"] < DEAD_SPACE for c in fits):
-            out.append(f"  注意：所有版式都不到 {DEAD_SPACE:.0%}（都偏稀）——"
-                       f"内容太少了。考虑：把两页合成一页、每个条目写长一点"
-                       f"（把“结论”展开成一句完整判断），或者换更满的版式。")
+            out.append(f"  注意：所有版式都不到 {DEAD_SPACE:.0%}（都偏稀）。"
+                       f"稀不是错误 —— 留白是构图，**不要为填满页面加内容**"
+                       f"（反 slop：空洞口号/无证据数字/重复卡片都是这么来的）。"
+                       f"要么接受留白，要么回内容层问：这页是否真有这么多可讲的"
+                       f"（并页是内容决策，不是排版填空）。")
         return "\n".join(out)
 
     # 一个都装不下 —— 这时“最多几条”才有意义
