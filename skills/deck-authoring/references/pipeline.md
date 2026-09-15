@@ -127,8 +127,8 @@ rotation/任意字号/任意 hex** —— `validate_spec.py` 的封闭字段集 
 ## 12. Asset Pipeline【✅ 简化形】
 
 所有图/截图/品牌素材进统一管线；推荐目录的对应：spec 同目录（交付整体拷走
-不断链），`image-brief.md` 即 requests，`brands/` 即官方素材——对照表见
-brand-assets.md §25。
+不断链），图像合同（`--brief` 产出的 image-brief 文件，非仓库文档）即
+requests，`brands/` 即官方素材——对照表见 brand-assets.md §25。
 
 ## 13. Image Request【✅】
 
