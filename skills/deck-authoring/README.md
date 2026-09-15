@@ -105,7 +105,7 @@ python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸�
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 226 条，约 3.5 分钟（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 235 条，约 4 分钟（负载敏感）（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时约 2.5 分钟，
@@ -147,8 +147,16 @@ PDF 是矢量且页数/页尺寸对、可编辑 PPTX 的**字是真字**且坐�
 ## 字体
 
 内置 **126 款免费商用中文字体清单**（六类各 21 款）+ **字体 ↔ 风格映射表**。
-仓库里只有清单与映射（纯文本）—— 字体文件 5–28MB 一款，**不进仓库**，换台机器跑一次
-`python3 scripts/fonts.py --fetch` 就回来了。
+仓库里只有清单与映射（纯文本）—— 字体文件 5–28MB 一款，**不进仓库**，也**不落在
+skill 目录里**（skill 目录是可分发的代码，不该长出自下载的二进制）。字体进用户级缓存：
+
+| 顺序 | 位置 | 什么时候用 |
+| --- | --- | --- |
+| 1 | `$DECK_FONT_DIR` | 显式指定，让调用方决定下载到哪 |
+| 2 | `~/.config/deck-authoring/fonts/` | 默认、持久（单款 5–28MB，重下太浪费） |
+| 3 | 临时目录（`--fetch --temp`） | 不想在这台机器上留东西 |
+
+`fonts.py --where` 看当前目录。换台机器跑一次 `fonts.py --fetch` 就回来了。
 
 ```bash
 python3 scripts/fonts.py --list --urls        # 126 款 + 来源页

@@ -118,8 +118,8 @@
    "label": "终端",
    "temperature": "中性 · 冷",
    "roles": {
-    "display": "霞鹜文楷（等宽版 LXGWWenKai-Mono）/ Menlo",
-    "body": "霞鹜文楷（等宽版 LXGWWenKai-Mono）/ Menlo",
+    "display": "LXGW WenKai Mono（霞鹜文楷等宽，OFL）/ Menlo",
+    "body": "LXGW WenKai Mono（霞鹜文楷等宽，OFL）/ Menlo",
     "numeral": "Menlo"
    },
    "fits": [
@@ -131,7 +131,7 @@
     "guochao",
     "ecom"
    ],
-   "why": "整套是等宽的 —— 换任何非等宽字体，列对齐和 `$` 提示符的位置立刻散掉。这是唯一必须锁死字族的风格。"
+   "why": "整套是等宽的 —— 换任何非等宽字体，列对齐和 `$` 提示符的位置立刻散掉。这是唯一必须锁死字族的风格；中文等宽只有霞鹜文楷 Mono 这一款（OFL）。"
   },
   "pastel-geometry": {
    "label": "粉彩几何",
@@ -259,8 +259,8 @@
     "numeral": "猫啃网糖圆体"
    },
    "terminal": {
-    "display": "霞鹜文楷（等宽版 LXGWWenKai-Mono）/ Menlo",
-    "body": "霞鹜文楷（等宽版 LXGWWenKai-Mono）/ Menlo",
+    "display": "LXGW WenKai Mono（霞鹜文楷等宽，OFL）/ Menlo",
+    "body": "LXGW WenKai Mono（霞鹜文楷等宽，OFL）/ Menlo",
     "numeral": "Menlo"
    },
    "pastel-geometry": {

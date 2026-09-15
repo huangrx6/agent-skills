@@ -30,8 +30,31 @@ python3 scripts/fonts.py --map                  # 字体 ↔ 风格映射表
 python3 scripts/fonts.py --embed out.html -o portable.html   # 字体内联进 HTML
 ```
 
-文件落在 `fonts/ttf/`（**被 .gitignore 挡掉**）。与 `h264_encode.swift` 首次编译成
-缓存是同一个模式。
+### 字体放哪儿：**不放在 skill 目录里**
+
+字体文件落在**用户级缓存**，不在 skill 目录 —— skill 目录是**可分发的代码**，
+不该长出自下载的二进制（仓库里 h264 编码器早就是这个规矩：编译进 tempdir 按源码
+哈希命名）。
+
+解析顺序：
+
+| 顺序 | 位置 | 什么时候用 |
+| --- | --- | --- |
+| 1 | `$DECK_FONT_DIR` | 显式指定 —— 让**调用方决定下载到哪**，不用改代码 |
+| 2 | `~/.config/deck-authoring/fonts/` | 默认，**持久**：单款 CJK 5–28MB，每次重下太浪费 |
+| 3 | 临时目录（`--temp`） | 不想在这台机器上留东西（CI / 一次性用） |
+
+```bash
+python3 scripts/fonts.py --where          # 看当前会用哪个目录
+python3 scripts/fonts.py --fetch --temp   # 这一次放临时目录
+DECK_FONT_DIR=/tmp/f python3 scripts/fonts.py --fetch   # 指定任意位置
+```
+
+旧的 `fonts/ttf/`（如果之前下过）**仍会被读取**当兜底，但**新下载只进缓存** ——
+已经下过的人不用重下。想清掉：`rm -rf fonts/ttf`。
+
+**所以做 PPT 的 AI 可以按实际情况选**：常用就让它落 `~/.config/...`（下次直接有），
+临时跑一遍就 `--temp`，也有环境变量这条路可走。
 
 **只有一部分能自动取**：清单里大多数只在这几个字体站上分发，下载要走页面（有的还要
 登录 / 领授权）。凡是没能验证直链的，`--fetch` 就**如实说"去来源页拿"**，不编 URL。

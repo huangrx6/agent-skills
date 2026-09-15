@@ -127,10 +127,10 @@ class TestMapping(unittest.TestCase):
                 for cand in pick.split("/"):
                     cand = cand.strip().split("（")[0].replace("ⓑ", "").strip()
                     with self.subTest(style=style, role=role, font=cand):
-                        allowed = self.names + self.map["system_fonts"]["list"]
+                        allowed = cand in self.map["system_fonts"]["list"]
                         self.assertTrue(
-                            any(cand in n or n.split()[0] in cand for n in allowed),
-                            f"{cand!r} 既不在清单里，也不在系统字体白名单里")
+                            allowed or fonts.owner_of(cand) is not None,
+                            f"{cand!r} 既不在清单里（含变体），也不在系统字体白名单里")
 
     def test_categories_reference_real_styles(self) -> None:
         for key, row in self.map["categories"].items():
@@ -349,11 +349,10 @@ class TestFreeOnly(unittest.TestCase):
                     if c in allowed:
                         continue
                     with self.subTest(style=style, role=role, font=c):
-                        hit = next((n for n in self.license
-                                    if n == c or c in n or n.split()[0] in c), None)
-                        self.assertIsNotNone(hit, f"{c!r} 不在清单里")
-                        self.assertEqual(self.license[hit], "A",
-                                         f"{c!r} 的授权是 {self.license[hit]}，不是纯 A")
+                        owner = fonts.owner_of(c)
+                        self.assertIsNotNone(owner, f"{c!r} 不在清单里（含变体）")
+                        self.assertEqual(owner["license"], "A",
+                                         f"{c!r} 的授权是 {owner['license']}，不是纯 A")
 
     def test_a_only_does_not_reuse_the_questionable_picks(self) -> None:
         """主映射里那些 B / A/B 的推荐，不许原样出现在纯 A 方案里。"""
@@ -363,9 +362,13 @@ class TestFreeOnly(unittest.TestCase):
                 for cand in pick.split("/"):
                     c = cand.strip().split("（")[0].strip()
                     with self.subTest(style=style, role=role, font=c):
-                        self.assertFalse(
-                            any(c == n or c in n for n in risky),
-                            f"{c!r} 是 B/C 档，不该出现在纯 A 方案里")
+                        if c in self.map["system_fonts"]["list"]:
+                            continue
+                        owner = fonts.owner_of(c)
+                        self.assertIsNotNone(owner, f"{c!r} 认不出来")
+                        self.assertEqual(owner["license"], "A",
+                                         f"{c!r} 是 {owner['license']} 档，"
+                                         f"不该出现在纯 A 方案里")
 
     def test_strict_a_share_is_reported_honestly(self) -> None:
         """清单里严格 A 只占一部分 —— 文档与 CLI 都得说清这件事，不能让人以为
@@ -373,6 +376,133 @@ class TestFreeOnly(unittest.TestCase):
         strict = [n for n, code in self.license.items() if code == "A"]
         self.assertLess(len(strict), len(self.license))
         self.assertGreater(len(strict), 50, "严格 A 的款数太少，值得复核清单")
+
+
+class TestFontCacheLocation(unittest.TestCase):
+    """字体放哪儿：**不放在 skill 目录里**。
+
+    skill 目录是**可分发的代码**，不该长出自下载的二进制（仓库里 h264 编码器早就
+    是这个规矩）。而且"下载到哪"这件事该由**调用方**决定 —— 做 PPT 的 AI 按实际
+    情况选持久目录还是临时目录。
+    """
+
+    def setUp(self) -> None:
+        self._saved = os.environ.pop("DECK_FONT_DIR", None)
+        self.addCleanup(self._restore)
+
+    def _restore(self) -> None:
+        if self._saved is None:
+            os.environ.pop("DECK_FONT_DIR", None)
+        else:
+            os.environ["DECK_FONT_DIR"] = self._saved
+
+    def test_env_var_wins(self) -> None:
+        os.environ["DECK_FONT_DIR"] = "/tmp/somewhere-fonts"
+        self.assertEqual(fonts.cache_dir(), "/tmp/somewhere-fonts")
+        self.assertEqual(fonts.cache_dir(temp=True), "/tmp/somewhere-fonts")
+
+    def test_default_is_user_level_not_skill(self) -> None:
+        d = fonts.cache_dir()
+        self.assertNotIn(SKILL, d, f"默认字体目录落在 skill 里了：{d}")
+        self.assertIn(os.path.expanduser("~"), d)
+        self.assertIn(".config", d)
+
+    def test_temp_stays_outside_the_skill_too(self) -> None:
+        import tempfile
+
+        d = fonts.cache_dir(temp=True)
+        self.assertTrue(d.startswith(tempfile.gettempdir()), d)
+        self.assertNotIn(SKILL, d)
+
+    def test_write_target_is_never_the_skill_dir(self) -> None:
+        """**回归**：`--fetch` 不许往 skill 目录写。
+
+        第一版就是写 `fonts/ttf/` —— 于是 skill 目录里长出 43MB 二进制。现在
+        那个旧目录只当**只读兜底**（已经下过的人不用重下）。
+        """
+        for temp in (False, True):
+            with self.subTest(temp=temp):
+                d = fonts.cache_dir(temp)
+                self.assertNotEqual(os.path.abspath(d), os.path.abspath(fonts.LEGACY_DIR))
+
+    def test_search_lists_legacy_as_fallback(self) -> None:
+        self.assertEqual(fonts.search_dirs()[0], fonts.cache_dir())
+        self.assertIn(fonts.LEGACY_DIR, fonts.search_dirs())
+
+
+class TestStylesUseFreeArtFonts(unittest.TestCase):
+    """8 套风格的字栈必须真的以**纯 A** 艺术字打头（用户要求"按纯 A"）。
+
+    而且**没下载字体时的行为与从前一致** —— 艺术字后面跟着原来的系统栈，
+    所以不下载的人观感不变。这两件事都要成立。
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.map = json.loads(open(os.path.join(SKILL, "fonts", "mapping.json"),
+                                  encoding="utf-8").read())
+        cls.license = {f["name"]: f["license"]
+                       for f in json.loads(open(os.path.join(SKILL, "fonts", "catalog.json"),
+                                                encoding="utf-8").read())["fonts"]}
+        cls.cat_fonts = list(cls.license)
+
+    def _styles(self):
+        root = os.path.join(SKILL, "styles")
+        return sorted(d for d in os.listdir(root) if not d.startswith("zz_")
+                      and os.path.isfile(os.path.join(root, d, "style.json")))
+
+    def _stack(self, style: str, slot: str) -> list[str]:
+        with open(os.path.join(SKILL, "styles", style, "style.json"), encoding="utf-8") as fh:
+            return [s.strip() for s in json.load(fh)["fonts"][slot].split(",")]
+
+    def test_every_style_leads_with_a_free_art_font(self) -> None:
+        """反面对照的另一半：**不许**以 B / A/B 档的字体打头。"""
+        for style in self._styles():
+            for slot in ("display", "body"):
+                with self.subTest(style=style, slot=slot):
+                    head = self._stack(style, slot)[0]
+                    owner = fonts.owner_of(head)
+                    self.assertIsNotNone(
+                        owner, f"{style}.{slot} 打头的是 {head!r}，既不是清单字体"
+                               f"也不是任何条目的变体")
+                    self.assertEqual(owner["license"], "A",
+                                     f"{style}.{slot} 打头的是 {head!r}"
+                                     f"（{owner['license']}）")
+
+    def test_the_original_system_stack_is_still_there(self) -> None:
+        """不下载字体时的观感必须与从前一致 —— 所以系统栈不能被艺术字顶掉。"""
+        for style in self._styles():
+            for slot in ("display", "body"):
+                stack = self._stack(style, slot)
+                with self.subTest(style=style, slot=slot):
+                    self.assertGreaterEqual(len(stack), 3, f"{style}.{slot} 太短：{stack}")
+                    tail = " ".join(stack[-3:])
+                    self.assertTrue(
+                        any(k in tail for k in
+                            ("sans-serif", "serif", "monospace", "Arial", "Helvetica",
+                             "Georgia", "Menlo", "Songti", "Heiti", "Hiragino", "Futura",
+                             "PingFang")),
+                        f"{style}.{slot} 末尾没有系统回退：{stack}")
+
+    def test_no_duplicate_entries_in_a_stack(self) -> None:
+        """**回归**：迁移脚本给 terminal 加前缀时留下了 `Menlo, Menlo` ——
+        因为幂等判断只看第一项。重复项无害但说明脚本是盲写的。"""
+        for style in self._styles():
+            for slot in ("display", "body"):
+                stack = self._stack(style, slot)
+                with self.subTest(style=style, slot=slot):
+                    self.assertEqual(len(stack), len(set(stack)), f"有重复：{stack}")
+
+    def test_terminal_stays_monospaced(self) -> None:
+        """**回归**：terminal 的整套立论是**等宽**，而迁移脚本一度把
+        `霞鹜文楷`（比例字体！）塞到了 `Menlo` 前面 —— 列对齐会立刻散掉。
+
+        正确的前缀是**等宽变体** `LXGW WenKai Mono`。
+        """
+        for slot in ("display", "body"):
+            stack = self._stack("terminal", slot)
+            self.assertIn("Mono", stack[0], f"terminal.{slot} 打头的不是等宽字体：{stack}")
+            self.assertNotIn("霞鹜文楷", stack[0], "terminal 打头的不许是比例字体")
 
 if __name__ == "__main__":
     unittest.main()

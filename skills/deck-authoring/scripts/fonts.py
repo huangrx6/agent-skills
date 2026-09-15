@@ -43,7 +43,17 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.dirname(HERE)
 CATALOG = os.path.join(SKILL, "fonts", "catalog.json")
 MAPPING = os.path.join(SKILL, "fonts", "mapping.json")
-TTF_DIR = os.path.join(SKILL, "fonts", "ttf")
+# 字体文件**不落在 skill 目录里**。三个候选位置，按需选：
+#   · `$DECK_FONT_DIR`           —— 显式指定（CI / 一次性用临时目录就靠它）
+#   · `~/.config/deck-authoring/fonts` —— 默认。**持久**：单款 CJK 5–28MB，
+#     每次重下太浪费；换台机器也就下一次。
+#   · `tempfile.gettempdir()/...` —— 给 `--temp` 用：不在这台机器上留东西。
+#
+# 为什么不在 skill 目录：skill 目录是**可分发的代码**，不该长出自下载的二进制。
+# 仓库里 h264 编码器早就是这个规矩（编译进 tempdir 按源码哈希命名），字体照同一个
+# 思路。旧的 `fonts/ttf/` 仍然**会被读**（已经下了的人不用重下），但**不再往里写**。
+LEGACY_DIR = os.path.join(SKILL, "fonts", "ttf")
+CACHE_DIRNAME = "deck-authoring"
 
 FONT_SUFFIXES = (".ttf", ".otf", ".ttc", ".woff2")
 
@@ -104,6 +114,10 @@ FETCHABLE = [
     # (catalog 名, owner/repo, 资产名匹配, 授权)
     ("得意黑 Smiley Sans", "atelier-anchor/smiley-sans", r"smiley-sans.*\.zip$", "OFL-1.1"),
     ("霞鹜文楷", "lxgw/LxgwWenKai", r"LXGWWenKai-Regular\.ttf$", "OFL-1.1"),
+    # Mono 变体是 terminal 那套的中文等宽来源（中文名「霞鹜文楷等宽」）。
+    # 它是同一个 catalog 条目的变体，所以这里另起一行 —— 名字用真实字族名，
+    # 否则 _local_path_for 找不到它。
+    ("LXGW WenKai Mono", "lxgw/LxgwWenKai", r"LXGWWenKaiMono-Regular\.ttf$", "OFL-1.1"),
     ("霞鹜文楷 TC", "lxgw/LxgwWenKaiTC", r"LXGWWenKaiTC-Regular\.ttf$", "OFL-1.1"),
     ("清松手写体 1", "jasonhandwriting/JasonHandwriting", r"[Jj]asonHandwriting1.*\.(ttf|otf|zip)$", "OFL-1.1"),
     # 资产名有 66 个变体：bdf / dfont / otb / pcf / woff / woff2 / ms.bitmap.ttf
@@ -142,16 +156,78 @@ def by_name(name: str) -> dict | None:
     return None
 
 
-def local_files() -> list[str]:
-    """本地 `fonts/ttf/` 里已有哪些字体文件（已排序）。
+def owner_of(name: str) -> dict | None:
+    """这个名字归**清单里的哪个条目** —— 认不出就 None。
+
+    一个条目可能被叫三种名字：清单名（`霞鹜文楷`）、字体真名（`LXGW WenKai`）、
+    变体名（`LXGW WenKai Mono`）。三者在映射表、样式栈、测试里都会出现，
+    所以"谁是谁"必须只有一处定义 —— 之前把它抄进测试里，抄错了一次
+    （合成了个缺 `match` 字段的 dict，于是带 `match` 的条目全部认不出来）。
+    """
+    exact = by_name(name)
+    if exact is not None:
+        return exact
+    low = _norm(name)
+    for entry in catalog():
+        # 拉丁记号（"lxgwwenkai" 认得 "LXGW WenKai Mono"）
+        if low and any(tok and tok in low for tok in _file_tokens(entry)):
+            return entry
+        # **中文名**：`_norm` 只留 [a-z0-9]，中文全被抹掉 —— 所以中文必须另走一路。
+        # 实测踩过：映射表写"汇文明朝体"（清单里是"汇文明朝体（修正版）"），
+        # 只认拉丁记号时认不出来，而那一款明明是纯 A。
+        cjk_low = _norm_cjk(name)
+        if len(cjk_low) >= CJK_MIN:
+            cjk_entry = _norm_cjk(entry["name"])
+            if cjk_low in cjk_entry or cjk_entry in cjk_low:
+                return entry
+    return None
+
+
+def cache_dir(temp: bool = False) -> str:
+    """字体文件该放（该找）哪个目录。
+
+    优先级：`$DECK_FONT_DIR` > `~/.config/deck-authoring/fonts` > 临时目录。
+    环境变量排第一，是为了让"下载到哪"这件事**可被调用方决定** —— 做 PPT 的 AI
+    可以按实际情况选持久目录或临时目录，不用改代码。
+    """
+    env = os.environ.get("DECK_FONT_DIR")
+    if env:
+        return os.path.abspath(env)
+    if temp:
+        import tempfile   # noqa: PLC0415
+
+        return os.path.join(tempfile.gettempdir(), CACHE_DIRNAME, "fonts")
+    return os.path.join(os.path.expanduser("~"), ".config", CACHE_DIRNAME, "fonts")
+
+
+def search_dirs(temp: bool = False) -> list[str]:
+    """按顺序找字体的所有目录（缓存在前，旧的 skill 目录兜底只读）。"""
+    return [cache_dir(temp), LEGACY_DIR]
+
+
+def local_files(temp: bool = False) -> list[str]:
+    """本地已有哪些字体文件（已排序，按文件名去重）。
 
     **这是"能不能渲染"的真凭据** —— 不是"系统里装没装"。因为渲染走 `@font-face`
     指本地文件，系统装没装其实无关。
+
+    同时扫缓存目录与旧的 skill 目录：已经下过的人不用重下，而新下载只进缓存。
     """
     out: list[str] = []
-    for suffix in FONT_SUFFIXES:
-        out.extend(deckio.list_files(TTF_DIR, suffix))
-    return sorted(set(out))
+    seen: dict[str, str] = {}
+    for d in search_dirs(temp):
+        for suffix in FONT_SUFFIXES:
+            for fn in deckio.list_files(d, suffix):
+                if fn not in seen:
+                    seen[fn] = os.path.join(d, fn)
+    for fn in sorted(seen):
+        out.append(seen[fn])
+    return out
+
+
+def local_paths() -> dict[str, str]:
+    """文件名 → 完整路径（给需要按名字找文件的地方用）。"""
+    return {os.path.basename(p): p for p in local_files()}
 
 
 def local_families() -> dict[str, str]:
@@ -162,8 +238,7 @@ def local_families() -> dict[str, str]:
     真名，读它比猜它可靠 —— 我之前手写字体探测翻过车，就是栽在猜名字上。
     """
     families: dict[str, str] = {}
-    for fn in local_files():
-        path = os.path.join(TTF_DIR, fn)
+    for path in local_files():          # local_files() 给的是完整路径
         for fam in _font_families(path):
             families.setdefault(fam, path)
     return families
@@ -237,8 +312,24 @@ def installed_names() -> set[str]:
 
 
 def _norm(text: str) -> str:
-    """归一化：只留字母数字、转小写。比较前两边都要过这一步。"""
+    """归一化：只留字母数字、转小写。比较前两边都要过这一步。
+
+    **中文会被整个抹掉** → 需要认中文名的地方要用 `_norm_cjk`。
+    """
     return re.sub(r"[^a-z0-9]", "", text.lower())
+
+
+# 中文名匹配要求至少这么多个字。太短的中文（"站酷"）会在别的名字里到处出现。
+CJK_MIN = 4
+
+
+def _norm_cjk(text: str) -> str:
+    """归一化，但**保留汉字**：只留汉字、字母、数字。
+
+    为什么需要它：`_norm` 把中文全抹了，于是"汇文明朝体"归一化后是空串，
+    **永远匹配不上**任何东西（实测：映射表里那一款因此认不出来）。
+    """
+    return re.sub(r"[^\u4e00-\u9fffa-z0-9]", "", text.lower())
 
 
 def _file_tokens(entry: dict) -> list[str]:
@@ -284,15 +375,23 @@ def _download(url: str) -> bytes:
 
 
 def fetch(only: list[str] | None = None, tier: str | None = None,
-          quiet: bool = False) -> tuple[int, list[str]]:
+          quiet: bool = False, temp: bool = False) -> tuple[int, list[str]]:
     """取能直接下的那批。返回 (成功数, 消息)。取不下来的如实说去哪儿拿。"""
-    deckio.ensure_dir(TTF_DIR)
+    target_dir = cache_dir(temp)
+    deckio.ensure_dir(target_dir)
+    if not quiet:
+        print(f"字体目录：{target_dir}"
+              + ("（临时；用 $DECK_FONT_DIR 可指定别处）" if temp else ""))
+        legacy = deckio.list_files(LEGACY_DIR, ".ttf") + deckio.list_files(LEGACY_DIR, ".otf")
+        if legacy:
+            print(f"  ⚠️ 旧的 skill 目录里还留着 {len(legacy)} 个字体文件"
+                  f"（会被读取，但新下载不再往里写）—— 想清掉：rm -rf fonts/ttf")
     cats = deckio.read_json(CATALOG)
     srcs = cats.get("sources", {})
     ok = 0
     msgs: list[str] = []
     for name, repo, asset_pat, lic in FETCHABLE:
-        entry = by_name(name)
+        entry = owner_of(name)
         if entry is None:
             msgs.append(f"⚠️ 清单里没有 {name!r} —— 清单与下载表脱节了")
             continue
@@ -321,7 +420,7 @@ def fetch(only: list[str] | None = None, tier: str | None = None,
         except SystemExit as exc:
             msgs.append(f"✗ {name}：{exc}")
             continue
-        dest = os.path.join(TTF_DIR, aname)
+        dest = os.path.join(target_dir, aname)
         deckio.write_bytes(dest, blob)
         msg = f"✓ {name} ← {aname}（{len(blob) / 1e6:.1f}MB，{lic}）"
         unpacked = _unpack(dest)
@@ -336,18 +435,23 @@ def fetch(only: list[str] | None = None, tier: str | None = None,
 
 
 def _unpack(path: str) -> list[str]:
-    """zip 里全是字体就解开（得意黑那种一个 zip 一个字体）。"""
+    """zip 里全是字体就解开（得意黑那种一个 zip 一个字体）。
+
+    解到**这个 zip 所在目录**，不是写死的某个常量 —— 字体可能来自 `DECK_FONT_DIR`
+    指定的任意位置。
+    """
     import zipfile   # noqa: PLC0415
 
     if not path.lower().endswith(".zip"):
         return []
     out: list[str] = []
+    target_dir = os.path.dirname(os.path.abspath(path))
     try:
         with zipfile.ZipFile(path) as z:
             for n in z.namelist():
                 if not n.lower().endswith((".ttf", ".otf")):
                     continue
-                target = os.path.join(TTF_DIR, os.path.basename(n))
+                target = os.path.join(target_dir, os.path.basename(n))
                 deckio.write_bytes(target, z.read(n))
                 out.append(target)
     except (zipfile.BadZipFile, OSError):
@@ -416,13 +520,19 @@ def _families_from_css(html: str) -> dict[str, str]:
 def face_css(font_stacks: list[str]) -> str:
     """给这些字体栈生成 `@font-face` 规则 —— **只对本地真有文件的字体**。
 
-    契约：样式栈里写**清单里的字体名**（如 `得意黑 Smiley Sans`），渲染时会自动
-    注入对应的 `@font-face`。这样：
+    契约：样式栈里写**字体名**（清单名 `霞鹜文楷`、真名 `LXGW WenKai`、或变体名
+    `LXGW WenKai Mono` 都行），渲染时自动注入对应的 `@font-face`。这样：
       · 装上就能用，不需要"把字体装进系统"（实测 macOS 缓存不刷新，装对了也回退）；
       · Chrome 出 PDF 时会把用到的字形**子集内嵌**（实测 25MB 字体 → PDF 62KB），
         读者那边不需要有这款字；
       · 本地没取的字体**静默跳过** —— 栈里还有回退项，不会画出裂图，
         具体谁顶上由 `check.py` 的字体回退提示说清楚。
+
+    **按本地文件走，不按清单条目走** —— 这是一个改对了的地方：原先每个清单条目只挑
+    一个文件（`_local_path_for` 按格式优先级选一个），于是"霞鹜文楷的等宽变体"
+    永远选不中，`terminal` 那套写 `LXGW WenKai Mono` 时**一条 @font-face 都没注入**，
+    浏览器静默回退（实测）。改成遍历本地文件、按它**自己声明的**每个字族名注入，
+    三种写法就都能对上了。
 
     用**绝对路径**：产物与字体不在同一个目录，相对路径会随产物移动而断。
     要单文件 HTML 就再跑 `fonts.py --embed`。
@@ -431,18 +541,55 @@ def face_css(font_stacks: list[str]) -> str:
     if not stacks:
         return ""
     norm = _norm(stacks)
+    # family → 候选文件。**按家族先去重再挑文件**：同一个字族常有 .otf 与 .ttf 两份，
+    # 各注一条的话浏览器会拿到两个同族 @font-face，谁生效取决于顺序 —— 而实测
+    # `.otf` 那份 Chrome 根本不用（见 FORMAT_PREFERENCE）。所以一个家族只留一条。
+    wanted: dict[str, list[str]] = {}
+    for path in local_files():
+        for fam in _injectable_names(path):
+            # 两种都认：· 归一化后是子串（拉丁名，"LXGW WenKai Mono"）
+            #          · 字面出现（中文名，"霞鹜文楷等宽" —— `_norm` 只留 [a-z0-9]，
+            #            中文名归一化后是空串，光靠归一化永远匹配不上）
+            if (len(_norm(fam)) >= MIN_TOKEN and _norm(fam) in norm) or fam in stacks:
+                wanted.setdefault(fam, []).append(path)
+        # 栈里写**清单名**的写法：清单名和字体真名不是一回事，得单独认
+        for name in _catalog_names_for(path):
+            if name in stacks:
+                wanted.setdefault(name, []).append(path)
     rules = []
-    for entry in catalog():
-        if not _names_font(entry, stacks, norm):
-            continue
-        path = _local_path_for(entry)
+    for fam, paths in wanted.items():
+        path = _preferred(paths)
         if not path:
             continue
-        fmt = css_format(path)
         url = "file://" + os.path.abspath(path)
-        rules.append(f'@font-face{{font-family:"{entry["name"]}";'
-                     f'src:url("{url}") format("{fmt}")}}')
+        rules.append(f'@font-face{{font-family:"{fam}";'
+                     f'src:url("{url}") format("{css_format(path)}")}}')
     return "\n".join(rules)
+
+
+def _injectable_names(path: str) -> dict[str, str]:
+    """这份字体文件可以用来注入哪些 family 名（都是它**自己声明的**）。"""
+    return {fam: path for fam in _font_families(path)}
+
+
+def _catalog_names_for(path: str) -> list[str]:
+    """这份文件对应清单里的哪个条目名（认不出就空）。
+
+    三种都对：· 文件路径就是该条目挑中的那个；· 文件名里带该条目的记号；
+    · 文件声明的字族名里带该条目的记号（Mono 变体就靠这条归属到"霞鹜文楷"）。
+    """
+    out: list[str] = []
+    base = _norm(os.path.basename(path))
+    fams = [_norm(f) for f in _font_families(path)]
+    for entry in catalog():
+        if _local_path_for(entry) == path:
+            out.append(entry["name"])
+            continue
+        for tok in _file_tokens(entry):
+            if tok and (tok in base or any(tok in f for f in fams)):
+                out.append(entry["name"])
+                break
+    return out
 
 
 def css_format(path: str) -> str:
@@ -485,7 +632,7 @@ def _local_path_for(entry: dict) -> str | None:
     """
     for tok in _file_tokens(entry):
         cands = [p for fam, p in local_families().items() if tok in _norm(fam)]
-        cands += [os.path.join(TTF_DIR, fn) for fn in local_files() if tok in _norm(fn)]
+        cands += [p for p in local_files() if tok in _norm(os.path.basename(p))]
         best = _preferred(cands)
         if best:
             return best
@@ -559,7 +706,22 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--category", default=None, help="--list 只列这一类")
     ap.add_argument("--license", default=None, help="--list 只列这个授权级")
     ap.add_argument("--urls", action="store_true", help="--list 时带上来源页地址")
+    ap.add_argument("--temp", action="store_true",
+                    help="字体放临时目录（不在这台机器上留东西），而不是 ~/.config")
+    ap.add_argument("--where", action="store_true", help="打印字体该放哪儿（含解析顺序）")
     args = ap.parse_args(argv[1:])
+
+    if args.where:
+        print(f"当前会用的目录：{cache_dir(args.temp)}")
+        print(f"  解析顺序：$DECK_FONT_DIR"
+              f"{' > 临时目录（--temp）' if args.temp else ''} "
+              f"> ~/.config/{CACHE_DIRNAME}/fonts")
+        print(f"  旧的 skill 目录（只读兜底）：{LEGACY_DIR}")
+        files = local_files(args.temp)
+        print(f"  这里找到 {len(files)} 个字体文件")
+        for p in files[:8]:
+            print(f"     {p}")
+        return 0
 
     if args.embed:
         out = args.out or os.path.splitext(args.embed)[0] + ".portable.html"
@@ -570,7 +732,7 @@ def main(argv: list[str]) -> int:
         only = [s.strip() for s in args.only.split(",")] if args.only else None
         # 默认只取严格 A —— "我只需要免费的字体，我没有什么 license"。
         # 要看 B/C 得显式 --tier all。
-        ok, _msgs = fetch(only=only, tier=args.tier or DEFAULT_TIER)
+        ok, _msgs = fetch(only=only, tier=args.tier or DEFAULT_TIER, temp=args.temp)
         have = installed_names()
         print(f"\n本地已有 {len(have)} 款 / 清单 {len(catalog())} 款")
         if len(have) < len(catalog()):
@@ -591,7 +753,8 @@ def main(argv: list[str]) -> int:
     if args.installed:
         have = installed_names()
         fonts = [f for f in fonts if f["name"] in have]
-        print(f"本地已就位 {len(fonts)} 款（判据：fonts/ttf/ 里有对应文件）\n")
+        print(f"本地已就位 {len(fonts)} 款（判据：字体目录里真有对应文件，"
+              f"见 --where）\n")
     for f in fonts:
         line = f"  {f['i']:3}  {f['name']:28} [{f['license']:3}] {f['for']}"
         if args.urls:

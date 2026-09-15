@@ -1,107 +1,107 @@
 {
-  "version": 2,
-  "label": "粉彩几何 Pastel Geometry",
-  "temperature": "中性",
-  "reference": "frontend-slides 的 Pastel Geometry / 当代 SaaS 与设计工具的品牌页 / 内部沟通与培训材料",
-  "note": "为什么补这一套：现有 7 套全是**高对比**的（要么白底黑字，要么黑底白字，强调色都饱和）。真实工作里还有一大类场合需要「不吓人」：内部培训、新人引导、跨部门沟通、给非专业受众讲一件复杂的事。这套用低饱和粉彩 + 圆角 + 药丸标记，把「这是一份正式文件」的压力降下来。代价：对比度低，不适合投影远距离讲，也不适合承载严肃的坏消息。",
-  "colorSets": {
-    "lilac": {
-      "primary": "#6C5CA8",
-      "secondary": "#8A8578",
-      "background": "#F7F5FB",
-      "text": "#2A2438"
-    },
-    "mint": {
-      "primary": "#3E7C67",
-      "secondary": "#8A8578",
-      "background": "#F4FAF7",
-      "text": "#22302B"
-    },
-    "peach": {
-      "primary": "#B5624C",
-      "secondary": "#8A8578",
-      "background": "#FDF5F1",
-      "text": "#33251F"
-    }
+ "version": 2,
+ "label": "粉彩几何 Pastel Geometry",
+ "temperature": "中性",
+ "reference": "frontend-slides 的 Pastel Geometry / 当代 SaaS 与设计工具的品牌页 / 内部沟通与培训材料",
+ "note": "为什么补这一套：现有 7 套全是**高对比**的（要么白底黑字，要么黑底白字，强调色都饱和）。真实工作里还有一大类场合需要「不吓人」：内部培训、新人引导、跨部门沟通、给非专业受众讲一件复杂的事。这套用低饱和粉彩 + 圆角 + 药丸标记，把「这是一份正式文件」的压力降下来。代价：对比度低，不适合投影远距离讲，也不适合承载严肃的坏消息。",
+ "colorSets": {
+  "lilac": {
+   "primary": "#6C5CA8",
+   "secondary": "#8A8578",
+   "background": "#F7F5FB",
+   "text": "#2A2438"
   },
-  "ink": {
-    "derivation": "explicit",
-    "forText": "declared",
-    "note": "文字色声明为深紫灰（#2A2438），不用纯黑 —— 纯黑配粉彩会「跳出画面」，硬得像在喊。强调色（紫 / 薄荷 / 蜜桃）都压在中低明度，保证对比度过 4.5 门槛。",
-    "rule": "深灰文字；强调色中明度，只碰小面积。"
+  "mint": {
+   "primary": "#3E7C67",
+   "secondary": "#8A8578",
+   "background": "#F4FAF7",
+   "text": "#22302B"
   },
-  "contrast": {
-    "minBody": 4.5,
-    "minLarge": 3.0,
-    "largeTextPx": 32
-  },
-  "type": {
-    "note": "几何无衬线（Avenir Next / Futura）的 x-height 高、字面宽，同 px 下看着比其他无衬线大一点 —— 所以字号与 swiss-grid 齐平即可。",
-    "cover": 120,
-    "compact": 90,
-    "small": 78,
-    "end": 116,
-    "subtitle": 32,
-    "bulletLarge": 44,
-    "bullet": 32,
-    "bulletSmall": 26,
-    "colTitle": 40,
-    "nodeLabel": 28,
-    "nodeNote": 22,
-    "chartValue": 20,
-    "chartLabel": 18,
-    "caption": 24,
-    "foot": 20
-  },
-  "fonts": {
-    "display": "Futura, Avenir Next, Hiragino Sans GB, Helvetica Neue, sans-serif",
-    "body": "Futura, Hiragino Sans GB, Helvetica Neue, sans-serif",
-    "note": "几何无衬线（Futura）是「友好」这个语气最直接的载体 —— 圆几何字面自带亲和力，不需要靠圆角去演。不用 Inter/Roboto（slop 名单第一条）。⚠️ 首项曾经是 Avenir Next，压测时实测**本机没有这个族**（`measure.py` 的提示是对的；我另外写的临时探针因为拿 serif/monospace 泛族当基准，把 Menlo/Songti 都误判成不存在，反倒更不可信）—— 现在首项换成实测存在的 Futura。"
-  },
-  "texture": {
-    "grainOpacity": [
-      0,
-      0
-    ],
-    "grainBaseFrequency": 0.9,
-    "halftoneDotSize": [
-      2,
-      4
-    ],
-    "note": "没有纸纹。粉彩 + 颗粒会显得脏。"
-  },
-  "decor": {
-    "kind": null,
-    "types": [],
-    "zones": [],
-    "sizes": [],
-    "note": "不放装饰墨块。这套的锚点是**圆角色块被裁在页角**（`.slide::before`）+ 药丸标记，用的是结构而不是散落的装饰。"
-  },
-  "misregistration": {
-    "note": "不做错位（全 0）。",
-    "offsetRangeX": [
-      0,
-      0
-    ],
-    "offsetRangeY": [
-      0,
-      0
-    ],
-    "rotationRange": [
-      0,
-      0
-    ],
-    "blendMode": "normal"
-  },
-  "viewerBackground": "#E9E4F2",
-  "motion": {
-    "easing": "overshoot",
-    "cssEase": "cubic-bezier(0.34, 1.56, 0.64, 1)",
-    "enterMs": 560,
-    "staggerMs": 80,
-    "titleHoldMs": 240,
-    "holdMs": 2700,
-    "readPerItemMs": 780,
-    "note": "运动性格＝轻快、带一点回弹（overshoot）—— 其余七套都是 expoOut 的「稳稳落定」，只有这套允许弹一下。回弹本身是「友好」这个语气的动作化，不是随便加的：一套风格里只用一个性格。"
+  "peach": {
+   "primary": "#B5624C",
+   "secondary": "#8A8578",
+   "background": "#FDF5F1",
+   "text": "#33251F"
   }
+ },
+ "ink": {
+  "derivation": "explicit",
+  "forText": "declared",
+  "note": "文字色声明为深紫灰（#2A2438），不用纯黑 —— 纯黑配粉彩会「跳出画面」，硬得像在喊。强调色（紫 / 薄荷 / 蜜桃）都压在中低明度，保证对比度过 4.5 门槛。",
+  "rule": "深灰文字；强调色中明度，只碰小面积。"
+ },
+ "contrast": {
+  "minBody": 4.5,
+  "minLarge": 3.0,
+  "largeTextPx": 32
+ },
+ "type": {
+  "note": "几何无衬线（Avenir Next / Futura）的 x-height 高、字面宽，同 px 下看着比其他无衬线大一点 —— 所以字号与 swiss-grid 齐平即可。",
+  "cover": 120,
+  "compact": 90,
+  "small": 78,
+  "end": 116,
+  "subtitle": 32,
+  "bulletLarge": 44,
+  "bullet": 32,
+  "bulletSmall": 26,
+  "colTitle": 40,
+  "nodeLabel": 28,
+  "nodeNote": 22,
+  "chartValue": 20,
+  "chartLabel": 18,
+  "caption": 24,
+  "foot": 20
+ },
+ "fonts": {
+  "display": "站酷庆科黄油体, 站酷快乐体, Futura, Avenir Next, Hiragino Sans GB, Helvetica Neue, sans-serif",
+  "body": "资源圆体 Resource Han Rounded, 源泉圆体 GenSenRounded, Futura, Hiragino Sans GB, Helvetica Neue, sans-serif",
+  "note": "几何无衬线（Futura）是「友好」这个语气最直接的载体 —— 圆几何字面自带亲和力，不需要靠圆角去演。不用 Inter/Roboto（slop 名单第一条）。⚠️ 首项曾经是 Avenir Next，压测时实测**本机没有这个族**（`measure.py` 的提示是对的；我另外写的临时探针因为拿 serif/monospace 泛族当基准，把 Menlo/Songti 都误判成不存在，反倒更不可信）—— 现在首项换成实测存在的 Futura。 ｜ 艺术字前缀来自 fonts/mapping.json 的**纯 A 档**（每款都可免费用、可嵌交付物）：本地用 `scripts/fonts.py --fetch` 取到就生效，没取到就按后面的系统栈渲染 —— 所以不下字体时的观感与从前一致。"
+ },
+ "texture": {
+  "grainOpacity": [
+   0,
+   0
+  ],
+  "grainBaseFrequency": 0.9,
+  "halftoneDotSize": [
+   2,
+   4
+  ],
+  "note": "没有纸纹。粉彩 + 颗粒会显得脏。"
+ },
+ "decor": {
+  "kind": null,
+  "types": [],
+  "zones": [],
+  "sizes": [],
+  "note": "不放装饰墨块。这套的锚点是**圆角色块被裁在页角**（`.slide::before`）+ 药丸标记，用的是结构而不是散落的装饰。"
+ },
+ "misregistration": {
+  "note": "不做错位（全 0）。",
+  "offsetRangeX": [
+   0,
+   0
+  ],
+  "offsetRangeY": [
+   0,
+   0
+  ],
+  "rotationRange": [
+   0,
+   0
+  ],
+  "blendMode": "normal"
+ },
+ "viewerBackground": "#E9E4F2",
+ "motion": {
+  "easing": "overshoot",
+  "cssEase": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+  "enterMs": 560,
+  "staggerMs": 80,
+  "titleHoldMs": 240,
+  "holdMs": 2700,
+  "readPerItemMs": 780,
+  "note": "运动性格＝轻快、带一点回弹（overshoot）—— 其余七套都是 expoOut 的「稳稳落定」，只有这套允许弹一下。回弹本身是「友好」这个语气的动作化，不是随便加的：一套风格里只用一个性格。"
+ }
 }
