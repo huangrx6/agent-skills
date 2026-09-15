@@ -1,175 +1,447 @@
-# 内容设计：说什么、为什么这样说（v3.0）
+# AI PPT 内容智能与叙事设计规则（v3.0 Final）
 
-这一层只回答三个问题：**我们知道什么、按什么顺序讲、每页让观众记住什么**。
-颜色、坐标、字体、动效、图片文件——全都不归它管（那是 layout / style / chart /
-image / motion 的事，见 `pipeline.md` 的分层地图）。
+适用：内容规划层（PPT / HTML Deck / PDF / MP4 / GIF 共用）。核心目标：把原始材料
+从"信息集合"转化为**有目标、有论证、有证据、有节奏、可设计**的演示内容。
+本规则只负责**说什么、为什么这样说、每页该让观众记住什么**；坐标、颜色、字体、
+动效、图片文件由 Page Planner / Layout / Style / Chart / Image / Motion 接管。
 
-## 0. 核心链路
+> 字段口径：本文 JSON 示例是规范推荐形（camelCase）；本仓库 schema 用 snake_case
+> （`source_ref` / `source_type`），fact 的 `inferred` 即规范的 `derived` 语义，
+> claim 的 `type` 用 `original | derived`。执行标记：【拦】= `plan.py --check` 阻塞，
+> 【提示】= 开口不拦。schema 全表见 `planning.md`。
+
+## 0. 核心原则
 
 ```text
 Audience / Goal → Desired Action → Core Thesis → Facts & Evidence → Claims
-    → Storyline → Section Message → Slide Message → Display Copy
-    → Visual Requirement → Page Planner →（设计/渲染）
+  → Storyline → Section Messages → Slide Message → Display Copy
+  → Visual Requirement → Page Planner → Design / Render
 ```
 
-先明确观众最终要**做什么**，再决定他需要**相信什么**；用事实形成论证；把论证
-拆成每页唯一的 Takeaway；最后才进视觉。顺序反了就是"把资料压缩后排漂亮"——
-那是排版，不是演示。
+先明确观众最终要**做什么**，再决定他需要**相信什么**；用事实和证据形成论证；
+把论证拆成每页唯一 Takeaway；最后才进页面设计。优秀的 PPT 不是把资料压缩后排漂亮。
 
-## 1. Presentation Brief 【缺 desiredAction/desiredBelief = 阻塞；缺 brief = 提示】
+## 1. 模块职责（四层）
 
-任何 deck 开工前先写 brief（`content.json` 的 `brief` 字段）：
+| 层 | 负责 | 回答 |
+| --- | --- | --- |
+| Content Understanding | 抽取事实/数字/时间/实体/关系/问题/原因/方案/结果/风险/证据，建立来源追踪 | 我们到底知道什么 |
+| Storyline | Core Thesis、叙事骨架、Section、页序、节奏、页数、防断层 | 按什么顺序说 |
+| Slide Content Planning | 每页唯一 Message、Claim+Evidence 绑定、压缩、信息预算、视觉需求、拆页、附录 | 这一页让观众记住什么 |
+| Content QA | 事实一致性、来源、无证据结论、重复、断点、焦点、受众、过载、完整性 | 够不够清楚可信完整 |
+
+## 2. Presentation Brief【缺 desiredAction/desiredBelief=拦；枚举=拦；缺席=提示】
 
 ```json
 {"purpose": "proposal", "audience": "technical", "delivery": "live",
- "targetSlides": 5, "durationMinutes": 10,
- "desiredAction": "批准统一 AI 能力平台建设方案"}
+ "targetSlides": 15, "durationMinutes": 20,
+ "desiredAction": "批准统一 AI 平台建设方案",
+ "desiredBelief": "统一平台建设现在有必要且可实施",
+ "audienceKnows": [], "audienceNeeds": [], "constraints": []}
 ```
 
-- `purpose` ∈ decision/proposal/report/update/training/sales/explanation/review，
-  `audience` ∈ executive/technical/customer/internal/general，
-  `delivery` ∈ live/async/printable/editable —— 封闭集，`plan.py --check` 拦。
-- **最重要的是 `desiredAction`**：PPT 放完观众做什么。推不出来至少给
-  `desiredBelief`（该相信什么）。两者都没有 = 阻塞——元规则 1。
-- 同一份材料，观众不同则组织不同：executive 要结论/影响/成本/风险/决策；
-  technical 要架构/接口/性能/部署；customer 要问题/价值/案例/收益。
-- delivery 影响密度：live 一页一个强 message、大字少条目；async 可更密；
-  printable 可带来源和注释。
+最重要的字段是 **desiredAction**：PPT 放完观众要做什么。推不出来至少推断
+desiredBelief。purpose ∈ decision/proposal/report/update/training/sales/explanation/review；
+audience ∈ executive/technical/customer/internal/general；delivery ∈ live/async/printable/editable。
 
-## 2. 四类内容对象（不得混用）
+## 3. Audience Model（同一份材料按观众重组）
 
-| 对象 | 是什么 | 例子 |
+| 观众 | 优先 | 降低 |
 | --- | --- | --- |
-| **Fact** | 材料里明确存在的 | "部署 8 个模型服务，5 个接口协议不一致" |
-| **Claim** | 基于事实的判断 | "模型服务已出现明显碎片化"（derivedFrom 两个 fact） |
-| **Message** | 这一页观众该记住的唯一 Takeaway | "超一半接口不统一，治理已成必要条件" |
-| **Display Copy** | 真正写到页面上的字 | 标题"5/8 模型接口仍未统一" |
+| Executive | 结论、影响、成本、风险、决策、ROI、时间计划 | 参数、技术细节、代码、底层实现 |
+| Technical | 架构、接口、资源、性能、依赖、部署、兼容、运维、风险 | 营销话术 |
+| Customer | 问题、价值、方案、使用方式、案例、交付、收益 | 内部实现细节 |
+| Training | 概念、步骤、原理、示例、易错点、总结 | 跳步、术语堆砌 |
 
-schema 都在 `planning.md`；`plan.py --check` 拦的：fact 缺 id/type/text、
-claim 的 `derivedFrom` 悬空、message 的 `claimId` 悬空、`claims` 空。
+## 4. 原始内容类型
 
-## 3. 事实追踪与禁止幻觉【source_type 封闭 = 阻塞】
+一句话 / Word / PDF / Markdown / Excel / 网页 / 数据库导出 / 多份材料 / 历史 deck /
+截图表格。Content Understanding **不得因文件类型不同改变最终语义结构**。
 
-每个 fact 标 `source_type`：`original`（材料明确给出）/ `inferred`（可从原始
-事实推导）/ `generated`（仅为叙事生成，不得伪装为事实）。数字、日期、百分比、
-排名、图表数据——全部要能追到 `source_ref`。
+## 5. 四类核心内容对象（不得混用）
 
-**不许补造**：用户没给的数字、同比环比、案例、客户名、性能结果、日期。
-资料里没有就标 missing_evidence，不编。【已拦：`source_type` 不在封闭集 = 错】
+**Fact**（材料明确存在的）：
+`{"id": "fact_021", "type": "problem", "text": "部署 8 个模型服务，5 个接口协议不一致", "source_type": "original", "source_ref": "doc01:p8", "confidence": 1.0}`
 
-**最危险的一类错**【提示】：重要性 ≥0.9 的 message，证据却全是 `inferred`
-——把 AI 推断的话当事实讲。要么找到原文证据，要么降重要性。
+**Claim**（基于事实的判断）：
+`{"id": "claim_03", "statement": "模型服务已出现明显接口碎片化", "derivedFrom": ["fact_021", "fact_024"], "type": "derived", "confidence": 0.92}`【derivedFrom 悬空=拦】
 
-## 4. Core Thesis【缺失 = 阻塞】
+**Slide Message**（这页观众记住的唯一 Takeaway）：
+"超过一半的模型接口不统一，平台治理已经成为必要条件。"
+
+**Display Copy**（真正写到页面上的字）：Headline "5/8 模型接口仍未统一"；Subheadline "接口碎片化正在增加业务接入和运维复杂度"。
+
+## 6. 来源与事实追踪【source_type 封闭=拦】
+
+数字、日期、百分比、排名、事实陈述、对外引用、Chart 数据、关键结论依据——全部
+可追溯：`{"source_type": "original|inferred|generated", "source_ref": "doc01:p8", "confidence": 0.94}`。
+original=材料明确给出；inferred/derived=可从原始事实合理推导；generated=仅为叙事、
+措辞或结构生成，**不得伪装为事实**。
+
+## 7. 禁止事实幻觉
+
+不得：补造数字、猜测同比环比、编案例/客户名/性能结果/日期、把推断写成原始事实。
+需要但资料不存在 → 标 **missing_evidence**，而不是编。
+
+## 8. Content Understanding 标准输出
+
+`{"topic", "document_intent", "facts", "metrics", "entities", "events", "problems",
+"causes", "solutions", "results", "risks", "evidence", "relationships"}` —— fact 的
+`type` ∈ context/problem/solution/metric/constraint/risk/result（封闭集）【拦】。
+
+## 9. 内容标准化（进 Storyline 前必须执行）
+
+去重（同一事实一份主记录）；名称统一（"大模型平台/AI 能力平台/统一模型平台"本质
+同一实体 → canonicalName）；数字统一（单位/千分位/小数位/百分比）；时间统一
+（2026/9/1、2026-09-01、9 月 1 日 → 标准格式）。
+
+## 10. 内容价值分类
+
+must_have（没它论证不成立）/ supporting（增强可信度）/ optional / appendix（保留
+但不打断主线）/ drop（与目标无关）。**原材料里有，不代表 PPT 必须讲。**
+
+## 11. Core Thesis【缺失=拦】
 
 ```json
-{"coreThesis": {"statement": "统一平台能解决碎片化并形成规模化服务能力",
-                 "desiredBelief": "现在有必要且可实施"}}
+{"coreThesis": {"statement": "建设统一 AI 能力平台可以解决模型服务碎片化问题，并形成规模化服务能力",
+                 "desiredBelief": "统一平台建设现在有必要且可实施"}}
 ```
 
-一份 deck **一句**统领论断。检验：能一句话说清？和 desiredAction 一致？
-能被事实支撑？足以统领全篇？没有它，每页各自为政——`plan.py --check` 直接拦。
-每个 must-have 的 claim 都要能回答"它如何支撑 thesis"；答不上 → drop 或进附录。
+检查：能否一句话说清；与 desiredAction 是否一致；能否被事实支撑；能否统领全篇。
 
-## 5. 叙事骨架（细节见 planning.md）
+## 12. Thesis Coverage
 
-不从零编故事。十个预定义骨架（问题→方案 / SCR / 过去现在未来 / why-what-how /
-目标进展结果 / 总览细节证据 / 复盘 / 技术方案 / 项目汇报），按 purpose+audience
-选；【拦：骨架乱序、sections 页数之和 ≠ target_slide_count】。每个 section 要有
-**message** 不只有 topic——"技术方案"不是 section message，"四层架构把接入、
-推理、治理收敛成一条服务链路"才是。
+每个 must_have Claim 必须能回答"它如何支撑 Core Thesis"；答不上 → drop / appendix。
 
-## 6. 一页一个 Takeaway【页无 message = to_spec 阻塞】
+## 13. Storyline Archetype（不从零自由生成故事）
 
-一页只允许**一个主要** Takeaway，但可以有多个事实**支撑**它——"吞吐 +42%、
-成本 -31%"可以同页，只要都在证明"优化显著提升推理效率"。
+预定义骨架（`plan.py --archetypes` 列全表）：problem_solution（问题→影响→方案→证明，
+适合方案/产品/销售）、scr（情境→冲突→解法，咨询/决策）、why_what_how（技术方案/
+战略）、current_gap_target（转型/平台升级）、goal_progress_result（汇报/复盘）、
+overview_detail_evidence（评审/研究）、product_capability_value（产品/售前）、
+incident_review（事故复盘）、tech_proposal（架构评审）、past_present_future（发展史/
+路线）。
 
-四问检验（写 pageplan 时过一遍）：
+## 14. Storyline 选择规则
 
-1. 能否一句话说出来？（说不出 = 还没想清楚）
-2. 页面所有元素都在支撑这句话吗？（不是的删掉）
-3. 存在第二个同等重要、结论不同的观点？（是 → 拆页，`split`）
-4. 去掉某元素结论完全不变？（是 → 该元素是无关内容）
+按 purpose + audience + content type 选最匹配骨架；一个不够可组合，**最多两种**；
+避免每页一个不同的逻辑结构。
 
-## 7. 标题：结论优先，不是主题
+## 15. Section 规则【乱序/角色越界=拦】
 
-内容页默认 **Message Title**（"5/8 模型接口仍未统一"），不是 Topic Title
-（"平台现状"——这适合目录和章节页）。好标题尽量有：对象、变化、判断、结果、
-方向。【提示层：标题空洞会由"空话检测"与层级检查兜住】
+每个 Section 必须有 topic **加** message："技术方案"不够，"通过统一模型层、服务层
+和治理层完成平台化改造"才是。禁止只有 topic 没有 message 的 section。
 
-## 8. 文案压缩与 Copy Level
+## 16. 页面数量分配【sections 页数之和 ≠ target_slide_count=拦；权重和≠1=拦】
 
-压缩**保留**事实/因果/数字/对象，**不增加**新事实、不改结论方向。重要文本给
-三档（long/medium/short），版面按实测空间选——**Renderer 不许临时截断句子**
-（fit.py 量的是"装不装得下"，装不下回来改文案或减条目，不是悄悄截）。
+```json
+{"target_slide_count": 15, "sections": [
+  {"name": "背景与问题", "weight": 0.20, "target_slides": 3},
+  {"name": "解决方案",   "weight": 0.40, "target_slides": 6},
+  {"name": "价值与实施", "weight": 0.27, "target_slides": 4},
+  {"name": "总结",       "weight": 0.13, "target_slides": 2}]}
+```
 
-条目数初筛：2~4 条适合一页；5~6 进拆分评估；>6 高风险；10 条除附录/表格外
-原则上拆页。复杂度评分（字符/120 + 节点×0.12 + 图表×0.25 + 图×0.15 + 层级×0.10，
-阈值 0.70）【已拦：超阈值未标 split = 错】。
+总页数是约束不是死值；严重不足或超载可调，但**必须说明原因**。
 
-## 9. 措辞的四条硬规矩
+## 17. 一页一个 Takeaway【页无 message=拦】
 
-1. **数字优先**：有数字证据就用数字（"92.4% → 98.7%"好于"明显提升"）。
-   【提示：变化词（提升/优化/降低/…）出现但全句无数字 → 追问"提升什么？多少？"】
-2. **因果谨慎**：材料明确支持才用"导致"；否则用"同时出现 / 可能影响 / 存在关联"。
-3. **比较要有基准**："更快/更省"必须有 baseline，没有就降措辞强度。
-4. **数字一致性**：同一指标跨页同单位、同精度、同口径、同定义——冲突 = 阻塞
-   （当前由人工保证，脚本未做跨页指标比对）。
+一页只允许一个主要 Takeaway，但可以有多个事实**支撑**它。吞吐 +42%、成本 -31%
+可以同页——只要都在证明"优化方案显著提升推理效率"。禁止机械理解为"一页只能一个
+数字/一条事实"。
 
-空话黑名单：赋能 / 助力 / 全面提升 / 一体化 / 领先 / 先进……单独出现就该被追问。
-反 AI-Slop：不许每页"标题+三条"、不许同一观点换词重复、不为凑页数加空洞 bullet、
-结论不藏最后（决策/汇报类默认结论先行）。
+## 18. Slide Message Test（每页四问）
 
-## 10. 重复与叙事断层
+1. 能否一句话表达？ 2. 所有主要元素都在支持这句话吗？ 3. 存在第二个同等重要、
+结论不同的观点吗（是 → split_candidate）？ 4. 去掉某元素结论完全不受影响吗
+（是 → 该元素可能是无关内容）？
 
-【提示：两条 message 归一化后完全相同 → 合并/改写/删一条（语义相似度是未实现
-约定，离线零依赖做不了 embedding）】。骨架已保证不断层（乱序=拦）；section 内
-推荐节奏：Section Message → Explain → Evidence → Implication，不要连续 6 页
-并列信息。整套 deck 主动创造强弱节奏：结论页 → 解释 → 证据 → 结构 → 数据 →
-留白 → 强结论。
+## 19. 标题规则
 
-## 11. 结尾与附录
+Topic Title（"技术架构"）只适合目录/章节/附录；内容页默认 **Message Title**
+（"四层架构将模型接入、推理与治理统一到一条服务链路"）。
 
-结尾不只有 THANK YOU：最终判断 / 下一步 / 决策请求 / 待确认事项
-（"下一步：完成 4 个核心模型统一纳管，启动网关切换"）。详细参数、原始表格、
-参考文献、完整测试数据 → 附录，不占主叙事页预算。
+## 20. 标题质量检查
 
-## 12. 视觉需求由语义决定
+尽量有：主语或明确对象、动词或变化、判断、结果、方向。避免"平台能力/项目背景/
+数据情况/实施方案"这类无结论标题。
 
-内容层只声明"需要什么视觉、为什么"（`visualRequirement` 的 kind/intent/reason），
-不决定怎么画：
+## 21. Claim + Evidence【claimId 悬空=拦】
 
-- **该有视觉**：观众要"看这个"——产品/UI 长什么样、改造前后、方案差异、
-  数据趋势、架构层级。
-- **不必塞图**：Timeline / Chart / 架构 / 流程 / 表格本身已是视觉结构；
-  纯结论页靠字与留白。宁多勿少，但"这一页你要说'看这个'"才是判据。
-- **图不承载信息**：标题/正文/数字/标签由 Renderer 用真文字排（可搜索、可翻译、
-  屏幕阅读器、PPTX 可编辑）；图只管观感、场景、证据、氛围。图不许盖满整页
-  （check.py ≥60% 阻塞）。
+重要页面必须明确 Claim + Evidence：
+`{"message": "统一入口显著降低模型接入复杂度", "claimId": "claim_08", "evidence": ["metric_12", "fact_37"]}`。
 
-图表：内容层给 intent（trend/comparison/composition…）+ message + metric 引用，
-类型由 `chart.py` 的意图树查表。图片：prompt、比例、留白由 `image_source.py`
-的契约流程处理（见 images.md）。
+## 22. Evidence 等级
 
-## 13. Content QA 与修复顺序
+Primary（没它 Claim 站不住）/ Supporting（增强可信度）/ Context（背景）/
+Decorative（只承担氛围）。Page Planner 优先保留 Primary。
 
-进视觉设计前过 `plan.py --check`（上表所有【拦】项）+ 人工过一遍提示项。
-修复顺序（别跳步）：**修事实和数字 → 补来源 → 重写 thesis → 删无关 → 合并
-重复 → 补证据 → 修骨架 → 拆多观点页 → 压文案 → 调附录 → 最后才动页数**。
-第一反应是缩字体 = 最差的修法（布局层还有排版预算兜底，但内容超载是内容层的错）。
+## 23. 无证据 Claim
 
-## 14. 元规则
+重要但没证据 → unsupported_claim：继续检索 / 降措辞强度 / 标注为推测 / 删除 /
+放"待验证"。**禁止强行保留为确定事实**。【高重要性只靠 inferred 支撑=提示】
 
-1. 先明确观众要做什么，再决定内容。
-2. 一份 deck 一句 Core Thesis。
-3. 一页一个主要 Takeaway；多事实同页必须服务同一个 Takeaway。
-4. 重要 Claim 必须有 Evidence；事实、推断、生成表达分开。
-5. 数字和事实可追溯；材料里有 ≠ PPT 必须讲。
-6. 内容价值高于页面填满程度；标题表达结论而非主题。
-7. 压缩不改事实和因果；视觉需求由语义决定。
-8. Content 说"说什么"，Page Planner 说"怎么表达"。
-9. fit.py 只判"装不装得下"，不判"值不值得说"。
-10. 视觉设计开始前，内容 QA 必须通过。
+## 24. 文案压缩规则
 
-合法例外（要有明确理由）：一页一句话若是核心结论；附录故意密集；留白是构图
-的一部分；多证据同页若同撑一个 Takeaway。
+保留事实、因果、数字、对象；不增加新事实；不改结论方向。
+原文（83 字）→ Long："多模型独立接入导致接口、鉴权和调用方式不一致，业务维护
+成本持续增加" → Medium："多模型独立接入导致接口治理复杂" → Short："多模型接入碎片化"。
+
+## 25. Copy Level
+
+重要文本同时生成 `{"long": "", "medium": "", "short": ""}`，版面按真实空间选。
+**Renderer 不允许临时截断句子**（fit 量的是"装不装得下"，装不下回来改文案或减条目）。
+
+## 26. Content Budget（语义预算，几何仍由 fit 实测）
+
+`{"headline": {"preferredChars": 24, "maxLines": 2}, "supportingPoints": {"preferredCount": 3, "maxCount": 5}, "body": {"preferredChars": 80}}`
+
+## 27. 条目数量规则
+
+2~4 条适合一页；5~6 进拆分评估；>6 默认高风险；10 条除 Appendix/Table 外原则上
+拆页。是 QA 初筛，不是绝对法律。
+
+## 28. 内容复杂度评分【≥0.70 未标 split=拦】
+
+complexity = textAmount + nodeCount + evidenceCount + hierarchyDepth +
+chartSeriesCount + visualRequirementCount。本仓库实现：
+`字符/120 + 节点×0.12 + 图表×0.25 + 图×0.15 + (层级-1)×0.10`，输出
+`{"complexityScore", "risk", "splitSuggested"}`。
+
+## 29. 拆页策略
+
+优先：按观点拆 / 按证据类型拆 / 按时间拆 / 按层级拆 / 按过程拆 / 主线+Appendix。
+**禁止第一反应就是缩字体**。
+
+## 30. 内容与视觉表达关系
+
+Content Engine 不决定 Layout，只输出语义关系（如 `"semanticRelation": "comparison"`），
+Page Planner 再映射（comparison → chart / two-column）。
+
+## 31. Visual Requirement
+
+`{"visualRequirement": {"needed": true, "kind": "data|evidence_image|process|hierarchy|comparison|architecture|mood", "intent": "", "reason": "", "priority": "primary|supporting|decorative"}}`
+
+## 32. 什么时候必须有视觉
+
+需要观众"看这个"就该产生：产品/UI 长什么样、改造前后、两方案差异、空间布局、
+数据趋势、系统关系、架构层级。
+
+## 33. 什么时候不需要额外图片
+
+Timeline / Chart / Architecture / Process / Table / Diagram 本身已是视觉结构——
+除非图片提供额外证据，否则不要为了"丰富"再塞一张。
+
+## 34. 图片职责
+
+图片不承载 PPT 正式信息（标题/正文/数字/标签/图表说明/流程文字必须由 Renderer
+用真实文字绘制）；图片只负责观感、场景、证据、氛围、产品/人物/环境呈现。
+
+## 35. Chart Requirement
+
+内容层只定义 `{"kind": "data", "intent": "trend", "message": "调用量自 Q3 开始快速增长", "metricIds": ["m01", "m02"]}`；Chart Engine 决定类型、编码、标注、强调、动画。
+
+## 36. Image Requirement
+
+内容层只定义 `{"kind": "evidence_image", "role": "hero", "reason": "展示产品实际外观"}`；prompt、比例、留白由 Image Pipeline 处理（见 images.md）。
+
+## 37. Audience Distance
+
+Live：一页一个强 Message、少条目、大字、强视觉；Async：更多解释、更密、更完整
+上下文；Printable/Archive：更高密度、注释、来源、页码。
+
+## 38. Delivery Context 的边界
+
+Content 只读 delivery mode、时长、观看距离（影响页数/密度/解释深度）；具体导出
+格式由 Delivery Rules 管（见 delivery-formats.md）。
+
+## 39. 叙事节奏
+
+整套 PPT 不应每页同强度：高强度结论页 → 解释 → 证据 → 结构 → 数据 → 留白/过渡 →
+强结论。Storyline 主动创造节奏。
+
+## 40. 章节内节奏
+
+Section 推荐：Section Message → Explain → Evidence → Implication；不要连续 6 页
+并列信息。
+
+## 41. 结论先行
+
+决策/汇报/方案类默认结论先行，不故意拖到最后。例外：故事型演讲、教学探索、
+悬念式发布、特定叙事需求。
+
+## 42. Ending 规则
+
+结束页不只是 THANK YOU；优先最终判断 / 下一步 / 决策请求 / 关键行动 / 待确认事项
+（"下一步：完成 4 个核心模型统一纳管，并启动网关切换"）。
+
+## 43. Appendix
+
+详细参数、原始表格、参考文献、完整测试数据、详细日志、低频问题、备份方案、
+不影响主线的技术细节 → 附录。**Appendix 不占主叙事页预算**。
+
+## 44. Redundancy Detection【归一化相同=提示】
+
+两条 message 语义相似（规范阈值 0.85）且证据角色无异 → merge/rewrite/remove。
+本仓库实现：归一化（去标点/小写）后**完全相同**才提示；语义相似度是未实现约定。
+
+## 45. Narrative Gap Detection
+
+Story Graph 不允许逻辑断层：Problem → Implementation 缺 Solution → narrative_gap。
+本仓库由骨架顺序检查兜底【乱序=拦】。
+
+## 46. Narrative Transition
+
+每页之间应能回答"为什么下一页现在出现"：
+`{"transitionReason": "既然现有接口碎片化，下一步需要说明统一平台如何解决"}`。
+答不出 = 可能叙事跳跃。
+
+## 47. 内容密度不是越满越好
+
+目标不是"填满页面"而是**信息理解效率**；大量留白若强化核心 Message，合法。
+
+## 48. 不得为了"页面不空"增加无关内容
+
+禁止：空洞口号、无证据数字、泛化描述、重复卡片、不相关图片、"为了完整"但无
+价值的 bullet。
+
+## 49. Copy Style
+
+简洁、具体、有信息量；少空话、套话、名词堆砌、无量化表达。优先"统一入口将 5 套
+调用方式收敛为 1 套"，而不是"全面提升模型统一管理能力"。
+
+## 50. 空洞语言检测【变化词且全句无数字=提示】
+
+赋能 / 助力 / 提升 / 优化 / 全面 / 高效 / 智能 / 协同 / 一体化 / 领先 / 先进 ——
+单独出现就追问：提升什么？优化多少？为什么？有什么证据？
+
+## 51. 数字优先
+
+有数字证据就用数字："成功率从 92.4% 提升至 98.7%" 优于 "成功率明显提升"。
+
+## 52. 因果关系必须谨慎
+
+只有材料明确支持才用因果措辞；否则用"同时出现 / 可能影响 / 存在关联"。
+
+## 53. 比较必须有基准
+
+更快/更高/更低/更稳定/更节省必须有 comparison baseline；没有就降措辞强度。
+
+## 54. 数字一致性【冲突应=阻断；跨页比对未实现】
+
+同一指标跨页必须同单位、同精度、同时间口径、同定义；冲突 = blocking error
+（当前由人工保证，脚本未做跨页指标比对）。
+
+## 55. Slide Content Object（推荐最终格式）
+
+```json
+{"slideId": "slide_07", "purpose": "prove_problem",
+ "message": "超过一半的模型接口不统一，平台治理已经成为必要条件",
+ "claim": {"id": "claim_08", "type": "derived", "confidence": 0.94},
+ "evidence": [{"id": "metric_03", "role": "primary"}, {"id": "fact_18", "role": "supporting"}],
+ "copy": {"headline": "5/8 模型接口仍未统一",
+          "subheadline": "接口碎片化正在增加业务接入和运维复杂度",
+          "points": ["鉴权方式不统一", "调用协议不统一", "错误处理方式不统一"]},
+ "visualRequirement": {"kind": "data_comparison", "intent": "emphasize_ratio", "priority": "primary"},
+ "contentBudget": {"headlineMaxLines": 2, "maxSupportingPoints": 3},
+ "sources": ["doc01:p8", "doc02:p14"]}
+```
+
+本仓库对应：pageplan 的页对象（message_ref + 页型 + data/nodes/columns），由
+`to_spec` 确定性映射成 deck-spec 的 slide。
+
+## 56. Presentation Plan（推荐）
+
+`{"brief", "coreThesis", "storyArchetype", "sections": [{"id", "title", "message", "slides": []}], "slides": []}` —— 本仓库拆成三份 JSON（content / storyline / pageplan），
+`plan.py --check` 分别校验。
+
+## 57. Content QA（进 Page Planner 前必须完成）
+
+Thesis（存在且与 desiredAction 一致）/ Coverage（must_have 全覆盖）/ Evidence /
+Traceability / Unsupported Claim / Redundancy / Narrative Flow / One Takeaway /
+Audience Fit / Density Risk / Relevance。落地：`plan.py --check` 覆盖其中的
+可判定项，其余人工过。
+
+## 58. Content QA Score
+
+`{"contentScore": {"thesisClarity", "evidenceCoverage", "narrativeFlow", "redundancy",
+"audienceFit", "slideFocus", "traceability"}}`；建议总分 <85 不进视觉设计
+（评分模型未实现，作为人工口径）。
+
+## 59. Hard Error（阻塞）
+
+关键数字冲突；关键事实来源缺失；**Core Thesis 不存在**；关键 Claim 无证据且被写成
+确定事实；同一页两个完全独立核心观点；明显超页数且未说明；必须内容被遗漏。
+
+## 60. Warning（提示）
+
+页面内容偏多；章节页数失衡；Message 偏弱；标题只有 Topic 没结论；多页语义相似；
+视觉需求不足；过多纯文字页；附录内容进入主线。
+
+## 61. Content Repair（按序修，别跳步）
+
+修事实和数字 → 补来源 → 重写 Core Thesis → 删无关 → 合并重复 Claim → 补证据 →
+修 Storyline → 拆多观点页 → 压 Copy → 调 Appendix → **最后才动页数**。
+
+## 62. 与 fit.py 的接口
+
+fit.py 只判断"装不装得下"：Content Planner → Content Budget → Page Planner →
+Layout Resolver → **fit 实测** → Repair。Content Engine 判断"值不值得说"。
+
+## 63. 与 Page Planner 的接口
+
+Content 输出 message / claim / evidence / copy / semanticRelation /
+visualRequirement / contentBudget；Page Planner 决定 pageType / layoutFamily /
+primaryVisual / density / focalPoint。
+
+## 64. 与 Image Pipeline 的接口
+
+Content 只说"需要什么视觉、为什么、什么证据角色"；prompt 结合 Layout/Style/Brand/
+Color/比例/留白由 Image Pipeline 生成（`image_source.py --brief`）。
+
+## 65. 与 Chart Engine 的接口
+
+Content 输出 data intent / message / metrics / comparison relation；Chart Engine
+决定类型、编码、标注、强调、动画（`chart.py` 意图树）。
+
+## 66. 与 Motion Engine 的接口
+
+Content 可输出 `{"motionIntent": "explain|reveal|compare|progress|focus"}`；具体
+效果由 Motion 层决定（`animation.md` 的决策优先级）。
+
+## 67. 反 AI-Slop 内容规则
+
+禁止：每页"标题+三条"；每页都"现状/问题/对策"；标题堆"赋能/提升/优化"；同一观点
+换词重复；为凑页数硬编；无证据的"大幅提升"；结论藏在最后；长文直接摘要成 bullet；
+页面只有 Topic 没有 Message；过度均匀的章节结构。
+
+## 68. 合法例外（必须有明确原因）
+
+一页只有一句话（若它就是核心结论）；故意密集（附录/数据表/参考文献）；没有封面
+（补充材料）；留白很多（构图的一部分）；多证据同页（同撑一个 Takeaway）；单一版式
+多页（内容要求连续比对）。
+
+## 69. 推荐运行流程
+
+Input → Brief → Audience Model → Content Understanding → Normalization →
+Fact/Metric/Evidence Store → Claim Synthesis → Core Thesis → Story Archetype →
+Section Plan → Slide Message Plan → Claim+Evidence Mapping → Display Copy →
+Visual Requirement → Content Budget → **Content QA** → Page Planner。
+
+## 70. 最终元规则
+
+Rule 1 先明确观众要做什么，再决定内容。Rule 2 一份 deck 必须有唯一 Core Thesis。
+Rule 3 一页只允许一个主要 Takeaway。Rule 4 多个事实可以同页，但必须服务同一个
+Takeaway。Rule 5 重要 Claim 必须有 Evidence。Rule 6 原始事实、推断和生成表达
+必须分开。Rule 7 任何数字和事实必须可追溯。Rule 8 原材料里有，不等于 PPT 必须讲。
+Rule 9 内容价值高于页面填满程度。Rule 10 标题优先表达结论，而不只是主题。
+Rule 11 文案压缩不得改变事实和因果。Rule 12 视觉需求由语义决定，不由"页面空
+不空"决定。Rule 13 Content Engine 决定"说什么"，Page Planner 决定"怎么表达"。
+Rule 14 fit.py 只判断"装不装得下"，不能反过来决定"值不值得说"。Rule 15 任何
+视觉设计开始前，Content QA 必须通过。
+
+## 71. 一句话定义
+
+优秀的 AI PPT 内容系统，不是把资料总结成几页，而是围绕观众目标建立 Core Thesis，
+用可追溯事实形成 Claim 与 Evidence，通过 Storyline 控制认知推进，再把每页压缩成
+一个唯一 Takeaway，最后才交给视觉系统设计。
