@@ -47,6 +47,35 @@ python3 scripts/fonts.py --embed out.html -o portable.html   # 字体内联进 H
 其余 120 款按 `--list --urls` 给的来源页手工拿，放进 `fonts/ttf/` 即可 —— 文件名里
 带得上字体名（或拉丁名）就能被 `--installed` 认出来。
 
+## 只走 A 档：没有 license 也能用的那一套
+
+**没有 license 就用严格 A，别碰 B/C，连 `A/B` 也别碰。**
+
+理由是 `A/B` 不等于 A：它意味着"某个来源标了 A、另一个标了 B"，而 B 意味着署名 /
+地区 / 禁商标 / **禁嵌入**等限制之一。而**把字体嵌进交付物属于再分发**，比"自己用"
+敏感得多 —— 没有 license 的时候，含糊等于不能用。
+
+所以 `--tier A` 与 `--list --license A` 用的是**严格相等**（`license == "A"`），
+不是 `startswith`。原先写成 `startswith` 的后果是 `A/B` 一路放过去，而那 4 款里有
+`阿里巴巴普惠体 3.0`、`猫啃珠圆体`、`庞门正道粗书体` 这种很容易被顺手用上的字。
+
+```bash
+python3 scripts/fonts.py --fetch                 # 默认就是严格 A（要 B/C 得 --tier all）
+python3 scripts/fonts.py --list --license A      # 只看纯 A 的
+python3 scripts/fonts.py --map --a-only          # 8 套风格各一整套纯 A 方案
+```
+
+**`--map --a-only` 是一份完整的替代方案**，不是"删掉几款" —— 每套风格 × display /
+body / numeral 三档都给齐，所以"只用免费的"不会变成"有几套风格不能用"。
+有测试钉着：那份表里点到的每一款授权必须**恰好是 A**。
+
+> **OFL 唯一要记住的一条**：如果你把**字体文件本身**再分发出去（比如把 `fonts/ttf/`
+> 打包给别人），要带上它的版权声明与 License 文本。只是拿它排版、或者把用到的字形
+> 子集嵌进 PDF，不受这条影响 —— 那是通行做法。
+
+清单 126 款里严格 A 是 **86 款**；`A/B` 有 4 处落在默认映射上，`B` 有 2 处
+（`京华老宋体`、`HarmonyOS Sans`）—— 这些在纯 A 方案里都换掉了。
+
 ## 授权：清单标了 A/B/C，但不是"标了就没事"
 
 - **A**（86 款）：OFL / 开源或官方明确广泛免费商用 —— 可以下载、安装、进交付物。

@@ -290,5 +290,89 @@ class TestRenderIntegration(unittest.TestCase):
         self.assertIn("file://", html)
 
 
+
+class TestFreeOnly(unittest.TestCase):
+    """**没有 license 也能用的那一档** —— 判据是严格 A。
+
+    用户的原话是"我只需要免费的字体，我没有什么 license"。所以这一层要保证两件事：
+    A/B 那种含糊标记**不算通过**，而且每套风格都有一份完整的纯 A 方案（否则
+    "只用免费的"就变成"有几套风格不能用"）。
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.cat = json.loads(open(os.path.join(SKILL, "fonts", "catalog.json"),
+                                  encoding="utf-8").read())
+        cls.map = json.loads(open(os.path.join(SKILL, "fonts", "mapping.json"),
+                                  encoding="utf-8").read())
+        cls.license = {f["name"]: f["license"] for f in cls.cat["fonts"]}
+
+    def test_tier_a_is_strict_not_prefix(self) -> None:
+        """**回归**：`"A/B"` 在选 A 时不算通过。
+
+        原先写的是 `license.startswith(tier)` —— 于是 `A/B` 一路放过去。而 B 意味着
+        署名 / 地区 / 禁商标 / **禁嵌入**等限制；把字体嵌进交付物属于再分发，
+        对没有 license 的人来说含糊等于不能用。
+        """
+        self.assertFalse(fonts.tier_matches("A/B", "A"))
+        self.assertFalse(fonts.tier_matches("B", "A"))
+        self.assertFalse(fonts.tier_matches("C", "A"))
+        self.assertTrue(fonts.tier_matches("A", "A"))
+        # all / 空 = 全都要（显式选择）
+        self.assertTrue(fonts.tier_matches("B", "all"))
+        self.assertTrue(fonts.tier_matches("B", None))
+
+    def test_fetch_defaults_to_free_only(self) -> None:
+        self.assertEqual(fonts.DEFAULT_TIER, fonts.FREE_LICENSE)
+        self.assertEqual(fonts.FREE_LICENSE, "A")
+
+    def test_a_only_table_covers_every_style_and_role(self) -> None:
+        """每套风格的每一档都得有纯 A 方案 —— 缺一档就是那套风格用不了。"""
+        a_only = self.map["a_only"]["styles"]
+        for style, row in self.map["styles"].items():
+            with self.subTest(style=style):
+                self.assertIn(style, a_only, f"{style} 没有纯 A 方案")
+                self.assertEqual(set(a_only[style]), set(row["roles"]),
+                                 f"{style} 的档位对不上")
+
+    def test_every_a_only_pick_is_strictly_free(self) -> None:
+        """**最关键的一条**：纯 A 方案里点到的每一款，license 必须恰好是 "A"。
+
+        这一条要是松了，"只用免费的"就变成一句空话 —— 而用户拿不到 license，
+        出事的时候是真的出事。
+        """
+        allowed = set(self.map["system_fonts"]["list"])
+        for style, roles in self.map["a_only"]["styles"].items():
+            for role, pick in roles.items():
+                for cand in pick.split("/"):
+                    c = cand.strip().split("（")[0].strip()
+                    if c in allowed:
+                        continue
+                    with self.subTest(style=style, role=role, font=c):
+                        hit = next((n for n in self.license
+                                    if n == c or c in n or n.split()[0] in c), None)
+                        self.assertIsNotNone(hit, f"{c!r} 不在清单里")
+                        self.assertEqual(self.license[hit], "A",
+                                         f"{c!r} 的授权是 {self.license[hit]}，不是纯 A")
+
+    def test_a_only_does_not_reuse_the_questionable_picks(self) -> None:
+        """主映射里那些 B / A/B 的推荐，不许原样出现在纯 A 方案里。"""
+        risky = {n for n, code in self.license.items() if code != "A"}
+        for style, roles in self.map["a_only"]["styles"].items():
+            for role, pick in roles.items():
+                for cand in pick.split("/"):
+                    c = cand.strip().split("（")[0].strip()
+                    with self.subTest(style=style, role=role, font=c):
+                        self.assertFalse(
+                            any(c == n or c in n for n in risky),
+                            f"{c!r} 是 B/C 档，不该出现在纯 A 方案里")
+
+    def test_strict_a_share_is_reported_honestly(self) -> None:
+        """清单里严格 A 只占一部分 —— 文档与 CLI 都得说清这件事，不能让人以为
+        126 款都是随便用的。"""
+        strict = [n for n, code in self.license.items() if code == "A"]
+        self.assertLess(len(strict), len(self.license))
+        self.assertGreater(len(strict), 50, "严格 A 的款数太少，值得复核清单")
+
 if __name__ == "__main__":
     unittest.main()

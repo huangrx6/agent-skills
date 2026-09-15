@@ -51,6 +51,22 @@ FONT_SUFFIXES = (".ttf", ".otf", ".ttc", ".woff2")
 # 这种短记号在长文件名里到处都是，做子串匹配必然误报。
 MIN_TOKEN = 5
 
+# ═══════════════════════════════════════════════════════════════════════════
+# **严格 A** —— "没有 license 也能用"的那一档
+#
+# 判据是 license **恰好等于** "A"，不是 `startswith("A")`。`"A/B"` 不算：
+# 它意味着某个来源标了 A、另一个标了 B，而 B 有署名 / 地区 / 禁商标 / **禁嵌入**
+# 等限制。把字体嵌进交付物属于**再分发**，比"自己用"敏感 —— 对没有 license 的人
+# 来说，含糊等于不能用。
+#
+# 所以 `--fetch` 与 `--list --license A` 都按**严格相等**比较；`--map --a-only`
+# 给出一整套纯 A 的字体方案（`mapping.json` 的 `a_only`）。
+# ═══════════════════════════════════════════════════════════════════════════
+FREE_LICENSE = "A"
+
+# 取字体时默认只取这一档。想连 B/C 一起看要显式给 `--tier all`。
+DEFAULT_TIER = FREE_LICENSE
+
 # 同一个字族有多个格式时，按这个顺序挑。**实测排出来的，不是偏好**：
 # 同一个得意黑，`.otf` 那份 Chrome **完全不嵌**（`@font-face` 指它，出 PDF 零字体、
 # 文件 40KB），`.ttf` 那份就正常嵌成 `AAAAAA+SmileySans-Oblique`（45KB）。
@@ -101,6 +117,18 @@ FETCHABLE = [
 GITHUB_API = "https://api.github.com/repos/{repo}/releases/latest"
 UA = {"User-Agent": "deck-authoring-fonts"}
 TIMEOUT = 300
+
+
+def tier_matches(license_code: str, tier: str | None) -> bool:
+    """某个授权级算不算落在要取的这一档里。
+
+    **严格相等**，不是 `startswith` —— 见 `FREE_LICENSE` 那段：`"A/B"` 在
+    选 A 的时候**不算通过**。这条抽成函数是为了能测：写在内联判断里的话，
+    "A/B 被当成 A 放过去"这种错只能靠人盯。
+    """
+    if not tier or tier == "all":
+        return True
+    return license_code == tier
 
 
 def catalog() -> list[dict]:
@@ -270,7 +298,7 @@ def fetch(only: list[str] | None = None, tier: str | None = None,
             continue
         if only and name not in only:
             continue
-        if tier and not entry["license"].startswith(tier):
+        if not tier_matches(entry["license"], tier):
             continue
         if name in installed_names():
             msgs.append(f"✓ 已有 {name}")
@@ -477,9 +505,23 @@ def mapping() -> dict:
     return deckio.read_json(MAPPING)
 
 
-def print_map(as_md: bool = False) -> None:
-    """字体 ↔ 风格映射表。"""
+def print_map(as_md: bool = False, a_only: bool = False) -> None:
+    """字体 ↔ 风格映射表。
+
+    `a_only=True` 时只打**严格 A** 那一套 —— 给"没有 license"的人用，
+    里面每一款都能下载、安装、嵌进交付物。
+    """
     mp = mapping()
+    if a_only:
+        print("字体 ↔ 风格映射（**纯 A 档**：每一款都能免费商用、可嵌入交付物）\n")
+        for style, roles in mp["a_only"]["styles"].items():
+            label = mp["styles"].get(style, {}).get("label", style)
+            print(f"── {style}（{label}）")
+            for role, pick in roles.items():
+                print(f"     {role:14} {pick}")
+        print()
+        print(mp["a_only"]["why"])
+        return
     if as_md:
         print("# 字体 ↔ 风格映射\n")
         for style, row in mp["styles"].items():
@@ -506,9 +548,12 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--installed", action="store_true", help="列出本地已就位哪些")
     ap.add_argument("--fetch", action="store_true", help="取能直接下载的那批")
     ap.add_argument("--only", default=None, help="只取这些（逗号分隔的名字）")
-    ap.add_argument("--tier", default=None, help="只取这个授权级（A / B / C）")
+    ap.add_argument("--tier", default=None,
+                    help="只取这个授权级（默认 A = 严格免费可嵌；要 B/C 用 --tier all）")
     ap.add_argument("--map", action="store_true", help="打印字体 ↔ 风格映射表")
     ap.add_argument("--md", action="store_true", help="--map 输出 markdown")
+    ap.add_argument("--a-only", action="store_true",
+                    help="--map 只打**纯 A** 那一套（没有 license 也能用、可嵌交付物）")
     ap.add_argument("--embed", default=None, metavar="HTML", help="把字体内联进这份 HTML")
     ap.add_argument("-o", "--out", default=None, help="--embed 的输出")
     ap.add_argument("--category", default=None, help="--list 只列这一类")
@@ -523,7 +568,9 @@ def main(argv: list[str]) -> int:
 
     if args.fetch:
         only = [s.strip() for s in args.only.split(",")] if args.only else None
-        ok, _msgs = fetch(only=only, tier=args.tier)
+        # 默认只取严格 A —— "我只需要免费的字体，我没有什么 license"。
+        # 要看 B/C 得显式 --tier all。
+        ok, _msgs = fetch(only=only, tier=args.tier or DEFAULT_TIER)
         have = installed_names()
         print(f"\n本地已有 {len(have)} 款 / 清单 {len(catalog())} 款")
         if len(have) < len(catalog()):
@@ -532,7 +579,7 @@ def main(argv: list[str]) -> int:
         return 0 if ok else 1
 
     if args.map:
-        print_map(as_md=args.md)
+        print_map(as_md=args.md, a_only=args.a_only)
         return 0
 
     fonts = catalog()
@@ -540,7 +587,7 @@ def main(argv: list[str]) -> int:
     if args.category:
         fonts = [f for f in fonts if f["category"] == args.category]
     if args.license:
-        fonts = [f for f in fonts if f["license"].startswith(args.license)]
+        fonts = [f for f in fonts if tier_matches(f["license"], args.license)]
     if args.installed:
         have = installed_names()
         fonts = [f for f in fonts if f["name"] in have]

@@ -105,7 +105,7 @@ python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸�
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 220 条，约 3 分钟（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 226 条，约 3.5 分钟（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时约 2.5 分钟，
@@ -172,8 +172,12 @@ python3 scripts/fonts.py --map               # 8 套风格 × display/body/numer
 | **原生 PPTX** | **有事** ⚠️ | python-pptx 只写字体名（`<a:latin>` / `<a:ea>`），不嵌字体文件 —— 对方没装就由宿主替换 |
 | HTML | **有事** | 用读者的字体；`--embed` 可把字体内联成单文件（CJK 太大会拒绝并建议走 PDF） |
 
-授权标了 A/B/C，但**标了不等于没事**：免费字体的授权会调整，而把字体嵌进交付物属于
-再分发，比"自己用"敏感。正式上线前请把每款的授权页面 / License 存下来。
+**没有 license 就只走 A 档，连 `A/B` 也别碰** —— `A/B` 意味着某个来源标了 B
+（署名 / 地区 / 禁商标 / **禁嵌入**），而把字体嵌进交付物属于再分发。
+`--fetch` **默认就只取严格 A**（`--tier all` 才要 B/C），`--map --a-only` 给一套
+**完整的**纯 A 替代方案（8 套风格 × 三档，所以不会变成"有几套风格不能用"）。
+OFL 唯一要记住的：**再分发字体文件本身**时要带上版权声明与 License 文本；
+只拿它排版、或把字形子集嵌进 PDF，不受影响。
 四个实测踩过的坑（`.otf` 那份 Chrome 完全不嵌所以要优先 `.ttf`、`format()` 写错会**静默
 不用这款字**、字族真名与清单中文名不是一回事、短记号子串匹配必然误报）见
 `references/fonts.md`。

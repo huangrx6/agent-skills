@@ -223,5 +223,51 @@
    "Hiragino Sans GB",
    "Heiti SC"
   ]
+ },
+ "a_only": {
+  "note": "**没有 license 也能用的那一套。** 判据是**严格 A**（catalog 里 license 恰好是 \"A\"）—— \"A/B\" 不算：它意味着某个来源标了 A、另一个标了 B，而 B 有署名 / 地区 / 禁商标 / **禁嵌入**等限制。把字体嵌进交付物属于再分发，含糊等于不能用。",
+  "why": "A 级（OFL / 官方明确广泛免费商用）可以下载、安装、**嵌入交付物**。OFL 的唯一硬要求是：**再分发字体文件本身时要带上版权声明与 License 文本** —— 只是用它在文档里排版不受影响，PDF 内嵌子集也是通行做法。",
+  "styles": {
+   "keynote-dark": {
+    "display": "得意黑 Smiley Sans / 庞门正道标题体",
+    "body": "MiSans / 资源圆体 Resource Han Rounded",
+    "numeral": "得意黑 Smiley Sans"
+   },
+   "botanical-dark": {
+    "display": "霞鹜文楷 / 汇文明朝体（修正版）",
+    "body": "霞鹜文楷 / 芫荽 Coriander",
+    "numeral": "霞鹜文楷"
+   },
+   "billboard": {
+    "display": "阿里妈妈数黑体 / 站酷酷黑",
+    "body": "MiSans / 资源圆体 Resource Han Rounded",
+    "numeral": "阿里妈妈数黑体"
+   },
+   "swiss-grid": {
+    "display": "MiSans / 资源圆体 Resource Han Rounded",
+    "body": "MiSans / 资源圆体 Resource Han Rounded",
+    "numeral": "MiSans"
+   },
+   "paper-ink": {
+    "display": "霞鹜文楷 / 汇文明朝体（修正版）",
+    "body": "霞鹜文楷 / 芫荽 Coriander",
+    "numeral": "霞鹜文楷"
+   },
+   "notebook": {
+    "display": "猫啃网糖圆体 / 内海字体 NaikaiFont",
+    "body": "内海字体 NaikaiFont / 霞鹜文楷",
+    "numeral": "猫啃网糖圆体"
+   },
+   "terminal": {
+    "display": "霞鹜文楷（等宽版 LXGWWenKai-Mono）/ Menlo",
+    "body": "霞鹜文楷（等宽版 LXGWWenKai-Mono）/ Menlo",
+    "numeral": "Menlo"
+   },
+   "pastel-geometry": {
+    "display": "站酷庆科黄油体 / 站酷快乐体",
+    "body": "资源圆体 Resource Han Rounded / 源泉圆体 GenSenRounded",
+    "numeral": "站酷庆科黄油体"
+   }
+  }
  }
 }
