@@ -365,7 +365,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   └── stress.spec.json     # **压测**用：21 页真实形状（长标题/密页/疏页/全部版式）
 ├── evals/evals.json         # 行为评估用例
 └── references/
-    ├── pipeline.md             # **总链路**：九站怎么串、每站谁拦你、自由度表
+    ├── pipeline.md             # **总编排协议 0-59 全文**：链路/五门/失效/可复现/交付
     ├── style-architecture.md    # 多风格 seam、字段集
     ├── validation.md            # 校验的口径（阻塞 vs 提示）
     ├── delivery-formats.md      # HTML / PDF / PNG / PPTX / MP4 的取舍
