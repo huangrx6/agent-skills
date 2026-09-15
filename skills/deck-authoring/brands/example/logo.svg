@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="100" viewBox="0 0 420 100" role="img" aria-label="ACME">
+  <!-- 演示用 logo：几何标记 + 字标。刻意不依赖系统字体之外的东西
+       （系统没有该字体时会回退，字宽略变，但只要还在 420×100 的画布里就没问题）。 -->
+  <rect x="0" y="18" width="64" height="64" fill="#0F172A"/>
+  <path d="M8 74 L32 26 L56 74 Z" fill="#FFFFFF"/>
+  <rect x="8" y="74" width="48" height="8" fill="#0B5FFF"/>
+  <text x="84" y="70" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="56" font-weight="700" letter-spacing="-1.5" fill="#0F172A">ACME</text>
+</svg>

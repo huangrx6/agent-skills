@@ -74,6 +74,7 @@ def _load_sibling(name: str):
 
 deckio = _load_sibling("deckio")
 measure_mod = _load_sibling("measure")
+brand_mod = _load_sibling("brand")     # 品牌 logo：路径解析 + 矢量栅格化
 
 # 1 CSS px = 0.75pt = 9525 EMU。版面 1600×900px → 1200×675pt。
 EMU_PER_PX = 9525
@@ -95,7 +96,9 @@ MONO_ROLES = {"subtitle", "bullet", "foot", "caption"}
 NOWRAP_ROLES = {"title", "foot"}
 
 # 文字元素之外的角色（有几何但不出文本框）
-NON_TEXT_ROLES = {"image", "chart"}
+NON_TEXT_ROLES = {"image", "chart", "logo"}
+# 位图角色：有真图就摆图（logo 与内容图的区别在 **base** —— 见 build() 里的 src_base）
+PICTURE_ROLES = {"image", "logo"}
 
 
 def parse_root_vars(html: str) -> dict[str, str]:
@@ -271,7 +274,10 @@ def build(html_path: str, out_path: str) -> dict:
     prs.slide_height = Emu(900 * EMU_PER_PX)
     blank = prs.slide_layouts[6]
 
-    counts = {"text": 0, "decor": 0, "chart": 0, "image": 0, "skipped": 0}
+    counts: dict[str, int] = {"text": 0, "decor": 0, "chart": 0, "image": 0,
+                              "logo": 0, "skipped": 0}
+    # 跳过的原因单独一个表：counts 是**计数**，混进字符串会让它不能再求和。
+    notes: list[str] = []
     by_slide: dict[int, list[dict]] = {}
     for entry in manifest:
         by_slide.setdefault(entry["slide"], []).append(entry)
@@ -298,16 +304,32 @@ def build(html_path: str, out_path: str) -> dict:
             if role == "chart":
                 add_chart(slide, entry, box, vars_)
                 counts["chart"] += 1
-            elif role == "image":
+            elif role in PICTURE_ROLES:
                 src = entry.get("text", "")
-                path = os.path.join(os.path.dirname(os.path.abspath(html_path)), src)
-                if os.path.isfile(path):
-                    slide.shapes.add_picture(path, Emu(round(box[0] * EMU_PER_PX)),
-                                             Emu(round(box[1] * EMU_PER_PX)),
-                                             width=Emu(round(box[2] * EMU_PER_PX)))
-                    counts["image"] += 1
+                # base=skill：品牌 logo 走的是**技能相对**路径（brands/<name>/logo.svg）。
+                # 内容图（image 字段）则是相对 HTML 的 —— 两种基准不能混。
+                if entry.get("src_base") == "skill":
+                    path = brand_mod.resolve_logo_ref(src)
                 else:
+                    path = os.path.join(os.path.dirname(os.path.abspath(html_path)), src)
+                if not os.path.isfile(path):
                     counts["skipped"] += 1      # 图不在旁边：跳过并计数，不假装成功
+                    continue
+                # 原生 PPTX 只吃位图：矢量 logo 当场用 Chrome 栅格化。
+                # 栅格化不了会**明说**（异常带原因），不静默少一个 logo。
+                if role == "logo" and brand_mod.need_raster(src):
+                    try:
+                        # 传**实测的盒子尺寸**：栅格化要保住宽高比（第一版传了个标量，
+                        # 出来是正方形，图要么被拉要么大片透明）。
+                        path = brand_mod.rasterize(path, box[2], box[3])
+                    except SystemExit as exc:
+                        counts["skipped"] += 1
+                        notes.append(str(exc))
+                        continue
+                slide.shapes.add_picture(path, Emu(round(box[0] * EMU_PER_PX)),
+                                         Emu(round(box[1] * EMU_PER_PX)),
+                                         width=Emu(round(box[2] * EMU_PER_PX)))
+                counts["logo" if role == "logo" else "image"] += 1
             elif role in NON_TEXT_ROLES:
                 counts["skipped"] += 1
             elif entry.get("text"):
@@ -316,6 +338,8 @@ def build(html_path: str, out_path: str) -> dict:
     prs.save(out_path)
     counts["bytes"] = os.path.getsize(out_path)
     counts["slides"] = len(prs.slides._sldIdLst)      # noqa: SLF001 —— 没有公开的页数接口
+    for n in notes:
+        print("  ·", n)
     return counts
 
 
@@ -328,7 +352,7 @@ def main(argv: list[str]) -> int:
     print(f"✓ 已写出 {args.out}")
     print(f"  {counts['slides']} 页 / {counts['bytes'] / 1048576:.2f}MB / "
           f"文本 {counts['text']} / 装饰 {counts['decor']} / 图表 {counts['chart']} / "
-          f"图 {counts['image']}")
+          f"图 {counts['image']} / logo {counts['logo']}")
     if counts["skipped"]:
         print(f"  · 跳过 {counts['skipped']} 个（量不到几何、或图不在产物旁边）—— 不猜位置")
     print("  · 字是真字，可直接改；错位与颗粒是屏幕/印刷效果，这里有意不做")

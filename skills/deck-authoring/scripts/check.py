@@ -54,6 +54,7 @@ ink = _load_sibling("ink")
 deckio = _load_sibling("deckio")   # IO 收口：读不到产物要报清楚，不甩 traceback
 measure_mod = _load_sibling("measure")   # 实测层：版面判断全部走它，不估算
 render_mod = _load_sibling("render")   # 只为拿“同一个风格”的 token（单一来源）
+brand_mod = _load_sibling("brand")     # 品牌资产（logo / 色板 / 字体）
 
 TOKENS = os.path.join(HERE, "..", "styles", "swiss-grid", "style.json")
 
@@ -203,6 +204,63 @@ def _check_font_fallback(measured: dict) -> list[str]:
     return out
 
 
+def _check_brand(measured: dict, deck: dict, tokens: dict) -> tuple[list[str], list[str]]:
+    """品牌资产：**logo 压文字（阻塞）** + 两条提示。
+
+    为什么 logo 压文字要阻塞：它和“越出该页”是两回事 —— 两个盒子都在页内，
+    `_check_layout` 看不出问题，但 logo 盖上标题就是废页。这条是确定性的
+    （两个实测矩形相交），所以它够格阻塞。
+
+    另两条是提示，因为它们的修法在品牌那边不在版面这边（补一个反白版 / 换更大的图）。
+    """
+    problems: list[str] = []
+    notes: list[str] = []
+    name = deck.get("brand")
+    if not name:
+        return problems, notes
+    brand = brand_mod.load(name)
+    els: list[dict] = measured.get("elements", [])
+    logos = [e for e in els if e.get("role") == "logo"]
+    if not logos:
+        return problems, notes
+
+    for lg in logos:
+        for t in els:
+            # 只跟**真带文字**的元素比。此处不能用“intendedText 非空”一句话打发：
+            # logo / 内容图 / 图表的清单条目的 text 也是非空的（存的是文件路径或数据），
+            # 拿那个当“有文字”会把 logo 报成“logo 压住了自己”（实写时就这么报了一次）。
+            if t.get("slide") != lg.get("slide") or not t.get("intendedText"):
+                continue
+            if t.get("role") in ("logo", "image", "chart"):
+                continue
+            if _overlap(lg, t):
+                problems.append(
+                    f"logo 压住了文字（第 {lg.get('slide')} 页）："
+                    f"logo x={lg['x']:.0f}..{lg['x'] + lg['w']:.0f} y={lg['y']:.0f}.."
+                    f"{lg['y'] + lg['h']:.0f} 与 {t.get('id')} "
+                    f"{t['x']:.0f}..{t['x'] + t['w']:.0f} 相交 —— "
+                    f"logo 换小一点、或让风格把它放到另一个角")
+
+    paper = tokens["colorSets"].get(deck.get("colorSet"), {}).get("background", "#FFFFFF")
+    if brand_mod.is_dark_paper(paper) and not brand.get("logoInverse"):
+        notes.append(
+            f"品牌 {name!r} 只给了一个 logo，而这张纸是深底（{paper}）—— "
+            f"实测过：白底用的 logo 放到纯黑底上，深色那块会**直接消失**（只剩零星浅色）。"
+            f"建议在 brand.json 里补 logoInverse（与正版形状一致、只换明暗）")
+    for lg in logos:
+        nat = lg.get("naturalW") or 0
+        if nat and lg.get("w", 0) > nat * 1.05:
+            notes.append(
+                f"logo 被放大渲染（原始 {nat:.0f}px 宽 → 渲染 {lg['w']:.0f}px）—— 会糊；"
+                f"换更大的位图，或者直接用 SVG")
+    return problems, notes
+
+
+def _overlap(a: dict, b: dict) -> bool:
+    return not (a["x"] + a["w"] <= b["x"] or b["x"] + b["w"] <= a["x"]
+                or a["y"] + a["h"] <= b["y"] or b["y"] + b["h"] <= a["y"])
+
+
 def style_tokens(spec: dict, override: dict | None = None) -> dict:
     """解析 deck 用哪个风格，取它的 token。
 
@@ -241,6 +299,8 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     data: dict = measure_mod.measure(html_path) if measured is None else measured
     problems.extend(_check_layout(data))
     problems.extend(_check_measured_health(data))
+    brand_problems, _ = _check_brand(data, deck, tokens)
+    problems.extend(brand_problems)
 
     for i, slide in enumerate(deck["slides"], 1):
         declared = slide.get("color")
@@ -313,14 +373,19 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     return problems
 
 
-def advisories(measured: dict) -> list[str]:
+def advisories(measured: dict, spec: dict | None = None,
+               tokens: dict | None = None) -> list[str]:
     """**不阻塞**的提示。
 
     与 `check()` 的分工照仓库既有做法（同 `check_pointers.py` 的 broken / suspect）：
     能确定性判定的才阻塞；启发式的只提示。字体那条是启发式 —— 拿一个一定不存在的
     族当基准比宽度，衬线撞衬线时可能误报，拿它挡交付会把人逼到忽略整个检查。
     """
-    return _check_font_fallback(measured)
+    notes = _check_font_fallback(measured)
+    if spec is not None and tokens is not None:
+        _, brand_notes = _check_brand(measured, spec.get("deck", {}), tokens)
+        notes.extend(brand_notes)
+    return notes
 
 
 def main(argv: list[str]) -> int:
@@ -333,17 +398,18 @@ def main(argv: list[str]) -> int:
     spec = deckio.read_json(args.spec)
     tokens = deckio.read_json(args.tokens) if args.tokens else None
     measured = measure_mod.measure(args.html)      # 只量一次，校验与提示共用
+    tokens = style_tokens(spec, tokens)
     problems = check(spec, args.html, tokens, measured=measured)
     if problems:
         print(f"✗ {len(problems)} 个问题：")
         for p in problems:
             print("  ·", p)
-        for n in advisories(measured):
+        for n in advisories(measured, spec, tokens):
             print("  ·", n)
         return 1
     print("✓ 校验全过（对比度 / 版面越界与裁切 / 错位区间 / 装饰不压文字 / "
-          "图表成比例 / 图表区无错位 / 图片加载 / 页面报错）")
-    for n in advisories(measured):
+          "图表成比例 / 图表区无错位 / 图片加载 / 页面报错 / logo 不压文字）")
+    for n in advisories(measured, spec, tokens):
         print("  ·", n)
     return 0
 

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "label": "ACME 示例品牌",
+  "logo": "logo.svg",
+  "logoInverse": "logo-inverse.svg",
+  "logoOn": "cover+end",
+  "footer": "© 2026 ACME",
+  "note": "演示品牌：只带 logo 与署名，**故意不覆盖色板/字体** —— 这样 demo.spec.json 引它之后，原有的对比度与墨色门禁测的还是风格本身（品牌覆盖那条路另有专门的测试）。两个 logo 都用 SVG 是刻意的：原生 PPTX 需要位图，正好验证 Chrome 栅格化那条路；logoInverse 则验证深底切换（keynote-dark 是纯黑底）。"
+}

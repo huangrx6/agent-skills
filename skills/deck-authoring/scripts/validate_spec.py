@@ -37,7 +37,7 @@ DEFAULT_TOKENS = os.path.join(STYLES_DIR, DEFAULT_STYLE, "style.json")
 
 # 封闭字段集。加字段要同时改这里与 `references/style-architecture.md` ——
 # 这正是设计意图：让"顺手加一个"变得有摩擦。
-DECK_FIELDS = {"colorSet", "seed", "title", "slides", "style"}
+DECK_FIELDS = {"colorSet", "seed", "title", "slides", "style", "brand"}
 SLIDE_FIELDS = {
     "title":         {"type", "title", "subtitle", "color"},
     "content-text":  {"type", "title", "bullets", "color"},

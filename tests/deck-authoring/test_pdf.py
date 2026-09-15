@@ -23,6 +23,7 @@ import json
 import os
 import sys
 import tempfile
+import re
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -69,7 +70,11 @@ class TestPdfExport(unittest.TestCase):
         # （实测踩过：测试绿了，真跑一遍却报“内嵌位图 1”）。
         from PIL import Image
         Image.new("RGB", (64, 48), (200, 40, 90)).save(os.path.join(td, "sample-treated.png"))
-        cls.photos = html.count("<img ")
+        # 只数**位图** <img>：品牌 logo 也是 <img> 但常是 SVG，SVG 在 PDF 里仍是矢量
+        # （数进去会让这条断言恒假 —— 而它要盯的是"除照片外多出来的栅格化图层"）。
+        cls.photos = len(re.findall(r'<img [^>]*src="(?!#|data:image/svg)', html))
+        cls.all_imgs = html.count("<img ")
+        cls.svg_imgs = html.count("data:image/svg+xml")
         # 变异：拿掉 @page 尺寸规则 —— 打印就会退成 Letter，而 --print-to-pdf 照样返回 0
         cls.bad_html = os.path.join(td, "bad.html")
         with open(cls.bad_html, "w", encoding="utf-8") as fh:

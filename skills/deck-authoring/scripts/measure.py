@@ -147,6 +147,10 @@ PROBE_JS = r"""
         scrollH: el.scrollHeight, clientH: el.clientHeight,
         fontSize: parseFloat(cs.fontSize),
         fontFamily: cs.fontFamily,
+        // 图元素的原始像素尺寸：判断“是不是被放大渲染了”（放大 = 糊）。
+        // SVG 也报自己的 viewBox 尺寸（但 SVG 放大不糊，所以那边不看这条）。
+        naturalW: el.naturalWidth || 0,
+        naturalH: el.naturalHeight || 0,
         color: cs.color,
         overflow: cs.overflow,
         visible: cs.visibility !== 'hidden' && cs.display !== 'none' && parseFloat(cs.opacity) > 0

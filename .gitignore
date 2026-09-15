@@ -52,3 +52,6 @@ skills/deck-authoring/deck.gif
 skills/deck-authoring/*.mp4
 skills/deck-authoring/*.gif
 skills/deck-authoring/*.stills/
+# 测试用的临时品牌（test_brand.py 建在真 brands/ 下，用完即删；
+# 这一行是防它跑崩后残留被误提交）
+skills/deck-authoring/brands/zz_test_*/

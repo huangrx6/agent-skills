@@ -41,7 +41,9 @@ EMU_PER_PX = 9525
 SLIDE_H_PX = 900
 
 # 会变成文本框的角色
-TEXT_ROLES = {"title", "subtitle", "bullet", "caption", "foot"}
+# 会变成真文本的角色。**新增一个文本角色就要加到这里** —— 漏了会让下面那条
+# "数量一个不少"的用例把 pptx 里多出来的段落报成失败（实测被 brandfoot 撞过一次）。
+TEXT_ROLES = {"title", "subtitle", "bullet", "caption", "foot", "brandfoot"}
 
 CHART_SLIDE = {
     "type": "chart", "title": "渠道占比", "unit": "%", "caption": "数据可改",
@@ -136,11 +138,17 @@ class TestPptxNative(unittest.TestCase):
     def test_no_whole_slide_picture(self) -> None:
         """整页贴图是贴图版的活 —— 可编辑版里出现整页图就说明退回去了。
 
-        第 1 页（封面）在 demo 里没有 image 角色，所以它不该有任何 `<p:pic>`。
+        判据是**大小**而不是"有没有 <p:pic>"：有品牌 logo 的封面本来就会有图片，
+        而 logo 是个小图。整页贴图才会占满整页 —— 那才是"退回了贴图版"。
         """
         first = self.slides["ppt/slides/slide1.xml"]
-        self.assertNotIn("<p:pic>", first, "封面页里有图片 —— 可编辑版不该有整页贴图")
         self.assertIn("<a:t>", first, "封面页里没有文本 —— 内容去哪了")
+        for cx, cy in re.findall(r'<a:ext cx="(\d+)" cy="(\d+)"/>', first):
+            area = int(cx) * int(cy)
+            slide_area = 12192000 * 6858000          # 13.333in × 7.5in
+            self.assertLess(area / slide_area, 0.5,
+                            f"封面页里有一张占了整页 {area / slide_area:.0%} 的图 —— "
+                            f"可编辑版不该有整页贴图（logo 之类的小图不算）")
 
     def test_image_role_becomes_a_picture(self) -> None:
         """图文页的图要真的放进去（图的**位置**是可改的，内容不是）。"""
@@ -263,7 +271,7 @@ class TestPptxNative(unittest.TestCase):
     def test_skipped_elements_are_counted_not_hidden(self) -> None:
         """量不到几何、或图不在旁边时**跳过并计数**，不猜一个位置静静画上去。"""
         want = (self.counts["text"] + self.counts["decor"] + self.counts["chart"]
-                + self.counts["image"] + self.counts["skipped"])
+                + self.counts["image"] + self.counts["logo"] + self.counts["skipped"])
         self.assertEqual(want, len(self.manifest) + self.counts["decor"],
                          "统计对不上：有元素既没进 pptx 也没被记成跳过")
 

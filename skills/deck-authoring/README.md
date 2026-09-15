@@ -30,6 +30,7 @@ python3 scripts/shots.py out.html --out-dir pages/ --count 6        # 8) 截图�
 python3 scripts/make_pptx.py --png-dir pages/ -o deck.pptx          # 9) 出 PPTX（贴图，观感 100%）
 python3 scripts/pptx_native.py out.html -o deck-editable.pptx       # 10) 出 PPTX（原生，能改字）
 python3 scripts/animate.py out.html -o deck.mp4                     # 11) 出视频（另有 GIF）
+python3 scripts/brand.py                                             # 12) 看有哪些品牌
 ```
 
 第 11 步不需要 ffmpeg：取帧走 Chrome DevTools Protocol（一次启动截几百帧，比一帧一个
@@ -44,17 +45,19 @@ python3 scripts/animate.py out.html -o deck.mp4                     # 11) 出视
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 81 条
+python3 -m unittest discover -s tests/deck-authoring -v     # 99 条
 ```
 
-钉住十四项不变量：同 spec + 同种子字节一致（带随机区间的风格；确定性风格本就与 seed 无关）、
+钉住十五项不变量：同 spec + 同种子字节一致（带随机区间的风格；确定性风格本就与 seed 无关）、
 色板门禁 + 两墨乘叠印的数学、校验的变异验证（每项都造违规样例）、半调墨覆盖率随灰度单调、
 缓存命中后仍过色板三角不变量、外壳行为（真开浏览器按键翻页 + letterbox 缩放比贴边不溢）、
 PDF 是矢量且页数/页尺寸对、可编辑 PPTX 的**字是真字**且坐标是页内坐标、
 字体提示不报废话、**每种风格的装饰落点与它声明的 `decor.types` 一致**、SKILL.md 的版式表与
 `render.py` 实测行为一致、规格字段集真的封闭（坐标/字号/色值必须被指名报出）、
 **同一个 t 两次独立浏览器会话取到的帧逐字节一致**（且不同 t 必须真的不同 —— 否则上一条
-会假绿）、渲染路径上没混进 CSS `transition`。
+会假绿）、渲染路径上没混进 CSS `transition`、
+**品牌资产**（优先级：品牌赢色板/字体/logo、风格赢版面；logo 内嵌且清单里给的是
+技能相对路径；`cover+end` 指的是 end 版式那页而不是数组最后一页；logo 压文字会挡）。
 
 ## 依赖
 
@@ -91,11 +94,12 @@ PDF 是矢量且页数/页尺寸对、可编辑 PPTX 的**字是真字**且坐�
 skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是这棵树的这部分
 ├── SKILL.md                 # 给模型看的触发条件 + 流程
 ├── README.md                # 给"想跑一下"的人看的
-├── scripts/                 # 流水线十三件（另有 1 个 Swift 编码器）
+├── scripts/                 # 流水线十四件（另有 1 个 Swift 编码器）
 │   ├── validate_spec.py     # 输入层校验：字段集封闭（坐标/字号/色值直接判失败）
 │   ├── ink.py               # 墨色推导 + 三色板门禁（唯一消费者）
 │   ├── plate.py             # 图片 → duotone + 半调（制版）
 │   ├── image_source.py      # 缓存 / 生图 / 几何色块拼贴
+│   ├── brand.py             # 品牌资产：logo 内嵌 / 色板与字体合并 / SVG 栅格化
 │   ├── render.py            # deck-spec.json → HTML（语义骨架 + 风格 skin + 演示壳 + 运动引擎）
 │   ├── measure.py           # 实测层：真浏览器量真盒子（不估算）
 │   ├── check.py             # 校验：越界/裁切/对比度/图表/图片/报错
@@ -113,14 +117,17 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── swiss-grid/           # 瑞士栅格：白底 + 编号列表 + 左轨 + 巨号页码（安静·冷）
 │   ├── billboard/            # 大字报：巨号数字 + 通栏色条 + 色场（大胆·亮）
 │   └── notebook/             # 笔记本：横格纸 + 红边线 + 侧边索引签（中性·暖）
+├── brands/                   # 品牌资产：一个品牌 = 一个目录，不碰 .py
+│   └── example/              #   示例品牌（logo 正版 + 反白版 + 署名）
 ├── dev-tools/
-│   └── demo.spec.json       # 一份能跑的样例
+│   └── demo.spec.json       # 一份能跑的样例（已引用 example 品牌）
 ├── evals/evals.json         # 行为评估用例
 └── references/
     ├── style-architecture.md    # 多风格 seam、字段集
     ├── validation.md            # 校验的口径（阻塞 vs 提示）
     ├── delivery-formats.md      # HTML / PDF / PNG / PPTX / MP4 的取舍
-    └── animation.md             # 运动设计、取帧的确定性、视频导出
+    ├── animation.md            # 运动设计、取帧的确定性、视频导出
+    └── brand-assets.md         # 品牌资产协议：第三层、优先级、logo 与署名
 tests/deck-authoring/           # 测试住在仓库顶层（不在 skill 目录里）
 ├── test_ink.py
 ├── test_determinism.py
@@ -133,7 +140,8 @@ tests/deck-authoring/           # 测试住在仓库顶层（不在 skill 目录
 ├── test_pdf.py
 ├── test_pptx_native.py
 ├── test_font_advisory.py
-└── test_animation.py
+├── test_animation.py
+└── test_brand.py
 ```
 
 测试**刻意不放在 skill 目录里** —— AI 调用 skill 时读的是 `skills/deck-authoring/`

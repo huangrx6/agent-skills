@@ -229,7 +229,19 @@ html,body{margin:0;background:var(--viewer)}
 .chartwrap{margin-top:44px;width:1180px;padding:34px 38px;position:relative}
 .chartwrap svg{position:relative;display:block;width:100%}
 .end{position:absolute;left:84px;top:330px}
-.foot{position:absolute;left:84px;bottom:52px}
+/* 页脚一行：页脚 + 品牌署名同在左下这一带。
+   不用 space-between 把署名推到右边 —— 那样它会压在巨号页码上（三套风格都把右下
+   给了页码）。所以是 flex-start + 间隔，页脚与署名并排。 */
+.footrow{position:absolute;left:84px;right:84px;bottom:52px;display:flex;
+  justify-content:flex-start;align-items:baseline;gap:28px}
+.foot,.brandfoot{position:static}
+/* 品牌 logo：位置在壳里给一个**能在四套风格都站住**的缺省（右上），某个风格需要
+   另说就自己覆盖那一条 —— 与 .foot 同机制。
+   约束**高度**而不是宽度：logo 多是横长条，锁高度才能让宽高比自然展开
+   （给宽会有的被拉横、有的被压扁）。 */
+.brandlogo{position:absolute;right:84px;top:58px;height:56px;width:auto}
+.brandfoot{font:400 var(--s-foot, 20px)/1 var(--body);color:var(--text);opacity:0.42;
+  letter-spacing:0.04em}
 """
 
 
@@ -552,12 +564,34 @@ def _grain_svg(tokens: dict) -> str:
 
 
 ink_module = _load_sibling("ink")  # 叠印与对比度只有一处定义，不重抄
+brand_module = _load_sibling("brand")
+
+
+def _apply_brand(style: dict, brand: dict) -> dict:
+    """把品牌资产并进风格 token。
+
+    在 `_head` 之前合并，后续全部环节（CSS 变量注入 / 语义清单 / 导出）自然看到
+    品牌后的值 —— 不需要在十个地方各判断一次“是风格还是品牌”。
+
+    优先级见 brand.py 模块头：**品牌赢在“是谁”（色板 / 字体 / logo），
+    风格赢在“怎么表达”（版面 / 构图 / 运动）**。
+    """
+    if not brand:
+        return style
+    tokens = dict(style["tokens"])
+    tokens["fonts"] = brand_module.merge_fonts(tokens["fonts"], brand)
+    tokens["colorSets"] = brand_module.merge_color_sets(tokens["colorSets"], brand)
+    merged = dict(style)
+    merged["tokens"] = tokens
+    return merged
 
 
 def render(deck_spec: dict, style: dict | None = None) -> str:
     """渲染。`style=None` 时按 `deck.style`（缺省 swiss-grid）从 styles/ 加载。"""
     deck = deck_spec["deck"]
     style = style or load_style(deck.get("style", DEFAULT_STYLE))
+    brand = brand_module.load(deck.get("brand"))
+    style = _apply_brand(style, brand)
     tokens = style["tokens"]
     tier = tokens["type"]
     seed = deck.get("seed", 1)
@@ -570,6 +604,24 @@ def render(deck_spec: dict, style: dict | None = None) -> str:
         """登记一条并返回 `data-m` 属性串。"""
         man.append(_entry(mid, slide_no, role, text, size, **extra))
         return f'data-m="{mid}"'
+
+    total = len(deck["slides"])
+    # 尾页 = **end 版式那一页**，不是数组最后一页。常见 deck 里两者重合（谢谢页收尾），
+    # 但附件页跟在后面也很常见 —— 那时该上 logo 的是谢谢页，不是附件页。
+    # 没有 end 页的 deck 就退回最后一页（那才是它的“尾页”）。
+    end_slide = total
+    for k, s in enumerate(deck["slides"], 1):
+        if s.get("type") == "end":
+            end_slide = k
+            break
+    # 品牌 logo 选哪个文件要**看纸色**（深底上用反白版）—— 纸色是每套 colorSet 定死的，
+    # 所以整份 deck 只算一次。colorSet 名字对不上时不在这里报错：_head 会报得更好
+    # （它会列出可用值），这里拿个安全的缺省继续走。
+    cs_name = deck.get("colorSet") or next(iter(tokens["colorSets"]), "")
+    paper = tokens["colorSets"].get(cs_name, {}).get("background", "#FFFFFF")
+    logo_file = brand_module.logo_file(brand, paper)
+    logo_uri = brand_module.logo_data_uri(brand, logo_file)
+    logo_ref = brand_module.logo_ref(brand, logo_file)
 
     def title_html(text: str, mid_attr: str) -> str:
         """标题：**单层**。`data-text` 留给 skin 想做叠加装饰时用（attr() 取）。"""
@@ -678,10 +730,30 @@ def render(deck_spec: dict, style: dict | None = None) -> str:
             raise SystemExit(f"✗ 未知版式 type={kind!r}（支持 title / content-text / "
                              f"content-image / two-column / timeline / chart / end）")
         out.append("</div>")
+        # 页脚一行：**页脚与品牌署名同处一个 flex 行**。
+        #
+        # 为什么不是各自绝对定位在左右两头：测完才发现的 —— 四套风格里有三套把
+        # 右下角给了巨号页码（`.slide::after{content:attr(data-idx)}`），署名放右下
+        # 就直接压在页码上（抽帧图里看得很清楚）。页脚那一带（左下）四套风格都是空的，
+        # 而且“文档元信息”本来就该在一块儿。
         foot_text = f'{deck.get("title", "")} / {i:02d}'
+        out.append('<div class="footrow">')
         out.append(f'<div class="foot" style="--s-foot:{tier["foot"]}px" '
                    f'{tag(f"s{i}.foot", i, "foot", foot_text, tier["foot"])}>'
                    f'{html.escape(foot_text)}</div>')
+        if brand.get("footer"):
+            bf = str(brand["footer"])
+            out.append(f'<div class="brandfoot" style="--s-foot:{tier["foot"]}px" '
+                       f'{tag(f"s{i}.brandfoot", i, "brandfoot", bf, tier["foot"])}>'
+                       f'{html.escape(bf)}</div>')
+        out.append('</div>')
+        # 品牌 logo。**没品牌就不渲染这个元素** —— 不是渲染一个空占位。
+        # src 是 base64 内嵌（产物自己完整，挪到哪都不裂）；清单里给的却是
+        # **技能相对**路径（导出脚本据此找原图）—— 所以标了 src_base，让导出端知道
+        # 该往哪儿解析（`image` 字段那种相对 HTML 的解析在这里是错的）。
+        if logo_uri and brand_module.shows_logo(brand, kind, i, end_slide):
+            out.append(f'<img class="brandlogo" src="{logo_uri}" alt="" '
+                       f'{tag(f"s{i}.logo", i, "logo", logo_ref, None, src_base="skill")}>')
         out.append('<div class="grain"></div>')
         out.append("</section>")
 
@@ -689,8 +761,10 @@ def render(deck_spec: dict, style: dict | None = None) -> str:
     payload = json.dumps(man, ensure_ascii=True, separators=(",", ":")).replace("<", "\\u003c")
     out.append(f'<script type="application/json" id="__deck_manifest">{payload}</script>')
     # 时间轴与运动参数也随产物走：JS 引擎不自己算时间轴（那是 render.py 的职责，
-    # animate.py 还要拿它去分配帧）。ensure_ascii 保持产物是纯 ASCII，
-    # 免得编码问题在“另存/转发”环节冒出来。
+    # animate.py 还要拿它去分配帧）。
+    # ensure_ascii 只针对**这两个内嵌 JSON 载荷**（正文里的中文当然是 UTF-8 原文）——
+    # 载荷走 \uXXXX 转义，是为了它在任何转存/重编码环节都不会被改坏。
+    # （早先这里写成“保持产物是纯 ASCII”，不实：`<title>` 与正文本来就是 UTF-8。）
     spans = timeline(deck, tokens)
     motion = {k: v for k, v in tokens["motion"].items() if k != "note"}
     out.append("<script>window.__deck_timeline="
@@ -700,7 +774,6 @@ def render(deck_spec: dict, style: dict | None = None) -> str:
                + ";</script>")
     # 壳：页码 / 快捷键提示 / 翻页脚本。**不给它们打 data-m** ——
     # 它们是壳不是内容，进了清单就会污染“清单条数 == 实测元素数”那条不变量。
-    total = len(deck["slides"])
     out.append(f'<div class="hud"><span id="__deck_page">1 / {total}</span></div>')
     out.append('<div class="hint">← → 翻页 · F 全屏 · P 演示/滚动</div>')
     out.append(f"<script>{SHELL_JS}</script>")

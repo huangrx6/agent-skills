@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="100" viewBox="0 0 420 100" role="img" aria-label="ACME">
+  <!-- 反白版：给深底用（keynote-dark 的黑底、billboard/ink 的 #0A0A0A）。
+       与正版形状完全一致，只换明暗关系 —— 品牌手册里的 logo 从来都是成对的。 -->
+  <rect x="0" y="18" width="64" height="64" fill="#FFFFFF"/>
+  <path d="M8 74 L32 26 L56 74 Z" fill="#0F172A"/>
+  <rect x="8" y="74" width="48" height="8" fill="#4D8BFF"/>
+  <text x="84" y="70" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="56" font-weight="700" letter-spacing="-1.5" fill="#FFFFFF">ACME</text>
+</svg>

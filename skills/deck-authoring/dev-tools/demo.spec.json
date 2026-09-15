@@ -1,6 +1,7 @@
 {
   "deck": {
     "style": "swiss-grid",
+    "brand": "example",
     "colorSet": "blue",
     "seed": 11,
     "title": "2026 产品复盘",
