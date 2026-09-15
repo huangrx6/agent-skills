@@ -312,6 +312,19 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None) -> dict:
 # 字段顺序就是优先级顺序，不要调换。
 PROMPT_ORDER = ("主体", "场景", "构图", "镜头", "光线", "色彩", "风格", "细节", "文字", "限制")
 
+# **默认不发**的可选字段。规则 6：镜头参数"只有当镜头信息能明显改善画面时才加入"。
+# 而"这张图需不需要镜头感"是工具判断不了的 —— 给了默认值，它就永远躺在那儿，
+# 等于把"每次都加"当了默认，正好违反规则。所以默认**整行不出现**，需要的人自己插。
+OPTIONAL_FIELDS = ("镜头",)
+LENS_HINT = {
+    "zh": "**要镜头感就自己插一行**，位置在【构图】和【光线】之间，例如："
+          "「平视、85mm、浅景深、对焦主体」/「俯拍、广角、大景深、透视强」/「特写、微距」。"
+          "不写不等于没有镜头，只是这个判断留给看图的人 —— 工具不知道你这张图需不需要它。",
+    "en": "Add a lens line yourself only if it improves the image, between "
+          "Composition and Lighting — e.g. 'eye-level, 85mm, shallow depth of field, "
+          "focus on the subject'.",
+}
+
 # 工具**不知道**、必须由人填的三栏。留空比编一个更负责 —— 规则 7：
 # "用户未提供且会影响事实准确性的内容，不得擅自补充"。
 FILL = {
@@ -387,7 +400,6 @@ def _field_values(slot: dict, brief: dict, lang: str) -> list[tuple[str, str]]:
             "**一个**主体，占画面 60~70%；轮廓干净、主体与背景分离明确；背景干净不杂。"
             "这张图**独立成栏**，说明文字排在它旁边的另一栏、**不压在图上** —— "
             "所以不要在图内为文字留白。")
-        lens = "（可选，不需要就删掉这一行）平视、浅景深、对焦主体"
         colour = (f"主色 {primary}、辅色 {secondary}、纸色 {paper}；{mood['色彩'][0]}。"
                   f"色系控制在 1~3 个；最终只保留两墨，**靠明暗层次而不靠色相**")
         # 风格那一栏只留"可执行的视觉语言"本身。第一版写了
@@ -408,8 +420,6 @@ def _field_values(slot: dict, brief: dict, lang: str) -> list[tuple[str, str]]:
             "subject/background separation, uncluttered background. This photo "
             "stands alone — its caption sits in a SEPARATE column beside it, never "
             "overlaid, so do NOT reserve space inside the frame for text.")
-        lens = "(optional — delete this line if it does not improve the image) " \
-               "eye-level, shallow depth of field, focus on the subject"
         colour = (f"primary {primary}, secondary {secondary}, paper {paper}; "
                   f"{mood['色彩'][1]}. Keep to 1-3 colour families. It ends up as two "
                   f"inks, so it must read by TONAL RANGE, not by hue")
@@ -430,7 +440,6 @@ def _field_values(slot: dict, brief: dict, lang: str) -> list[tuple[str, str]]:
         ("主体", FILL["主体"][lang]),
         ("场景", FILL["场景"][lang]),
         ("构图", composition),
-        ("镜头", lens),
         ("光线", mood["光线"][0 if zh else 1]),
         ("色彩", colour),
         ("风格", style),
@@ -480,9 +489,13 @@ def write_brief_md(brief: dict, out_path: str) -> str:
         "主体 → 场景 → 构图 → 镜头 → 光线 → 色彩 → 风格 → 细节 → 文字 → 限制",
         "```",
         "",
-        "先「画什么」（主体 / 场景），再「怎么画」（构图 / 镜头 / 光线 / 色彩 / 风格），",
+        "先「画什么」（主体 / 场景），再「怎么画」（构图 / 光线 / 色彩 / 风格），",
         "最后是「绝对不能错」（文字 / 限制）。**别把顺序打乱**——堆成一段会让"
         "「不要细密纹理」这种约束把「主体是什么」淹掉，而主体最优先。",
+        "",
+        "**「镜头」默认不出现**：镜头参数只有在能明显改善画面时才该加，而工具判断不了"
+        "你这张图需不需要它 —— 给了默认值就等于每次都加。要加就自己插一行，位置在"
+        "【构图】与【光线】之间。",
         "",
         "打架的时候按这个优先级裁决（左边赢）：",
         "",
@@ -536,6 +549,8 @@ def write_brief_md(brief: dict, out_path: str) -> str:
             "```text",
             render_prompt(s, brief, "en"),
             "```",
+            "",
+            f"📷 {LENS_HINT['zh']}",
             "",
             "**参数**（用 API 参数传，**不要写进 prompt**）",
             "",

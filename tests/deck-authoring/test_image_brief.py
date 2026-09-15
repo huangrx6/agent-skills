@@ -90,20 +90,37 @@ class TestBrief(unittest.TestCase):
         self.assertIn("English prompt", self.md)
 
     def test_fields_appear_in_the_mandated_order(self) -> None:
-        """十个字段**必须按序**出现：主体 → 场景 → 构图 → 镜头 → 光线 → 色彩 → 风格 → 细节 → 文字 → 限制。
+        """出现的字段**必须按序**：主体 → 场景 → 构图 → (镜头) → 光线 → 色彩 → 风格 → 细节 → 文字 → 限制。
 
         顺序本身就是"先明白画什么、再明白怎么画"。堆成一段的写法会让
         「不要细密纹理」这种约束把「主体是什么」淹掉 —— 而主体最优先。
         """
-        for lang, _name in (("zh", "中文提示词"), ("en", "English prompt")):
+        for lang in ("zh", "en"):
             with self.subTest(lang=lang):
                 block = self._prompt_block(lang)
                 positions = []
                 for field in image_source.PROMPT_ORDER:
+                    if field in image_source.OPTIONAL_FIELDS:
+                        continue
                     self.assertIn(f"【{field}】", block, f"{lang} 缺字段「{field}」")
                     positions.append(block.index(f"【{field}】"))
                 self.assertEqual(positions, sorted(positions),
                                  f"{lang} 的字段顺序乱了：{positions}")
+
+    def test_lens_line_is_absent_by_default(self) -> None:
+        """**只在需要时加** —— 所以默认整行不出现。
+
+        给一个"安全默认值"看起来无害，但它意味着**每次都加**，正好违反
+        "只有当镜头信息能明显改善画面时才加入"。工具判断不了这张图需不需要镜头感，
+        就把判断权交回给看图的人。
+        """
+        for lang in ("zh", "en"):
+            with self.subTest(lang=lang):
+                self.assertNotIn("【镜头】", self._prompt_block(lang))
+        # 但要告诉人怎么加、加在哪
+        self.assertIn("镜头", self.md)
+        self.assertIn("在【构图】和【光线】之间", self.md)
+        self.assertIn("LENS", self.md) if "LENS" in self.md else None
 
     def test_api_params_are_not_written_into_the_prompt(self) -> None:
         """**回归**：尺寸 / 比例 / 数量不能出现在提示词正文里。
