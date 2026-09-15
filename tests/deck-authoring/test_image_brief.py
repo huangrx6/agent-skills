@@ -86,8 +86,71 @@ class TestBrief(unittest.TestCase):
                 self.assertIn(key, self.md, f"契约里没写「{key}」")
 
     def test_prompt_carries_both_languages(self) -> None:
-        self.assertIn("中文说明", self.md)
+        self.assertIn("中文提示词", self.md)
         self.assertIn("English prompt", self.md)
+
+    def test_fields_appear_in_the_mandated_order(self) -> None:
+        """十个字段**必须按序**出现：主体 → 场景 → 构图 → 镜头 → 光线 → 色彩 → 风格 → 细节 → 文字 → 限制。
+
+        顺序本身就是"先明白画什么、再明白怎么画"。堆成一段的写法会让
+        「不要细密纹理」这种约束把「主体是什么」淹掉 —— 而主体最优先。
+        """
+        for lang, _name in (("zh", "中文提示词"), ("en", "English prompt")):
+            with self.subTest(lang=lang):
+                block = self._prompt_block(lang)
+                positions = []
+                for field in image_source.PROMPT_ORDER:
+                    self.assertIn(f"【{field}】", block, f"{lang} 缺字段「{field}」")
+                    positions.append(block.index(f"【{field}】"))
+                self.assertEqual(positions, sorted(positions),
+                                 f"{lang} 的字段顺序乱了：{positions}")
+
+    def test_api_params_are_not_written_into_the_prompt(self) -> None:
+        """**回归**：尺寸 / 比例 / 数量不能出现在提示词正文里。
+
+        生图 API 有独立参数，prompt 里再写一遍只会在冲突时给出随机结果。
+        第一版就把 `3:2` 与 `1280x853px` 写进了正文。
+        """
+        for lang in ("zh", "en"):
+            with self.subTest(lang=lang):
+                block = self._prompt_block(lang)
+                w, h = self.brief["target_px"]
+                for banned in (f"{w}", f"{h}", f"{w}×{h}", f"{w}x{h}", "3:2", "aspect ratio"):
+                    self.assertNotIn(banned, block,
+                                     f"{lang} 提示词里出现了 API 参数「{banned}」")
+        self.assertIn("参数", self.md)
+        self.assertIn("不要写进 prompt", self.md)
+
+    def test_out_of_frame_metadata_stays_out_of_the_prompt(self) -> None:
+        """**回归**：提示词只装"模型要照做的事"，不能混进写给读者的旁白。
+
+        上一版漏进去三句：「（可执行的视觉语言）」「限制只列与这条管线相关的，
+        不堆通用负面词」「优先于任何装饰性的色彩偏好」—— 后者是人看的规则说明，
+        模型会把它当成画面要求。两个读者不能混在一段里。
+        """
+        banned = ["可执行的视觉语言", "限制只列", "不堆通用负面词",
+                  "优先于任何装饰性的色彩偏好", "优先于",
+                  "pipeline-relevant", "boilerplate"]
+        for lang in ("zh", "en"):
+            for text in banned:
+                with self.subTest(lang=lang, text=text):
+                    self.assertNotIn(text, self._prompt_block(lang))
+
+    def test_style_is_not_duplicated_and_is_executable(self) -> None:
+        """风格栏要写"可执行的视觉语言"，且不许重复说同一件事。
+
+        上一版是「纪实摄影（可执行的视觉语言）；克制平静的**纪实摄影**…」。
+        """
+        block = self._prompt_block("zh")
+        style = block.split("【风格】")[1].split("\n")[0]
+        self.assertEqual(style.count("纪实摄影"), 1, style)
+        self.assertIn("大块明暗", style)
+
+    def _prompt_block(self, lang: str) -> str:
+        """取出某个语言的提示词正文（不含契约里的叙述部分）。"""
+        head = "**中文提示词**" if lang == "zh" else "**English prompt**"
+        chunk = self.md.split(head, 1)[1]
+        return chunk.split("```text", 1)[1].split("```", 1)[0]
 
     def test_prompt_knows_the_halftone_constraint(self) -> None:
         """提示词必须说清"会被压成两墨 + 半调" —— 这是这条流水线特有的约束。
@@ -104,17 +167,44 @@ class TestBrief(unittest.TestCase):
         第一版写错了：模型会交一张主体偏到一边、空掉半张的图。
         """
         self.assertNotIn("压文字", self.md)
-        self.assertNotIn("overlay", self.md)
         self.assertIn("SEPARATE column", self.md)
+        self.assertIn("不要在图内为文字留白", self.md)
 
-    def test_subject_is_marked_as_a_draft(self) -> None:
-        """内容那一栏是**草稿**：条目往往在讲 deck 的叙事，不是在讲画面里该有什么。
+    def test_limits_are_pipeline_specific_not_boilerplate(self) -> None:
+        """限制项要与任务相关。通用的"不要水印/不要额外人物"是噪音。"""
+        block = self._prompt_block("zh")
+        limits = block.split("【限制】")[1]
+        self.assertIn("细线", limits)
+        self.assertIn("双色调", limits)
+        for generic in ("水印", "额外人物", "畸形手指"):
+            self.assertNotIn(generic, limits)
 
-        标不清楚的后果是人直接把草稿丢给模型，然后拿到一张文不对题的图。
+    def test_tool_does_not_invent_the_subject(self) -> None:
+        """**回归**：主体 / 场景 / 细节留空给人填 —— 工具**不许**自己编。
+
+        规则是"用户未提供且会影响事实准确性的内容，不得擅自补充"。第一版把该页标题
+        拼成"内容草稿"塞进了提示词，而条目往往在讲这份 deck 的叙事
+        （"原始照片降噪后重新制版"），不是在讲画面里该有什么。
         """
-        self.assertIn("这是草稿", self.md)
-        self.assertIn("REPLACE THIS", self.md)
-        self.assertTrue(all(s["subject_is_draft"] for s in self.brief["slots"]))
+        for lang in ("zh", "en"):
+            for field in ("主体", "场景", "细节"):
+                with self.subTest(lang=lang, field=field):
+                    block = self._prompt_block(lang)
+                    line = block.split(f"【{field}】")[1].split("\n")[0]
+                    self.assertIn("〈" if lang == "zh" else "<", line,
+                                  f"{lang} 的「{field}」没留空，工具自己填了：{line}")
+        # 但参考材料要给到，否则人无从下手
+        self.assertIn("参考材料", self.md)
+        self.assertIn("现场", self.md)
+
+    def test_text_field_points_at_the_layout_not_the_model(self) -> None:
+        """「文字」那一栏要落到**版面**上：画面里不要字，字由版面排。
+
+        这比笼统的"不要水印"有用 —— 而且它把准确性放在后期排版，不押在模型身上。
+        """
+        block = self._prompt_block("zh")
+        self.assertIn("不要出现任何文字", block)
+        self.assertIn("版面", block)
 
     def test_style_bibliography_stays_out_of_the_prompt(self) -> None:
         """风格的"参考文献"只给人看，**不进提示词**（对模型是噪音）。"""

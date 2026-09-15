@@ -233,6 +233,10 @@ def _slot_geometry(spec_path: str, style: str | None, out_dir: str,
             "bullets": slide.get("bullets", []),
             "file": str(slide["image"]),
             "box": box[0] if box else None,
+            # 说明文字与版式类型：提示词的「文字」那一栏要用它们说清
+            # "画面里不要有字，字由版面排"——这比笼统的负面词有用。
+            "caption": slide.get("caption", ""),
+            "type": slide.get("type", ""),
         }
     return (info, style_name)
 
@@ -262,9 +266,12 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None) -> dict:
             "file": s["file"], "pages": [], "titles": [], "bullets": [],
             "target_px": [w, h], "aspect": _aspect_box(*BRIEF_ASPECT), "alpha": False,
             "measured": f"实测槽位 {box['w']:.0f}×{box['h']:.0f}px" if box else "",
-            # ⚠️ 内容只是**草稿**：条目往往在讲这份 deck 的叙事，而不是在讲"照片里该有什么"。
-            # 工具只能读到文字，读不到你脑子里的画面 —— 所以这一栏必须由人改写。
-            "subject": s["title"], "subject_is_draft": True,
+            # 「主体 / 场景 / 细节」三栏**故意留空**，交给填的人。
+            # 第一版把该页标题当"内容草稿"塞进提示词 —— 那是**擅自补充事实**：
+            # 条目往往在讲这份 deck 的叙事（"把现场图处理成两色…"），不是在讲画什么。
+            # 规则是"用户未提供且会影响事实准确性的内容不得擅自补充"，所以这里只给
+            # **参考材料**（标题/条目/说明文字），不进提示词。
+            "caption": s.get("caption", ""), "layout": s.get("type", ""),
         })
         entry["pages"].append(page)
         entry["titles"].append(s["title"])
@@ -278,143 +285,264 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None) -> dict:
     return brief
 
 
-# 气质 → 该给模型的**视觉后果**。不写风格文献（Massimo Vignelli / 某本杂志那种）：
-# 对读文档的人是背景，对生图模型是噪音 —— 它不知道该把"Vignelli"画成什么样。
-# 这里只给能画出来的东西：光、对比、饱和、材质。
-MOOD_CUES = {
-    "大胆": "dramatic high-contrast lighting, bold simple forms, deep shadows, "
-            "confident graphic silhouette",
-    "安静": "even neutral daylight, restrained and calm, low drama, clean "
-            "uncluttered composition, muted tones",
-    "中性": "natural balanced light, everyday documentary feel, honest and plain",
+# ═══════════════════════════════════════════════════════════════════════════
+# 提示词：按**固定字段顺序**组装，不是把属性堆成一段
+#
+#        主体 → 场景 → 构图 → 镜头 → 光线 → 色彩 → 风格 → 细节 → 文字 → 限制
+#
+# 顺序本身就是信息：先让模型明白「画什么」（主体 / 场景），再明白「怎么画」
+# （构图 / 镜头 / 光线 / 色彩 / 风格），最后是「绝对不能错」（文字 / 限制）。
+# 堆成一段会让"不要细密纹理"这类约束把"主体是什么"淹没 —— 而主体最优先。
+#
+# 据此改掉的三个第一版错法：
+#   · 把"气质"写成一句"观感" → 光和风格混在同一行。现在**拆进各自字段**：
+#     光线只讲光源/方向/质感，风格只讲可执行的视觉语言（规则 8 / 10）。
+#   · 把尺寸与比例写进 prompt 正文 → API 有独立参数的东西写进去只会打架。
+#     现在它们只出现在「参数」栏，明写"不要写进 prompt"（规则 14）。
+#   · 负面词是一堆通用 boilerplate（水印 / 界面截图 / 不要额外人物）→ 限制项
+#     必须与任务相关。现在只留**与这条管线有关**的：双色调 + 半调会毁掉的那些
+#     （规则 13）。
+#
+# 冲突时的优先级（规则 12）：用户明确要求 > 主体准确性 > 文字与品牌准确性 >
+# 构图 > 场景 > 光线 > 风格 > 装饰细节。**低优先级的不得破坏高优先级的** ——
+# 这条在本流水线里真的有冲突点：风格的强色相（低优先级）不许破坏
+# "双色调能活下来"（构图/细节级），见「风格」那一栏的写法。
+# ═══════════════════════════════════════════════════════════════════════════
+
+# 字段顺序就是优先级顺序，不要调换。
+PROMPT_ORDER = ("主体", "场景", "构图", "镜头", "光线", "色彩", "风格", "细节", "文字", "限制")
+
+# 工具**不知道**、必须由人填的三栏。留空比编一个更负责 —— 规则 7：
+# "用户未提供且会影响事实准确性的内容，不得擅自补充"。
+FILL = {
+    "主体": {
+        "zh": "〈写：是什么、几个、主要特征。别写「好看 / 高级 / 漂亮」这类词〉",
+        "en": "<what it is / how many / key features. No vague words like "
+              "'beautiful', 'premium', 'stunning'>",
+    },
+    "场景": {
+        "zh": "〈写：地点 + 环境氛围（室内/室外、时间、天气）。背景元素要服务于主体〉",
+        "en": "<where + atmosphere (indoor/outdoor, time of day, weather). "
+              "Background elements must serve the subject>",
+    },
+    "细节": {
+        "zh": "〈可选：材质与质感。产品写金属/玻璃/皮革，场景写地面/墙面/环境细节〉",
+        "en": "<optional: materials and texture — metal / glass / leather for "
+              "products, ground / wall / environment detail for scenes>",
+    },
+}
+
+# 气质 → **拆进三个不同字段**。不写风格文献（Massimo Vignelli 那种）：对读文档的人
+# 是背景，对生图模型是噪音 —— 它不知道该把"Vignelli"画成什么样。
+MOOD = {
+    "大胆": {
+        "光线": ("戏剧性高对比、方向明确的**单**光源，阴影深而实",
+                 "dramatic high-contrast single directional light, deep solid shadows"),
+        "色彩": ("高饱和、以深色为主，明暗反差大",
+                 "highly saturated, dark-dominant, strong tonal contrast"),
+        "风格": ("海报式的强对比，形体简洁有力",
+                 "poster-like high contrast, bold simple forms"),
+    },
+    "安静": {
+        "光线": ("均匀柔和的中性日光，没有强烈方向性",
+                 "even soft neutral daylight, no strong directionality"),
+        "色彩": ("低饱和、色调偏灰，近似单色",
+                 "desaturated, greyish, near-monochrome"),
+        "风格": ("克制平静、画面干净不杂",
+                 "restrained, calm, clean and uncluttered"),
+    },
+    "中性": {
+        "光线": ("自然均衡、方向柔和的日常光",
+                 "natural balanced everyday light with soft direction"),
+        "色彩": ("自然中性色，不额外引入色相",
+                 "natural neutral tones, no added hue"),
+        "风格": ("诚实朴素", "plain and honest"),
+    },
 }
 
 
-# 同样三档的中文说法。中文提示里夹一句英文观感很出戏（实测：中文段里冒出
-# "even neutral daylight, restrained and calm"），而且给中文模型看也没帮助。
-MOOD_CUES_ZH = {
-    "大胆": "戏剧性的高对比光、形体简洁有力、阴影深、轮廓像海报一样肯定",
-    "安静": "均匀中性的日光、克制平静、不戏剧化、画面干净不杂、色调偏灰",
-    "中性": "自然均衡的光、日常纪实感、朴素不修饰",
-}
-
-
-def _mood(temperature: str) -> str:
-    return _pick(MOOD_CUES, temperature)
-
-
-def _mood_zh(temperature: str) -> str:
-    return _pick(MOOD_CUES_ZH, temperature)
-
-
-def _pick(table: dict, temperature: str) -> str:
-    for key, cue in table.items():
+def _mood_row(temperature: str) -> dict:
+    for key, row in MOOD.items():
         if key in (temperature or ""):
-            return cue
-    return table["中性"]
+            return row
+    return MOOD["中性"]
 
 
-def _prompt_en(slot: dict, brief: dict) -> str:
-    """交给生图模型的那段。**按管线约束写**，不是通用套话。
+def _field_values(slot: dict, brief: dict, lang: str) -> list[tuple[str, str]]:
+    """按 PROMPT_ORDER 逐栏给出内容 —— 工具知道的事实，或留给人的空。
 
-    约束都来自这条流水线的事实：图会被压成两个墨色 + 半调网点（见 plate.py）。
-    所以"细密纹理、细线、渐变、图里的文字"全都是坑 —— 它们在双色调里糊成一团。
-    这类话不写进去，模型会给你一张很漂亮但制完版就废掉的图。
+    每一栏只讲它该讲的事：构图不谈光线、光线不谈风格。这是"描述顺序统一"能成立的
+    前提；混着写的话顺序就名存实亡了。
     """
+    zh = lang == "zh"
     palette = brief["colors"]
-    return (
-        f"Editorial photograph for a slide deck, {brief['aspect']} aspect ratio, "
-        f"{brief['target_px'][0]}x{brief['target_px'][1]}px.\n"
-        f"Subject: {slot['subject']} — REPLACE THIS with what the photo should "
-        f"actually show (auto-drafted from the slide title).\n"
-        f"Look: {_mood(brief['temperature'])}.\n"
-        # ⚠️ 不写"给文字留压字空间"：我们的版式里文字是**独立一栏**（左文右图），
-        # 不是压在图上。写错了会让模型交一张主体偏到一边、空掉半张的图（第一版就写错了）。
-        "Composition: ONE clear subject filling 60-70% of the frame, strong simple "
-        "silhouette, clear separation between subject and background, shallow depth "
-        "of field, clean uncluttered background. The photo stands on its own — "
-        "text sits in a SEPARATE column beside it, never on top.\n"
-        "Lighting: single directional light source, high contrast between light and "
-        "shadow, deliberate shadows.\n"
-        f"IMPORTANT — this image will be reduced to TWO INKS and printed as a "
-        f"halftone (duotone {palette['primary']} / {palette['secondary']} on "
-        f"{palette['background']}). It must still read clearly after that "
-        f"reduction: rely on LARGE tonal masses and strong shapes, not on color "
-        f"or fine detail.\n"
-        "Avoid: text, letters, numbers, watermarks, logos, UI screenshots, thin "
-        "lines, fine mesh or woven textures, busy repeating patterns, subtle "
-        "gradients, low-contrast flat lighting, cluttered backgrounds, more than "
-        "one focal subject."
-    )
+    mood = _mood_row(brief["temperature"])
+    primary = palette["primary"]
+    secondary = palette["secondary"]
+    paper = palette["background"]
+    caption = slot.get("caption") or ""
+
+    if zh:
+        composition = (
+            "**一个**主体，占画面 60~70%；轮廓干净、主体与背景分离明确；背景干净不杂。"
+            "这张图**独立成栏**，说明文字排在它旁边的另一栏、**不压在图上** —— "
+            "所以不要在图内为文字留白。")
+        lens = "（可选，不需要就删掉这一行）平视、浅景深、对焦主体"
+        colour = (f"主色 {primary}、辅色 {secondary}、纸色 {paper}；{mood['色彩'][0]}。"
+                  f"色系控制在 1~3 个；最终只保留两墨，**靠明暗层次而不靠色相**")
+        # 风格那一栏只留"可执行的视觉语言"本身。第一版写了
+        # "（可执行的视觉语言）"和"优先于任何装饰性的色彩偏好"—— 那是**给读者的
+        # 规则说明**，模型会把它当成画面要求，属于把两个读者混在一起。
+        style = (f"纪实摄影；{mood['风格'][0]}；靠**大块明暗和强形状**立住"
+                 f"（双色调下只有这些能活下来）")
+        text = ("画面里**不要出现任何文字、字母或数字**，也不要画任何 logo —— "
+                "说明文字与品牌标识都由版面另行排 / 叠")
+        if caption:
+            text += f"（这一页的说明文字是「{caption}」，它是**排出来的**，不是画出来的）"
+        limits = ("不要：细线、细密网格或织物纹理、柔和渐变、低对比平光"
+                  "（这四样在双色调 + 半调下会糊成一团）；不要多个并列主体或重复主体；"
+                  "不要结构变形、过曝、裁切主体")
+    else:
+        composition = (
+            "ONE subject filling 60-70% of the frame; clean silhouette, clear "
+            "subject/background separation, uncluttered background. This photo "
+            "stands alone — its caption sits in a SEPARATE column beside it, never "
+            "overlaid, so do NOT reserve space inside the frame for text.")
+        lens = "(optional — delete this line if it does not improve the image) " \
+               "eye-level, shallow depth of field, focus on the subject"
+        colour = (f"primary {primary}, secondary {secondary}, paper {paper}; "
+                  f"{mood['色彩'][1]}. Keep to 1-3 colour families. It ends up as two "
+                  f"inks, so it must read by TONAL RANGE, not by hue")
+        style = (f"documentary photography; {mood['风格'][1]}; it must hold on large "
+                 f"tonal masses and strong shapes (the only things that survive a "
+                 f"duotone)")
+        text = ("No text, letters or numbers inside the image, and do not draw any "
+                "logo — captions and brand marks are placed by the layout")
+        if caption:
+            text += f" (this page's caption is \u300c{caption}\u300d \u2014 it is composed, " \
+                    f"not drawn)"
+        limits = ("Avoid: thin lines, fine mesh or woven texture, subtle gradients, "
+                  "low-contrast flat light (all four mud up under duotone + halftone); "
+                  "multiple competing or duplicated subjects; structural distortion, "
+                  "blown highlights, a cropped-off subject")
+
+    return [
+        ("主体", FILL["主体"][lang]),
+        ("场景", FILL["场景"][lang]),
+        ("构图", composition),
+        ("镜头", lens),
+        ("光线", mood["光线"][0 if zh else 1]),
+        ("色彩", colour),
+        ("风格", style),
+        ("细节", FILL["细节"][lang]),
+        ("文字", text),
+        ("限制", limits),
+    ]
 
 
-def _prompt_zh(slot: dict, brief: dict) -> str:
-    return (
-        f"给幻灯片用的纪实摄影，画面比例 {brief['aspect']}，目标 {brief['target_px'][0]}"
-        f"×{brief['target_px'][1]} 像素。\n"
-        f"内容：{slot['subject']}。← **这一句务必改成你真正要的画面**\n"
-        f"观感：{_mood_zh(brief['temperature'])}。\n"
-        f"构图：**一个**主体，占画面 60~70%；轮廓干净简单；主体与背景分离明确；"
-        f"浅景深、背景干净不杂。"
-        f"（图是**独立**的，文字在旁边的另一栏，不压在图上。）\n"
-        f"光线：单一方向光源，明暗对比强，有明确的阴影。\n"
-        f"⚠️ 这张图会被压成**两个墨色 + 半调网点**（{brief['colors']['primary']} / "
-        f"{brief['colors']['secondary']} 印在 {brief['colors']['background']} 上）。"
-        f"所以它必须靠**大块的明暗和强形状**立住，不能靠颜色或细节。\n"
-        f"避免：文字/字母/数字/水印/logo、界面截图、细线、细密网格或织物纹理、"
-        f"繁复重复的图案、柔和渐变、低对比的平光、杂乱的背景、多个并列主体。"
-    )
+def render_prompt(slot: dict, brief: dict, lang: str = "zh") -> str:
+    """带字段名的提示词。字段名本身携带顺序与优先级信息，模型读得懂 ——
+    比把同样的内容写成一段不分层的话更可控。"""
+    lines = []
+    for name, value in _field_values(slot, brief, lang):
+        lines.append(f"【{name}】{value}")
+    return "\n".join(lines)
+
+
+def api_params(brief: dict) -> list[str]:
+    """**不进提示词**的那些 —— API 有独立参数，写进 prompt 只会和参数打架。
+
+    规则 14。这里把它们单列出来，并明写"不要写进 prompt"，否则填的人会顺手
+    把尺寸抄回正文里，然后模型既收到参数又收到文字描述，两者冲突时就是随机结果。
+    """
+    w, h = brief["target_px"]
+    return [
+        f"尺寸 {w}×{h}px",
+        f"比例 {brief['aspect']}",
+        "数量 1 张",
+        "不需要透明通道（整张不透明照片）",
+        "质量 / seed 随意 —— 这张图是外部素材，不参与 deck 的确定性渲染",
+    ]
 
 
 def write_brief_md(brief: dict, out_path: str) -> str:
+    """契约文档：工具知道的事实 + 给模型的提示词 + 参数栏 + 由人填的空。"""
     lines = [
         "# 图片提示词契约",
         "",
         f"风格 **{brief['style_label']}**（{brief['temperature']}）· 参考 {brief['reference']}",
         "",
-        f"**统一规格**：`{brief['target_px'][0]}×{brief['target_px'][1]}px`，"
-        f"比例 {brief['aspect']}，**不需要透明通道**（会是整张不透明照片）。",
-        f"倍率取 2x 是因为导出 PNG 时也是 2x（投影与打印都不糊）。",
+        "## 提示词怎么读",
         "",
-        "**出完图存到哪**：与产物（`out.html`）**同一个目录**，文件名逐张见下。",
-        "相对路径的产物挪个目录就会全员裂图（这是已知限制）—— 所以要同目录交付。",
+        "每条提示词按**固定字段顺序**给，这个顺序就是优先级：",
         "",
-        "> ⚠️ **这些图会被压成两个墨色 + 半调网点**（见 `plate.py`）。所以靠"
-        "**大块明暗和强形状**立住的图能活下来，靠颜色/细密纹理/细线的图会糊成一团。"
-        "下面的负面清单就是按这条写的，不是通用套话。",
+        "```text",
+        "主体 → 场景 → 构图 → 镜头 → 光线 → 色彩 → 风格 → 细节 → 文字 → 限制",
+        "```",
+        "",
+        "先「画什么」（主体 / 场景），再「怎么画」（构图 / 镜头 / 光线 / 色彩 / 风格），",
+        "最后是「绝对不能错」（文字 / 限制）。**别把顺序打乱**——堆成一段会让"
+        "「不要细密纹理」这种约束把「主体是什么」淹掉，而主体最优先。",
+        "",
+        "打架的时候按这个优先级裁决（左边赢）：",
+        "",
+        "```text",
+        "你的明确要求 > 主体准确 > 文字与品牌准确 > 构图 > 场景 > 光线 > 风格 > 装饰细节",
+        "```",
+        "",
+        "**工具能填的已经填好，剩下的 〈…〉 得你来填**：「主体 / 场景 / 细节」这三栏"
+        "工具读不到（它只看得见 spec 里的文字）——你写什么就是什么，它不会替你编。"
+        "填完把 〈…〉 换掉、按需删掉标了（可选）的行，就是一条可直接发送的完整提示词。",
+        "",
+        "**尺寸 / 比例 / 数量这些不要写进提示词**：生图 API 有独立参数，"
+        "prompt 里再写一遍只会和参数打架。它们单列在每张图的「参数」栏。",
+        "",
+        "**这些图会被压成两个墨色 + 半调网点**（见 `plate.py`）——这是为什么提示词里"
+        "反复强调「靠大块明暗和强形状」：靠颜色、细密纹理、细线立住的图会糊成一团。"
+        "「限制」栏里只列与这条管线相关的项，没有通用负面词堆砌。",
+        "",
+        "**出完图存到哪**：与产物（`out.html`）**同一个目录**，文件名逐张见下"
+        "（相对路径的产物挪个目录就会全员裂图，所以要同目录交付）。",
         "",
         "---",
         "",
     ]
     for s in brief["slots"]:
+        used = "、".join("第 %d 页" % p for p in s["pages"])
         lines += [
-            f"## {'、'.join('第 %d 页' % p for p in s['pages'])} · "
-            f"{' / '.join(s['titles'])}",
+            f"## {used} · {' / '.join(s['titles'])}",
             "",
-            f"- **文件名**：`{s['file']}`（存到产物同目录，用在 "
-            f"{'、'.join('第 %d 页' % p for p in s['pages'])}）"
+            f"- **文件名**：`{s['file']}`（存到产物同目录，用在 {used}）"
             f"{'；' + s['measured'] if s['measured'] else ''}",
-            f"- **尺寸**：{s['target_px'][0]}×{s['target_px'][1]}px，比例 {s['aspect']}",
-            f"- **透明通道**：不需要（不透明照片即可）",
-            f"- **会被制版处理**：双色调 + 半调网点 + 不引入色板外的色相",
+            f"- **用途**：配图（版式 `{s['layout'] or 'content-image'}`）"
+            f"{'；说明文字「' + s['caption'] + '」由版面排，**别画进图里**' if s['caption'] else ''}",
+            "- **会被制版处理**：双色调 + 半调网点 + 不引入色板外的色相",
             "",
-            f"- **内容**：`{s['subject']}` —— ⚠️ **这是草稿**：从该页标题自动取的，"
-            f"而条目的文字往往在讲这份 deck 的叙事、不是在讲照片里该有什么。"
-            f"**请自己改写这一句** —— 工具读不到你脑子里的画面。",
+            "**工具读得到的参考材料**（是**文字**，不是画面 —— 只帮你回忆这一页在讲什么；"
+            "「主体 / 场景 / 细节」仍然要你填）",
             "",
-            "**中文说明**",
+            f"- 标题：{s['titles'][0]}",
+            f"- 条目：{'；'.join(s['bullets'][:4]) or '（这一页没有条目）'}"
+            if s["bullets"] else "- 条目：（无）",
             "",
-            "```text",
-            _prompt_zh(s, brief),
-            "```",
-            "",
-            "**English prompt（多数模型对英文更稳）**",
+            "**中文提示词** —— 把 〈…〉 换成你的内容，可直接发送",
             "",
             "```text",
-            _prompt_en(s, brief),
+            render_prompt(s, brief, "zh"),
             "```",
+            "",
+            "**English prompt**（多数模型对英文更稳）",
+            "",
+            "```text",
+            render_prompt(s, brief, "en"),
+            "```",
+            "",
+            "**参数**（用 API 参数传，**不要写进 prompt**）",
             "",
         ]
+        for item in api_params(brief):
+            lines.append(f"- {item}")
+        lines.append("")
     lines += [
         "---",
         "",
