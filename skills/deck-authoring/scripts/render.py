@@ -598,7 +598,7 @@ SHELL_JS = """
         it.parts.bars.forEach(function(b){ b.el.style.scale=''; b.el.style.transformBox='';
           b.el.style.transformOrigin=''; });
         it.parts.lines.forEach(function(l){ l.el.style.strokeDashoffset=''; });
-        it.parts.dots.forEach(function(d){ d.style.scale=''; d.el.style.transformBox='';
+        it.parts.dots.forEach(function(d){ d.style.scale=''; d.style.transformBox='';
           d.style.transformOrigin=''; });
       }
     }); });

@@ -192,6 +192,12 @@ def compile_spec(deck_spec: dict, style: dict | None = None,
                                          f"{entry.get('source', '未标')}）",
                                          "assetId 是语义引用，路径只在 resolved 里出现；"
                                          "缺文件由 check 的「图片加载」门实测拦"]})
+        # ── Chart：intent → 图形类型（§19 v2，与渲染同源的纯函数）────────
+        if kind == "chart":
+            ctype, why = _load_sibling("chart").infer_chart_type(slide)
+            trace.append({"stage": "chart", "slide": i,
+                          "decision": f"chart:{ctype}", "reason": [why]})
+
         variant = slide.get("variant")
         if variant == "auto":
             # auto：吃 fit --recommend 的实测分数（同内容同图，可复现）。

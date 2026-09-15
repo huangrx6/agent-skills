@@ -48,14 +48,15 @@ python3 scripts/chart.py --explain spec.json   # 每张图为什么用那个图�
 
 ## 意图树（规范第 3/16 条）：图表不是"选样式"，是"判意图"
 
-映射是**确定性的**，不交给 AI 随便选：
+映射不是 1:1 死表 —— `resolve_type` 按数据形状分支（条数/标签是否像
+时间），每步带理由，`--explain` 与 compile 的 Decision Trace 同源：
 
 | 意图 | 图形 | | 意图 | 图形 |
 | --- | --- | --- | --- | --- |
 | trend 趋势 | line / area | | correlation 相关 | scatter |
-| ranking 排名 | bar-horizontal | | progress 进度 | donut（中心放达成率） |
+| ranking 排名 | bar-horizontal | | progress 进度 | bar-horizontal（温度计：位置即进度） |
 | comparison 比较 | bar | | deviation 偏差 | bar（第一版） |
-| composition 组成 | donut / bar-stacked | | distribution 分布 | bar（第一版） |
+| composition 组成 | donut（≤5 条）/ 排序横条（>5） | | distribution 分布 | bar（离散桶）/ line（时间桶） |
 
 没写 `chart` 也没写 `intent` 时按**数据形状**推：多系列 → line；单系列且标签像时间
 （Q1/月份/年份）→ line；否则 bar。理由会写进 `--explain` —— "为什么是这张图"本身

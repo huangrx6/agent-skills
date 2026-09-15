@@ -32,10 +32,14 @@ G2 渲染器，把这层换成 `g2.js` 生成器即可，DSL 与 PPT 层都不�
 | trend 趋势 | line / area | 时间横向展开 |
 | ranking 排名 | bar-horizontal | 大的排上面 |
 | comparison 比较 | bar | |
-| composition 组成 | bar-stacked（≤5 份）/ donut | |
+| composition 组成 | donut（≤5 份）/ 排序横条（>5） | 切片多了角度差读不出，比长度比角度准 |
 | correlation 相关 | scatter | |
-| progress 进度 | donut | 中心放达成率 |
-| deviation / distribution | bar（第一版） | 直方图/瀑布是第二阶段 |
+| progress 进度 | bar-horizontal | 横条温度计：条的位置就是"到哪了"；donut 读不出位置 |
+| deviation 偏差 | bar | 从基线的正负柱 |
+| distribution 分布 | bar（离散桶）/ line（时间桶） | 直方图语义；桶是时间时走向更重要 |
+
+映射不是 1:1 死表 —— `resolve_type` 按数据形状（条目数 / 标签是否像时间）
+分支，每步带理由，`--explain` 与 compile 的 Decision Trace 同源。
 
 没写 `chart` 也没写 `intent` 时，按**数据形状**推：多系列 → line；单系列且标签
 像时间（Q1/月份/年份）→ line；否则 bar。推出来的会在 `--explain` 里说明理由。
@@ -93,17 +97,6 @@ CHART_TYPES = ("bar", "bar-horizontal", "line", "area", "bar-stacked", "donut",
 INTENTS = ("trend", "ranking", "comparison", "composition", "correlation",
            "progress", "deviation", "distribution")
 
-INTENT_TO_TYPE = {
-    "trend": "line",
-    "ranking": "bar-horizontal",
-    "comparison": "bar",
-    "composition": "donut",
-    "correlation": "scatter",
-    "progress": "donut",
-    "deviation": "bar",
-    "distribution": "bar",
-}
-
 # 意图的中文名（报错与人读的提示里用）
 INTENT_ZH = {
     "trend": "趋势", "ranking": "排名", "comparison": "比较",
@@ -122,6 +115,42 @@ def looks_temporal(labels: list) -> bool:
     return bool(labels) and sum(1 for x in labels if _TIME_LABEL.match(str(x))) >= max(1, len(labels) // 2)
 
 
+def resolve_type(intent: str, slide: dict) -> tuple[str, list[str]]:
+    """intent + 数据形状 → 图形类型（§19 Chart Resolver v2）。
+
+    旧的 1:1 死表（composition 一律 donut / progress 一律 donut）在可视化
+    语义上太粗：donut 的角度差在切片多时读不出来；progress 用 donut 既占
+    地方又读不出"到哪了"。这里按数据形状走，每步带理由 —— `--explain`
+    与 compile 的 Decision Trace 同源（规范：Resolver 决策可追踪）。
+    """
+    data = slide.get("data") or []
+    n = len(data)
+    labels = [d.get("label", "") for d in data]
+    if intent == "composition":
+        if n > 5:
+            return ("bar-horizontal",
+                    [f"{n} 条切片超出 donut 的可读上限（5）→ 排序横条",
+                     "比长度比比角度准（Cleveland & McGill 1984）；渲染器大的在上"])
+        return ("donut", [f"{n} 条切片 ≤5 → donut（少量切片的角度差可读）"])
+    if intent == "progress":
+        return ("bar-horizontal",
+                ["进度 → 横条温度计：条的位置就是「到哪了」，donut 读不出位置",
+                 "达成率/目标值走 annotations 与 caption，不占图形本体"])
+    if intent == "distribution":
+        if looks_temporal(labels):
+            return ("line", ["分布的桶是时间 → line：走向比逐桶高低更该被看见"])
+        return ("bar", ["分布的桶是离散类别 → bar（直方图语义）"])
+    one_to_one = {
+        "trend": ("line", "时间横向展开"),
+        "ranking": ("bar-horizontal", "大的排上面"),
+        "comparison": ("bar", "类别并排比高度"),
+        "correlation": ("scatter", "两变量逐点，看聚合形状"),
+        "deviation": ("bar", "从基线的正负柱，离 0 的距离就是偏差"),
+    }
+    ctype, why = one_to_one[intent]
+    return ctype, [f"{INTENT_ZH[intent]}语义 → {ctype}：{why}"]
+
+
 def infer_chart_type(slide: dict) -> tuple[str, str]:
     """决定这一页用什么图形。返回 (chart 类型, 理由)。
 
@@ -137,7 +166,9 @@ def infer_chart_type(slide: dict) -> tuple[str, str]:
     if intent:
         if intent not in INTENTS:
             raise SystemExit(f"✗ intent={intent!r} 不认识（{list(INTENTS)}）")
-        return INTENT_TO_TYPE[intent], f"intent={intent}（{INTENT_ZH[intent]}）映射"
+        ctype, reasons = resolve_type(intent, slide)
+        return ctype, (f"intent={intent}（{INTENT_ZH[intent]}）→ {ctype}："
+                       + "；".join(reasons))
     # ⚠️ 什么都不写时**缺省是 bar** —— 与历史行为一致，不悄悄改观感。
     #
     # 第一版在这里按数据形状推：标签像时间就给 line。实测后果：压测 deck 的

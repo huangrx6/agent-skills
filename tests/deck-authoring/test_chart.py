@@ -64,12 +64,51 @@ class TestIntentTree(unittest.TestCase):
         self.assertEqual(chart.infer_chart_type({"chart": "donut"})[0], "donut")
 
     def test_intent_maps_deterministically(self) -> None:
+        """1:1 的意图稳定映射（数据形状无关的那五个）。"""
         cases = {"trend": "line", "ranking": "bar-horizontal", "comparison": "bar",
-                 "composition": "donut", "correlation": "scatter", "progress": "donut",
-                 "deviation": "bar", "distribution": "bar"}
+                 "correlation": "scatter", "deviation": "bar"}
         for intent, want in cases.items():
             with self.subTest(intent=intent):
-                self.assertEqual(chart.infer_chart_type({"intent": intent})[0], want)
+                ctype, why = chart.infer_chart_type({"intent": intent})
+                self.assertEqual(ctype, want)
+                self.assertIn("→", why, "理由里没写类型推导")
+
+    def test_composition_splits_by_slice_count(self) -> None:
+        """组成：≤5 条 donut（角度差可读），>5 条排序横条（比长度比角度准）。"""
+        few = {"intent": "composition", "data": [
+            {"label": f"g{i}", "value": v} for i, v in enumerate([40, 30, 20, 10], 1)]}
+        many = {"intent": "composition", "data": [
+            {"label": f"g{i}", "value": v}
+            for i, v in enumerate([32, 24, 14, 9, 7, 5, 3], 1)]}
+        self.assertEqual(chart.resolve_type("composition", few)[0], "donut")
+        ctype, reasons = chart.resolve_type("composition", many)
+        self.assertEqual(ctype, "bar-horizontal")
+        self.assertTrue(any("可读上限" in r for r in reasons))
+
+    def test_progress_leaves_donut(self) -> None:
+        """进度不再用 donut：横条温度计，条的位置就是「到哪了」。"""
+        ctype, reasons = chart.resolve_type("progress", {
+            "data": [{"label": "Q4", "value": 72}]})
+        self.assertEqual(ctype, "bar-horizontal")
+        self.assertTrue(any("温度计" in r for r in reasons))
+
+    def test_distribution_splits_by_temporal_labels(self) -> None:
+        """分布：桶是时间 → line（走向优先），离散类别 → bar（直方图语义）。"""
+        temporal = {"intent": "distribution", "data": [
+            {"label": l, "value": v}
+            for l, v in (("Q1", 8), ("Q2", 12), ("Q3", 19), ("Q4", 26))]}
+        discrete = {"intent": "distribution", "data": [
+            {"label": l, "value": v}
+            for l, v in (("0-10 岁", 8), ("11-20 岁", 12), ("21-30 岁", 19))]}
+        self.assertEqual(chart.resolve_type("distribution", temporal)[0], "line")
+        self.assertEqual(chart.resolve_type("distribution", discrete)[0], "bar")
+
+    def test_resolve_reasons_always_present(self) -> None:
+        """每条决策都带理由 —— Resolver 决策可追踪（§26 同款纪律）。"""
+        for intent in chart.INTENTS:
+            _ctype, reasons = chart.resolve_type(
+                intent, {"data": [{"label": "a", "value": 1}]})
+            self.assertTrue(reasons, f"{intent} 的决策没有理由")
 
     def test_undeclared_defaults_to_bar_not_line(self) -> None:
         """**回归**：什么都不写时缺省 bar，与历史一致 —— 不悄悄改观感。

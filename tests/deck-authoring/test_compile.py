@@ -174,6 +174,17 @@ class TestDecisionTrace(unittest.TestCase):
         resolved = compile_mod.compile_spec(_demo())
         self.assertFalse(any(t["stage"] == "layout" for t in resolved["trace"]))
 
+    def test_chart_type_decision_is_traced(self) -> None:
+        """图表页的 intent→type 决策进 trace（§19 v2，与渲染同源的纯函数）。"""
+        spec = _demo()
+        spec["deck"]["slides"] = [
+            {"type": "chart", "title": "季度达成", "intent": "progress",
+             "data": [{"label": "Q4", "value": 72}]}]
+        resolved = compile_mod.compile_spec(spec)
+        entry = next(t for t in resolved["trace"] if t["stage"] == "chart")
+        self.assertEqual(entry["decision"], "chart:bar-horizontal")
+        self.assertIn("温度计", "".join(entry["reason"]))
+
     def test_brand_merge_is_traced(self) -> None:
         resolved = compile_mod.compile_spec(_demo())       # demo 引 example 品牌
         self.assertTrue(any(t["decision"].startswith("brand:") for t in resolved["trace"]))
