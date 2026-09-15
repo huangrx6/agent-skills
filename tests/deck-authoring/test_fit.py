@@ -484,6 +484,31 @@ class TestHeroScoring(unittest.TestCase):
         self.assertEqual(two, 1.0)
         self.assertEqual(many, 0.2)
 
+    def test_hierarchy_score_rewards_dominance(self) -> None:
+        """层级分（1−归一化熵）：标题主导的页面高于"一页全是重点"。"""
+        dominant = [("title", 0.9, "t"), ("bullet", 0.3, "b1"), ("bullet", 0.2, "b2")]
+        flat = [("title", 0.4, "t"), ("bullet", 0.4, "b1"), ("bullet", 0.4, "b2")]
+        d = fit._hierarchy_score(dominant)
+        f = fit._hierarchy_score(flat)
+        self.assertGreater(d, f, "标题主导居然不比全平分高")
+        self.assertGreater(d, 0.4, "健康层级页被熵尺压扁了 —— 标定失效")
+        self.assertEqual(fit._hierarchy_score(None), 0.5)
+
+    def test_focal_score_scales_with_gap(self) -> None:
+        """焦点分：领先幅度够 MIN_FOCAL_GAP 为满分，一半就一半。"""
+        strong = [("title", 1.0, "t"), ("bullet", 0.3, "b")]
+        weak = [("title", 1.0, "t"), ("bullet", 0.9, "b")]
+        self.assertEqual(fit._focal_score(strong), 1.0)
+        self.assertLess(fit._focal_score(weak), 1.0)
+        self.assertEqual(fit._focal_score(None), 0.5)
+
+    def test_balance_score_peaks_at_center(self) -> None:
+        """平衡分：墨心在版心中线满分，贴边归零。"""
+        center = fit.render.SLIDE_W / 2
+        self.assertEqual(fit._balance_score([(1.0, center)]), 1.0)
+        self.assertEqual(fit._balance_score([(1.0, 0.0)]), 0.0)
+        self.assertEqual(fit._balance_score(None), 0.5)
+
     def test_text_page_still_gets_crowding_penalty(self) -> None:
         """同一数字 93%：文字主导页照吃拥挤惩罚 —— role-aware 不是放水。"""
         _s, _p, pens = fit.score_candidate(

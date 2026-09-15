@@ -223,6 +223,29 @@ def weights(measured: dict, slide_no: int) -> list[tuple[str, float, str]]:
     return sorted(out, key=lambda x: -x[1])
 
 
+def ink_centers(measured: dict, slide_no: int) -> list[tuple[float, float]]:
+    """(墨迹面积, 墨心 x) 列表 —— 供左右平衡类评分用。
+
+    与 `weights` 同一套墨迹口径（textW 截断、数字缺失跳过、不抛）—— 平衡
+    不要在别处再发明一遍"什么算墨"。
+    """
+    out: list[tuple[float, float]] = []
+    for el in measured.get("elements", []):
+        if el.get("slide") != slide_no:
+            continue
+        w, h = el.get("w"), el.get("h")
+        x = el.get("x")
+        if (not isinstance(w, (int, float)) or not isinstance(h, (int, float))
+                or not isinstance(x, (int, float))):
+            continue
+        ink_w = w
+        text_w = el.get("textW")
+        if isinstance(text_w, (int, float)) and text_w > 0:
+            ink_w = min(text_w, w)
+        out.append((ink_w * h, x + w / 2))
+    return out
+
+
 def focal_issues(measured: dict, deck: dict) -> list[str]:
     """一页应当有**一个**明显的第一焦点（规范第 8 条）。提示级。"""
     out: list[str] = []

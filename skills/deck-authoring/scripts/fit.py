@@ -58,6 +58,7 @@ def _load_sibling(name: str):
 deckio = _load_sibling("deckio")
 render = _load_sibling("render")
 measure_mod = _load_sibling("measure")
+hierarchy_mod = _load_sibling("hierarchy")   # 层级/焦点/平衡：同一份测量，不另立口径
 
 # 正文带（与壳里的几何一致）—— 去 render.py 拿，不在这里重拄一份：
 # 两份几何常量对同一张图，只会对出一个错的前提。
@@ -69,10 +70,12 @@ DEAD_SPACE = 0.55          # 内容高度不足正文带的这个比例 → 半�
 # 规则侧完整公式：Fit .20 + Hierarchy .15 + Whitespace .15 + FocalClarity .15
 #   + Balance .10 + SemanticFit .10 + StyleMatch .075 + DeckRhythm .075
 #   − 惩罚（Overflow / SmallFont / Crowding / Repetition / FocalConflict / Cards）。
-# 本工具现在**量得到**的维度：Fit / Whitespace / SemanticFit + 拥挤与最小字号
-# 两项惩罚；其余维度未接入（要等 Layout Variant 候选并测 —— 同一份测量服务
-# 多个候选时，Hierarchy/Focal/Balance 才有输入），report 里如实标注。
-SCORE_WEIGHTS = {"fit": 0.20, "whitespace": 0.15, "semantic": 0.10}
+# 本工具量得到的维度：Fit / Whitespace / SemanticFit / **Hierarchy / Focal /
+# Balance**（后三维从 hierarchy.weights 与 ink_centers 的实测来 —— Design
+# Search 的评分器开始"会看"候选，不只是量密度）。StyleMatch / Rhythm 仍未
+# 接入（要风格模型与跨页序列），report 里如实标注。
+SCORE_WEIGHTS = {"fit": 0.20, "whitespace": 0.15, "semantic": 0.10,
+                 "hierarchy": 0.15, "focal": 0.15, "balance": 0.10}
 CROWDING_ABOVE = 0.85      # 占正文带超过这个比例 → 拥挤惩罚
 CROWDING_PENALTY = 0.10
 SMALLFONT_PENALTY = 0.10
@@ -115,13 +118,58 @@ def _semantic_score(kind: str, content: dict) -> float:
     return 1.0 if n <= 4 else (0.5 if n <= 5 else 0.2)
 
 
+def _hierarchy_score(el_weights: list | None) -> float:
+    """层级分（实测）：权重分布的尖度 = 1 − 归一化熵。
+
+    标题主导的页面熵低 → 分高；"一页全是重点"熵顶满 → 分低（规范第 8 条：
+    一页只允许一个主要 Takeaway 的可测代理）。
+    """
+    import math
+    ws = [w for _r, w, _t in (el_weights or []) if w > 0]
+    if len(ws) < 2:
+        return 0.5                      # 没什么可排的：不给奖也不罚
+    total = sum(ws)
+    ps = [w / total for w in ws]
+    entropy = -sum(p * math.log(p) for p in ps)
+    concentration = max(0.0, min(1.0, 1.0 - entropy / math.log(len(ps))))
+    # 熵尺对 3+ 个元素天然压缩（健康页 ≈0.19、极端主导 ≈0.64）—— sqrt 展宽
+    # 量程（健康 ≈0.43、主导 ≈0.80、全平 0），顺序不变、区分力与其它维度相当。
+    return round(concentration ** 0.5, 3)
+
+
+def _focal_score(el_weights: list | None) -> float:
+    """焦点分（实测）：第一名领先第二名多少 —— 复用 focal_issues 的判据
+    （MIN_FOCAL_GAP 够阈值为 1.0），同一把尺子，只是从"报不报"变"打几分"。"""
+    ws = sorted((w for _r, w, _t in (el_weights or []) if w > 0), reverse=True)
+    if len(ws) < 2:
+        return 0.5
+    gap = (ws[0] - ws[1]) / ws[0]
+    return round(min(1.0, gap / hierarchy_mod.MIN_FOCAL_GAP), 3)
+
+
+def _balance_score(ink_cx: list | None) -> float:
+    """平衡分（实测）：墨量加权的左右重心离版心中线的相对距离。"""
+    pairs = ink_cx or []
+    total = sum(w for w, _cx in pairs)
+    if total <= 0:
+        return 0.5
+    center = render.SLIDE_W / 2
+    cx = sum(w * x for w, x in pairs) / total
+    return round(max(0.0, 1.0 - abs(cx - center) / center), 3)
+
+
 def score_candidate(c: dict, content: dict) -> tuple[float, dict, list[str]]:
     """一个候选的多目标得分（0~0.45 满分基准）+ 分项 + 惩罚名。纯函数。"""
     is_hero = c["kind"].split(":")[-1] == "hero"
     parts = {"fit": 1.0 if c["fits"] else 0.0,
              "whitespace": round(
                  (_hero_whitespace if is_hero else _whitespace_score)(c["density"]), 3),
-             "semantic": round(_semantic_score(c["kind"], content), 3)}
+             "semantic": round(_semantic_score(c["kind"], content), 3),
+             # 三维实测分：el_weights / ink_cx 由 analyze/recommend 从测量里带
+             # 进候选；没有就 0.5（中性）—— 纯函数路径（合成候选）不崩。
+             "hierarchy": _hierarchy_score(c.get("el_weights")),
+             "focal": _focal_score(c.get("el_weights")),
+             "balance": _balance_score(c.get("ink_cx"))}
     score = sum(parts[k] * SCORE_WEIGHTS[k] for k in SCORE_WEIGHTS)
     penalties: list[str] = []
     if not is_hero and c["density"] > CROWDING_ABOVE:
@@ -252,6 +300,9 @@ def analyze(measured: dict, labels: dict, content: dict) -> dict:
                     capped.add(meta["kind"])
             continue
         candidates.append({"kind": meta["kind"], "bottom": round(bottom, 1),
+                           # 实测三维的输入随候选走（同一份测量，report 保持纯函数）
+                           "el_weights": hierarchy_mod.weights(measured, no),
+                           "ink_cx": hierarchy_mod.ink_centers(measured, no),
                            "fits": overflow <= 0,
                            # `overflow` 是“**溢出**量”：装得下时是 0，不是负数。
                            # 有余多少是 `density` 的事 —— 一个名叫 overflow 的字段
@@ -287,13 +338,15 @@ def report(result: dict, content: dict, style: str, brand: str | None) -> str:
         scored = sorted(((*score_candidate(c, content), c) for c in fits),
                         key=lambda t: t[0], reverse=True)
         (score, parts, penalties, best) = scored[0]
-        why = f"留白 {parts['whitespace']:.2f} · 语义 {parts['semantic']:.2f}"
+        why = (f"留白 {parts['whitespace']:.2f} · 语义 {parts['semantic']:.2f} ·"
+               f" 层级 {parts['hierarchy']:.2f} · 焦点 {parts['focal']:.2f} ·"
+               f" 平衡 {parts['balance']:.2f}")
         extra = f"；惩罚：{'、'.join(penalties)}" if penalties else ""
         out.append(f"  建议：用 {best['kind']}（candidate score {score:.2f} ——"
                    f" {why}{extra}；占正文带 {best['density']:.0%}）。")
-        out.append("  （已接入维度：Fit .20 + 留白 .15 + 语义 .10 − 拥挤/最小字号"
-                   "惩罚；Hierarchy/Focal/Balance/StyleMatch/Rhythm 未接入 ——"
-                   " 等 Layout Variant 候选并测）")
+        out.append("  （已接入维度：Fit .20 + 留白 .15 + 语义 .10 + 层级 .15 +"
+                   " 焦点 .15 + 平衡 .10（三维为 hierarchy 实测）− 拥挤/最小字号"
+                   "惩罚；StyleMatch/Rhythm 未接入 —— 需风格模型与跨页序列）")
         if all(c["density"] < DEAD_SPACE for c in fits):
             out.append(f"  注意：所有版式都不到 {DEAD_SPACE:.0%}（都偏稀）。"
                        f"稀不是错误 —— 留白是构图，**不要为填满页面加内容**"
@@ -376,7 +429,9 @@ def recommend(measured: dict, labels: dict, spec: dict) -> list[dict]:
         _b, overflow, density = _measure_row(measured, no)
         variant = meta["kind"].split(":")[1]
         by_page.setdefault(meta["page"], []).append(
-            (variant, {"fits": overflow <= 0, "density": round(density, 3)}))
+            (variant, {"fits": overflow <= 0, "density": round(density, 3),
+                       "el_weights": hierarchy_mod.weights(measured, no),
+                       "ink_cx": hierarchy_mod.ink_centers(measured, no)}))
     out: list[dict] = []
     for page_no, rows in sorted(by_page.items()):
         content = slides[page_no - 1] if page_no <= len(slides) else {}
