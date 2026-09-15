@@ -25,7 +25,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # `skills/<skill>/` 那棵树，测试放在里面会被顺手读进去）。
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "styles", "risograph", "style.json")
+TOKENS = os.path.join(SKILL, "styles", "swiss-grid", "style.json")
 
 
 def _load(name: str, path: str):
@@ -68,16 +68,23 @@ class TestInkGate(unittest.TestCase):
         self.assertLess(ratio, self.limits["minBody"],
                         f"两墨都亮本应不达标，却算出 {ratio:.2f} —— 门禁退化")
 
-    def test_primary_and_secondary_alone_are_not_text_colors(self) -> None:
-        """主 / 副色单独当文字色必然不达标 —— 这是"为什么必须叠印"的证据。"""
+    def test_the_declared_text_color_clears_the_body_threshold(self) -> None:
+        """每套色板**声明的文字色**必须过正文门槛。
+
+        这条取代了原来的「主/副色单独当文字色必然不达标」。原断言是**叠印风格专属**的
+        —— 孔版那套主/副色是荧光色（2.35/2.68），所以“只能叠印”。而黑底白字、
+        白底黑字、深蓝当文字这类风格，主色本来就能承载文字（实测瑞士栅格 blue
+        的主色单独当文字是 8.95，达标）。拿旧断言套新风格就是假设过时了。
+
+        真正要守的不变的是：**产出的文字色过门槛** —— 无论它是声明的还是派生的。
+        """
         for name, colors in self.tokens["colorSets"].items():
             with self.subTest(palette=name):
-                alone = min(ink.contrast(colors["primary"], colors["background"]),
-                            ink.contrast(colors["secondary"], colors["background"]))
-                self.assertLess(
-                    alone, self.limits["minBody"],
-                    f"{name} 的专色单独当文字色竟达标（{alone:.2f}）—— 该色板不够荧光/高饱和，"
-                    f"或者门禁被放宽了")
+                ratio = ink.contrast(ink.text_color(colors), colors["background"])
+                self.assertGreaterEqual(
+                    ratio, self.limits["minBody"],
+                    f"{name} 声明的文字色对比度只有 {ratio:.2f}，低于正文门槛 "
+                    f"{self.limits['minBody']} —— 换色板，不要放宽门槛")
 
     def test_overprint_is_commutative(self) -> None:
         """sRGB 逐通道相乘必然可交换 —— 实现一致性自检。"""

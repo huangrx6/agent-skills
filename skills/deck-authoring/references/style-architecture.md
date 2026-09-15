@@ -1,6 +1,6 @@
 # 样式架构
 
-`styles/risograph/style.json` 是**单一来源** —— 渲染器、CSS、墨色门禁都从这一处读。
+`styles/<style>/style.json` 是**单一来源** —— 渲染器、skin.css、墨色门禁都从这一处读。
 改色板 / 改字号 / 改错位量，**全在 token 里改**，spec 与脚本零改动。
 
 ## 字段集（schema）
@@ -81,7 +81,7 @@
 ### A. 加一套 riso 色板（同风格、新色板）
 
 `colorSets` 里再加一个键。`ink.py` 会自动把它纳入三套色板门禁。
-**唯一约束**：`rule` —— 叠印墨对比度必须达到 `contrast.minBody`。
+**唯一约束**：`rule` —— 文字色对比度必须达到 `contrast.minBody`（派生或声明都一样）。
 两墨都亮时压不深（比如朱红 × 土黄只有 3.74 ✗），
 至少其中一个要走深色（朱红 × 深棕 → 达标 ✓）。
 
@@ -148,7 +148,7 @@ styles/<name>/
 ```jsonc
 {
   "deck": {
-    "style":    "risograph",          // 可选；缺省 risograph。styles/ 下的目录名
+    "style":    "swiss-grid",         // 可选；缺省 swiss-grid。styles/ 下的目录名
     "colorSet": "vivid",              // 必须存在于该风格 token.colorSets
     "seed":     11,                   // 建议显式写（缺省 1）；错位/颗粒按 (seed, 元素) 派生
     "title":    "封面文案",

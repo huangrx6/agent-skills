@@ -1,15 +1,17 @@
-# deck-authoring — riso 风的 slide deck 工具集
+# deck-authoring — 把结构化内容渲成能讲的 deck
 
-把一份结构化的 `deck-spec.json` 渲成 risograph 印刷风的 deck，最终交付物
-是 16:9 PPTX（一页一张贴图）。
+把一份 `deck-spec.json` 渲成演示 deck，**风格从 `styles/` 选**（一种风格 = 一个目录），
+交付 HTML（可演讲）/ 矢量 PDF / 可编辑 PPTX / 每页 PNG。
 
 ## 这是什么 / 不是什么
 
-- 这是「**视觉做到极近真实孔版**」的 skill —— 套色错位、颗粒、半调网点、
-  两墨叠印成深色当正文色。
-- 它**不是**「能改字的 PowerPoint 编辑器」—— PPTX 里每页是一张 PNG 贴图，
-  字改不了；要改字就回改 spec 再重出。
-- 它**不是**通用图表工具 —— 数据图表只支持柱状图，且 riso 效果只作用于容器，
+- 这是「**内容只管写，版面与颜色脚本算**」的 skill —— 字号、折行、对比度、
+  条目密集页的字号自适应、四种风格的适配，全部由脚本管。
+- 它**不是**单一风格的：`styles/` 下现在有 4 套（黑底剧场 / 瑞士栅格 / 大字报 /
+  笔记本），加一套 = 拷一个目录改 token 与 CSS，不改任何 .py。
+- 它**不是**只能出死图的：HTML 自带走演示态（键盘翻页 / 缩放 / 页码），
+  而且能用 `pptx_native.py` 出**字能改**的 PPTX。
+- 它**不是**通用图表工具 —— 数据图表只支持柱状图，且风格处理只作用于容器，
   柱与刻度保持干净（错位会毁掉可读性）。
 - 它**不是**「换个 css 滤镜」—— duotone + 半调是「重新制版」，不是「加滤镜」。
 
@@ -18,7 +20,7 @@
 ```bash
 cd skills/deck-authoring/
 python3 scripts/validate_spec.py dev-tools/demo.spec.json           # 1) 规格（字段集封闭）
-python3 scripts/ink.py styles/risograph/style.json                  # 2) 墨色门禁
+python3 scripts/ink.py styles/swiss-grid/style.json                # 2) 墨色门禁
 python3 scripts/plate.py --sample -o sample-treated.png             # 3) 造演示图
 python3 scripts/render.py dev-tools/demo.spec.json -o out.html      # 4) 出 HTML
 python3 scripts/measure.py out.html                                 # 5) 实测（真浏览器）
@@ -36,15 +38,14 @@ python3 scripts/pptx_native.py out.html -o deck-editable.pptx       # 10) 出 PP
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 65 条
+python3 -m unittest discover -s tests/deck-authoring -v     # 67 条
 ```
 
-钉住十一项不变量：墨色推导 + 三套色板门禁、同 spec + 同种子字节一致、校验的
-变异验证（每项都造违规样例，且变异替换的是产物里**真实存在**的值）、半调墨覆盖率
-随灰度单调（100% → 0%）、缓存命中后仍过色板三角形不变量、外壳行为（真开浏览器
-按键翻页 + letterbox 缩放比贴边不溢）、PDF 是矢量且页数/页尺寸对（连"删掉 @page
-能不能拦"都有用例）、可编辑 PPTX 的**字是真字**且坐标是页内坐标（连"`<a:pattFill>`
-空不空"都查）、字体提示不报废话且要说清谁顶上了、SKILL.md 的版式表与
+钉住十二项不变量：同 spec + 同种子字节一致（带随机区间的风格；确定性风格本就与 seed 无关）、
+色板门禁 + 两墨乘叠印的数学、校验的变异验证（每项都造违规样例）、半调墨覆盖率随灰度单调、
+缓存命中后仍过色板三角不变量、外壳行为（真开浏览器按键翻页 + letterbox 缩放比贴边不溢）、
+PDF 是矢量且页数/页尺寸对、可编辑 PPTX 的**字是真字**且坐标是页内坐标、
+字体提示不报废话、**每种风格的装饰落点与它声明的 `decor.types` 一致**、SKILL.md 的版式表与
 `render.py` 实测行为一致、规格字段集真的封闭（坐标/字号/色值必须被指名报出）。
 
 ## 依赖
@@ -57,11 +58,11 @@ python3 -m unittest discover -s tests/deck-authoring -v     # 65 条
 
 ## 已知限制
 
-1. **PPTX 里改不了字**：见上。要可编辑 PPT 就走原生 shapes，riso 效果必然打折。
+1. **贴图版 PPTX 改不了字**：要能改字就走 `pptx_native.py`（原生 shapes）。两者取舍见 `references/delivery-formats.md`。
 2. **图表只支持柱状图**：折线 / 饼 / 散点都没有；柱高必须与数据成比例是硬要求
    （由 `check.py` 第 ④ 条独立复核，不是渲染器自觉）。
 3. **错位只用在标题 / 时间点**：其他地方用错位会毁可读性（方案第 2 层）。
-4. **生图是可选**：`image_source.py` 默认走色块拼贴（它本身就是 riso 的），
+4. **生图是可选**：`image_source.py` 默认走色块拼贴（它本身就是版画式的拼贴），
    不配 `--provider-cmd` 永远不会调生图模型 —— 这是设计不是疏漏。
 5. **缓存命中不等于可信**：缓存里的图也会过"只在色板三角形内"的不变量，
    塞彩图会被拒绝并丢弃重做。
@@ -83,7 +84,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 ├── scripts/                 # 流水线十二件
 │   ├── validate_spec.py     # 输入层校验：字段集封闭（坐标/字号/色值直接判失败）
 │   ├── ink.py               # 墨色推导 + 三色板门禁（唯一消费者）
-│   ├── plate.py             # 图片 → duotone + 半调（riso 制版）
+│   ├── plate.py             # 图片 → duotone + 半调（制版）
 │   ├── image_source.py      # 缓存 / 生图 / 几何色块拼贴
 │   ├── render.py            # deck-spec.json → HTML（语义骨架 + 风格 skin + 演示壳）
 │   ├── measure.py           # 实测层：真浏览器量真盒子（不估算）
@@ -94,11 +95,12 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── pptx_native.py       # HTML → PPTX（原生 shapes，字能改）
 │   └── deckio.py            # IO 收口（try/except 不散落）
 ├── styles/                   # 风格目录：一种风格 = 一个目录（token + skin），不碰 .py
-│   ├── risograph/            # 孔版印刷：套色错版 + 纸纹 + 半调网点（大胆·暖）
-│   │   ├── style.json        #   token：色板 / 字号级数 / 字体 / 纹理 / 装饰 / 错位 / 对比度
-│   │   └── skin.css          #   视觉层：只负责"墨与纸"
 │   ├── keynote-dark/         # 黑底剧场：纯黑底 + 巨号字 + 一屏一观点（大胆·暗）
-│   └── swiss-grid/           # 瑞士栅格：白底 + 编号列表 + 1px 细线（安静·冷）
+│   │   ├── style.json        #   token：色板 / 字号级数 / 字体 / 纹理 / 装饰 / 错位 / 对比度
+│   │   └── skin.css          #   视觉层：颜色、字体、纹理、装饰观感
+│   ├── swiss-grid/           # 瑞士栅格：白底 + 编号列表 + 左轨 + 巨号页码（安静·冷）
+│   ├── billboard/            # 大字报：巨号数字 + 通栏色条 + 色场（大胆·亮）
+│   └── notebook/             # 笔记本：横格纸 + 红边线 + 侧边索引签（中性·暖）
 ├── dev-tools/
 │   └── demo.spec.json       # 一份能跑的样例
 ├── evals/evals.json         # 行为评估用例
@@ -107,6 +109,8 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
     ├── validation.md            # 校验的口径（阻塞 vs 提示）
     └── delivery-formats.md      # HTML / PDF / PNG / PPTX 的取舍
 tests/deck-authoring/           # 测试住在仓库顶层（不在 skill 目录里）
+├── test_ink.py
+├── test_determinism.py
 ├── test_ink.py
 ├── test_determinism.py
 ├── test_check_mutations.py

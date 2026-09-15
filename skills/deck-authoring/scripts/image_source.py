@@ -9,7 +9,7 @@
 2. **缓存里的东西也要合规范**：缓存命中不等于可信 —— 上一次留下的可能根本不合规，
    所以命中后仍然要过"只在色板三角形内"这条不变量（实测能抓到：往里塞一张彩图就红）
 
-跑法：python3 image_source.py --prompt "team photo, riso" -o pic.png [--provider-cmd "…"]
+跑法：python3 image_source.py --prompt "team photo, poster" -o pic.png [--provider-cmd "…"]
 """
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ import importlib.util
 import json
 import os
 import random
+import shlex
 import subprocess
 import sys
 
@@ -46,6 +47,7 @@ def _load_sibling(name: str):
 
 
 ink = _load_sibling("ink")
+deckio = _load_sibling("deckio")   # IO 收口：本来就是本仓库的规矩，这个文件是最后一个没跟上的
 # 文件名是 plate.py，但下游用法是 `treat_image.xxx` —— 绑定同名以最小化变更。
 treat_image = _load_sibling("plate")
 
@@ -67,14 +69,16 @@ def cache_key(prompt: str, colors: dict, size: tuple[int, int]) -> str:
 def collage(seed: int, colors: dict, size: tuple[int, int]) -> Image.Image:
     """几何色块拼贴（确定性）：圆 / 半圆 / 条纹 的专色组合。
 
-    它自己也必须是 riso 的（方案 §5.2 原话：不能用无风格的灰色占位图）。
+    它本身就得是**有版式的**（方案 §5.2 原话：不能用无风格的灰色占位图）——
+    哪怕是兜底图，也要看得出是这个 deck 的图，而不是“图待补”。
     """
     w, h = size
     image = Image.new("L", size, 255)
     draw = ImageDraw.Draw(image)
     r = random.Random(seed)
+    lo, hi = round(min(w, h) * 0.18), round(min(w, h) * 0.42)   # 循环外算一次就够
     for _ in range(r.randint(3, 5)):
-        radius = r.randint(int(min(w, h) * 0.18), int(min(w, h) * 0.42))
+        radius = r.randint(lo, hi)
         x, y = r.randint(0, w), r.randint(0, h)
         kind = r.choice(["circle", "half", "band"])
         tone = r.choice([40, 90, 150, 200])
@@ -106,9 +110,24 @@ def in_palette(image: Image.Image, colors: dict, tol: float = 0.01) -> list[tupl
     return stray
 
 
+def _provider_argv(template: str, prompt: str, out: str) -> list[str]:
+    """把 provider 命令模板变成 argv —— **不过 shell**。
+
+    原来是 `subprocess.run(template.format(...), shell=True)`。prompt 是**用户内容**，
+    直接拼进 shell 命令里就是一个命令注入点：prompt 里写个 `; rm -rf …` 就能执行
+    （这是静态检查真报出来的，不是噪声）。
+
+    改法：先用哨兵值 shlex 切好 argv，再把哨兵换成真值 —— prompt 永远只是
+    **一个参数**，不再经过 shell 解析。引号写不写都行（占位处一般不写更清楚）。
+    """
+    sp, so = "\x00prompt\x00", "\x00out\x00"
+    parts = shlex.split(template.format(prompt=sp, out=so))
+    return [p.replace(sp, prompt).replace(so, out) for p in parts]
+
+
 def resolve(prompt: str, colors: dict, size: tuple[int, int], out: str,
             provider_cmd: str | None = None) -> str:
-    os.makedirs(cache_dir(), exist_ok=True)
+    deckio.ensure_dir(cache_dir())
     path = os.path.join(cache_dir(), f"{cache_key(prompt, colors, size)}.png")
     if os.path.isfile(path):
         cached = Image.open(path).convert("RGB")
@@ -122,12 +141,12 @@ def resolve(prompt: str, colors: dict, size: tuple[int, int], out: str,
     source = None
     if provider_cmd:
         try:
-            subprocess.run(provider_cmd.format(prompt=prompt, out=path), shell=True, check=True)
+            subprocess.run(_provider_argv(provider_cmd, prompt, path), check=True)
             source = "generated"
         except subprocess.CalledProcessError as exc:
             print(f"✗ 生图失败（{exc.returncode}）→ 降级为几何色块拼贴")
     else:
-        print("· 未配置生图（--provider-cmd）→ 用几何色块拼贴（它本身就是 riso 的，不是灰占位图）")
+        print("· 未配置生图（--provider-cmd）→ 用几何色块拼贴（它本身就是版画式的拼贴，不是灰占位图）")
     if source is None:
         image = collage(abs(hash(cache_key(prompt, colors, size))) % (10 ** 6), colors, size)
         treated = treat_image.duotone(image, colors["primary"], colors["secondary"],
@@ -141,20 +160,28 @@ def resolve(prompt: str, colors: dict, size: tuple[int, int], out: str,
     return source or "collage"
 
 
+def _parse_size(raw: str) -> tuple[int, int]:
+    """`WxH` → (w, h)。格式不对要说清楚哪里不对，不甩生成器报错。"""
+    parts = raw.lower().split("x")
+    if len(parts) != 2:
+        raise SystemExit(f"✗ --size 要写成 WxH（如 640x400），收到 {raw!r}")
+    return (round(deckio.as_number(parts[0], f"--size 的宽（{raw!r}）")),
+            round(deckio.as_number(parts[1], f"--size 的高（{raw!r}）")))
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="图片来源：缓存 / 生图 / 几何色块拼贴")
     ap.add_argument("--prompt", required=True)
     ap.add_argument("-o", "--out", required=True)
-    ap.add_argument("--tokens", default=os.path.join(HERE, "..", "styles", "risograph", "style.json"))
+    ap.add_argument("--tokens", default=os.path.join(HERE, "..", "styles", "swiss-grid", "style.json"))
     ap.add_argument("--color-set", default="vivid")
     ap.add_argument("--size", default="640x400")
     ap.add_argument("--provider-cmd", default=None,
                     help="可选的生图命令，用 {prompt} 与 {out} 占位；不填就用色块拼贴")
     args = ap.parse_args(argv[1:])
-    tokens = json.load(open(args.tokens, encoding="utf-8"))
+    tokens = deckio.read_json(args.tokens)
     colors = tokens["colorSets"][args.color_set]
-    w, h = (int(x) for x in args.size.lower().split("x"))
-    resolve(args.prompt, colors, (w, h), args.out, args.provider_cmd)
+    resolve(args.prompt, colors, _parse_size(args.size), args.out, args.provider_cmd)
     return 0
 
 

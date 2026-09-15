@@ -1,20 +1,20 @@
 ---
 name: deck-authoring
 description: >-
-  Build slide decks from a structural spec, in one of several real visual styles
-  (孔版印刷 riso / 黑底剧场 keynote / 瑞士栅格 swiss). Pipeline: deck-spec.json → HTML
-  (可演讲) → 矢量 PDF / 可编辑 PPTX / 每页 PNG. Use when the user asks 做一份 deck /
-  做幻灯片 / 做个 PPT / 把这份内容做成演示 —— 包括有明确风格要求时（"做成 riso 风"、
-  "像苹果发布会那样"），也要先出多个风格方向让他选。The model writes only the spec
-  content (titles, bullets, style, colorSet, seed); scripts compute every coordinate,
-  font size, and contrast check. Do NOT use for editable-PowerPoint-only jobs, for
-  chart-only deliverables, or for one-off slide images with no deck structure.
+  Build slide decks from a structural spec, in one of four real visual styles
+  (黑底剧场 keynote-dark / 瑞士栅格 swiss-grid / 大字报 billboard / 笔记本 notebook).
+  Pipeline: deck-spec.json → HTML (可演讲) → 矢量 PDF / 可编辑 PPTX / 每页 PNG. Use when
+  the user asks 做一份 deck / 做幻灯片 / 做个 PPT / 把这份内容做成演示 —— 包括有明确
+  风格要求时（"做成苹果发布会那样"），也要先出多个风格方向让他选。The model writes only
+  the spec content (titles, bullets, style, colorSet, seed); scripts compute every
+  coordinate, font size, and contrast check. Do NOT use for editable-PowerPoint-only
+  jobs, for chart-only deliverables, or for one-off slide images with no deck structure.
 ---
 
 # Deck authoring
 
 把一份 `deck-spec.json` 渲成能直接拿去讲的 deck。**你只写内容，脚本算一切坐标、
-字号与颜色**；风格从 `styles/` 选（孔版印刷 / 黑底剧场 / 瑞士栅格），加新风格＝加一个
+字号与颜色**；风格从 `styles/` 选（黑底剧场 / 瑞士栅格 / 大字报 / 笔记本），加新风格＝加一个
 目录，不改渲染器。
 
 ## 风格选择：先出三个方向，让人选
@@ -26,7 +26,7 @@ description: >-
 
 ```bash
 # 同一份内容，三个风格各渲一遍（只改 deck.style + deck.colorSet）
-for s in risograph keynote-dark swiss-grid; do
+for s in keynote-dark swiss-grid billboard notebook; do
   python3 scripts/render.py spec.json --style $s -o $s.html
   python3 scripts/shots.py $s.html --out-dir shots-$s --count 2   # 封面 + 一页内容页
 done
@@ -41,9 +41,10 @@ done
 
 | `style` | 温度 | 适合 | 不适合 |
 | --- | --- | --- | --- |
-| `risograph` | 大胆·暖 | 拿在手里看的印刷品、作品集、有设计感的复盘 | 大量小字（错版伤小字可读性） |
-| `keynote-dark` | 大胆·暗 | 会议室投屏站着讲、一屏一个观点 | 高密度汇报（它一页只能装几条） |
+| `keynote-dark` | 大胆·暗 | 会议室投屏站着讲、一屏一个观点 | 高密度汇报（一页只能装几条） |
 | `swiss-grid` | 安静·冷 | 路演、评审、研报、要被反复翻阅的文档型 deck | 需要"气势"的发布会 |
+| `billboard` | 大胆·亮 | 路演 / QBR / 年度复盘（读者只关心几个数） | 需要慢慢读的长文页 |
+| `notebook` | 中性·暖 | 培训、工作坊、读书笔记（观众会凑近、会做笔记） | 投影远距离演讲（字号偏小） |
 
 每个风格支持几个 `colorSet`（`python3 scripts/ink.py styles/<style>/style.json` 会列出
 并逐个过对比度门槛）。**换风格/换色板只改 spec 的两个字段，内容一字不动。**
@@ -88,19 +89,20 @@ done
 
 `type` 字段支持：
 
-| type | 用途 | 装饰墨块 | 风险点 |
-| --- | --- | --- | --- |
-| `title` | 封面 | ✓ | 副标题一行内 |
-| `content-text` | 全文页 | ✓ | 条目太多会撞出该页下缘（实测判） |
-| `content-image` | 图文页（左文右图） | ✗ | 图必须是 duotone + 半调产物 |
-| `two-column` | 双栏 | ✗ | 每栏 660px；栏标色带是专色，正文仍叠印 |
-| `timeline` | 时间线 | ✗ | 每格 300px；时间点独立错位 |
-| `chart` | 柱状图 | ✓ | **柱与刻度不做质感**（风格只碰容器） |
-| `end` | 收尾 | ✓ | 居中大字 |
+| type | 用途 | 风险点 |
+| --- | --- | --- |
+| `title` | 封面 | 副标题一行内 |
+| `content-text` | 全文页 | 条目太多会撞出该页下缘（实测判） |
+| `content-image` | 图文页（左文右图） | 图必须先过 `image_source.py`，不能直接塞彩照 |
+| `two-column` | 双栏 | 每栏 660px，字号固定走小档（不参与条目数自适应） |
+| `timeline` | 时间线 | 每格 300px；节点标签用数字档字号 |
+| `chart` | 柱状图 | **柱与刻度不做质感**（风格只碰容器） |
+| `end` | 收尾 | 居中大字 |
 
-「装饰墨块」那一列是 **risograph 风格**的行为；另两套风格 `decor.kind` 是 `null`，
-它们靠字大小与负空间，不放装饰。哪些版式放装饰也是风格在 token 里自报的（`decor.types`），
-不是写死在渲染器里的。
+「装饰墨块」那一列已经删掉了：「放不放装饰」是**风格**的属性（token 的
+`decor.types` / `decor.kind`），不是版式的属性。现在四套风格里只有 `billboard`
+有（色场），其余三套完全没有 ——
+拿一张写死的表去对版式，只会对出一个错的前提（测试里已经改成验契约）。
 
 版面判断**全部靠实测**（`measure.py` 开真浏览器量真盒子）：越出**该页**边界、或
 被自己会裁的容器切掉，都报。文字宽不再估算 —— 估算对同一行汉字会差 2 倍多，

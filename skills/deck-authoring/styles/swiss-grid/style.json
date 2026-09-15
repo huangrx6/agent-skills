@@ -26,12 +26,13 @@
   },
 
   "type": {
-    "note": "比孔版略小、比剧场小很多：这个风格的观众距离是「拿在手里 / 一臂之内」。字号层级靠**跨度**而不是绝对值 —— 标题 96 配正文 32，跨度 3 倍，层级就立住了。",
+    "note": "比孔版略小、比剧场小很多：这个风格的观众距离是「拿在手里 / 一臂之内」。字号层级靠**跨度**而不是绝对值 —— 标题 96 配正文 32，跨度 3 倍，层级就立住了。\n\nbulletLarge / bullet / bulletSmall 三档由**条目数**自动选（render.py 的 bullet_tier）—— 稀疏页排大一点，否则半页是死的。",
     "cover": 128,
     "compact": 96,
     "small": 84,
     "end": 128,
     "subtitle": 32,
+    "bulletLarge": 46,
     "bullet": 32,
     "bulletSmall": 26,
     "colTitle": 40,

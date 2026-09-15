@@ -56,11 +56,26 @@ def _load_sibling(name: str):
 deckio = _load_sibling("deckio")   # IO 收口：参数写错要报清楚，不甩 traceback
 
 STYLES_DIR = os.path.join(HERE, "..", "styles")
-DEFAULT_STYLE = "risograph"
+DEFAULT_STYLE = "swiss-grid"
 
 # 版式 → 用字号级数里的哪一档（级数本身在 style.json 的 type 里，是唯一来源）
 TITLE_TIER = {"title": "cover", "content-text": "compact", "end": "end"}
 DEFAULT_TITLE_TIER = "small"
+
+# 条目根据**条数**选字号档：(上限, 档名)。
+#
+# 为什么按条数自适应：固定字号下，稀疏页（2 条）会留出半页死白，
+# 密集页（7 条）又会撞出下缘 —— 同一档字号不可能同时服务两者。
+# 这不是“好看一点”，是**构图问题**：留白必须是构图（有视觉锚点），不是内容缺席。
+# （实测：瑞士栅格那版图文页只有 2 条、字号 32，页面下半 55% 是空的。）
+BULLET_TIERS = ((3, "bulletLarge"), (5, "bullet"), (99, "bulletSmall"))
+
+
+def bullet_tier(n_items: int) -> str:
+    for limit, tier in BULLET_TIERS:
+        if n_items <= limit:
+            return tier
+    return "bulletSmall"
 
 
 def _rng(seed, *parts) -> random.Random:
@@ -111,8 +126,25 @@ def decor(tokens: dict, seed, index: int, kind_slide: str) -> str:
     kind = spec.get("kind")
     if not kind or kind_slide not in spec.get("types", []):
         return ""                                   # 这个风格/这个版式不要装饰
-    if kind != "halftone-circle":
-        raise SystemExit(f"✗ 认不出的装饰 kind={kind!r}（目前只有 halftone-circle）")
+    if kind == "halftone-circle":
+        return _halftone_circle(spec, seed, index)
+    if kind == "accent-block":
+        # 大色块：给“数字当主角”那类风格补一块**色场**（左下或右下的底），
+        # 它不抢字 —— 透明度很低，读起来是“这块版面归这一色管”。
+        r = _rng(seed, "decor", index)
+        size = r.choice(spec["sizes"])
+        zone = r.choice(spec["zones"])
+        css = {"tr": "right:-90px;top:-70px", "br": "right:-110px;bottom:-120px",
+               "tl": "left:-90px;top:-70px"}[zone]
+        return (f'<div class="decor-block" data-kind="accent-block" '
+                f'data-zone="{zone}" data-size="{size}" '
+                f'style="{css};width:{size}px;height:{round(size * 0.62)}px"></div>')
+    raise SystemExit(f"✗ 认不出的装饰 kind={kind!r}")
+
+
+def _halftone_circle(spec: dict, seed, index: int) -> str:
+    """网点圆（叠印类风格用）。虚线描边画网点，不用 <pattern>：Chrome 导 PDF 会
+    把 <pattern> 整块栅格化（实测 4 块半调 → 4 张位图）。"""
     r = _rng(seed, "decor", index)
     size = r.choice(spec["sizes"])
     zone = r.choice(spec["zones"])
@@ -123,7 +155,8 @@ def decor(tokens: dict, seed, index: int, kind_slide: str) -> str:
                      for y in range(size // step + 1))
     # 必须 clip 成圆 —— 虚线是**通栏**画的，不裁就是一块方底（视觉检查当场抓到 ✗）。
     cid = f"hc{index}"
-    return (f'<svg class="halftone" data-zone="{zone}" data-size="{size}" '
+    return (f'<svg class="halftone" data-kind="halftone-circle" data-zone="{zone}" '
+            f'data-size="{size}" '
             f'style="{css};width:{size}px;height:{size}px" '
             f'viewBox="0 0 {size} {size}" aria-hidden="true">'
             f'<defs><clipPath id="{cid}">'
@@ -356,7 +389,7 @@ ink_module = _load_sibling("ink")  # 叠印与对比度只有一处定义，不�
 
 
 def render(deck_spec: dict, style: dict | None = None) -> str:
-    """渲染。`style=None` 时按 `deck.style`（缺省 risograph）从 styles/ 加载。"""
+    """渲染。`style=None` 时按 `deck.style`（缺省 swiss-grid）从 styles/ 加载。"""
     deck = deck_spec["deck"]
     style = style or load_style(deck.get("style", DEFAULT_STYLE))
     tokens = style["tokens"]
@@ -381,11 +414,17 @@ def render(deck_spec: dict, style: dict | None = None) -> str:
         kind = slide.get("type")
         t_tier = TITLE_TIER.get(kind, DEFAULT_TITLE_TIER)
         tsize = tier[t_tier]
-        bsize = tier["bulletSmall"] if kind == "two-column" else tier["bullet"]
+        # 两栏页永远是窄栏，不参与自适应
+        b_tier = "bulletSmall" if kind == "two-column" else bullet_tier(
+            len(slide.get("bullets", [])))
+        bsize = tier[b_tier]
         # 错位是**整页一个值**，不是每个元素一个 —— 真实孔版里一张纸过一次滚筒，
         # 整张的偏移是同一个。按元素随机在物理上是错的，看着也更乱。
         dx, dy, rot = misregistration(tokens, seed, "page", i)
-        out.append(f'<section class="slide" data-slide="{i}" '
+        # data-idx：给 skin 一个**零成本的页码钩子**（.slide::after{content:attr(data-idx)}）。
+        # 用属性而不是再加一个元素：安静派风格的构图需要一个字号锚点，但为此往每页
+        # 塞一个 div、还得同步进清单和测量层，不值。
+        out.append(f'<section class="slide" data-slide="{i}" data-idx="{i:02d}" '
                    f'style="--dx:{dx}px;--dy:{dy}px;--rot:{rot}deg">')
         out.append(decor(tokens, seed, i, kind))
         out.append('<div class="pad">')

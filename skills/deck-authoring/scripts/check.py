@@ -55,7 +55,7 @@ deckio = _load_sibling("deckio")   # IO 收口：读不到产物要报清楚，�
 measure_mod = _load_sibling("measure")   # 实测层：版面判断全部走它，不估算
 render_mod = _load_sibling("render")   # 只为拿“同一个风格”的 token（单一来源）
 
-TOKENS = os.path.join(HERE, "..", "styles", "risograph", "style.json")
+TOKENS = os.path.join(HERE, "..", "styles", "swiss-grid", "style.json")
 
 # **两个不同的框，别混用**（我自己第一版就混了 ✗，导致正常产物被误判"溢出"）：
 #   内容区 = 版面减去内边距，量"放不放得下"（宽 1600-2×84 = 1432）
@@ -207,7 +207,7 @@ def style_tokens(spec: dict, override: dict | None = None) -> dict:
     """解析 deck 用哪个风格，取它的 token。
 
     token 不再由调用方“带进来”：风格已经写在 spec 的 `deck.style` 里了
-    （缺省 risograph）。让校验层自己去读同一份，就不会出现“拿 A 风格的门槛
+    （缺省 swiss-grid）。让校验层自己去读同一份，就不会出现“拿 A 风格的门槛
     去量 B 风格的产物”——那是多风格之后新增的错配面。
     """
     if override is not None:

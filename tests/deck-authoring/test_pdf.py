@@ -28,7 +28,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "styles", "risograph", "style.json")
+TOKENS = os.path.join(SKILL, "styles", "swiss-grid", "style.json")
 DEMO = os.path.join(SKILL, "dev-tools", "demo.spec.json")
 
 PAGE_RULE = "@page{size:1600px 900px;margin:0}"

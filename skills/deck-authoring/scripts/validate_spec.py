@@ -32,7 +32,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STYLES_DIR = os.path.join(HERE, "..", "styles")
-DEFAULT_STYLE = "risograph"
+DEFAULT_STYLE = "swiss-grid"
 DEFAULT_TOKENS = os.path.join(STYLES_DIR, DEFAULT_STYLE, "style.json")
 
 # 封闭字段集。加字段要同时改这里与 `references/style-architecture.md` ——
@@ -77,7 +77,7 @@ HINTS = {
     "rotation": "同上 —— 旋转角由脚本派生。",
     "width": "尺寸由版式决定，规格里没有它。",
     "height": "同上 —— 尺寸由版式决定。",
-    "primary": "色值不在规格里：换色板请改 styles/risograph/style.json 的 colorSets。",
+    "primary": "色值不在规格里：换色板请改 styles/swiss-grid/style.json 的 colorSets。",
     "secondary": "同上 —— 色值只在 token 里。",
     "background": "同上 —— 纸色只在 token 里。",
     "ink": "同上 —— 叠印墨是推导出来的，不是写进来的。",
@@ -201,7 +201,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # token 读不到**不算** spec 的错（可能只是没带对路径）—— 那就跳过 colorSet 存在性校验，
     # 而不是把一件读不到的事报成"规格有问题"。
-    # 风格从 spec 的 deck.style 解析（缺省 risograph）：多风格之后，色板名单必须按
+    # 风格从 spec 的 deck.style 解析（缺省 swiss-grid）：多风格之后，色板名单必须按
     # **这一份 deck 选的风格**去查，拿别的风格的名单去核会误报。
     tokens_path = args.tokens
     if tokens_path is None:

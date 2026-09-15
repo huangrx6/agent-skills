@@ -3,33 +3,44 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "帮我做一份十页的产品复盘 deck，riso 风的。",
-      "expected_output": "先读 dev-tools/demo.spec.json 摸清字段集，然后按用户的实际内容写 deck-spec.json —— 每页只有 type + 内容（标题 / 条目 / 时间点 / 数据 / 图片），**不要**写坐标、字号、色值。填完后跑 scripts/ink.py 看色板门禁 → scripts/render.py 出 HTML → scripts/check.py 过六项校验。三道门全过再交付；任何一项不过就报告问题，不要靠放宽阈值蒙混。",
-      "files": ["dev-tools/demo.spec.json"]
+      "prompt": "帮我做一份十页的产品复盘 deck，做成苹果发布会那种感觉。",
+      "expected_output": "**先说风格，再说内容。** 用户给了风格词（\"苹果发布会那种\"）也不豁免三方向门 —— 风格词收窄的是解释空间，不转移选择权：黑底巨字、大白底衬线都是合法诠释。所以先读 dev-tools/demo.spec.json 摸字段集，然后用 `--style` 把同一份内容渲成 2~3 个方向（至少 `keynote-dark` 与 `swiss-grid` 各一版）真出图给他看，摆完**停下等选择**。选定后才写正式 deck-spec.json —— 每页只有 type + 内容（标题 / 条目 / 时间点 / 数据 / 图片），**不要**写坐标、字号、色值。填完跑 scripts/ink.py 看色板门禁 → scripts/render.py 出 HTML → scripts/check.py 过校验。所有门全过再交付；任何一项不过就报告问题，不要靠放宽阈值蒙混。",
+      "files": [
+        "dev-tools/demo.spec.json"
+      ]
     },
     {
       "id": 2,
       "prompt": "标题字号我想大一点，120px。",
       "expected_output": "拒绝在 spec 层面改：字号、坐标、色值都不在 schema 里 —— 不存在，不是「不推荐填」。字号参与对比度分档（由 token.contrast.largeTextPx 判定），由 render.py 派生。允许的做法是改 style.json 的 fonts.display（字体族）或 contrast 阈值；不允许在 spec 里写 fontSize 字段。如果用户坚持要 120px 的视觉感受，那属于改渲染器行为，要在 references/style-architecture.md 里同步说明。",
-      "files": ["styles/risograph/style.json"]
+      "files": [
+        "styles/swiss-grid/style.json"
+      ]
     },
     {
       "id": 3,
       "prompt": "对比度 4.5 太严了，能不能降到 3.5 让更多色板能用？",
-      "expected_output": "**不调阈值**。4.5 是 WCAG AA 正文底线，3.0 是大字底线；降了等于让「荧光色当正文」那种事故合法化。正确做法：换色板 —— style.json 里 colorSets 新加一套，或改现有一套让叠印墨变深（ink.rule 已经写了「每套色板必须含一个深墨」）。跑 scripts/ink.py 自检。",
-      "files": ["styles/risograph/style.json", "references/validation.md"]
+      "expected_output": "**不调阈值**。4.5 是 WCAG AA 正文底线，3.0 是大字底线；降了等于让「荧光色当正文」那种事故合法化。正确做法：换色板 —— style.json 里 colorSets 新加一套，或改现有一整套让声明的文字色变深（ink.rule 已经写了「每套色板必须含一个深墨」）。跑 scripts/ink.py 自检。",
+      "files": [
+        "styles/swiss-grid/style.json",
+        "references/validation.md"
+      ]
     },
     {
       "id": 4,
       "prompt": "PPTX 里的字我等下发给你的时候现场改，你先做。",
-      "expected_output": "先把代价说清楚：make_pptx.py 是**贴图**（每页一张 PNG），字改不了；要现场改字就得走原生 shapes，但原生 shapes 做不到套色错位 / 颗粒 / 半调网点。两件事不能兼得 —— 这个 skill 选了视觉。如果对方必须改字，正确做法是用 PowerPoint 自己做一个普通 deck，不要用本 skill；或者改工作流：先把字定死，渲完再发 PPT。若对方接受「先把字定死」，照常出。",
-      "files": ["references/delivery-formats.md"]
+      "expected_output": "这个 skill 两种 pptx 都能出，所以不要把它说成二选一：make_pptx.py 是**贴图**（观感 100%，字改不了）；pptx_native.py 是**原生 shapes**（字是真字、图表是原生图表，但没有风格化的纹理与装饰）。正确做法是把两个都摆出来让对方选：要「一模一样」给贴图版或 PDF，要「能改字」给原生版。只有一种情况要说「不该用本 skill」：对方要的是**从零编辑的普通 PPT**（版式随内容重排），那本来就该用 PowerPoint。",
+      "files": [
+        "references/delivery-formats.md"
+      ]
     },
     {
       "id": 5,
       "prompt": "标题颜色我想用 #FF48B0（粉红），醒目一点。",
       "expected_output": "拒绝：主 / 副色单独当文字色对比度天生不达标（vivid 实测 2.35 ✗）。文字色只能是 overprint(primary, secondary) —— 派生不手写。spec 里不允许写 color: '#xxxxxx'；只允许写 color: 'overprint'（不写也行）。如果用户要「醒目」，建议改大字号或加色块装饰（render.py 的装饰墨块只落在右侧上下两角），而不是改文字色。",
-      "files": ["references/style-architecture.md"]
+      "files": [
+        "references/style-architecture.md"
+      ]
     },
     {
       "id": 6,

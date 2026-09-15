@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """墨色推导与对比度门禁 —— token 的**唯一**消费者。
 
-为什么单独一层：原型实测「两墨各自当文字色」对比度不达标（2.35 / 2.68），
-而两墨 multiply 的叠印色达标（9.55）。所以文字色不是**选**出来的，是**推导**出来的：
-换色板时它自动跟着变，不许手写第二个值。
+为什么单独一层：文字色是**版面里最容易悄悄出事**的一项 —— 它是唯一一处
+“颜色一变、可读性就崩”的地方，而它又分布在每页的每个元素上。所以收成一条门禁。
 
-跑法：python3 ink.py [styles/risograph/style.json]   # 不传就用仓库那份；任一色板不达标退出码 1
+两种来源都要支持（`text_color`）：
+  - **派生**：两墨 multiply 的叠印色（叠印类风格用；原型实测那套主/副色各自当文字色
+    只有 2.35 / 2.68，乘起来才 9.55 —— 所以它不是“选”出来的）
+  - **声明**：黑底白字、白底黑字这类风格直接写 `colorSets.*.text`（黑不是任何两色的乘积）
+
+跑法：python3 ink.py [styles/swiss-grid/style.json]   # 不传就用仓库那份；任一色板不达标退出码 1
 """
 from __future__ import annotations
 
@@ -106,7 +110,7 @@ def main(argv: list[str]) -> int:
     # 默认路径跟其它脚本一致（指向仓库那份 token）—— 原来写死的 "design-tokens.json"
     # 是原型期的文件名，在这个仓库里不存在，不传参数会直接 traceback。
     path = argv[1] if len(argv) > 1 else os.path.join(
-        HERE, "..", "styles", "risograph", "style.json")
+        HERE, "..", "styles", "swiss-grid", "style.json")
     return check(deckio.read_json(path))
 
 

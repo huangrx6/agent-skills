@@ -20,6 +20,7 @@
 
 from __future__ import annotations
 
+import copy
 import importlib.util
 import json
 import os
@@ -32,7 +33,7 @@ import zipfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "styles", "risograph", "style.json")
+TOKENS = os.path.join(SKILL, "styles", "swiss-grid", "style.json")
 DEMO = os.path.join(SKILL, "dev-tools", "demo.spec.json")
 
 # 版面 1600×900px → EMU。1 CSS px = 9525 EMU（= 0.75pt）。
@@ -174,23 +175,76 @@ class TestPptxNative(unittest.TestCase):
 
     # ── 装饰：拦"属性名写错被默默吞掉"这一类 ─────────────────────────────
 
-    def test_decor_is_a_patterned_ellipse(self) -> None:
-        """装饰墨块要是**带 prst 的椭圆图案填充**。
+    def test_every_style_decor_kind_is_exportable(self) -> None:
+        """每种风格声明的 `decor.kind` 都必须有导出映射。
 
-        属性名写成 `pattern_type` 时 python-pptx 不报错、当成普通属性吞掉，
-        XML 里就是 `<a:pattFill/>` —— 光秃秃没有 `prst`，渲染出来是个空圈（实测踩过）。
+        守的是**静默少元素**：`add_decor` 按 kind 分派，新加一种装饰而忘了加分支，
+        导出的 pptx 会照常生成、页数照样对，只是静默缺一个形状。
+
+        也钉住了“图案填充必须有 prst”那条 —— python-pptx 的属性名写错
+        （`pattern_type` 而不是 `pattern`）会被当成普通属性默默吞掉，
+        XML 里 `<a:pattFill>` 光秃秃，渲染出来是个空圈（实测踩过）。若哪天有风格
+        重新用上 halftone-circle，这条会把它拉回来。
         """
-        hit = 0
-        for name, xml in self.slides.items():
-            fills = re.findall(r"<a:pattFill\b[^>]*>", xml)
-            if not fills:
-                continue    # 这一页没有装饰墨块 —— 不是每种版式都放（图文页就不放）
-            self.assertIn('prst="ellipse"', xml, f"{name} 有图案填充却没有椭圆形状")
-            for fill in fills:
-                self.assertRegex(fill, r'prst="\w+"',
-                                 f"图案填充没有 prst —— 画出来会是个空圈：{fill}")
-                hit += 1
-        self.assertGreater(hit, 0, "没有任何图案填充 —— 装饰墨块没生成")
+        declared = set()
+        for name in ("billboard", "swiss-grid", "keynote-dark", "notebook"):
+            spec = self.render.load_style(name)["tokens"].get("decor") or {}
+            if spec.get("kind"):
+                declared.add(spec["kind"])
+        self.assertTrue(declared, "没有任何风格声明装饰 —— 这条用例的前提没了")
+        self.assertTrue(
+            declared <= self.native.DECOR_SHAPES,
+            f"有风格声明了导出层不认识的装饰：{declared - self.native.DECOR_SHAPES}")
+
+    def test_decor_lands_as_a_native_shape(self) -> None:
+        """有装饰的风格，装饰要真的落成一个原生形状（不是被静默吞掉）。"""
+        style = self.render.load_style("billboard")
+        deck = json.loads(json.dumps(json.load(open(DEMO, encoding="utf-8"))))
+        deck["deck"]["style"] = "billboard"
+        deck["deck"]["colorSet"] = next(iter(style["tokens"]["colorSets"]))
+        with tempfile.TemporaryDirectory() as td:
+            html = os.path.join(td, "out.html")
+            with open(html, "w", encoding="utf-8") as fh:
+                fh.write(self.render.render(deck, style))
+            pptx = os.path.join(td, "deck.pptx")
+            counts = self.native.build(html, pptx)
+            expected = len(self.measure.measure(html).get("decor", []))
+            xml = _slide_xmls(pptx)["ppt/slides/slide1.xml"]
+        self.assertEqual(counts["decor"], expected,
+                         f"测到 {expected} 个装饰，pptx 里只落了 {counts['decor']} 个")
+        self.assertIn('prst="rect"', xml, "装饰在 pptx 里不是个矩形形状")
+
+    def test_halftone_decor_exports_with_a_real_pattern(self) -> None:
+        """网点圆（halftone-circle）导出时 `<a:pattFill>` **必须带 prst**。
+
+        现在没有发布的风格用网点圆（risograph 那套已删），所以这条得**自己造一份**
+        token 去驱那个分支 —— 不然它就是个空跑的用例，而空跑的用例比没有更糟：
+        它让人以为有人看着。
+
+        为什么盯这一条：python-pptx 的属性名写错（`pattern_type` 而不是 `pattern`）
+        会被当成普通属性默默吞掉，XML 里 `<a:pattFill>` 光秃秃没有 prst，
+        渲染出来是个空圈 —— 实测踩过，而且文件生成/页数全对，不查就发现不了。
+        """
+        base = self.render.load_style("billboard")
+        style = dict(base, tokens=copy.deepcopy(base["tokens"]))
+        style["tokens"]["decor"] = {"kind": "halftone-circle", "types": ["title"],
+                                    "zones": ["br"], "sizes": [400]}
+        deck = json.loads(json.dumps(json.load(open(DEMO, encoding="utf-8"))))
+        deck["deck"]["style"] = "billboard"
+        deck["deck"]["colorSet"] = next(iter(style["tokens"]["colorSets"]))
+        with tempfile.TemporaryDirectory() as td:
+            html = os.path.join(td, "out.html")
+            with open(html, "w", encoding="utf-8") as fh:
+                fh.write(self.render.render(deck, style))
+            pptx = os.path.join(td, "deck.pptx")
+            self.native.build(html, pptx)
+            xml = _slide_xmls(pptx)["ppt/slides/slide1.xml"]
+        fills = re.findall(r"<a:pattFill\b[^>]*>", xml)
+        self.assertTrue(fills, "网点圆没导出成图案填充的椭圆")
+        for fill in fills:
+            self.assertRegex(fill, r'prst="\w+"',
+                             f"图案填充没有 prst —— 画出来会是个空圈：{fill}")
+        self.assertIn('prst="ellipse"', xml, "网点圆在 pptx 里不是个椭圆")
 
     # ── 图表：要能改数据 ─────────────────────────────────────────────────
 

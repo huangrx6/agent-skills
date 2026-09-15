@@ -184,6 +184,7 @@ PROBE_JS = r"""
       var r = el.getBoundingClientRect();
       out.decor.push({
         slide: secs.indexOf(el.closest('section.slide')) + 1,
+        kind: el.getAttribute('data-kind'),
         zone: el.getAttribute('data-zone'),
         size: parseFloat(el.getAttribute('data-size')),
         x: Math.round(r.x * 10) / 10, y: Math.round(r.y * 10) / 10,

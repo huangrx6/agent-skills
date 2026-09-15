@@ -27,7 +27,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "styles", "risograph", "style.json")
+TOKENS = os.path.join(SKILL, "styles", "swiss-grid", "style.json")
 DEMO = os.path.join(SKILL, "dev-tools", "demo.spec.json")
 
 
@@ -56,7 +56,12 @@ VALID_SLIDES = [
 
 
 def _spec(slides=None) -> dict:
-    return {"deck": {"colorSet": "vivid", "seed": 7, "title": "t",
+    # 色板名**不写死**：从真实的风格 token 里取。写死过 "vivid"，孔版那套一删
+    # 这里就开始报 BAD_COLOR_SET —— 于是“合法 spec 必须全过”这条用例变成在报
+    # 一个与本意无关的错。
+    with open(TOKENS, encoding="utf-8") as fh:
+        color_set = next(iter(json.load(fh)["colorSets"]))
+    return {"deck": {"colorSet": color_set, "seed": 7, "title": "t",
                      "slides": copy.deepcopy(slides or VALID_SLIDES)}}
 
 

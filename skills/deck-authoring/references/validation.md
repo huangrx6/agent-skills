@@ -17,7 +17,7 @@
 **判据**：每页文字（标题 / 条目 / 时间点 / 图表值 / 图表标签）相对纸色的对比度
 必须达到 `contrast.minBody`（4.5）或 `contrast.minLarge`（3.0，按 ≥ 32px 分档）。
 
-**为什么是叠印墨**：
+**为什么文字色不让你自己填**：
 
 主 / 副色单独当文字色对比度天生不达标（vivid 实测 2.35 / 2.68 ✗）。
 它们的语义是**墨层 / 色块 / 装饰**，不是**承载文字**。
@@ -25,7 +25,7 @@
 
 **会报的情况**：
 
-- `第 N 页 X 对比度 R < floor` —— 叠印墨在该色板下不达标。换色板，不要改 `minBody`。
+- `第 N 页 X 对比度 R < floor` —— 该色板声明的文字色不达标。换色板，不要改 `minBody`。
 - `第 N 页 X 声明 color='<hex>'` —— spec 里写了 `color` 字段且不是 `"overprint"`。
   主 / 副色不允许直接当文字色。
 
@@ -120,10 +120,10 @@
 
 ## ink.py 的门禁（不进 check.py 但同源）
 
-`python3 scripts/ink.py styles/risograph/style.json` 是色板门禁 —— 任何一套色板
+`python3 scripts/ink.py styles/<style>/style.json` 是色板门禁 —— 任何一套色板
 不达标退出 1。它和 `check.py` 第 ① 条共用同一份 token，但视角不同：
 
-- ink.py 看的是**色板本身**（叠印墨相对纸色是否达标）
+- ink.py 看的是**色板本身**（声明的文字色相对纸色是否达标）
 - check.py 第 ① 条看的是**产物里实际写进去的文字色**（产物里所有文字都是
   overprint 色，所以一旦 ink.py 过，check.py 第 ① 条在该色板下不会失败）
 

@@ -5,7 +5,7 @@
 真实孔版印刷的图是网点密度表现灰度、只有两个专色的 —— 所以这里是"重新制版"，
 不是"加个滤镜"：先把图变灰度，再把灰度映射到 两墨叠印 的色阶上，最后叠半调网点。
 
-跑法：python3 plate.py in.jpg -o out.png --tokens styles/risograph/style.json --color-set vivid
+跑法：python3 plate.py in.jpg -o out.png --tokens styles/swiss-grid/style.json --color-set vivid
      python3 plate.py --sample -o sample.png            # 没有真图时生成一张测试卡
 """
 from __future__ import annotations
@@ -40,6 +40,7 @@ def _load_sibling(name: str):
 
 
 ink = _load_sibling("ink")
+deckio = _load_sibling("deckio")   # IO 收口：读不到 token 要报清楚，不甩 traceback
 
 
 def _rgb(h: str) -> tuple[int, int, int]:
@@ -54,8 +55,12 @@ def duotone(image: Image.Image, primary: str, secondary: str, paper: str,
     dark = _rgb(ink.overprint(primary, secondary))
     paper_rgb = _rgb(paper)
     # 色阶：白 → 纸色，黑 → 叠印墨色（中间线性过渡 = 网点密度的连续近似）
-    out = Image.merge("RGB", [gray.point(lambda v, i=i: int(dark[i] + (paper_rgb[i] - dark[i]) * v / 255))
-                              for i in range(3)])
+    # 色阶：白 → 纸色，黑 → 叠印墨色（中间线性过渡 = 网点密度的连续近似）
+    # 用 256 项 LUT 而不是 lambda：point() 的 callable 形式每个像素都要回转进 Python，
+    # 而且类型上也说不清；LUT 一次算好、之后走 C 层。
+    lut = [[round(dark[i] + (paper_rgb[i] - dark[i]) * t / 255) for t in range(256)]
+           for i in range(3)]
+    out = Image.merge("RGB", [gray.point(lut[i]) for i in range(3)])
     # 半调：**有序抖动**（Bayer 4×4）。
     # 我第一版写成 `if v < 128: 每个像素都打点 else 棋盘格` ✗ —— 结果是"暗处实心、
     # 128 以上密度全都一样"，等于没有连续调（实测：光/中调区域平滑无网点 ✗）。
@@ -117,7 +122,7 @@ def sample(size: tuple[int, int] = (640, 400)) -> Image.Image:
     draw = ImageDraw.Draw(image)
     width, height = size
     for x in range(width):
-        draw.line([(x, 0), (x, height)], fill=int(255 * x / width))
+        draw.line([(x, 0), (x, height)], fill=round(255 * x / width))
     draw.ellipse([width * 0.1, height * 0.15, width * 0.45, height * 0.75], fill=60)
     draw.rectangle([width * 0.55, height * 0.2, width * 0.9, height * 0.8], fill=180)
     return image.convert("RGB")
@@ -127,12 +132,12 @@ def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="图片 → duotone + 半调（riso 制版）")
     ap.add_argument("src", nargs="?")
     ap.add_argument("-o", "--out", required=True)
-    ap.add_argument("--tokens", default=os.path.join(HERE, "..", "styles", "risograph", "style.json"))
+    ap.add_argument("--tokens", default=os.path.join(HERE, "..", "styles", "swiss-grid", "style.json"))
     ap.add_argument("--color-set", default="vivid")
     ap.add_argument("--dots", type=int, default=3)
     ap.add_argument("--sample", action="store_true", help="不读真图，生成测试卡")
     args = ap.parse_args(argv[1:])
-    tokens = json.load(open(args.tokens, encoding="utf-8"))
+    tokens = deckio.read_json(args.tokens)
     colors = tokens["colorSets"][args.color_set]
     source = sample() if args.sample else Image.open(args.src)
     treated = duotone(source, colors["primary"], colors["secondary"], colors["background"], args.dots)

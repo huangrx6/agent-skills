@@ -10,49 +10,132 @@
 /* ── 标题：一个字重、紧字距、大字号 ──────────────────────────────────────────
    字距用 em 而不是 px：这个风格的字号跨 96~190px，写死 px 会让不同字号下的
    视觉松紧不一致（-3px 在 96px 上是紧，在 190px 上几乎没感觉）。 */
-.title{font:800 var(--s-title,190px)/1.04 var(--display);letter-spacing:-.035em;
-  color:var(--text);white-space:nowrap;margin:0;display:block}
+.title {
+ font: 800 var(--s-title, 190px) / 1.04 var(--display);
+ letter-spacing: -0.035em;
+ color: var(--text);
+ white-space: nowrap;
+ margin: 0;
+ display: block;
+}
 
 /* 副标题：压在标题下面一行，用**次级色**降一档，不抢戏 */
-.subtitle{font:400 var(--s-subtitle,40px)/1.45 var(--display);color:var(--accent);
-  margin-top:26px;letter-spacing:.01em}
+.subtitle {
+ font: 400 var(--s-subtitle, 40px) / 1.45 var(--display);
+ color: var(--accent);
+ margin-top: 26px;
+ letter-spacing: 0.01em;
+}
 
 /* 分隔线 = 一条短强调色杠。这是这个风格**唯一**的装饰元素。 */
-.rule{width:120px;height:10px;margin:44px 0 0;background:var(--accent);border-radius:0}
+.rule {
+ width: 120px;
+ height: 10px;
+ margin: 44px 0 0;
+ background: var(--accent);
+ border-radius: 0;
+}
 
 /* ── 条目：去掉项目符号，靠行距和缩进分层 ──────────────────────────────────
    这一条是这个风格的关键：方点符号（■）是印刷品语汇。讲台上要的是"一屏几条
    大字"，符号只会把句子切碎。 */
-.bullets{font:400 var(--s-bullet,46px)/1.75 var(--display);color:var(--text);
-  margin:0;padding:0;list-style:none}
-.bullets li{padding-left:0}
-.bullets i{display:none}
-.bullets.small{font-size:var(--s-bulletSmall,34px);line-height:1.7}
+.bullets {
+ font: 400 var(--s-bullet, 46px) / 1.75 var(--display);
+ color: var(--text);
+ margin: 0;
+ padding: 0;
+ list-style: none;
+}
+.bullets li {
+ padding-left: 0;
+}
+.bullets i {
+ display: none;
+}
+.bullets.small {
+ font-size: var(--s-bulletSmall, 34px);
+ line-height: 1.7;
+}
 
 /* ── 双栏 ────────────────────────────────────────────────────────────────── */
-.col .band{height:6px;margin-bottom:26px;background:var(--accent)}
-.col .band.b{background:var(--accent-2)}
-.col h3{font:700 var(--s-colTitle,54px)/1.2 var(--display);color:var(--text);
-  margin:0 0 20px;letter-spacing:-.02em}
+.col .band {
+ height: 6px;
+ margin-bottom: 26px;
+ background: var(--accent);
+}
+.col .band.b {
+ background: var(--accent-2);
+}
+.col h3 {
+ font: 700 var(--s-colTitle, 54px) / 1.2 var(--display);
+ color: var(--text);
+ margin: 0 0 20px;
+ letter-spacing: -0.02em;
+}
 
 /* ── 时间线：实心圆点（没有错位可言） ────────────────────────────────────── */
-.tl .dot{display:block;width:20px;height:20px;border-radius:50%;
-  background:var(--accent);margin-bottom:26px}
-.tl .dot::after{display:none}
-.tl b{display:block;font:700 var(--s-nodeLabel,34px)/1.3 var(--display);color:var(--text)}
-.tl em{display:block;font:400 var(--s-nodeNote,26px)/1.5 var(--display);
-  color:var(--text);opacity:.62;font-style:normal}
+.tl .dot {
+ display: block;
+ width: 20px;
+ height: 20px;
+ border-radius: 50%;
+ background: var(--accent);
+ margin-bottom: 26px;
+}
+.tl .dot::after {
+ display: none;
+}
+.tl b {
+ display: block;
+ font: 700 var(--s-nodeLabel, 34px) / 1.3 var(--display);
+ color: var(--text);
+}
+.tl em {
+ display: block;
+ font: 400 var(--s-nodeNote, 26px) / 1.5 var(--display);
+ color: var(--text);
+ opacity: 0.62;
+ font-style: normal;
+}
 
 /* ── 图表：不要外框、不要底纹、不要歪 —— 屏幕风格靠对比不靠质感 ─────────────── */
-.chartwrap{background:transparent;box-shadow:none;transform:none;padding:34px 0}
-.chartwrap .hf{display:none}
-.chartwrap .bar{fill:var(--accent)}
-.chartwrap .axis{stroke:var(--text);stroke-width:2;opacity:.28}
-.chartwrap .val{font:700 var(--s-chartValue,24px) var(--body);fill:var(--text)}
-.chartwrap .lbl{font:400 var(--s-chartLabel,22px) var(--body);fill:var(--text);opacity:.62}
-.chartcap{font:400 var(--s-caption,28px)/1.5 var(--body);color:var(--text);
-  opacity:.62;margin-top:26px}
+.chartwrap {
+ background: transparent;
+ box-shadow: none;
+ transform: none;
+ padding: 34px 0;
+}
+.chartwrap .hf {
+ display: none;
+}
+.chartwrap .bar {
+ fill: var(--accent);
+}
+.chartwrap .axis {
+ stroke: var(--text);
+ stroke-width: 2;
+ opacity: 0.28;
+}
+.chartwrap .val {
+ font: 700 var(--s-chartValue, 24px) var(--body);
+ fill: var(--text);
+}
+.chartwrap .lbl {
+ font: 400 var(--s-chartLabel, 22px) var(--body);
+ fill: var(--text);
+ opacity: 0.62;
+}
+.chartcap {
+ font: 400 var(--s-caption, 28px) / 1.5 var(--body);
+ color: var(--text);
+ opacity: 0.62;
+ margin-top: 26px;
+}
 
 /* ── 页码：安静地待在角落 ────────────────────────────────────────────────── */
-.foot{font:400 var(--s-foot,24px)/1 var(--body);color:var(--text);opacity:.42;
-  letter-spacing:.06em}
+.foot {
+ font: 400 var(--s-foot, 24px) / 1 var(--body);
+ color: var(--text);
+ opacity: 0.42;
+ letter-spacing: 0.06em;
+}

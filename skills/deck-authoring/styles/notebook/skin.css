@@ -1,0 +1,212 @@
+/* ══ 笔记本 Notebook skin ═══════════════════════════════════════════════════
+   纸的质感不是靠噪点，是靠**横格线 + 红边线 + 右上索引标签**这三样**矢量**元素 ——
+   所以它进 PDF 也是矢量（噪点颗粒在打印态被关掉，那套质感在这里不适用）。
+
+   三个钩子都用现成的，没加 DOM：
+     .slide 的 background-image  → 横格线
+     .slide::before              → 红边线（活页本的页边距线）
+     .slide::after               → 右上索引标签（竖排页码）
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 横格线：48px 一格的淡线，铺满整页 ──────────────────────────────────────
+   线是 6% 黑，很淡：**故意不跟文字基线对齐** —— 对齐需要每页按字号算 offset，
+   而字号是自适应的（每个版式不一样）。6% 的线偏半格看不出来，硬对齐反而是过度设计。 */
+.slide {
+  background-color: var(--paper);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 47px,
+    rgba(34, 32, 28, 0.07) 47px 48px
+  );
+}
+
+/* ── 红边线：距左 110px 的竖线 ───────────────────────────────────────────── */
+.slide::before {
+  content: "";
+  position: absolute;
+  left: 110px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--accent);
+  opacity: 0.55;
+}
+
+/* ── 右上索引标签：像活页夹侧边的分页签 ──────────────────────────────────── */
+.slide::after {
+  content: attr(data-idx);
+  position: absolute;
+  right: 0;
+  top: 96px;
+  padding: 20px 9px;
+  background: var(--accent);
+  color: var(--paper);
+  font: 700 22px/1 var(--body);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  writing-mode: vertical-rl;
+  border-radius: 5px 0 0 5px;
+}
+
+/* ── 标题：衬线、偏小、和正文拉开字体对比 ────────────────────────────────── */
+.title {
+  font: 700 var(--s-title, 112px)/1.12 var(--display);
+  letter-spacing: -0.01em;
+  color: var(--text);
+  white-space: nowrap;
+  margin: 0;
+  display: block;
+}
+
+.subtitle {
+  font: 400 var(--s-subtitle, 28px)/1.55 var(--body);
+  color: var(--text);
+  opacity: 0.62;
+  margin-top: 18px;
+}
+
+.rule {
+  width: 100%;
+  height: 1px;
+  margin: 32px 0 0;
+  background: var(--text);
+  opacity: 0.22;
+}
+
+/* ── 条目：短横线项目符（像手写的破折号），行距宽松好做笔记 ────────────────── */
+.bullets {
+  font: 400 var(--s-bullet, 30px)/1.72 var(--body);
+  color: var(--text);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bullets li {
+  position: relative;
+  padding-left: 40px;
+}
+
+.bullets li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0.72em;
+  width: 18px;
+  height: 3px;
+  background: var(--accent);
+}
+
+.bullets i {
+  display: none;
+}
+
+.bullets.small {
+  font-size: var(--s-bulletSmall, 25px);
+  line-height: 1.65;
+}
+
+.bullets.small li {
+  padding-left: 30px;
+}
+
+.bullets.small li::before {
+  width: 13px;
+  height: 2px;
+}
+
+/* ── 双栏：标签页式的顶条 ────────────────────────────────────────────────── */
+.col .band {
+  height: 26px;
+  margin-bottom: 18px;
+  background: var(--accent);
+  opacity: 0.9;
+}
+
+.col .band.b {
+  background: var(--accent-2);
+}
+
+.col h3 {
+  font: 700 var(--s-colTitle, 38px)/1.25 var(--display);
+  color: var(--text);
+  margin: 0 0 14px;
+}
+
+/* ── 时间线：手写时间轴上的刻度点 ───────────────────────────────────────── */
+.tl .dot {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-bottom: 20px;
+}
+
+.tl .dot::after {
+  display: none;
+}
+
+.tl b {
+  display: block;
+  font: 700 var(--s-nodeLabel, 28px)/1.3 var(--display);
+  color: var(--text);
+}
+
+.tl em {
+  display: block;
+  font: 400 var(--s-nodeNote, 21px)/1.55 var(--body);
+  color: var(--text);
+  opacity: 0.6;
+  font-style: normal;
+}
+
+/* ── 图表：细柱 + 淡基线，像手绘的条形图 ────────────────────────────────── */
+.chartwrap {
+  background: var(--paper);
+  box-shadow: 0 0 0 1px rgba(34, 32, 28, 0.18);
+  transform: none;
+  padding: 30px 34px;
+  border-radius: 6px;
+}
+
+.chartwrap .hf {
+  display: none;
+}
+
+.chartwrap .bar {
+  fill: var(--accent);
+}
+
+.chartwrap .axis {
+  stroke: var(--text);
+  stroke-width: 1;
+  opacity: 0.3;
+}
+
+.chartwrap .val {
+  font: 700 var(--s-chartValue, 22px) var(--body);
+  fill: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.chartwrap .lbl {
+  font: 400 var(--s-chartLabel, 18px) var(--body);
+  fill: var(--text);
+  opacity: 0.6;
+}
+
+.chartcap {
+  font: 400 var(--s-caption, 22px)/1.55 var(--body);
+  color: var(--text);
+  opacity: 0.6;
+  margin-top: 20px;
+}
+
+.foot {
+  font: 400 var(--s-foot, 18px)/1 var(--body);
+  color: var(--text);
+  opacity: 0.5;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}

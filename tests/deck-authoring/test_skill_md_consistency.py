@@ -32,11 +32,14 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "styles", "risograph", "style.json")
+TOKENS = os.path.join(SKILL, "styles", "swiss-grid", "style.json")
 SKILL_MD = os.path.join(SKILL, "SKILL.md")
 
-# 「| `type` | 用途 | 装饰墨块 | 风险点 |」
-TABLE_ROW = re.compile(r"^\|\s*`([a-z][a-z-]*)`\s*\|[^|]*\|\s*([✓✗])\s*\|[^|]*\|\s*$", re.M)
+# 「| `type` | 用途 | 风险点 |」——只取版式名与用途两列；装饰那一列删了，
+# 因为“放不放装饰”现在是**风格**决定的（token 的 decor.types），不是版式决定的，
+# 拿一张写死的表去对只会对出一个错的前提。守契约的用例改成了
+# test_decoration_contract_is_honored（有装饰的风格只在它声明的那几种版式上放）。
+TABLE_ROW = re.compile(r"^\|\s*`([a-z][a-z-]*)`\s*\|([^|]*)\|[^|]*\|\s*$", re.M)
 
 # 每个版式一页的最小 spec —— 只为把那一页渲出来看有没有墨块
 PROBE_SLIDES = {
@@ -71,47 +74,72 @@ class TestSkillMdMatchesRender(unittest.TestCase):
     def setUpClass(cls) -> None:
         with open(SKILL_MD, encoding="utf-8") as fh:
             cls.skill_md = fh.read()
-        with open(TOKENS, encoding="utf-8") as fh:
-            cls.tokens = json.load(fh)
+        cls.style = render.load_style()
+        cls.tokens = cls.style["tokens"]
+        # 色板名从风格里取（不写死）：写死过 "vivid"，默认风格一换就变成
+        # “用例还是绿的，但测的不是它要测的东西”。
+        cls.color_set = next(iter(cls.tokens["colorSets"]))
 
-    def _documented_decoration(self) -> dict[str, str]:
-        found = dict(TABLE_ROW.findall(self.skill_md))
+    def _documented_types(self) -> set[str]:
+        found = {m.group(1) for m in TABLE_ROW.finditer(self.skill_md)}
         self.assertTrue(found, "SKILL.md 里没解析到版式表 —— 表头或格式变了")
         return found
 
-    def _render_each(self, kinds: list[str]) -> dict[str, str]:
-        deck = {"colorSet": "vivid", "seed": 7, "title": "探针",
-                "slides": [PROBE_SLIDES[k] for k in kinds]}
-        html = render.render({"deck": deck})
+    def _render_each(self, kinds: list[str], style: dict | None = None) -> dict[str, str]:
+        chosen = style if style is not None else render.load_style()
+        # 色板名每种风格各自一套，从**这份风格**里取（不能拿别人的 colorSet 去渲）
+        deck = {"colorSet": next(iter(chosen["tokens"]["colorSets"])), "seed": 7,
+                "title": "探针", "slides": [PROBE_SLIDES[k] for k in kinds]}
+        html = render.render({"deck": deck}, chosen)
         sections = SECTION.findall(html)
         self.assertEqual(len(sections), len(kinds),
                          f"渲染出的页数 {len(sections)} ≠ 版式数 {len(kinds)}")
         return {k: ("✓" if "data-zone=" in s else "✗") for k, s in zip(kinds, sections)}
 
-    def test_decoration_column_matches_actual_render(self) -> None:
-        """「装饰墨块」那一列必须与产物里有没有 data-zone 完全一致。"""
-        documented = self._documented_decoration()
-        actual = self._render_each(list(documented))
-        mismatched = {k: (documented[k], actual[k]) for k in documented
-                      if documented[k] != actual[k]}
-        self.assertEqual(
-            mismatched, {},
-            f"SKILL.md 版式表与 render.py 不一致（版式: 文档写的→实测）：{mismatched}")
+    def test_decoration_contract_is_honored(self) -> None:
+        """装饰只在**风格自己声明的那几种版式**上出现。
+
+        为什么不用“版式 ↔ ✓/✗”那张写死的表：那等于把“放不放装饰”当成版式的属性。
+        它其实是**风格**的属性（`decor.types`），所以表一变就得同步改，
+        而同步一漏就是文档与产物不一致。改测契约之后，这条对每种风格都成立：
+
+          - 风格声明了装饰 → data-zone 恰好落在 decor.types 列的那些版式上
+          - 风格没声明（kind=null）→ 一页都不该有 data-zone
+        """
+        kinds = list(PROBE_SLIDES)
+        for name in ("billboard", "swiss-grid", "keynote-dark", "notebook"):
+            with self.subTest(style=name):
+                style = render.load_style(name)
+                spec = style["tokens"].get("decor") or {}
+                declared = set(spec.get("types") or []) if spec.get("kind") else set()
+                actual = self._render_each(kinds, style)
+                got = {k for k, mark in actual.items() if mark == "✓"}
+                self.assertEqual(
+                    got, declared,
+                    f"{name} 的装饰落点与它声明的 decor.types 不一致："
+                    f"声明 {sorted(declared)}，实际 {sorted(got)}")
 
     def test_documented_types_cover_all_probes(self) -> None:
         """文档列出的版式必须覆盖探针里的每一种 —— 少写一种就说明文档缺行。"""
-        documented = set(self._documented_decoration())
+        documented = self._documented_types()
         self.assertEqual(
             documented, set(PROBE_SLIDES),
             f"文档版式集与实现集不同：只在文档 {documented - set(PROBE_SLIDES)}；"
             f"只在实现 {set(PROBE_SLIDES) - documented}")
 
     def test_unknown_slide_type_is_rejected(self) -> None:
-        """版式集是封闭的 —— 未知 type 必须被拒，而不是静默渲成空白页。"""
-        bad = {"deck": {"colorSet": "vivid", "seed": 1, "title": "x",
+        """版式集是封闭的 —— 未知 type 必须被拒，而不是静默渲成空白页。
+
+        ⚠️ colorSet 要用**当前默认风格里真实存在**的名字：以前写死 "vivid"，
+        默认风格一换它就开始因为 colorSet 而报错 —— 用例还是绿的，
+        但测的已经不是“版式被拒”了。
+        """
+        bad = {"deck": {"colorSet": self.color_set, "seed": 1, "title": "x",
                         "slides": [{"type": "not-a-real-type", "title": "x"}]}}
-        with self.assertRaises(SystemExit):
+        with self.assertRaises(SystemExit) as caught:
             render.render(bad)
+        self.assertIn("版式", str(caught.exception),
+                      f"报的错与版式无关 —— 用例没测到目标：{caught.exception}")
 
 
 if __name__ == "__main__":

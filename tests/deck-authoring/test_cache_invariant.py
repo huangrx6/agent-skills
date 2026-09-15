@@ -35,7 +35,7 @@ logging.getLogger("PIL").setLevel(logging.ERROR)
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "styles", "risograph", "style.json")
+TOKENS = os.path.join(SKILL, "styles", "swiss-grid", "style.json")
 
 CACHE_ENV = "AGENT_SKILLS_CACHE_DIR"
 SIZE = (320, 200)
@@ -61,7 +61,9 @@ class TestCacheInvariant(unittest.TestCase):
     def setUp(self) -> None:
         with open(TOKENS, encoding="utf-8") as fh:
             tokens = json.load(fh)
-        self.colors = tokens["colorSets"]["vivid"]
+        # 取哪套色板不重要，只要是**真存在的一套**：这些用例测的是缓存与色板三角
+        # 不变量，与风格无关。写死某个名字就会在换默认风格时挂掉（已经挂过一次）。
+        self.colors = next(iter(tokens["colorSets"].values()))
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         self.cache = os.path.join(self._tmp.name, "cache")

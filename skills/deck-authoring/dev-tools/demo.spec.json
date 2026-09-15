@@ -1,13 +1,14 @@
 {
   "deck": {
-    "colorSet": "vivid",
+    "style": "swiss-grid",
+    "colorSet": "blue",
     "seed": 11,
     "title": "2026 产品复盘",
     "slides": [
       {
         "type": "title",
         "title": "2026 产品复盘",
-        "subtitle": "从 0 到 1 的十二个月 / riso print · 双色叠印"
+        "subtitle": "从 0 到 1 的十二个月 / 产品与增长"
       },
       {
         "type": "content-text",
@@ -22,8 +23,8 @@
         "type": "content-image",
         "title": "现场照片",
         "bullets": [
-          "把原始照片重新制版",
-          "两墨色阶 + 半调网点"
+          "原始照片降噪后重新制版",
+          "分色版 → 高对比双色调"
         ],
         "image": "sample-treated.png"
       },

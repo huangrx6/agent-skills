@@ -1,0 +1,212 @@
+/* ══ 大字报 Billboard skin ══════════════════════════════════════════════════
+   数字是主角，其余全部**退到背景里**。
+
+   这个风格最怕的是「什么都想要」：正文也想大、数字也想大、还想加色块 —— 一页就吵了。
+   所以层级只有三级，而且跨度拉得很开：
+     数字（64~150）>>  标题（88~150，但不与数字同页争主角）  >  注释（20~24）
+   注释统一小、统一灰，它的作用是**给数字做注脚**，不是说完话。
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 顶部通栏强调色条：整页唯一的"装饰"，也是栅格的起跑线 ─────────────────── */
+.slide::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  height: 14px;
+  background: var(--accent);
+}
+
+/* 右下角巨号页码：和大数字呼应，把右下角的空补上 */
+.slide::after {
+  content: attr(data-idx);
+  position: absolute;
+  right: 56px;
+  bottom: 22px;
+  font: 700 132px/0.8 var(--display);
+  color: var(--accent);
+  opacity: 0.14;
+  letter-spacing: -0.06em;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* ── 标题：紧字距、粗、左对齐 ────────────────────────────────────────────── */
+.title {
+  font: 800 var(--s-title, 150px)/1.02 var(--display);
+  letter-spacing: -0.045em;
+  color: var(--text);
+  white-space: nowrap;
+  margin: 0;
+  display: block;
+}
+
+.subtitle {
+  font: 400 var(--s-subtitle, 30px)/1.5 var(--body);
+  color: var(--text);
+  opacity: 0.6;
+  margin-top: 20px;
+}
+
+.rule {
+  width: 96px;
+  height: 14px;
+  margin: 36px 0 0;
+  background: var(--accent);
+}
+
+/* ── 条目：粗方块 + 紧凑行距（不是列表，是一组并列的论断） ─────────────────── */
+.bullets {
+  font: 700 var(--s-bullet, 38px)/1.45 var(--display);
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bullets li {
+  position: relative;
+  padding-left: 44px;
+  margin-bottom: 0.55em;
+}
+
+.bullets li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.42em;
+  width: 18px;
+  height: 18px;
+  background: var(--accent);
+}
+
+.bullets i {
+  display: none;
+}
+
+.bullets.small {
+  font-size: var(--s-bulletSmall, 28px);
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+.bullets.small li {
+  padding-left: 30px;
+}
+
+.bullets.small li::before {
+  width: 12px;
+  height: 12px;
+}
+
+/* ── 双栏：上色条 + 大栏标（栏标就是这一栏的"数字位"） ───────────────────── */
+.col .band {
+  height: 12px;
+  margin-bottom: 20px;
+  background: var(--accent);
+}
+
+.col .band.b {
+  background: var(--text);
+  opacity: 0.85;
+}
+
+.col h3 {
+  font: 800 var(--s-colTitle, 52px)/1.1 var(--display);
+  letter-spacing: -0.03em;
+  color: var(--text);
+  margin: 0 0 18px;
+}
+
+/* ── 时间线：节点标签走大字号（时间点是论点） ───────────────────────────── */
+.tl .dot {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-radius: 0;
+  background: var(--accent);
+  margin-bottom: 22px;
+}
+
+.tl .dot::after {
+  display: none;
+}
+
+.tl b {
+  display: block;
+  font: 800 var(--s-nodeLabel, 64px)/1 var(--display);
+  letter-spacing: -0.04em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.tl em {
+  display: block;
+  font: 400 var(--s-nodeNote, 22px)/1.5 var(--body);
+  color: var(--text);
+  opacity: 0.6;
+  font-style: normal;
+  margin-top: 10px;
+}
+
+/* ── 图表：柱值也大字、去框、只留基线 ───────────────────────────────────── */
+.chartwrap {
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  padding: 30px 0;
+}
+
+.chartwrap .hf {
+  display: none;
+}
+
+.chartwrap .bar {
+  fill: var(--accent);
+}
+
+.chartwrap .axis {
+  stroke: var(--text);
+  stroke-width: 2;
+}
+
+.chartwrap .val {
+  font: 800 var(--s-chartValue, 40px) var(--display);
+  letter-spacing: -0.03em;
+  fill: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.chartwrap .lbl {
+  font: 400 var(--s-chartLabel, 20px) var(--body);
+  fill: var(--text);
+  opacity: 0.6;
+}
+
+.chartcap {
+  font: 400 var(--s-caption, 24px)/1.5 var(--body);
+  color: var(--text);
+  opacity: 0.6;
+  margin-top: 22px;
+}
+
+.foot {
+  font: 400 var(--s-foot, 20px)/1 var(--body);
+  color: var(--text);
+  opacity: 0.45;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ── 大色块（decor.kind = accent-block） ─────────────────────────────────────
+   它不是图案，是**色场**：把右下一大片白「收住」，给巨号页码一个色底。
+   所以透明度压得很低（0.1）—— 一高就变成色块贴纸，和「数字当主角」打架。 */
+.decor-block {
+  position: absolute;
+  background: var(--accent);
+  opacity: 0.1;
+  pointer-events: none;
+}

@@ -40,7 +40,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "styles", "risograph", "style.json")
+TOKENS = os.path.join(SKILL, "styles", "swiss-grid", "style.json")
 DEMO = os.path.join(SKILL, "dev-tools", "demo.spec.json")
 
 CHART_SLIDE = {
@@ -119,10 +119,15 @@ class TestCheckMutations(unittest.TestCase):
     # ── ① 对比度 ──────────────────────────────────────────────────────────
 
     def test_contrast_mutation_is_caught(self) -> None:
-        """变异：把 vivid 换成两墨都亮的坏色板（朱红 × 土黄）。"""
+        """变异：把文字色改成跟底色几乎一样（对比度必然不达标）。
+
+        变异的是 `colorSets.*.text` —— 现在文字色是**声明**的（风格自己说了").
+        原来是改 primary/secondary 让**推导**出来的叠印色变差（那是叠印风格的路）。
+        两种走的是同一个门禁（ink.text_color），所以改哪一边都能验到门禁真的在跑。
+        """
         bad = copy.deepcopy(self.tokens)
-        bad["colorSets"]["vivid"] = {
-            "primary": "#FF6B35", "secondary": "#FFCC00", "background": "#FAF3E7"}
+        name = next(iter(bad["colorSets"]))
+        bad["colorSets"][name]["text"] = bad["colorSets"][name]["background"]
         bad_style = dict(self.style, tokens=bad)
         problems = self._problems(self.demo, render.render(self.demo, bad_style), bad)
         self._assert_reports(problems, "对比度", "① 对比度")
@@ -159,15 +164,25 @@ class TestCheckMutations(unittest.TestCase):
     # ── ④ 装饰不压文字 ────────────────────────────────────────────────────
 
     def test_decoration_zone_mutation_is_caught(self) -> None:
-        """变异：把产物里真实的 data-zone 改成一个未知 zone。"""
-        found = re.search(r'data-zone="(tr|br)"', self.demo_html)
+        """变异：把产物里真实的 data-zone 改成一个未知 zone。
+
+        ⚠️ 拿**有装饰的风格**测：默认的瑞士栅格没有装饰（`decor.kind = null`），
+        产物里一个 data-zone 都不会有 —— 拿它跑这条只会得到“前提不成立”。
+        这条用例的真正含义是“有装饰时都得待在安全区”，所以必须挑一个有装饰的风格。
+        """
+        style = render.load_style("billboard")
+        deck = copy.deepcopy(self.demo)
+        # 色板名是**每种风格各自**的 —— 拿 A 风格的 colorSet 去渲 B 风格会被拒。
+        deck["deck"]["colorSet"] = next(iter(style["tokens"]["colorSets"]))
+        html = render.render(deck, style)
+        found = re.search(r'data-zone="(tr|br)"', html)
         if found is None:
-            self.fail("产物里没有 data-zone=tr|br —— render.py 改格式了")
+            self.fail("billboard 产物里没有 data-zone=tr|br —— 装饰版式或标记改了")
         original = found.group(1)
         mutated, count = re.subn(rf'data-zone="{original}"', 'data-zone="center"',
-                                 self.demo_html, count=1)
+                                 html, count=1)
         self.assertEqual(count, 1)
-        problems = self._problems(self.demo, mutated)
+        problems = self._problems(deck, mutated, style["tokens"])
         self._assert_reports(problems, "未知装饰 zone", "④ 装饰不压文字")
 
     # ── ④ 柱高成比例 ──────────────────────────────────────────────────────

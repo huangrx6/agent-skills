@@ -27,7 +27,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "styles", "risograph", "style.json")
+TOKENS = os.path.join(SKILL, "styles", "swiss-grid", "style.json")
 DEMO = os.path.join(SKILL, "dev-tools", "demo.spec.json")
 
 
@@ -61,12 +61,26 @@ class TestDeterminism(unittest.TestCase):
         self.assertEqual(first, second,
                          "同种子两次渲染不一致 —— 派生函数里混进了全局 random")
 
-    def test_different_seed_changes_output(self) -> None:
-        """改 seed 必须改变产物 —— 否则 seed 没被真正使用。"""
+    def test_different_seed_changes_output_for_a_random_style(self) -> None:
+        """改 seed 必须改变产物 —— 但**仅限真的带随机性的风格**。
+
+        ⚠️ 这条原本是拿默认风格测的，而在默认风格从叠印那套换成瑞士栅格之后
+        它挂了 —— 因为瑞士栅格的 `misregistration` 与 `grainOpacity` 都是 [0,0]，
+        它就是一个**确定性风格**，seed 对它本就无事可做。
+
+        那不是 bug，是断言的前提错了：seed 的作用范围就是“声明了随机区间的风格”。
+        所以要测的是**机制还活着**，而不是“每个风格都必须抖”—— 明确给一份
+        带非零区间的 token 去驱它。
+        """
+        style = dict(render.load_style(), tokens=copy.deepcopy(self.style["tokens"]))
+        style["tokens"]["misregistration"]["offsetRangeX"] = [3, 7]
+        style["tokens"]["misregistration"]["offsetRangeY"] = [3, 7]
+        style["tokens"]["texture"]["grainOpacity"] = [0.08, 0.15]
+        first = render.render(self.spec, style)
         other = copy.deepcopy(self.spec)
         other["deck"]["seed"] = other["deck"].get("seed", 1) + 1
-        self.assertNotEqual(self._render(self.spec), self._render(other),
-                            "改 seed 后产物没变 —— 派生函数没用到 seed")
+        self.assertNotEqual(first, render.render(other, style),
+                            "给了非零随机区间、只改 seed，产物却没变 —— 派生函数没用到 seed")
 
     def test_check_result_is_idempotent_on_same_product(self) -> None:
         """同一份产物跑两次 check，判定必须一致。"""

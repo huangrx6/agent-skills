@@ -79,6 +79,11 @@ measure_mod = _load_sibling("measure")
 EMU_PER_PX = 9525
 PX_TO_PT = 0.75
 
+# 能导出成原生形状的装饰类型。**加新装饰时这里与 add_decor 必须同时长** ——
+# 只长一边的话，导出会静默少一个元素（文件照生成、页数照样对，就是缺东西）。
+# test_pptx_native 里有一条用例拿所有风格声明的 kind 来对这里。
+DECOR_SHAPES = {"accent-block", "halftone-circle"}
+
 # 角色 → 用哪套字。/ 是否加粗。字体族本身从产物里的 --display / --body 取。
 SERIF_ROLES = {"title"}
 BOLD_ROLES = {"title"}
@@ -186,11 +191,31 @@ def add_text(slide, el: dict, box: tuple[float, float, float, float],
 
 
 def add_decor(slide, d: dict, slides: list[dict], vars_: dict[str, str]) -> None:
-    """装饰墨块 → 带图案填充的椭圆（PowerPoint 内置 `pct25` 近似网点）。"""
+    """装饰墨块 → 原生形状。**按 kind 分派**（不是写死一种）：
+
+      accent-block     实心矩形色场
+      halftone-circle  带 `pct25` 图案填充的椭圆（网点圆的近似）
+
+    加新装饰类型时这里必须同步加一分支，否则导出会**静默少一个元素**。
+    `test_pptx_native` 里有一条「每种风格的 decor.kind 都有映射」看着它。
+    """
     x, y, w, h = rel_box(d, slides)
-    shape = slide.shapes.add_shape(MSO_SHAPE.OVAL,
-                                   Emu(round(x * EMU_PER_PX)), Emu(round(y * EMU_PER_PX)),
-                                   Emu(round(w * EMU_PER_PX)), Emu(round(h * EMU_PER_PX)))
+    kind = d.get("kind") or "halftone-circle"
+    geom = (Emu(round(x * EMU_PER_PX)), Emu(round(y * EMU_PER_PX)),
+            Emu(round(w * EMU_PER_PX)), Emu(round(h * EMU_PER_PX)))
+    if kind not in DECOR_SHAPES:
+        raise SystemExit(f"✗ pptx 导出认不出的装饰 kind={kind!r}"
+                         f"（可选：{sorted(DECOR_SHAPES)} —— add_decor 缺分支？）")
+    if kind == "accent-block":
+        shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, *geom)
+        shape.line.fill.background()
+        shape.shadow.inherit = False
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = css_color(vars_["--accent"])
+        return
+    if kind != "halftone-circle":
+        raise SystemExit(f"✗ pptx 导出认不出的装饰 kind={kind!r}（add_decor 缺分支）")
+    shape = slide.shapes.add_shape(MSO_SHAPE.OVAL, *geom)
     shape.line.fill.background()
     shape.shadow.inherit = False             # add_shape 会带一套主题效果（阴影），清掉
     shape.fill.patterned()
