@@ -43,6 +43,8 @@ python3 scripts/brand.py                                             # 12) 看�
 ```bash
 python3 scripts/style.py                       # 八套风格 + 契约状态
 python3 scripts/style.py --sheet -o s.png      # 所有风格 × 同一份 demo → 一张图
+python3 scripts/style.py --sheet -o m.png --spec dev-tools/stress.spec.json --pages 9,14
+                                               # 矩阵：某份 deck 的第 9/14 页在**全部风格**下
 python3 scripts/style.py swiss-grid            # 一套风格的摘要
 ```
 
@@ -67,10 +69,13 @@ python3 scripts/fit.py --json '{"title":"结论","bullets":["…","…"]}'
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 141 条
+python3 -m unittest discover -s tests/deck-authoring -v     # 143 条，约 3 分钟
 ```
 
-钉住十七项不变量：同 spec + 同种子字节一致（带随机区间的风格；确定性风格本就与 seed 无关）、
+耗时说明：其中约 30 秒是**压测回归**（每套风格 × 真实形状的 deck 各开一次真浏览器），
+其余是各测试自己的渲染/测量。改了风格或渲染层就跑全量；只改文档可以只跑相关的那个文件。
+
+钉住十八项不变量：同 spec + 同种子字节一致（带随机区间的风格；确定性风格本就与 seed 无关）、
 色板门禁 + 两墨乘叠印的数学、校验的变异验证（每项都造违规样例）、半调墨覆盖率随灰度单调、
 缓存命中后仍过色板三角不变量、外壳行为（真开浏览器按键翻页 + letterbox 缩放比贴边不溢）、
 PDF 是矢量且页数/页尺寸对、可编辑 PPTX 的**字是真字**且坐标是页内坐标、
@@ -82,7 +87,9 @@ PDF 是矢量且页数/页尺寸对、可编辑 PPTX 的**字是真字**且坐�
 技能相对路径；`cover+end` 指的是 end 版式那页而不是数组最后一页；logo 压文字会挡）、
 **试排**（"装得下"与"半页空"是两个判据，混成一个就会把稀疏页判成装不下 —— 真踩过）、
 **风格契约**（字号档 / 运动参数 / 色板门槛 / 装饰声明，逐项造违规样例验它有牙；
-遍历的是**目录**不是写死的名单 —— 写死名单让四套新风格逃过检查过一次）。
+遍历的是**目录**不是写死的名单 —— 写死名单让四套新风格逃过检查过一次）、
+**压测**（每套风格 × 真实形状的 deck 过 check：7 条密页 / 5+5 两栏 / 6 节点时间线 /
+6 柱图表 / 带图注的图文页 / 18 字长标题 / 收尾页）。
 
 ## 依赖
 
@@ -150,7 +157,8 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 ├── brands/                   # 品牌资产：一个品牌 = 一个目录，不碰 .py
 │   └── example/              #   示例品牌（logo 正版 + 反白版 + 署名）
 ├── dev-tools/
-│   └── demo.spec.json       # 一份能跑的样例（已引用 example 品牌）
+│   ├── demo.spec.json       # 一份能跑的样例（已引用 example 品牌）
+│   └── stress.spec.json     # **压测**用：21 页真实形状（长标题/密页/疏页/全部版式）
 ├── evals/evals.json         # 行为评估用例
 └── references/
     ├── style-architecture.md    # 多风格 seam、字段集

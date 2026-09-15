@@ -149,17 +149,34 @@ PROBE_JS = r"""
         fontFamily: cs.fontFamily,
         // 图元素的原始像素尺寸：判断“是不是被放大渲染了”（放大 = 糊）。
         // SVG 也报自己的 viewBox 尺寸（但 SVG 放大不糊，所以那边不看这条）。
-        naturalW: el.naturalWidth || 0,
-        naturalH: el.naturalHeight || 0,
+        //
+        // 要往下找一层 `<img>`：`data-m` 有时挂在**包着图的容器**上（内容图的
+        // `.imgwrap` 是 `<figure>`，而品牌 logo 的 `data-m` 直接挂在 `<img>` 上）。
+        // 只看 el.naturalWidth 的话，内容图永远报 0 —— “图被放大＝糊”那条检查
+        // 就永远不会触发（实测：压测里量出来 s12.image 是 0，而 images 数组里是 640）。
+        naturalW: el.naturalWidth || (el.querySelector && el.querySelector('img')
+                   ? el.querySelector('img').naturalWidth : 0) || 0,
+        naturalH: el.naturalHeight || (el.querySelector && el.querySelector('img')
+                   ? el.querySelector('img').naturalHeight : 0) || 0,
         color: cs.color,
         overflow: cs.overflow,
         visible: cs.visibility !== 'hidden' && cs.display !== 'none' && parseFloat(cs.opacity) > 0
       });
-      // 只统计**真有文字的**元素。`<figure class="imgwrap">` 这类一个字形都不渲染，
+      // 只统计**自己直接渲染文字**的元素。
+      //
+      // 判据是「有直接子文本节点」，不是 `textContent`：后者会把**后代的**文字也算进来，
+      // 于是 `<figure class="imgwrap"><img><figcaption>图注</figcaption></figure>`
+      // 里的 figure 就被当成“有文字”的元素 —— 而它自己一个字形都不渲染，
       // 它的 font-family 只是 Chrome 给 CJK 的 UA 默认值（实测报了 'PingFang SC'，
-      // 而页面上根本没写这个族）—— 对一个不出字的元素谈字体回退没有意义，
-      // 报出来只会把人练成“忽略字体提示”。
-      if ((el.textContent || '').trim()) {
+      // 页面上根本没写这个族）。这类假提示会把人生生练成"忽略字体提示"。
+      //
+      // 踩过两次：第一次是 figure 里只有 <img>（无 textContent，侥幸躲过）；
+      // 加上 <figcaption> 之后 textContent 非空，八套风格全部报了同一条假提示。
+      var ownText = '';
+      for (var ni = 0; ni < el.childNodes.length; ni++) {
+        if (el.childNodes[ni].nodeType === 3) ownText += el.childNodes[ni].nodeValue;
+      }
+      if (ownText.trim()) {
         stacks[cs.fontFamily] = true;
         cs.fontFamily.split(',').forEach(function (f) {
           f = f.trim().replace(/^["']|["']$/g, '');

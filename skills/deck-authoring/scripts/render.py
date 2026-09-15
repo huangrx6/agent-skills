@@ -255,7 +255,13 @@ html,body{margin:0;background:var(--viewer)}
 .tl{display:flex;gap:34px;list-style:none;padding:0;margin:60px 0 0}
 .tl li{width:300px}
 .chartwrap{margin-top:44px;width:1180px;padding:34px 38px;position:relative}
-.chartwrap svg{position:relative;display:block;width:100%}
+/* 图表的高度**由壳给死**（330px），宽度按 viewBox 比例自己算。
+   为什么不能让它 width:100% 自己撑：那样高度会跟着容器宽度变 ——
+   而各风格的 .chartwrap 内边距不同（34px vs 30px vs 0），于是同一张图表
+   在不同风格里高 40~50px，页脚余量从 43 到 92 不等，有的发空有的贴边。
+   钉死高度之后八套一致，余量稳定在 30~50px。 */
+.chartwrap svg{position:relative;display:block;height:330px;width:auto;
+  max-width:100%;margin:0 auto}
 .end{position:absolute;left:84px;top:330px}
 /* 页脚一行：页脚 + 品牌署名同在左下这一带。
    不用 space-between 把署名推到右边 —— 那样它会压在巨号页码上（三套风格都把右下
@@ -291,10 +297,16 @@ def chart_svg(data: list[dict], unit: str = "", tag_attr: str = "") -> str:
         # 上面已经确认是 int/float 且排除了 bool —— 不用再 float() 转一次
         values.append(v)
     peak = max(values) or 1.0
-    w, h, base = 1100, 380, 400
+    # 图表自身的**比例**决定它在页面上占多高（SVG 是 width:100%，高度按比例来）。
+    # 压测之前这里是 1100×460 —— 满宽渲染出 ~462px 高，加上标题块(152) + 容器上下
+    # padding(68) + 图注(60) + 页边(132)，整页要 911px，**八套风格全部**把图注压进了
+    # 页脚区，paper-ink 直接裁掉。demo 里根本没有图表页，所以从来没人看见。
+    # 现在压到 1100×330：满宽渲染 ~331px，整页 ~787px，留 37px 余量。
+    # 柱区占 250/330（比例与原来一致），上下给刻度标签留了头。
+    w, h, base = 1100, 250, 286
     slot = w / len(data)
     bar_w = min(120.0, slot * 0.55)
-    parts = [f'<svg viewBox="0 0 {w} {base + 60}" role="img" {tag_attr}>']
+    parts = [f'<svg viewBox="0 0 {w} {base + 44}" role="img" {tag_attr}>']
     for k, (d, v) in enumerate(zip(data, values)):
         bh = h * (v / peak)
         x = k * slot + (slot - bar_w) / 2
@@ -703,10 +715,20 @@ def render(deck_spec: dict, style: dict | None = None) -> str:
                 for bi, b in enumerate(slide.get("bullets", [])))
             src = slide["image"]
             img_attrs = tag(f"s{i}.image", i, "image", src)
+            # 图注放在 <figure> 里的 <figcaption>，不是另外挂一个 div：
+            # 语义上它属于这张图（读屏器会念成图的一部分），样式上它跟着图的宽度
+            # （640px）而不是跟着正文栏 —— 压测时才发现 content-image 之前
+            # **根本不能带图注**，而给图配一行注是很自然的写法。
+            cap = ""
+            if slide.get("caption"):
+                cap_attrs = tag(f"s{i}.caption", i, "caption", slide["caption"],
+                                tier["caption"])
+                cap = (f'<figcaption class="chartcap" {cap_attrs}>'
+                       f'{html.escape(slide["caption"])}</figcaption>')
             out.append('<div class="two"><div class="main">'
                        f'<ul class="bullets" style="--s-bullet:{bsize}px">{items}</ul></div>'
                        f'<figure class="imgwrap" {img_attrs}>'
-                       f'<img src="{html.escape(src)}" alt=""></figure></div>')
+                       f'<img src="{html.escape(src)}" alt="">{cap}</figure></div>')
         elif kind == "two-column":
             out.append(f'<div class="titleblock tb-{t_tier}" '
                        f'style="--s-title:{tsize}px">{th}</div>')

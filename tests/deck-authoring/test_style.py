@@ -33,6 +33,7 @@ SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.b
 SCRIPTS = os.path.join(SKILL, "scripts")
 STYLES = os.path.join(SKILL, "styles")
 DEMO = os.path.join(SKILL, "dev-tools", "demo.spec.json")
+STRESS = os.path.join(SKILL, "dev-tools", "stress.spec.json")
 
 
 def _load(name: str):
@@ -226,6 +227,79 @@ class TestContactSheet(unittest.TestCase):
                 spec["deck"]["colorSet"] = next(iter(raw["colorSets"]))
                 html = render.render(spec)          # 会 raise（色板名不认识）
                 self.assertIn("</html>", html)
+
+class TestEveryStyleSurvivesTheStressDeck(unittest.TestCase):
+    """每套风格都要能在**真实形状**的 deck 上过 check —— 这才是"稳定"的实际含义。
+
+    为什么值得这个代价：图表页那条**结构性溢出**（八套风格全部把图注压进页脚区、
+    paper-ink 直接裁掉）就是压测找出来的 —— 而它在此之前躲过了所有测试，
+    因为 `demo.spec.json` 里**根本没有图表页**。契约测试只验 token 齐不齐，
+    渲染出来长什么样它不知道；而"换个风格就撞车"正是最该被自动拦住的事。
+
+    代价控制：只取**每种版式一页**（8 页）而不是压测的 21 页 —— 这里要验的是
+    版式 × 风格，不是内容量。测量开销随页数走，21 页 × 8 套会把套件拖到两分钟以上。
+
+    图片自己造（`plate.sample()`）：`sample-treated.png` 是 gitignore 的产物，
+    让测试依赖一个本地才有的文件，等于换台机器就红。
+    """
+
+    # 每种版式取一页，且刻意取**最险的形状**：7 条密页、5+5 两栏、6 节点时间线、
+    # 6 根柱的图表、带图注的图文页、18 字长标题、收尾页。
+    # ⚠️ 这串页号写错过一次：第 21 页是**附录**，第 20 页才是 `end` ——
+    # 于是"收尾版式"根本没进压测。下面那条 `test_the_pick_really_covers_every_layout`
+    # 就是为这个写的（它会去比 PICK 覆盖的版式集合）。
+    PICK = (1, 3, 5, 8, 9, 12, 13, 20)
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls._tmp.cleanup)
+        cls.spec = deckio.read_json(STRESS)
+        # 造图（相对路径的产物要同目录交付，所以写进临时目录）
+        plate = _load("plate")
+        plate.sample((640, 400)).save(os.path.join(cls._tmp.name, "sample-treated.png"))
+
+    def test_every_style_renders_cleanly(self) -> None:
+        """一次测量两用（check 的毛病 + 图表页的余量）—— 每次测量都要开一次
+        Chrome 并截图整份 deck，重复付这个钱不值。"""
+        check_mod = _load("check")
+        measure_mod = _load("measure")
+        for name in style.available():
+            with self.subTest(style=name):
+                raw = deckio.read_json(os.path.join(STYLES, name, "style.json"))
+                spec = json.loads(json.dumps(self.spec))
+                spec["deck"]["style"] = name
+                spec["deck"]["colorSet"] = next(iter(raw["colorSets"]))
+                spec["deck"]["slides"] = [self.spec["deck"]["slides"][i - 1] for i in self.PICK]
+                path = os.path.join(self._tmp.name, f"{name}.html")
+                with open(path, "w", encoding="utf-8") as fh:
+                    fh.write(render.render(spec))
+                measured = measure_mod.measure(path)
+                problems = check_mod.check(spec, path, measured=measured)
+                self.assertEqual(problems, [], f"{name} 在真实形状的 deck 上没过 check")
+
+                # 图表页那条结构性溢出（图注压进页脚）单独钉死 —— 它是最贵的那次回归。
+                # 判据用**内容带底**（页脚之上），不是页边界：压进页脚区就算坏，
+                # 因为页脚那一行会被盖住（被裁是更晚的事）。
+                chart_no = self.PICK.index(9) + 1        # 6 柱图表在 PICK 里的序号
+                box = measure_mod.slide_content_span(measured, chart_no)
+                self.assertIsNotNone(box, f"{name} 的图表页量不到内容")
+                assert box is not None
+                _top, bottom = box
+                self.assertLessEqual(
+                    bottom, render.CONTENT_BOTTOM,
+                    f"{name} 的图表页内容底 {bottom:.0f}px 越过正文带底 "
+                    f"{render.CONTENT_BOTTOM}px —— 图注压进页脚区了")
+
+    def test_the_pick_really_covers_every_layout(self) -> None:
+        """这条是给上面那条兜底的：`PICK` 要是漏了某种版式，
+        上面那条测试会照样绿 —— 而它绿得毫无意义。"""
+        kinds = {self.spec["deck"]["slides"][i - 1]["type"] for i in self.PICK}
+        from_renderer = set(render.TITLE_TIER) | {"content-text", "content-image",
+                                                  "two-column", "timeline", "chart"}
+        self.assertEqual(sorted(from_renderer - kinds), [],
+                         f"PICK 漏了这些版式，那它们就没被压测覆盖：{sorted(from_renderer - kinds)}")
+
 
 
 if __name__ == "__main__":

@@ -162,11 +162,13 @@ def summarize(name: str) -> str:
     return "\n".join(out)
 
 
-def sheet(path: str, styles: list[str] | None = None, scale_pct: int = 42) -> str:
-    """所有风格 × 同一份 demo → 一张联系表。
+def sheet(path: str, styles: list[str] | None = None, scale_pct: int = 42,
+          spec_path: str | None = None, pages: list[int] | None = None) -> str:
+    """所有风格 × 同一份内容 → 一张联系表。
 
-    看的是**同一份内容**在不同风格下的样子，所以固定用 demo、固定取封面与一页内容页。
-    这是「先出三个方向让人选」那个流程的实物依据。
+    - 缺省用 `dev-tools/demo.spec.json` 的**封面 + 第 2 页**（选风格看这两页最有效）。
+    - 传 `spec_path` / `pages` 就变成**矩阵**：某一份 deck 的第 N 页在全部风格下的样子。
+      压测就是用这个看 8 风格 × 各版式（`--spec dev-tools/stress.spec.json --pages 9,14`）。
 
     `scale_pct` 是**整数百分比**而不是浮点缩放：尺寸用整数算术算出来，
     不必再调 `int()` 转一道（那只是多一个抛异常的地方）。
@@ -176,7 +178,7 @@ def sheet(path: str, styles: list[str] | None = None, scale_pct: int = 42) -> st
     names = styles or available()
     if not names:
         raise SystemExit("✗ 一套风格都没有")
-    spec = deckio.read_json(DEMO)
+    spec = deckio.read_json(spec_path or DEMO)
     tiles: list[tuple[str, list[str]]] = []
     tmp = tempfile.mkdtemp(prefix="deck-sheet-")
     for name in names:
@@ -186,10 +188,14 @@ def sheet(path: str, styles: list[str] | None = None, scale_pct: int = 42) -> st
         probe["deck"]["colorSet"] = next(iter(raw["colorSets"]))
         html_path = os.path.join(tmp, f"{name}.html")
         deckio.write_text(html_path, render.render(probe))
-        pages = shots.shoot(html_path, os.path.join(tmp, name), render.SLIDE_W,
-                            render.SLIDE_H, 6)
-        # 封面 + 第 2 页（一页正文）—— 这两页最能看出这套风格怎么处理“稀疏”与“密集”
-        tiles.append((f"{name}（{raw['temperature']}）", [pages[0], pages[1]]))
+        count = max(pages) if pages else 6
+        rendered = shots.shoot(html_path, os.path.join(tmp, name), render.SLIDE_W,
+                               render.SLIDE_H, count)
+        want = [p - 1 for p in pages] if pages else [0, 1]
+        picked = [rendered[k] for k in want if 0 <= k < len(rendered)]
+        if not picked:
+            raise SystemExit(f"✗ --pages 越界：这份 deck 只有 {len(rendered)} 页")
+        tiles.append((f"{name}（{raw['temperature']}）", picked))
 
     tw = render.SLIDE_W * scale_pct // 100
     th = render.SLIDE_H * scale_pct // 100
@@ -198,10 +204,10 @@ def sheet(path: str, styles: list[str] | None = None, scale_pct: int = 42) -> st
     height = pad + (head + th + 10) * len(tiles)
     board = Image.new("RGB", (width, height), (20, 20, 22))
     draw = ImageDraw.Draw(board)
-    for i, (label, pages) in enumerate(tiles):
+    for i, (label, imgs) in enumerate(tiles):
         y = pad + i * (head + th + 10)
         draw.text((pad, y + 8), label, fill=(232, 232, 232))
-        for k, page in enumerate(pages):
+        for k, page in enumerate(imgs):
             with Image.open(page) as im:
                 board.paste(im.convert("RGB").resize((tw, th), Image.Resampling.LANCZOS),
                             (pad + k * (tw + 8), y + head))
@@ -214,12 +220,21 @@ def main(argv: list[str]) -> int:
     ap.add_argument("name", nargs="?", default=None, help="看某套风格的摘要")
     ap.add_argument("--check", action="store_true", help="只做契约体检（有问题退出 1）")
     ap.add_argument("--sheet", default=None, metavar="PNG",
-                    help="所有风格 × 同一份 demo 拼成一张联系表")
+                    help="所有风格 × 同一份内容拼成一张联系表（缺省用 demo 的封面 + 第 2 页）")
+    ap.add_argument("--spec", default=None, help="配合 --sheet：换一份 deck")
+    ap.add_argument("--pages", default=None,
+                    help="配合 --sheet：取哪几页，逗号分隔（如 9,14）")
     ap.add_argument("--json", action="store_true", help="机读输出")
     args = ap.parse_args(argv[1:])
 
     if args.sheet:
-        path = sheet(args.sheet)
+        picked = None
+        if args.pages:
+            try:
+                picked = [int(x) for x in args.pages.split(",") if x.strip()]
+            except ValueError as exc:
+                raise SystemExit(f"✗ --pages 要是逗号分隔的页号：{exc}") from exc
+        path = sheet(args.sheet, spec_path=args.spec, pages=picked)
         print(f"✓ 联系表 → {path}")
         return 0
 

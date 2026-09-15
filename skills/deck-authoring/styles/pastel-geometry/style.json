@@ -54,9 +54,9 @@
     "foot": 20
   },
   "fonts": {
-    "display": "Avenir Next, Futura, Hiragino Sans GB, Helvetica Neue, sans-serif",
-    "body": "Avenir Next, Hiragino Sans GB, Helvetica Neue, sans-serif",
-    "note": "几何无衬线（Avenir Next / Futura）+ 中文落 Hiragino Sans GB。这两个拉丁族本机都有，而且是「友好」这个语气最直接的载体 —— 它们的圆几何形状自带亲和力，不需要靠圆角去演。不用 Inter/Roboto（slop 名单第一条）。"
+    "display": "Futura, Avenir Next, Hiragino Sans GB, Helvetica Neue, sans-serif",
+    "body": "Futura, Hiragino Sans GB, Helvetica Neue, sans-serif",
+    "note": "几何无衬线（Futura）是「友好」这个语气最直接的载体 —— 圆几何字面自带亲和力，不需要靠圆角去演。不用 Inter/Roboto（slop 名单第一条）。⚠️ 首项曾经是 Avenir Next，压测时实测**本机没有这个族**（`measure.py` 的提示是对的；我另外写的临时探针因为拿 serif/monospace 泛族当基准，把 Menlo/Songti 都误判成不存在，反倒更不可信）—— 现在首项换成实测存在的 Futura。"
   },
   "texture": {
     "grainOpacity": [

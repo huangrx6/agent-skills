@@ -257,12 +257,20 @@ def _check_brand(measured: dict, deck: dict, tokens: dict) -> tuple[list[str], l
             f"品牌 {name!r} 只给了一个 logo，而这张纸是深底（{paper}）—— "
             f"实测过：白底用的 logo 放到纯黑底上，深色那块会**直接消失**（只剩零星浅色）。"
             f"建议在 brand.json 里补 logoInverse（与正版形状一致、只换明暗）")
-    for lg in logos:
-        nat = lg.get("naturalW") or 0
-        if nat and lg.get("w", 0) > nat * 1.05:
+    # 图被放大渲染 → 糊。logo 与**内容图**都查：判据一样（渲染宽 > 原始宽 5%），
+    # 只是 logo 是品牌资产、内容图是每页那几张。SVG 不参与（放大不糊，它报的是
+    # viewBox 尺寸）—— 素材里凡是 .svg 的跳过。
+    for el in els:
+        if el.get("role") not in ("logo", "image"):
+            continue
+        src = str(el.get("intendedText", ""))
+        if src.lower().endswith(".svg"):
+            continue
+        nat = el.get("naturalW") or 0
+        if nat and el.get("w", 0) > nat * 1.05:
             notes.append(
-                f"logo 被放大渲染（原始 {nat:.0f}px 宽 → 渲染 {lg['w']:.0f}px）—— 会糊；"
-                f"换更大的位图，或者直接用 SVG")
+                f"第 {el.get('slide')} 页的图被放大渲染（原始 {nat:.0f}px 宽 → "
+                f"实际 {el['w']:.0f}px）—— 会糊；换更大的位图，或者直接用 SVG")
     return problems, notes
 
 
@@ -393,11 +401,17 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
             problems.append(f"第 {i} 页 声明 color={declared!r} —— 主/副色不能承载文字，只允许 overprint")
 
     # ④ 图表：柱高必须与数据成比例（独立复核，不看渲染器自觉），且图表区不许带错位
+    #
+    # 数柱高**必须限定在该页的 <section> 里**。压测之前这里扫的是整页 ——
+    # 一页 deck 只有一张图时看不出问题，三张图时第一张会数到 6+2+3=11 根柱，
+    # 报"柱子 11 根 ≠ 数据 6 条"。那种假报错比不报更坏：它会把一个正常的 deck 挡住。
+    sections = page.split('<section class="slide"')[1:]
     for i, slide in enumerate(deck["slides"], 1):
         if slide.get("type") != "chart":
             continue
+        block = sections[i - 1] if i - 1 < len(sections) else ""
         heights: list[float] = []
-        for raw in re.findall(r'class="bar"[^>]*height="([^"]+)"', page):
+        for raw in re.findall(r'class="bar"[^>]*height="([^"]+)"', block):
             num = _num(raw, f"第 {i} 页图表柱高", problems)
             if num is not None:
                 heights.append(num)
