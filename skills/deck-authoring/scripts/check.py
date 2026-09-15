@@ -56,14 +56,19 @@ measure_mod = _load_sibling("measure")   # 实测层：版面判断全部走它�
 render_mod = _load_sibling("render")   # 只为拿“同一个风格”的 token（单一来源）
 brand_mod = _load_sibling("brand")     # 品牌资产（logo / 色板 / 字体）
 hierarchy_mod = _load_sibling("hierarchy")   # 文本预算 / 视觉焦点 / 密度
+grid_mod = _load_sibling("grid")     # 网格与间距（版面几何唯一来源）
 
 TOKENS = os.path.join(HERE, "..", "styles", "swiss-grid", "style.json")
 
 # **两个不同的框，别混用**（我自己第一版就混了 ✗，导致正常产物被误判"溢出"）：
 #   内容区 = 版面减去内边距，量"放不放得下"（宽 1600-2×84 = 1432）
 #   文字栏 = 文字实际占的窄带，只用来判"墨块进没进栏"（更保守）
-CONTENT = (84.0, 132.0, 1516.0, 838.0)
-TEXT_BAND = (84.0, 132.0, 1000.0, 770.0)
+# 几何从 grid.py 取（**唯一来源**）。这里曾手写过 (…, 838) —— 与 render.py
+# 推导的 824 差 14px：两个"唯一来源"已经漂了才发现（这就是 grid.py 存在的理由）。
+CONTENT = (render_mod.PAD_X, render_mod.CONTENT_TOP,
+           render_mod.SLIDE_W - render_mod.PAD_X, render_mod.CONTENT_BOTTOM)
+TEXT_BAND = (render_mod.PAD_X, render_mod.CONTENT_TOP,
+             render_mod.PAD_X + 1000.0, render_mod.CONTENT_BOTTOM - 54.0)
 SLIDE_W, SLIDE_H = 1600.0, 900.0
 # 内容只占正文带这么少 → 提示“这页几乎没有内容”。
 #
@@ -218,6 +223,41 @@ def _check_full_page_image(measured: dict) -> list[str]:
                 f"这一页的信息（标题 / 条目 / 数字 / 示意）必须是版面里的**真文字**，"
                 f"图只能是配图或点缀。要那种观感就换版式，别把内容画进图里")
     return out
+
+
+def _check_grid_alignment(measured: dict) -> list[str]:
+    """**锚点元素必须吸附到网格列**（提示级）。
+
+    只查结构锚点（标题 / 副标题 / 栏题 / 图 / 图表）：它们的左缘应当在边距或某个
+    列起点上。列表条目不查 —— 有的风格给条目做悬挂缩进（paper-ink 的破折号缩进
+    68/82px），那是版式语言不是失对齐。logo 也不查：位置是各风格自己定的。
+
+    为什么是提示：skin 可以有正当理由偏移（比如装饰性出血），拿它挡交付会把
+    有意的偏移当成错误。但它得开口 —— 网格是"整齐"的地基，吸没吸上要看得见。
+
+    实测改网格前：左缘出现 7 个任意值（418/752/800/909/1086/1281/84）；
+    改后全部落在列上（84 / 448=col4 / 812=col7 / 933=col8 / 1176=col10）。
+    """
+    anchors = ("title", "subtitle", "image", "chart")
+    starts = [round(v, 1) for v in grid_mod.column_starts()]
+    off: list[tuple[int, float, str]] = []
+    for el in measured.get("elements", []):
+        if el.get("role") not in anchors:
+            continue
+        slide_no = el.get("slide")
+        x = el.get("x")
+        # 数字由 measure.py 写出来；不是数字就跳过，不抛 —— check() 从不抛
+        # （与 _check_full_page_image / hierarchy.weights 同一个写法）。
+        if not isinstance(slide_no, int) or not isinstance(x, (int, float)):
+            continue
+        if grid_mod.snap(x) is None:
+            off.append((slide_no, x, str(el.get("role"))))
+    if not off:
+        return []
+    head = "、".join(f"第{s}页 {r}（x={x:.0f}）" for s, x, r in off[:4])
+    return [f"有 {len(off)} 个锚点元素的左缘没吸附到网格列：{head}"
+            f" —— 列起点是 {starts[:6]}…（见 grid.py）。网格对齐是「整齐」的地基；"
+            f"若是风格有意的偏移（悬挂缩进/出血），可以忽略这条"]
 
 
 def _check_measured_health(measured: dict) -> list[str]:
@@ -547,6 +587,7 @@ def advisories(measured: dict, spec: dict | None = None,
     族当基准比宽度，衬线撞衬线时可能误报，拿它挡交付会把人逼到忽略整个检查。
     """
     notes = _check_font_fallback(measured)
+    notes.extend(_check_grid_alignment(measured))
     if spec is not None and tokens is not None:
         _, brand_notes = _check_brand(measured, spec.get("deck", {}), tokens)
         notes.extend(brand_notes)

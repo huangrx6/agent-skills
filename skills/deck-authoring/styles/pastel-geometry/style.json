@@ -36,12 +36,12 @@
   "largeTextPx": 32
  },
  "type": {
-  "note": "几何无衬线（Avenir Next / Futura）的 x-height 高、字面宽，同 px 下看着比其他无衬线大一点 —— 所以字号与 swiss-grid 齐平即可。",
+  "note": "几何无衬线（Avenir Next / Futura）的 x-height 高、字面宽，同 px 下看着比其他无衬线大一点 —— 所以字号与 swiss-grid 齐平即可。 ｜ subtitle 32→36：修「同级碰撞」（原来与 bullet 同字号，两级之间没有层级可言——实测阶梯里相邻比 1.00 的档位）。",
   "cover": 120,
   "compact": 90,
   "small": 78,
   "end": 116,
-  "subtitle": 32,
+  "subtitle": 36,
   "bulletLarge": 44,
   "bullet": 32,
   "bulletSmall": 26,

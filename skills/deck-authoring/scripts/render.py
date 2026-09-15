@@ -62,9 +62,11 @@ DEFAULT_STYLE = "swiss-grid"
 # `SHELL_CSS` 里的 `.pad{padding:132px 84px}` 与 `.footrow{bottom:52px}` 是这几个值；
 # check.py（判越界/死白）与 fit.py（试排）都读这里，不各自再拄一份。
 # 拿两份几何常量去对同一张图，只会对出一个错的前提（本仓库已经踩过一次）。
-SLIDE_W, SLIDE_H = 1600, 900
-PAD_X, PAD_Y = 84, 132
-FOOT_BOTTOM, FOOT_H = 52, 24
+grid_mod = _load_sibling("grid")   # 版面几何的唯一来源（网格 / 间距令牌 / 区域）
+
+SLIDE_W, SLIDE_H = grid_mod.SLIDE_W, grid_mod.SLIDE_H
+PAD_X, PAD_Y = grid_mod.PAD_X, grid_mod.PAD_Y
+FOOT_BOTTOM, FOOT_H = grid_mod.FOOT_BOTTOM, grid_mod.FOOT_H
 # 正文带：内容该待的竖向区间。下界是页脚之上 —— 内容压过它就是和页脚打架。
 # 整数就是它们本来的样子（都是 px）：不做 float() 转一道，那只是给异常多一个入口。
 CONTENT_TOP = PAD_Y
@@ -243,18 +245,18 @@ html,body{margin:0;background:var(--viewer)}
 /* 标题块：高度是版面几何（每种版式不同），字号由 --s-title 给（来自 type 级数） */
 .titleblock{position:relative;display:block}
 .tb-cover{height:158px}
-.tb-compact{height:104px;margin-bottom:64px}
+.tb-compact{height:104px;margin-bottom:var(--sp-section)}
 .tb-small{height:88px}
 .sub{margin:0}
-.two{display:flex;gap:48px;align-items:flex-start;margin-top:44px}
-.two .main{width:820px}
-.imgwrap{margin:0;width:640px}
+.two{display:flex;gap:var(--sp-item);align-items:flex-start;margin-top:var(--sp-group)}
+.two .main{width:825.33px}
+.imgwrap{margin:0;width:582.67px}
 .imgwrap img{width:100%;display:block}
-.cols{display:flex;gap:56px;margin-top:48px}
-.col{width:660px}
-.tl{display:flex;gap:34px;list-style:none;padding:0;margin:60px 0 0}
-.tl li{width:300px}
-.chartwrap{margin-top:44px;width:1180px;padding:34px 38px;position:relative}
+.cols{display:flex;gap:var(--sp-item);margin-top:var(--sp-item)}
+.col{flex:1;min-width:0}
+.tl{display:flex;gap:var(--sp-item);list-style:none;padding:0;margin:var(--sp-group) 0 0}
+.tl li{flex:1;min-width:0;width:var(--tl-node,300px)}
+.chartwrap{margin-top:var(--sp-item);width:1432px;padding:var(--sp-item);position:relative}
 /* 图表的高度**由壳给死**（330px），宽度按 viewBox 比例自己算。
    为什么不能让它 width:100% 自己撑：那样高度会跟着容器宽度变 ——
    而各风格的 .chartwrap 内边距不同（34px vs 30px vs 0），于是同一张图表
@@ -569,6 +571,9 @@ def _head(title: str, style: dict, seed: int, color_set: str) -> str:
     text = ink_module.text_color(colors)
     tier = tokens["type"]
     vars_ = [
+        # 间距令牌（grid.py 的 ramp + 语义档）：壳与 skin 里的 gap **只许**用这些，
+        # 不许再写裸数字 —— 那是"间距无律"的来源（实测 10 个 gap 出现 7 种值）。
+        *[f"{k}:{v}" for k, v in grid_mod.spacing_vars().items()],
         f"--paper:{colors['background']}", f"--accent:{colors['primary']}",
         f"--accent-2:{colors['secondary']}", f"--text:{text}",
         f"--display:{tokens['fonts']['display']}", f"--body:{tokens['fonts']['body']}",
@@ -774,8 +779,13 @@ def render(deck_spec: dict, style: dict | None = None) -> str:
                 nodes.append('<li><span class="dot"></span>'
                              f'<b {lab_attrs}>{html.escape(label)}</b>'
                              f'<em {note_attrs}>{html.escape(note)}</em></li>')
-            out.append('<ol class="tl" style="--s-nodeLabel:%dpx;--s-nodeNote:%dpx">%s</ol>'
-                       % (tier["nodeLabel"], tier["nodeNote"], "".join(nodes)))
+            # 节点宽度由**网格**算，不写死：写死 300px 时 6 节点会到 1970px
+            # （超出内容宽 538px，靠 flex 收缩硬扛 —— 那是"挤"的来源之一）。
+            n_nodes = max(1, len(slide.get("nodes", [])))
+            node_w = (grid_mod.CONTENT_W - (n_nodes - 1) * grid_mod.GUTTER) / n_nodes
+            out.append('<ol class="tl" style="--s-nodeLabel:%dpx;--s-nodeNote:%dpx;'
+                       '--tl-node:%.2fpx">%s</ol>'
+                       % (tier["nodeLabel"], tier["nodeNote"], node_w, "".join(nodes)))
         elif kind == "end":
             out.append(f'<div class="end" style="--s-title:{tsize}px">{th}</div>')
         elif kind == "chart":

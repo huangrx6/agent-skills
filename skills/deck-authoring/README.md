@@ -105,7 +105,7 @@ python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸�
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 299 条，约 5 分钟（负载敏感）（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 321 条，约 5 分钟（负载敏感）（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时约 2.5 分钟，
@@ -217,6 +217,27 @@ python3 scripts/palette.py --roles swiss-grid blue          # 13 个角色的推
 哪些是流程判断、哪些**还没实现**（渐变渲染、玻璃拟态、强调色占比实测），
 逐条列在 `references/color.md`。
 
+## 布局：网格与间距（`grid.py`，几何唯一来源）
+
+版面几何只有这一个来源 —— 此前 `check.py` 手写的 `CONTENT=(…,838)` 与 `render.py`
+推导的 824 差 14px，两个"唯一来源"已经漂了才发现。
+
+```bash
+python3 scripts/grid.py            # 12 列 / 列距 24 / 列宽 97.33 / 间距令牌 / 关系规则
+python3 scripts/grid.py --json     # 机读（跨度、区域、令牌）
+```
+
+- **12 列网格**：图文页 7+5 列（825+24+583=1432 分毫不差），两栏 6+6，
+  时间线宽度按节点数从网格算（原来写死 300px，6 节点超宽 538px）
+- **间距令牌**：ramp 8/12/16/24/32/48/64/96 + 语义档 inner/item/group/section，
+  注入产物为 `--sp-*`，壳里的 gap 全走令牌 —— **实测改前 10 个 gap 有 7 种值**
+  （48/68/45/74/101/16/0），改后全部落在令牌上
+- **关系规则**：组距 ≥ 1.5 × 条目距（Gestalt 接近性），`grid.py` 自检
+- **对齐**：锚点（标题/栏题/图/图表）左缘必须吸附列 —— `check.py` 提示。
+  改前左缘是 7 个任意值，改后全部落在列上（84/448/812/933/1176 = 边距+第4/7/8/10列）
+- **阶梯**：4 套风格曾有 subtitle == bullet（同级碰撞 = 没有层级），已修；
+  `style.py --check` 把同级碰撞与倒挂判错
+
 ## 布局与信息层级
 
 **我们的布局不是模板系统，也不是约束系统** —— 是**固定画布 + 7 种手写版式 + 真浏览器
@@ -280,6 +301,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── fonts.py             # 字体库：清单(--list) / 取字体(--fetch) / 映射(--map) / 内嵌
 │   ├── palette.py           # 配色：OKLCH / 结构实测(--audit) / novelty / 三方向 / 角色
 │   ├── hierarchy.py         # 信息层级：文本预算 / 视觉焦点 / 内容密度（全是提示级）
+│   ├── grid.py              # 网格与间距：12 列 / 令牌 ramp / 关系规则（几何唯一来源）
 │   ├── brand.py             # 品牌资产：logo 内嵌 / 色板与字体合并 / SVG 栅格化
 │   ├── fit.py               # 试排：给定一页内容，实测哪些版式装得下（真渲真量）
 │   ├── style.py             # 风格层：列表 / 契约体检 / 摘要 / 联系表（八套拼一张图）

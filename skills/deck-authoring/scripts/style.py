@@ -98,6 +98,19 @@ def audit(name: str) -> list[str]:
         problems.append(f"{name} 的 type 级数少了 {missing_tiers} —— skin 里 "
                         f"var(--t-…) 拿不到值会静默退回默认字号，最难看的那种 bug")
 
+    # 阶梯的「同级碰撞」与倒挂（实测：4 套风格 subtitle 与 bullet 同字号 ——
+    # 两级之间没有层级可言；那正是「中段挤成一团」的来源）。
+    tiers = raw["type"]
+    if tiers.get("subtitle") == tiers.get("bullet"):
+        problems.append(f"{name} 的 subtitle({tiers.get('subtitle')}) == "
+                        f"bullet({tiers.get('bullet')}) —— 同级碰撞，抬 subtitle 一档")
+    if tiers.get("bulletSmall", 0) >= tiers.get("bullet", 1):
+        problems.append(f"{name} 的 bulletSmall({tiers.get('bulletSmall')}) ≥ "
+                        f"bullet({tiers.get('bullet')}) —— 倒挂")
+    if tiers.get("bullet", 0) >= tiers.get("bulletLarge", 1):
+        problems.append(f"{name} 的 bullet({tiers.get('bullet')}) ≥ "
+                        f"bulletLarge({tiers.get('bulletLarge')}) —— 倒挂")
+
     for key in REQUIRED_MOTION:
         if key not in raw["motion"]:
             problems.append(f"{name} 的 motion 缺 {key!r}")

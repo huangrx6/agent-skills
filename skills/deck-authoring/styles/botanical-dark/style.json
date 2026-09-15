@@ -36,12 +36,12 @@
   "largeTextPx": 32
  },
  "type": {
-  "note": "衬线字号的**视觉**尺寸比同 px 的无衬线小（x-height 低、字面窄），所以这里比 keynote-dark 再上一档：cover 132 的 Georgia 看着约等于 118 的 Helvetica Neue。条目保持 34 以上 —— 暗底上的衬线小字最难读。",
+  "note": "衬线字号的**视觉**尺寸比同 px 的无衬线小（x-height 低、字面窄），所以这里比 keynote-dark 再上一档：cover 132 的 Georgia 看着约等于 118 的 Helvetica Neue。条目保持 34 以上 —— 暗底上的衬线小字最难读。 ｜ subtitle 34→38：修「同级碰撞」（原来与 bullet 同字号，两级之间没有层级可言——实测阶梯里相邻比 1.00 的档位）。",
   "cover": 132,
   "compact": 92,
   "small": 80,
   "end": 120,
-  "subtitle": 34,
+  "subtitle": 38,
   "bulletLarge": 46,
   "bullet": 34,
   "bulletSmall": 27,
