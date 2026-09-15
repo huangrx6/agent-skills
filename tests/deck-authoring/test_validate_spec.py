@@ -221,3 +221,28 @@ class TestRequiredFields(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestImageVariants(unittest.TestCase):
+    """content-image 的 variant 字段：键与值都封闭（Family × Variant 第一片）。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        with open(TOKENS, encoding="utf-8") as fh:
+            cls.color_sets = set(json.load(fh)["colorSets"])
+
+    def _codes(self, spec: dict) -> set[str]:
+        return {i["code"] for i in vs.validate(spec, self.color_sets).errors}
+
+    def test_known_variant_passes(self) -> None:
+        slides = [{"type": "content-image", "title": "图", "bullets": ["a"],
+                   "image": "x.png", "variant": "visual-left"}]
+        codes = self._codes(_spec(slides))
+        self.assertNotIn("UNKNOWN_VARIANT", codes, "合法变体被拒")
+        self.assertNotIn("UNKNOWN_FIELD", codes, "variant 不在封闭字段集里")
+
+    def test_unknown_variant_is_rejected(self) -> None:
+        slides = [{"type": "content-image", "title": "图", "bullets": ["a"],
+                   "image": "x.png", "variant": "center-stage"}]
+        self.assertIn("UNKNOWN_VARIANT", self._codes(_spec(slides)),
+                      "变体值不封闭 —— 拼错会一路漏到渲染器")

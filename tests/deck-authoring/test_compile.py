@@ -148,6 +148,20 @@ class TestDecisionTrace(unittest.TestCase):
         self.assertIn("内容少字就该大", joined)
         self.assertNotIn("第 13 位", joined, "升档被写成了降档警告 —— trace 在撒谎")
 
+    def test_explicit_variant_is_traced_and_carried(self) -> None:
+        """显式 variant：layout 决策进 trace，页对象带变体（{**slide} 自动合并）。"""
+        spec = _demo()
+        spec["deck"]["slides"][2]["variant"] = "visual-left"   # 第 3 页 content-image
+        resolved = compile_mod.compile_spec(spec)
+        entry = next(t for t in resolved["trace"] if t["stage"] == "layout")
+        self.assertIn("content-image:visual-left", entry["decision"])
+        self.assertEqual(resolved["deck"]["slides"][2].get("variant"), "visual-left")
+
+    def test_default_variant_is_silent(self) -> None:
+        """不写 variant：不记 layout trace（默认不值得一行日志，留痕只给偏离）。"""
+        resolved = compile_mod.compile_spec(_demo())
+        self.assertFalse(any(t["stage"] == "layout" for t in resolved["trace"]))
+
     def test_brand_merge_is_traced(self) -> None:
         resolved = compile_mod.compile_spec(_demo())       # demo 引 example 品牌
         self.assertTrue(any(t["decision"].startswith("brand:") for t in resolved["trace"]))
@@ -170,3 +184,33 @@ class TestTierAdvisoryAtTheGate(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestVariantRendering(unittest.TestCase):
+    """三个变体真实几何不同；显式默认 == 隐式默认（字节级契约）。"""
+
+    def _page_html(self, variant: str | None) -> str:
+        spec = _demo()
+        page = spec["deck"]["slides"][2]              # 第 3 页 content-image
+        page.pop("variant", None)
+        if variant:
+            page["variant"] = variant
+        out = render.render(spec)
+        # 页码是补零的（data-idx="03"）—— 第 3 页的片段切到第 4 页之前
+        return out.split('data-idx="03"')[1].split('data-idx="04"')[0]
+
+    def test_variants_differ_in_geometry_and_order(self) -> None:
+        right = self._page_html("visual-right")
+        left = self._page_html("visual-left")
+        even = self._page_html("even")
+        self.assertNotEqual(right, left)
+        self.assertNotEqual(right, even)
+        self.assertIn('class="two v-left"', left)
+        self.assertIn('class="two v-even"', even)
+        self.assertIn('class="two">', right, "默认不该带变体类（保持旧字节）")
+        # visual-left：figure（图）在 main（文）之前 —— DOM 顺序即阅读顺序
+        self.assertLess(left.index("<figure"), left.index('class="main"'))
+        self.assertGreater(right.index("<figure"), right.index('class="main"'))
+
+    def test_explicit_default_equals_implicit(self) -> None:
+        self.assertEqual(self._page_html(None), self._page_html("visual-right"))

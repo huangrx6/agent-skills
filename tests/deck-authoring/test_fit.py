@@ -245,9 +245,21 @@ class TestFitEndToEnd(unittest.TestCase):
         self.assertIn("3 页", text, "30 条 / 单页 12 条 = 3 页")
 
     def test_verdicts_never_invent_a_layout(self) -> None:
-        """报的版式必须是真渲过的那些，不能出现没试过的版式名。"""
+        """报的版式必须是真渲过的那些，不能出现没试过的版式名。
+
+        "content-image:even" 这类是**家族变体**（探针真渲过），拆前缀对家族名。
+        """
         for c in self.result["candidates"]:
-            self.assertIn(c["kind"], fit.CANDIDATES)
+            self.assertIn(c["kind"].split(":")[0], fit.CANDIDATES)
+
+    def test_probe_deck_includes_image_variants(self) -> None:
+        """content-image 是家族不是单一版式：探针把 visual-left / even 摆进同一份
+        产物 —— CandidateScore 有真候选可比，compile 的自动选变体从这里取数。"""
+        _deck, labels = fit.build_probe_deck(
+            {"title": "T", "bullets": ["a", "b", "c"], "image": "x.png"})
+        kinds = [v["kind"] for v in labels.values()]
+        self.assertIn("content-image:visual-left", kinds)
+        self.assertIn("content-image:even", kinds)
 
 
 class TestFitCli(unittest.TestCase):

@@ -62,6 +62,11 @@ deckio = _load_sibling("deckio")   # IO 收口：参数写错要报清楚，不�
 STYLE_ROOTS = (os.path.join(HERE, "..", "styles"),
                os.path.join(HERE, "..", "dev-tools", "style-fixture"))
 DEFAULT_STYLE = "swiss-grid"
+# content-image 的变体（Family × Variant 第一片，值封闭 —— validate_spec 同步）：
+#   visual-right = 文 7 栅 + 图 5 栅（默认，历史上唯一的那一种）
+#   visual-left  = 图先文后（镜像，宽度不动 —— 阅读从图开始/连续图页换侧换节奏）
+#   even         = 6+6 均分（图与文等权，statement 用）
+IMAGE_VARIANTS = ("visual-right", "visual-left", "even")
 
 # ── 版面几何：壳里那些数字的**唯一出处** ─────────────────────────────
 # `SHELL_CSS` 里的 `.pad{padding:132px 84px}` 与 `.footrow{bottom:52px}` 是这几个值；
@@ -286,6 +291,10 @@ html,body{margin:0;background:var(--viewer)}
 .two{display:flex;gap:var(--sp-item);align-items:flex-start;margin-top:var(--sp-group)}
 .two .main{width:825.33px}
 .imgwrap{margin:0;width:582.67px}
+/* content-image 变体：v-even 6+6 均分（704px=span(6)，825.33+582.67+24=1432 不变）；
+   v-left 只换 DOM 顺序（宽度不动），类名留给 skin 做侧别微调的钩子。 */
+.two.v-even .main{width:704px}
+.two.v-even .imgwrap{width:704px}
 .imgwrap img{width:100%;display:block}
 .cols{display:flex;gap:var(--sp-item);margin-top:var(--sp-item)}
 .col{flex:1;min-width:0}
@@ -895,10 +904,23 @@ def render_resolved(resolved: dict) -> str:
                                 tier["caption"])
                 cap = (f'<figcaption class="chartcap" {cap_attrs}>'
                        f'{html.escape(slide["caption"])}</figcaption>')
-            out.append('<div class="two"><div class="main">'
-                       f'<ul class="bullets" style="--s-bullet:{bsize}px">{items}</ul></div>'
-                       f'<figure class="imgwrap" {img_attrs}>'
-                       f'<img src="{html.escape(src)}" alt="">{cap}</figure></div>')
+            # Family(content-image) × Variant：spec/compile 决定文图栅格分配，
+            # 渲染只执行。默认 visual-right 必须**逐字节**等于旧输出（重构不改像素）。
+            variant = slide.get("variant") or "visual-right"
+            if variant not in IMAGE_VARIANTS:
+                raise SystemExit(
+                    f"✗ 第 {i} 页（content-image）未知变体 {variant!r}；"
+                    f"支持 {list(IMAGE_VARIANTS)}（validate_spec.py 会先拦住）。")
+            main_html = (f'<div class="main"><ul class="bullets" '
+                         f'style="--s-bullet:{bsize}px">{items}</ul></div>')
+            img_html = (f'<figure class="imgwrap" {img_attrs}>'
+                        f'<img src="{html.escape(src)}" alt="">{cap}</figure>')
+            if variant == "visual-left":       # 图先文后
+                out.append(f'<div class="two v-left">{img_html}{main_html}</div>')
+            elif variant == "even":            # 6+6 均分
+                out.append(f'<div class="two v-even">{main_html}{img_html}</div>')
+            else:                              # 默认：文 7 + 图 5，图在右
+                out.append(f'<div class="two">{main_html}{img_html}</div>')
         elif kind == "two-column":
             out.append(f'<div class="titleblock tb-{t_tier}" '
                        f'style="--s-title:{tsize}px">{th}</div>')

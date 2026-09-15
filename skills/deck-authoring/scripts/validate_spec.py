@@ -41,7 +41,8 @@ DECK_FIELDS = {"colorSet", "seed", "title", "slides", "style", "brand", "note"}
 SLIDE_FIELDS = {
     "title":         {"type", "title", "subtitle", "color"},
     "content-text":  {"type", "title", "bullets", "color"},
-    "content-image": {"type", "title", "bullets", "image", "caption", "color"},
+    "content-image": {"type", "title", "bullets", "image", "caption", "color",
+                   "variant"},
     "two-column":    {"type", "title", "columns", "color"},
     "timeline":      {"type", "title", "nodes", "color"},
     # 图表的 DSL：几何/样式/动画都不在 spec 里（chart.py 决定），AI 只写语义。
@@ -56,6 +57,10 @@ SLIDE_FIELDS = {
 # 不给 `image` 会一路放行到渲染器，然后 `KeyError: 'image'` 崩栈。实测撞到过。
 # 与"图片该要就要，别为了省事少要"是同一条：这一页的版式已经说了要图，
 # 就不该把它省掉。
+# content-image 变体的值集（与 render.IMAGE_VARIANTS 一字不差）：
+# visual-right（默认）/ visual-left（图先文后，镜像）/ even（6+6 均分）。
+IMAGE_VARIANTS = ("visual-right", "visual-left", "even")
+
 REQUIRED_SLIDE_FIELDS = {
     "content-image": {"image"},
 }
@@ -192,6 +197,11 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
                          f"未知版式 {kind!r}；支持 {sorted(SLIDE_FIELDS)}")
             continue
         _check_fields(slide, SLIDE_FIELDS[kind], where, issues)
+        variant = slide.get("variant")
+        if variant is not None and variant not in IMAGE_VARIANTS:
+            issues.error("UNKNOWN_VARIANT", where,
+                         f"未知变体 {variant!r}；content-image 支持 "
+                         f"{list(IMAGE_VARIANTS)}")
         for need in REQUIRED_SLIDE_FIELDS.get(kind, ()):
             if not slide.get(need):
                 issues.error("MISSING_FIELD", f"{where}.{need}",

@@ -95,6 +95,7 @@ def _semantic_score(kind: str, content: dict) -> float:
     """语义匹配：内容形状与版式的契合（不是"哪个装得多"）。"""
     n = len(content.get("bullets") or [])
     has_image = bool(content.get("image"))
+    kind = kind.split(":")[0]          # "content-image:even" → 家族语义同默认
     if kind == "content-image":
         return 1.0 if has_image else 0.0
     if kind == "two-column":
@@ -172,6 +173,13 @@ def build_probe_deck(content: dict, columns: int = 2) -> tuple[dict, dict]:
         if kind == "content-image":
             s["image"] = image
         add(s, kind)
+        # 变体探针：content-image 不是一种版式，是一个**家族**。同一份产物里把
+        # visual-left / even 也摆出来，CandidateScore 才有真候选可比 ——
+        # compile 的"自动选变体"下一步就从这里取数（现在是显式才生效）。
+        if kind == "content-image":
+            for v in ("visual-left", "even"):
+                add({"type": "content-image", "title": title, "bullets": bullets,
+                     "image": image, "variant": v}, f"content-image:{v}")
 
     # 条目数扫描：找出 content-text / two-column 各自最多装几条。
     # 不能假设"越少越矮" —— 字号按条数分档（≤3 条用大字），所以 4 条可能比 3 条还矮。

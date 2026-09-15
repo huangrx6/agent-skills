@@ -114,19 +114,22 @@ Page Type=页面语义类型，Layout Family=空间组织方式（comparison 页
 族）。落地：`plan.py` 的 `PAGE_TYPES` 把页型查表映射到版式（comparison→chart、
 process→timeline…）；**family/variant 两级中间层未建**（§15-18 约定）。
 
-## 15. Layout Family【约定】
+## 15. Layout Family【✅ 第一片已落地（content-image）】
 
 规范至少支持 single/split/stack/grid/hero/editorial/overlay/timeline/diagram/
 chart/table/dashboard/full-bleed。现状：7 种 slide type（title/content-text/
-content-image/two-column/timeline/chart/end）+ 自建风格 = 事实上的变体池，但没有
-family 命名层。缺的表在路线图阶段 3。
+content-image/two-column/timeline/chart/end）+ 自建风格。**content-image 率先
+成为显式家族**：`variant` 字段进 spec（封闭值集），其余 type 仍是单版式 ——
+family 命名层全量铺开在路线图阶段 3。
 
-## 16. Layout Variant【约定】
+## 16. Layout Variant【✅ 第一片已落地（3 变体）】
 
 每个 Family 多 Variant（split_40_60 / split_50_50 / split_left_visual / …；
-hero_center / hero_left / hero_full_bleed / …）。现状：content-image 的图在
-右列（隐式 split_right_visual）、两栏 6+6（split_50_50）——**隐式存在、无显式
-变体表**。
+hero_center / hero_left / hero_full_bleed / …）。**content-image 已有显式变体**：
+`visual-right`（文 7 栅 + 图 5 栅，默认）/ `visual-left`（图先文后，镜像换节奏）/
+`even`（6+6 均分）——键值双封闭（validate_spec），显式即进 Decision Trace
+（compile layout 段），fit 探针把三变体摆进同一份产物供评分。其余 type
+（两栏 6+6、时间线）仍隐式 —— 等候选实测铺开。
 
 ## 17. Variant 选择依据【约定】
 

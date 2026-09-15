@@ -151,6 +151,17 @@ def compile_spec(deck_spec: dict, style: dict | None = None) -> dict:
             trace.append({"stage": "typography", "slide": i,
                           "decision": f"{kind}:{b_tier}",
                           "reason": [reason]})
+        # ── Layout：Family × Variant（第一片：content-image 三变体）────────
+        # variant 本身在 spec 里，{**slide} 合并页对象时自动带进 resolved ——
+        # compile 的职责是**留痕**：谁选的变体、为什么。自动选变体（按内容形状
+        # 派生）要等 fit 的候选实测给数据，现在是显式才记、默认静默。
+        variant = slide.get("variant")
+        if variant:
+            trace.append({"stage": "layout", "slide": i,
+                          "decision": f"{kind}:{variant}",
+                          "reason": ["spec 显式指定 —— 变体是内容决策（图在哪侧/"
+                                     "文图几几开），写 spec 的人定，compile 只执行与留痕；"
+                                     "自动选变体等 fit 把三变体摆进同一探针后再上"]})
         dx, dy, rot = r.misregistration(tokens, seed, "page", i)
         # 决策与内容**合并进同一页对象**：resolved 自足 —— 渲染器只吃这一份，
         # 不需要回头读 spec（"resolved = read_json(...); html = render(resolved)"）。
