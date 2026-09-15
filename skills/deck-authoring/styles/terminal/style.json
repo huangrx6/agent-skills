@@ -1,0 +1,107 @@
+{
+  "version": 2,
+  "label": "终端 Terminal",
+  "temperature": "中性",
+  "reference": "frontend-slides 的 Terminal Green / GitHub 深色主题 / 工程团队的技术评审",
+  "note": "为什么补这一套：现有 6 套里没有一套是**等宽**的。等宽字体自带一个信号 —— 「这份东西是给动手的人看的」，它同时改变了版面的空气（字宽固定，行会显得更整齐、更像屏幕）。适合：技术评审、架构决策、事故复盘、给工程团队的方案。不适合：给非技术受众的路演（等宽会让正文显得冷且难读）。",
+  "colorSets": {
+    "green": {
+      "primary": "#3FB950",
+      "secondary": "#8B949E",
+      "background": "#0D1117",
+      "text": "#C9D1D9"
+    },
+    "amber": {
+      "primary": "#D29922",
+      "secondary": "#8B949E",
+      "background": "#0D1117",
+      "text": "#C9D1D9"
+    },
+    "cyan": {
+      "primary": "#58A6FF",
+      "secondary": "#8B949E",
+      "background": "#0D1117",
+      "text": "#C9D1D9"
+    }
+  },
+  "ink": {
+    "derivation": "explicit",
+    "forText": "declared",
+    "note": "文字色声明为 GitHub 深色主题的正文色 #C9D1D9（不是纯白）—— 纯白在 #0D1117 上对比过强，长段落会刺眼，而这套的正文往往是一整段技术描述。强调色只做小面积：提示符、行号、图表一档。",
+    "rule": "正文 #C9D1D9；强调色只碰小面积。"
+  },
+  "contrast": {
+    "minBody": 4.5,
+    "minLarge": 3.0,
+    "largeTextPx": 32
+  },
+  "type": {
+    "note": "等宽字母的**字宽**比无衬线宽约 20%，同样一行字占的地方更大 —— 所以字号整体比 swiss-grid 小一档，否则标题一上来就撞右边。换句话说：这套的「大」是靠整齐与留白，不是靠字号。",
+    "cover": 84,
+    "compact": 64,
+    "small": 56,
+    "end": 76,
+    "subtitle": 24,
+    "bulletLarge": 30,
+    "bullet": 24,
+    "bulletSmall": 20,
+    "colTitle": 28,
+    "nodeLabel": 22,
+    "nodeNote": 18,
+    "chartValue": 18,
+    "chartLabel": 16,
+    "caption": 20,
+    "foot": 18
+  },
+  "fonts": {
+    "display": "Menlo, Courier New, Heiti SC, monospace",
+    "body": "Menlo, Courier New, Heiti SC, monospace",
+    "note": "全等宽 —— 这是这套风格的全部身份。中文没有可用的等宽族（本机没有等宽 CJK），会落到 Heiti SC（黑体），所以「等宽感」主要由拉丁字母、数字和标点承担；字号小一档也是为此留的余量。"
+  },
+  "texture": {
+    "grainOpacity": [
+      0,
+      0
+    ],
+    "grainBaseFrequency": 0.9,
+    "halftoneDotSize": [
+      2,
+      4
+    ],
+    "note": "没有纸纹。屏幕不需要纸的质感 —— 加颗粒反而像扫描件。"
+  },
+  "decor": {
+    "kind": null,
+    "types": [],
+    "zones": [],
+    "sizes": [],
+    "note": "不放装饰。这套的锚点是**提示符与行号**（`.titleblock::before` 的 `$`、右上的状态行），都是排版元素而不是图形。"
+  },
+  "misregistration": {
+    "note": "不做错位（全 0）。",
+    "offsetRangeX": [
+      0,
+      0
+    ],
+    "offsetRangeY": [
+      0,
+      0
+    ],
+    "rotationRange": [
+      0,
+      0
+    ],
+    "blendMode": "normal"
+  },
+  "viewerBackground": "#010409",
+  "motion": {
+    "easing": "expoOut",
+    "cssEase": "cubic-bezier(0.16, 1, 0.3, 1)",
+    "enterMs": 420,
+    "staggerMs": 50,
+    "titleHoldMs": 180,
+    "holdMs": 2400,
+    "readPerItemMs": 700,
+    "note": "运动性格＝快、干脆、不拖泥带水 —— 终端的隐喻是「输出」，输出不该有仪式感。停顿只有 180ms（别的风格是 260~420），因为这套的正文更短、更密，等久了像卡住。"
+  }
+}

@@ -38,7 +38,18 @@ python3 scripts/brand.py                                             # 12) 看�
 抽几帧看看再编：`--stills 0,1.5,22.4,32.3`。运动设计与什么时候该用视频，见
 `references/animation.md`。
 
-设计期还有一件工具（不在流水线上，是**写内容时**用的）：
+设计期还有两件工具（不在流水线上）：
+
+```bash
+python3 scripts/style.py                       # 八套风格 + 契约状态
+python3 scripts/style.py --sheet -o s.png      # 所有风格 × 同一份 demo → 一张图
+python3 scripts/style.py swiss-grid            # 一套风格的摘要
+```
+
+`--sheet` 是「先出三个方向让人选」那个流程的实物依据 —— 选风格要的是**画面**，
+不是对照表。风格本身怎么加见 `references/style-architecture.md`。
+
+写内容时用的：
 
 ```bash
 python3 scripts/fit.py --from-spec your.spec.json --slide 3   # 试排：这页哪种版式装得下
@@ -56,10 +67,10 @@ python3 scripts/fit.py --json '{"title":"结论","bullets":["…","…"]}'
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 123 条
+python3 -m unittest discover -s tests/deck-authoring -v     # 141 条
 ```
 
-钉住十六项不变量：同 spec + 同种子字节一致（带随机区间的风格；确定性风格本就与 seed 无关）、
+钉住十七项不变量：同 spec + 同种子字节一致（带随机区间的风格；确定性风格本就与 seed 无关）、
 色板门禁 + 两墨乘叠印的数学、校验的变异验证（每项都造违规样例）、半调墨覆盖率随灰度单调、
 缓存命中后仍过色板三角不变量、外壳行为（真开浏览器按键翻页 + letterbox 缩放比贴边不溢）、
 PDF 是矢量且页数/页尺寸对、可编辑 PPTX 的**字是真字**且坐标是页内坐标、
@@ -69,7 +80,9 @@ PDF 是矢量且页数/页尺寸对、可编辑 PPTX 的**字是真字**且坐�
 会假绿）、渲染路径上没混进 CSS `transition`、
 **品牌资产**（优先级：品牌赢色板/字体/logo、风格赢版面；logo 内嵌且清单里给的是
 技能相对路径；`cover+end` 指的是 end 版式那页而不是数组最后一页；logo 压文字会挡）、
-**试排**（"装得下"与"半页空"是两个判据，混成一个就会把稀疏页判成装不下 —— 真踩过）。
+**试排**（"装得下"与"半页空"是两个判据，混成一个就会把稀疏页判成装不下 —— 真踩过）、
+**风格契约**（字号档 / 运动参数 / 色板门槛 / 装饰声明，逐项造违规样例验它有牙；
+遍历的是**目录**不是写死的名单 —— 写死名单让四套新风格逃过检查过一次）。
 
 ## 依赖
 
@@ -106,13 +119,14 @@ PDF 是矢量且页数/页尺寸对、可编辑 PPTX 的**字是真字**且坐�
 skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是这棵树的这部分
 ├── SKILL.md                 # 给模型看的触发条件 + 流程
 ├── README.md                # 给"想跑一下"的人看的
-├── scripts/                 # 流水线十五件（另有 1 个 Swift 编码器）
+├── scripts/                 # 流水线十六件（另有 1 个 Swift 编码器）
 │   ├── validate_spec.py     # 输入层校验：字段集封闭（坐标/字号/色值直接判失败）
 │   ├── ink.py               # 墨色推导 + 三色板门禁（唯一消费者）
 │   ├── plate.py             # 图片 → duotone + 半调（制版）
 │   ├── image_source.py      # 缓存 / 生图 / 几何色块拼贴
 │   ├── brand.py             # 品牌资产：logo 内嵌 / 色板与字体合并 / SVG 栅格化
 │   ├── fit.py               # 试排：给定一页内容，实测哪些版式装得下（真渲真量）
+│   ├── style.py             # 风格层：列表 / 契约体检 / 摘要 / 联系表（八套拼一张图）
 │   ├── render.py            # deck-spec.json → HTML（语义骨架 + 风格 skin + 演示壳 + 运动引擎）
 │   ├── measure.py           # 实测层：真浏览器量真盒子（不估算）
 │   ├── check.py             # 校验：越界/裁切/对比度/图表/图片/报错
@@ -124,12 +138,15 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── h264_encode.swift    # 帧序列 → H.264（AVFoundation，无需 ffmpeg）
 │   └── deckio.py            # IO 收口（try/except 不散落）
 ├── styles/                   # 风格目录：一种风格 = 一个目录（token + skin），不碰 .py
-│   ├── keynote-dark/         # 黑底剧场：纯黑底 + 巨号字 + 一屏一观点（大胆·暗）
-│   │   ├── style.json        #   token：色板 / 字号级数 / 字体 / 纹理 / 装饰 / 错位 / 对比度
-│   │   └── skin.css          #   视觉层：颜色、字体、纹理、装饰观感
-│   ├── swiss-grid/           # 瑞士栅格：白底 + 编号列表 + 左轨 + 巨号页码（安静·冷）
+│                             #   每个目录两件：style.json（token）+ skin.css（视觉层）
+│   ├── keynote-dark/         # 黑底剧场：纯黑底 + 巨号字 + 一屏一观点（大胆·冷）
+│   ├── botanical-dark/       # 植物暗房：近黑 + 暖白 + 衬线不加粗 + 描边圆环（大胆·暖）
 │   ├── billboard/            # 大字报：巨号数字 + 通栏色条 + 色场（大胆·亮）
-│   └── notebook/             # 笔记本：横格纸 + 红边线 + 侧边索引签（中性·暖）
+│   ├── paper-ink/            # 纸墨编辑：粗细线夹标题 + 段首悬挂短横 + 书眉（安静·暖）
+│   ├── swiss-grid/           # 瑞士栅格：白底 + 编号列表 + 左轨 + 巨号页码（安静·冷）
+│   ├── notebook/             # 笔记本：横格纸 + 红边线 + 侧边索引签（中性·暖）
+│   ├── terminal/             # 终端：全等宽 + `$` 提示符 + 右上状态行（中性·冷）
+│   └── pastel-geometry/      # 粉彩几何：页角圆角色块 + 竖药丸标记（中性·暖）
 ├── brands/                   # 品牌资产：一个品牌 = 一个目录，不碰 .py
 │   └── example/              #   示例品牌（logo 正版 + 反白版 + 署名）
 ├── dev-tools/
@@ -156,7 +173,8 @@ tests/deck-authoring/           # 测试住在仓库顶层（不在 skill 目录
 ├── test_font_advisory.py
 ├── test_animation.py
 ├── test_brand.py
-└── test_fit.py
+├── test_fit.py
+└── test_style.py
 ```
 
 测试**刻意不放在 skill 目录里** —— AI 调用 skill 时读的是 `skills/deck-authoring/`

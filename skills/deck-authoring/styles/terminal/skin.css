@@ -1,0 +1,188 @@
+/* ══ 终端 Terminal skin ══════════════════════════════════════════════════════
+   全部身份就是**等宽**。其余表达力来自：
+     1. 提示符（`$` 在标题前、`>` 在条目上）
+     2. 右上的状态行（一行小字，像编辑器标题栏）
+     3. 细边框感的图表与表格化对齐
+
+   刻意不做：扫描线、光标闪烁、霓虹发光 —— 那是「赛博」而不是「终端」，
+   而且前两个会动（录视频时不可复现）、第三个在投影上会糊。
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 构图锚点：标题左侧的提示符 + 页脚上方一条分隔线 ─────────────────────── */
+.titleblock {
+  position: relative;
+  padding-left: 84px;
+}
+/* `$` 用伪元素而不是往标题文字里塞 —— 塞进去的话它会被算进标题宽度，
+   标题一长就提前撞右边（而且 pptx 导出时那个 $ 会变成可编辑文字的一部分）。 */
+.titleblock::before {
+  content: "$";
+  position: absolute;
+  left: 0;
+  top: 0.08em;
+  font: 700 var(--s-title, 84px) / 1 var(--display);
+  color: var(--accent);
+  opacity: 0.9;
+}
+
+.slide::before {
+  content: "";
+  position: absolute;
+  left: 84px;
+  right: 84px;
+  bottom: 96px;
+  height: 1px;
+  background: var(--accent-2);
+  opacity: 0.22;
+}
+
+/* 右上状态行：一个纯排版元素，不占流 */
+.slide::after {
+  content: "── ready ──";
+  position: absolute;
+  right: 84px;
+  top: 48px;
+  font: 400 18px / 1 var(--body);
+  color: var(--accent);
+  opacity: 0.55;
+  letter-spacing: 0.14em;
+  pointer-events: none;
+}
+
+/* ── 标题：等宽、中等字重、不紧字距（等宽收紧会粘连）────────────────────── */
+.title {
+  font: 600 var(--s-title, 84px) / 1.16 var(--display);
+  letter-spacing: 0;
+  color: var(--text);
+  white-space: nowrap;
+  margin: 0;
+  display: block;
+}
+
+.subtitle {
+  font: 400 var(--s-subtitle, 24px) / 1.6 var(--body);
+  color: var(--accent-2);
+  margin-top: 22px;
+  letter-spacing: 0.02em;
+}
+
+/* 分隔线 = 一条虚线（排印里的「未定义区」，很像代码注释分隔） */
+.rule {
+  width: 100%;
+  height: 1px;
+  margin: 40px 0 0;
+  background: none;
+  border-top: 1px dashed var(--accent-2);
+  opacity: 0.45;
+}
+
+/* ── 条目：`>` 作标记，像命令行输出 ─────────────────────────────────────── */
+.bullets {
+  font: 400 var(--s-bullet, 24px) / 1.9 var(--body);
+  color: var(--text);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bullets li {
+  padding-left: 38px;
+  position: relative;
+}
+.bullets li::before {
+  content: ">";
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--accent);
+}
+.bullets i {
+  display: none;
+}
+.bullets.small {
+  font-size: var(--s-bulletSmall, 20px);
+  line-height: 1.8;
+}
+.bullets.small li {
+  padding-left: 30px;
+}
+
+/* ── 双栏：色带换成一行短横 + 标签，对齐到等宽网格 ──────────────────────── */
+.col .band {
+  height: 0;
+  border-top: 3px solid var(--accent);
+  margin-bottom: 22px;
+}
+.col .band.b {
+  border-top-color: var(--accent-2);
+}
+.col h3 {
+  font: 600 var(--s-colTitle, 28px) / 1.3 var(--display);
+  color: var(--text);
+  margin: 0 0 16px;
+}
+
+/* ── 时间线：方点（等宽的语汇是方块，不是圆）────────────────────────────── */
+.tl .dot {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 0;
+  background: var(--accent);
+  margin-bottom: 22px;
+}
+.tl .dot::after {
+  display: none;
+}
+.tl b {
+  display: block;
+  font: 600 var(--s-nodeLabel, 22px) / 1.4 var(--display);
+  color: var(--text);
+}
+.tl em {
+  display: block;
+  font: 400 var(--s-nodeNote, 18px) / 1.6 var(--body);
+  color: var(--accent-2);
+  font-style: normal;
+}
+
+/* ── 图表：有边框（像一块输出区）+ 强调色柱 ─────────────────────────────── */
+.chartwrap {
+  background: transparent;
+  border: 1px solid var(--accent-2);
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+  padding: 30px 32px;
+}
+.chartwrap .hf {
+  display: none;
+}
+.chartwrap .bar {
+  fill: var(--accent);
+}
+.chartwrap .axis {
+  stroke: var(--text);
+  stroke-width: 1;
+  opacity: 0.3;
+}
+.chartwrap .val {
+  font: 600 var(--s-chartValue, 18px) var(--body);
+  fill: var(--text);
+}
+.chartwrap .lbl {
+  font: 400 var(--s-chartLabel, 16px) var(--body);
+  fill: var(--accent-2);
+}
+.chartcap {
+  font: 400 var(--s-caption, 20px) / 1.6 var(--body);
+  color: var(--accent-2);
+  margin-top: 22px;
+}
+
+/* ── 页码：像一行日志 ────────────────────────────────────────────────────── */
+.foot {
+  font: 400 var(--s-foot, 18px) / 1 var(--body);
+  color: var(--accent-2);
+  opacity: 0.75;
+  letter-spacing: 0.1em;
+}

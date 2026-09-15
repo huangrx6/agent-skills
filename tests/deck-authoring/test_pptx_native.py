@@ -34,6 +34,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
 TOKENS = os.path.join(SKILL, "styles", "swiss-grid", "style.json")
+STYLES = os.path.join(SKILL, "styles")
 DEMO = os.path.join(SKILL, "dev-tools", "demo.spec.json")
 
 # 版面 1600×900px → EMU。1 CSS px = 9525 EMU（= 0.75pt）。
@@ -79,6 +80,16 @@ def _chart_xmls(pptx_path: str) -> dict[str, str]:
             if re.fullmatch(r"ppt/charts/chart\d+\.xml", name):
                 out[name] = zf.read(name).decode("utf-8")
     return out
+
+
+
+def _style_names() -> list[str]:
+    """所有风格 —— **读目录，不写死名单**。
+
+    写死名单的代价是实测过的：加了四套新风格之后，那份写死的名单让它们全部逃过了
+    运动 / 装饰 / 版式表三条检查 —— 而测试是绿的。目录才是唯一事实来源。
+    """
+    return sorted(d for d in os.listdir(STYLES) if os.path.isdir(os.path.join(STYLES, d)))
 
 
 class TestPptxNative(unittest.TestCase):
@@ -195,7 +206,7 @@ class TestPptxNative(unittest.TestCase):
         重新用上 halftone-circle，这条会把它拉回来。
         """
         declared = set()
-        for name in ("billboard", "swiss-grid", "keynote-dark", "notebook"):
+        for name in _style_names():
             spec = self.render.load_style(name)["tokens"].get("decor") or {}
             if spec.get("kind"):
                 declared.add(spec["kind"])

@@ -38,18 +38,18 @@ done
 然后并排摆出来（拼图或直接发三张），每版标：**风格名 + 温度 + 一句话适合什么场合**。
 摆完**停下等选择**，并把选择记进项目目录（后面所有页都按它出）。
 
-### 现有四种风格
+### 现有八种风格
 
-| `style` | 温度 | 适合 | 不适合 |
-| --- | --- | --- | --- |
-| `keynote-dark` | 大胆·暗 | 会议室投屏站着讲、一屏一个观点 | 高密度汇报（一页只能装几条） |
-| `swiss-grid` | 安静·冷 | 路演、评审、研报、要被反复翻阅的文档型 deck | 需要"气势"的发布会 |
-| `billboard` | 大胆·亮 | 路演 / QBR / 年度复盘（读者只关心几个数） | 需要慢慢读的长文页 |
-| `notebook` | 中性·暖 | 培训、工作坊、读书笔记（观众会凑近、会做笔记） | 投影远距离演讲（字号偏小） |
+完整对照（温度 / 适合 / 不适合 / 构图锚点）在 `references/style-architecture.md`；
+用 `python3 scripts/style.py` 看全部与它们的契约状态，`style.py --sheet -o s.png`
+把**所有风格 × 同一份 demo** 拼成一张图 —— 选风格要的是画面，不是对照表。
 
-每个风格支持几个 `colorSet`（`python3 scripts/ink.py styles/<style>/style.json` 会列出
-并逐个过对比度门槛）。**换风格/换色板只改 spec 的两个字段，内容一字不动**；
-改风格本身只动 `styles/<style>/style.json`，渲染器零改动。
+一句话记住八个：**暗** `keynote-dark`（冷）/ `botanical-dark`（暖）；
+**亮** `swiss-grid`（安静）/ `billboard`（大字报）；**纸** `notebook`（横格）/
+`paper-ink`（编辑）；**另类** `terminal`（等宽）/ `pastel-geometry`（粉彩）。
+每个风格支持几个 `colorSet`（`ink.py` 会列出并逐个过对比度门槛）。
+**换风格/换色板只改 spec 的两个字段，内容一字不动**；改风格本身只动
+`styles/<style>/style.json`，渲染器零改动。
 
 ## 为什么不能让你写坐标或色值
 

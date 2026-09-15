@@ -35,7 +35,18 @@ SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.b
 SCRIPTS = os.path.join(SKILL, "scripts")
 DEMO = os.path.join(SKILL, "dev-tools", "demo.spec.json")
 STYLES = os.path.join(SKILL, "styles")
-STYLE_NAMES = ("keynote-dark", "swiss-grid", "billboard", "notebook")
+
+
+def _style_names() -> list[str]:
+    """所有风格 —— **读目录，不写死名单**。
+
+    写死名单的代价是实测过的：加了四套新风格之后，那份写死的名单让它们全部逃过了
+    运动 / 装饰 / 版式表三条检查 —— 而测试是绿的。目录才是唯一事实来源。
+    """
+    return sorted(d for d in os.listdir(STYLES) if os.path.isdir(os.path.join(STYLES, d)))
+
+
+STYLE_NAMES = _style_names()
 
 
 def _load(name: str, path: str):

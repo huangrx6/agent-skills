@@ -33,6 +33,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
 TOKENS = os.path.join(SKILL, "styles", "swiss-grid", "style.json")
+STYLES = os.path.join(SKILL, "styles")
 SKILL_MD = os.path.join(SKILL, "SKILL.md")
 
 # 「| `type` | 用途 | 风险点 |」——只取版式名与用途两列；装饰那一列删了，
@@ -67,6 +68,16 @@ def _load(name: str, path: str):
 render = _load("_deck_test_render_md", os.path.join(SCRIPTS, "render.py"))
 # 页现在带着 data-slide / 错位变量（`--dx` 等上移到了 section）—— 匹配要允许属性。
 SECTION = re.compile(r'<section class="slide"[^>]*>(.*?)</section>', re.S)
+
+
+
+def _style_names() -> list[str]:
+    """所有风格 —— **读目录，不写死名单**。
+
+    写死名单的代价是实测过的：加了四套新风格之后，那份写死的名单让它们全部逃过了
+    运动 / 装饰 / 版式表三条检查 —— 而测试是绿的。目录才是唯一事实来源。
+    """
+    return sorted(d for d in os.listdir(STYLES) if os.path.isdir(os.path.join(STYLES, d)))
 
 
 class TestSkillMdMatchesRender(unittest.TestCase):
@@ -107,7 +118,7 @@ class TestSkillMdMatchesRender(unittest.TestCase):
           - 风格没声明（kind=null）→ 一页都不该有 data-zone
         """
         kinds = list(PROBE_SLIDES)
-        for name in ("billboard", "swiss-grid", "keynote-dark", "notebook"):
+        for name in _style_names():
             with self.subTest(style=name):
                 style = render.load_style(name)
                 spec = style["tokens"].get("decor") or {}

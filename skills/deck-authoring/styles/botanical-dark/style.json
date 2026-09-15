@@ -1,0 +1,107 @@
+{
+  "version": 2,
+  "label": "植物暗房 Botanical Dark",
+  "temperature": "大胆",
+  "reference": "frontend-slides 的 Dark Botanical（暗底 + 暖色 + 衬线）/ 高端香氛与酒店品牌手册 / 深色杂志内页",
+  "note": "为什么补这一套：现有 4 套里，深底只有 keynote-dark 一套，而它是**冷**的（纯黑 + 白字 + 荧光感）。真实场合里还有另一种深色需求 —— 温暖、安静、贵。所以这套用近黑（不是纯黑）+ 暖白字 + 陶土/玫瑰/鼠尾草三组暖强调色，标题用**衬线且不加粗**（其他 4 套的标题全是粗黑体，这是它最大的区别）。适合：品牌发布、客户提案、需要显得贵而不吵的场合。不适合：数据密集的汇报（衬线小字在投影上吃亏）。",
+  "colorSets": {
+    "terracotta": {
+      "primary": "#D4A574",
+      "secondary": "#C9B896",
+      "background": "#0F0F0F",
+      "text": "#EDE8E1"
+    },
+    "rose": {
+      "primary": "#E0A9AE",
+      "secondary": "#C9B896",
+      "background": "#121013",
+      "text": "#EDE8E1"
+    },
+    "sage": {
+      "primary": "#9FB39A",
+      "secondary": "#C9B896",
+      "background": "#0E1210",
+      "text": "#E9EDE7"
+    }
+  },
+  "ink": {
+    "derivation": "explicit",
+    "forText": "declared",
+    "note": "文字色声明为暖白（#EDE8E1），而不是纯白：纯白在近黑底上是「硬切」，而且偏冷 —— 那正是 keynote-dark 的观感。暖白 + 近黑（#0F0F0F 而不是 #000000）是这个风格「暖」的全部来源。强调色只做小面积（细线、圆环、编号、图表一档）。",
+    "rule": "暖白文字；强调色只碰小面积。"
+  },
+  "contrast": {
+    "minBody": 4.5,
+    "minLarge": 3.0,
+    "largeTextPx": 32
+  },
+  "type": {
+    "note": "衬线字号的**视觉**尺寸比同 px 的无衬线小（x-height 低、字面窄），所以这里比 keynote-dark 再上一档：cover 132 的 Georgia 看着约等于 118 的 Helvetica Neue。条目保持 34 以上 —— 暗底上的衬线小字最难读。",
+    "cover": 132,
+    "compact": 92,
+    "small": 80,
+    "end": 120,
+    "subtitle": 34,
+    "bulletLarge": 46,
+    "bullet": 34,
+    "bulletSmall": 27,
+    "colTitle": 44,
+    "nodeLabel": 30,
+    "nodeNote": 23,
+    "chartValue": 22,
+    "chartLabel": 20,
+    "caption": 26,
+    "foot": 20
+  },
+  "fonts": {
+    "display": "Georgia, Songti SC, Times New Roman, serif",
+    "body": "Helvetica Neue, Hiragino Sans GB, Arial, sans-serif",
+    "note": "display 走衬线（Georgia + 中文 Songti SC），且**不加粗** —— 这是这套风格最明显的识别特征；body 仍用无衬线，因为暖白小字在暗底上衬线会糊。不用 Inter/Roboto（slop），也不用 Times 当主选（那是默认回退，不是选择）。"
+  },
+  "texture": {
+    "grainOpacity": [
+      0.04,
+      0.08
+    ],
+    "grainBaseFrequency": 0.75,
+    "halftoneDotSize": [
+      2,
+      4
+    ],
+    "note": "极轻的纸纹。暗底上的颗粒是「哑光纸」而不是「印刷噪点」—— 所以只有 0.04~0.08，比 keynote-dark 略高（近黑比纯黑更经得起颗粒）。"
+  },
+  "decor": {
+    "kind": null,
+    "types": [],
+    "zones": [],
+    "sizes": [],
+    "note": "不放装饰墨块。这套的构图锚点是**右侧一条细竖线 + 一个描边圆环**，都是矢量线条，不是色块 —— 暖色一旦成块就俗了。"
+  },
+  "misregistration": {
+    "note": "不做错位（全 0）。",
+    "offsetRangeX": [
+      0,
+      0
+    ],
+    "offsetRangeY": [
+      0,
+      0
+    ],
+    "rotationRange": [
+      0,
+      0
+    ],
+    "blendMode": "normal"
+  },
+  "viewerBackground": "#1A1A1A",
+  "motion": {
+    "easing": "expoOut",
+    "cssEase": "cubic-bezier(0.16, 1, 0.3, 1)",
+    "enterMs": 820,
+    "staggerMs": 110,
+    "titleHoldMs": 420,
+    "holdMs": 3000,
+    "readPerItemMs": 820,
+    "note": "运动性格＝舒缓、有停顿（这是「贵」的一部分：急 = 便宜）。收紧的 overshoot 会显得跳，所以是纯 expoOut；停顿给到 420ms，比其余风格都长。"
+  }
+}

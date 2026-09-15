@@ -82,6 +82,22 @@ DEFAULT_TITLE_TIER = "small"
 # （实测：瑞士栅格那版图文页只有 2 条、字号 32，页面下半 55% 是空的。）
 BULLET_TIERS = ((3, "bulletLarge"), (5, "bullet"), (99, "bulletSmall"))
 
+# `type` 级数里**渲染器与 skin 必读**的那些档位。
+#
+# 为什么要一个名单：新增风格时漏一档，渲染器不会报错 —— `tier["caption"]` 会
+# KeyError（还算好），而 skin 里 `var(--t-something)` 拿不到值只会**静默地退回默认字号**，
+# 那一页看着“就是有点怪”，查起来极贵。拿这份名单在 `style.py` 里当场报出来。
+#
+# 注意这是**下限**：skin 可以用 `--t-<任意键>` 再多拿几档（比如那张表里的 chartValue），
+# 那些是自由的，不在名单里。
+REQUIRED_TYPE_TIERS = frozenset({
+    "cover", "compact", "small", "end",        # TITLE_TIER 的取值
+    "subtitle", "caption", "foot",
+    "bulletLarge", "bullet", "bulletSmall",    # BULLET_TIERS 的取值
+    "colTitle", "nodeLabel", "nodeNote",
+    "chartValue", "chartLabel",
+})
+
 
 def bullet_tier(n_items: int) -> str:
     for limit, tier in BULLET_TIERS:
