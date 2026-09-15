@@ -214,3 +214,55 @@ class TestVariantRendering(unittest.TestCase):
 
     def test_explicit_default_equals_implicit(self) -> None:
         self.assertEqual(self._page_html(None), self._page_html("visual-right"))
+
+
+class TestAutoVariant(unittest.TestCase):
+    """variant:"auto"：吃实测数据选变体；没数据回退默认 —— 都不猜。"""
+
+    REC = {"page": 3, "variant": "even", "score": 0.42, "density": 0.6,
+           "parts": {"fit": 1.0, "whitespace": 1.0, "semantic": 1.0},
+           "penalties": [],
+           "alternatives": [{"variant": "visual-right", "score": 0.31, "density": 0.5},
+                            {"variant": "visual-left", "score": 0.31, "density": 0.5}]}
+
+    def _spec(self, variant: str | None) -> dict:
+        spec = _demo()
+        page = spec["deck"]["slides"][2]              # 第 3 页 content-image
+        page.pop("variant", None)
+        if variant:
+            page["variant"] = variant
+        return spec
+
+    def test_auto_with_data_uses_measured_best(self) -> None:
+        resolved = compile_mod.compile_spec(self._spec("auto"),
+                                            fit_variants=[self.REC])
+        self.assertEqual(resolved["deck"]["slides"][2]["variant"], "even")
+        entry = next(t for t in resolved["trace"] if t["stage"] == "layout")
+        self.assertIn("实测最佳", entry["decision"])
+        self.assertIn("0.42", "".join(entry["reason"]), "理由里没带分数对比")
+
+    def test_auto_without_data_falls_back_to_default(self) -> None:
+        resolved = compile_mod.compile_spec(self._spec("auto"))
+        self.assertEqual(resolved["deck"]["slides"][2]["variant"], "visual-right")
+        entry = next(t for t in resolved["trace"] if t["stage"] == "layout")
+        self.assertIn("默认", entry["decision"])
+        self.assertIn("回退默认而不是猜", "".join(entry["reason"]))
+
+    def test_explicit_beats_data(self) -> None:
+        """显式 variant 永远赢 —— 实测数据不越权改内容决策。"""
+        resolved = compile_mod.compile_spec(self._spec("visual-left"),
+                                            fit_variants=[self.REC])
+        self.assertEqual(resolved["deck"]["slides"][2]["variant"], "visual-left")
+
+    def test_dict_form_accepted(self) -> None:
+        """{页码: rec} 形态也认（页码 str/int 都行）。"""
+        resolved = compile_mod.compile_spec(self._spec("auto"),
+                                            fit_variants={"3": self.REC})
+        self.assertEqual(resolved["deck"]["slides"][2]["variant"], "even")
+
+    def test_resolved_never_carries_auto(self) -> None:
+        """auto 是意图不是几何：resolved 里不许出现（渲染器值集没有它）。"""
+        for fv in (None, [self.REC]):
+            resolved = compile_mod.compile_spec(self._spec("auto"), fit_variants=fv)
+            for page in resolved["deck"]["slides"]:
+                self.assertNotEqual(page.get("variant"), "auto")

@@ -131,16 +131,21 @@ hero_center / hero_left / hero_full_bleed / …）。**content-image 已有显�
 （compile layout 段），fit 探针把三变体摆进同一份产物供评分。其余 type
 （两栏 6+6、时间线）仍隐式 —— 等候选实测铺开。
 
-## 17. Variant 选择依据【约定】
+## 17. Variant 选择依据【✅ 第一片已落地（content-image）】
 
 不得随机选版式；必须考虑内容量/视觉角色/图比例/优先级/语义关系/风格/密度/
-平衡/前后页节奏。现状：页型查表（确定性，不随机）+ fit 实测兜底——满足
-"不随机"，缺"多候选比较"。
+平衡/前后页节奏。现状（content-image）：spec 写 `variant: "auto"` →
+`fit --recommend` 把三变体 × 真图摆进同一份探针**实测**（CandidateScore，
+图的高宽比是真实输入）→ 落盘 JSON → `compile --fit-variants` 按分选最佳；
+平局偏默认，无数据回退默认并留痕。**显式 variant 永远赢**——实测数据
+不越权改内容决策。其余 type 仍页型查表（确定性，不随机）。
 
-## 18. Variant Candidate Ranking【约定】
+## 18. Variant Candidate Ranking【✅ 第一片已落地（content-image）】
 
-Page Planner 输出候选+分数，Resolver 实测后定版。未实现；`fit.py` 的多档位
-试排是它的雏形（同一产物量多组条目数）。
+Page Planner 输出候选+分数，Resolver 实测后定版。现状（content-image 闭环）：
+`fit recommend`（纯函数）从实测选每页最佳 + 对手分数；`compile` 的
+auto 决策吃同一份数据、Decision Trace 带分数对比。全类型铺开待各家族
+有真变体（hero / cards / editorial …）。
 
 ## 19. Information Hierarchy【部分 ✅】
 

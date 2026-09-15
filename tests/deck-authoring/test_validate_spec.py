@@ -246,3 +246,12 @@ class TestImageVariants(unittest.TestCase):
                    "image": "x.png", "variant": "center-stage"}]
         self.assertIn("UNKNOWN_VARIANT", self._codes(_spec(slides)),
                       "变体值不封闭 —— 拼错会一路漏到渲染器")
+
+    def test_auto_accepted_with_reminder(self) -> None:
+        """auto 是合法值（意图：让实测来选），但门禁要提醒喂数据的链路。"""
+        slides = [{"type": "content-image", "title": "图", "bullets": ["a"],
+                   "image": "x.png", "variant": "auto"}]
+        result = vs.validate(_spec(slides), self.color_sets)
+        self.assertNotIn("UNKNOWN_VARIANT", {i["code"] for i in result.errors})
+        warns = {i["code"] for i in result.items if i["level"] == "warn"}
+        self.assertIn("AUTO_VARIANT", warns, "auto 没提醒实测链路 —— 用例会忘了喂数据")

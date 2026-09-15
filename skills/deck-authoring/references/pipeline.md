@@ -52,7 +52,7 @@ Page Message；Motion Engine 改变信息层级；Brand 覆盖整个 Style；Con
 `--to-spec`+`validate_spec`；⑦⑧ = `image_source --brief/--check`；⑨ =
 `compile.py`+`render.py`（**决策与绘制已分家**：compile 出 resolved.deck.json
 ——主题/字号档/错位/logo/时间轴全在它定，每条决策带 trace；render_resolved
-只画不想；`render(spec)` 仍是 compile→draw 一步到位，字节级不变）；⑩⑫ = `check.py`
+只画不想；`render(spec)` 仍是 compile→draw 一步到位，字节级不变；variant:"auto" 的页吃 `fit --recommend` 实测数据（`--fit-variants` 喂入，无数据回退默认并留痕））；⑩⑫ = `check.py`
 （Layout QA 与 Visual QA 都在实测 DOM 上做，因为 resolved 层就是 DOM）；
 ⑬⑭ = `deliver.py` + 各导出的回读验证。
 

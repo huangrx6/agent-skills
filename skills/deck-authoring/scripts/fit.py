@@ -177,7 +177,9 @@ def build_probe_deck(content: dict, columns: int = 2) -> tuple[dict, dict]:
         # visual-left / even 也摆出来，CandidateScore 才有真候选可比 ——
         # compile 的"自动选变体"下一步就从这里取数（现在是显式才生效）。
         if kind == "content-image":
-            for v in ("visual-left", "even"):
+            for v in render.IMAGE_VARIANTS:
+                if v == "visual-right":
+                    continue                    # 默认就是它，上面已加
                 add({"type": "content-image", "title": title, "bullets": bullets,
                      "image": image, "variant": v}, f"content-image:{v}")
 
@@ -306,6 +308,76 @@ def report(result: dict, content: dict, style: str, brand: str | None) -> str:
     return "\n".join(out)
 
 
+def build_variant_probe(spec: dict, spec_dir: str | None = None) -> tuple[dict, dict]:
+    """把 spec 里所有 content-image 页 × 三变体摆进**一份**探针产物。
+
+    与 build_probe_deck 的分工：那个答"哪类版式装得下"（带条目扫描）；这个答
+    "这一页用哪个变体"（只摆变体、带**真图** —— 图的高宽比是变体选择的真实
+    输入，图裂了高度塌 0，量出来的就是错的）。
+
+    图的相对路径按 spec 所在目录解析成绝对路径：探针 HTML 写在临时目录，
+    相对 src 会指向不存在的位置。
+    """
+    deck = spec.get("deck", spec)
+    base = spec_dir or "."
+    probe_slides: list[dict] = []
+    labels: dict[int, dict] = {}
+    for page_no, s in enumerate(deck.get("slides", []), 1):
+        if s.get("type") != "content-image" or not s.get("image"):
+            continue
+        img = str(s["image"])
+        if not os.path.isabs(img):
+            cand = os.path.abspath(os.path.join(base, img))
+            img = cand if os.path.exists(cand) else img
+        for v in render.IMAGE_VARIANTS:
+            probe_slides.append({"type": "content-image",
+                                 "title": s.get("title", ""),
+                                 "bullets": list(s.get("bullets") or []),
+                                 "image": img, "variant": v})
+            labels[len(probe_slides)] = {"kind": f"content-image:{v}", "page": page_no}
+    probe = {"deck": {"title": deck.get("title", "变体实测"),
+                      "style": deck.get("style") or render.DEFAULT_STYLE,
+                      "colorSet": deck.get("colorSet"),
+                      "seed": deck.get("seed", 1), "slides": probe_slides}}
+    if deck.get("brand"):
+        probe["deck"]["brand"] = deck["brand"]
+    return probe, labels
+
+
+def recommend(measured: dict, labels: dict, spec: dict) -> list[dict]:
+    """从变体探针的实测里选每页最佳变体。纯函数（同测量 → 同结果）。
+
+    打分复用 score_candidate；同分时按 render.IMAGE_VARIANTS 的默认序破平 ——
+    平局偏向默认（visual-right），确定且保守。返回可直接落盘，
+    compile --fit-variants 吃同一份结构。
+    """
+    deck = spec.get("deck", spec)
+    slides = deck.get("slides", [])
+    by_page: dict[int, list[tuple[str, dict]]] = {}
+    for no, meta in sorted(labels.items()):
+        if no > len(measured.get("slides", [])):
+            continue
+        _b, overflow, density = _measure_row(measured, no)
+        variant = meta["kind"].split(":")[1]
+        by_page.setdefault(meta["page"], []).append(
+            (variant, {"fits": overflow <= 0, "density": round(density, 3)}))
+    out: list[dict] = []
+    for page_no, rows in sorted(by_page.items()):
+        content = slides[page_no - 1] if page_no <= len(slides) else {}
+        scored = []
+        for variant, extra in rows:
+            score, parts, pens = score_candidate(
+                {**extra, "kind": f"content-image:{variant}"}, content)
+            scored.append((score, variant, parts, pens, extra["density"]))
+        scored.sort(key=lambda t: (-t[0], render.IMAGE_VARIANTS.index(t[1])))
+        (score, variant, parts, pens, density) = scored[0]
+        out.append({"page": page_no, "variant": variant, "score": score,
+                    "density": density, "parts": parts, "penalties": pens,
+                    "alternatives": [{"variant": v, "score": sc, "density": d}
+                                     for sc, v, _p, _q, d in scored[1:]]})
+    return out
+
+
 def read_content(args) -> dict:
     if args.from_spec:
         spec = deckio.read_json(args.from_spec)
@@ -336,6 +408,34 @@ def read_content(args) -> dict:
     return {"title": args.title or "", "bullets": list(args.bullet or []), "image": None}
 
 
+def _cli_recommend(args) -> int:
+    """--recommend 的执行体：渲探针 → 量 → 选 → 输出（表 / JSON）。"""
+    spec_path = os.path.abspath(args.from_spec)
+    spec = deckio.read_json(spec_path)
+    probe, labels = build_variant_probe(spec, os.path.dirname(spec_path))
+    if not probe["deck"]["slides"]:
+        print("（没有 content-image 页 —— 无变体可推荐）")
+        return 0
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix="deck-fitrec-") as tmp:
+        html_path = os.path.join(tmp, "recommend.html")
+        deckio.write_text(html_path, render.render(probe))
+        measured = measure_mod.measure(html_path)
+    recs = recommend(measured, labels, spec)
+    if args.json_out:
+        print(json.dumps(recs, ensure_ascii=False, indent=2))
+    else:
+        print(f"变体实测「{spec.get('deck', spec).get('title', '')}」·"
+              f" {len(recs)} 个 content-image 页 · 风格 {probe['deck']['style']}")
+        for rec in recs:
+            alts = "、".join(f"{a['variant']} {a['score']:.2f}" for a in rec["alternatives"])
+            print(f"  第 {rec['page']} 页 → {rec['variant']}"
+                  f"（score {rec['score']:.2f}，占带 {rec['density']:.0%}；"
+                  f"对手：{alts}）")
+        print("  落盘：--json-out > variants.json，再 compile --fit-variants 喂入")
+    return 0
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(
         description="试排：给定一页内容，实测哪些版式装得下（渲一次、量一次）")
@@ -349,7 +449,15 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--brand", default=None, help="品牌（缺省：spec 的）")
     ap.add_argument("--columns", type=int, default=2, help="two-column 试几栏（缺省 2）")
     ap.add_argument("--json-out", action="store_true", help="输出机读 JSON（给脚本用）")
+    ap.add_argument("--recommend", action="store_true",
+                    help="逐页实测 content-image 三变体并选最佳（配合 --from-spec；"
+                         "--json-out 的产物喂给 compile --fit-variants）")
     args = ap.parse_args(argv[1:])
+
+    if args.recommend:
+        if not args.from_spec:
+            raise SystemExit("✗ --recommend 需要 --from-spec（变体选择是对某一页内容+真图的）")
+        return _cli_recommend(args)
 
     content = read_content(args)
     if not content["bullets"]:

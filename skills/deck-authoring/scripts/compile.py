@@ -91,12 +91,27 @@ _TIER_REASON = "条目数超过 5 条档上限 → 降为 {tier}。缩字号是�
                "先删条目 / 拆页 / 换变体，别把降档当第一手段"
 
 
-def compile_spec(deck_spec: dict, style: dict | None = None) -> dict:
-    """spec → resolved（决策层）。纯函数：同 spec + 同 seed 恒等。"""
+def compile_spec(deck_spec: dict, style: dict | None = None,
+                 fit_variants: dict | list | None = None) -> dict:
+    """spec → resolved（决策层）。纯函数：同 spec + 同 seed（+ 同实测数据）恒等。
+
+    fit_variants：`fit --recommend` 的产物（list 或 {页码: rec}），只喂给
+    variant:"auto" 的页 —— 显式 variant 永远赢，实测数据不越权改内容决策。
+    """
     r = _render()
     brand_mod = r.brand_module
     deck = deck_spec["deck"]
     trace: list[dict] = []
+    # 归一化：键统一转 str（JSON 落盘是 list，喂进来 list / dict 都得认；
+    # str() 不会抛，脏条目静默丢弃后走"auto 无数据 → 默认"兜底，好过抛栈）。
+    recs: dict[str, dict] = {}
+    if isinstance(fit_variants, list):
+        for rec in fit_variants:
+            if isinstance(rec, dict) and "page" in rec:
+                recs[str(rec["page"])] = rec
+    elif isinstance(fit_variants, dict):
+        for k, v in fit_variants.items():
+            recs[str(k)] = v
 
     # ── Theme：风格（双根）→ 品牌合并 → colorSet ─────────────────────────
     resolved_style: dict = (style if style is not None
@@ -156,19 +171,46 @@ def compile_spec(deck_spec: dict, style: dict | None = None) -> dict:
         # compile 的职责是**留痕**：谁选的变体、为什么。自动选变体（按内容形状
         # 派生）要等 fit 的候选实测给数据，现在是显式才记、默认静默。
         variant = slide.get("variant")
-        if variant:
+        if variant == "auto":
+            # auto：吃 fit --recommend 的实测分数（同内容同图，可复现）。
+            # 没数据就回退默认并留痕 —— 无实测的选择是另一个拍脑袋。
+            rec = recs.get(str(i))
+            if rec and rec.get("variant") in r.IMAGE_VARIANTS:
+                alts = "、".join(f"{a['variant']} {a['score']:.2f}"
+                                 for a in rec.get("alternatives", []))
+                trace.append({"stage": "layout", "slide": i,
+                              "decision": f"{kind}:{rec['variant']}（auto→实测最佳）",
+                              "reason": [f"fit 实测：{rec['variant']} score "
+                                         f"{rec['score']:.2f}"
+                                         + (f"（对手：{alts}）" if alts else ""),
+                                         "数据来自 fit --recommend 的同内容同图实测，"
+                                         "可复现；显式 variant 永远优先于 auto"]})
+                variant = rec["variant"]
+            else:
+                trace.append({"stage": "layout", "slide": i,
+                              "decision": f"{kind}:visual-right（auto 无数据 → 默认）",
+                              "reason": ["spec 要 auto 但没喂实测数据："
+                                         "fit --from-spec … --recommend --json-out "
+                                         "> variants.json 落盘，compile --fit-variants 喂入",
+                                         "回退默认而不是猜"]})
+                variant = "visual-right"
+        elif variant:
             trace.append({"stage": "layout", "slide": i,
                           "decision": f"{kind}:{variant}",
                           "reason": ["spec 显式指定 —— 变体是内容决策（图在哪侧/"
-                                     "文图几几开），写 spec 的人定，compile 只执行与留痕；"
-                                     "自动选变体等 fit 把三变体摆进同一探针后再上"]})
+                                     "文图几几开），写 spec 的人定，compile 只执行与留痕"]})
         dx, dy, rot = r.misregistration(tokens, seed, "page", i)
         # 决策与内容**合并进同一页对象**：resolved 自足 —— 渲染器只吃这一份，
         # 不需要回头读 spec（"resolved = read_json(...); html = render(resolved)"）。
-        slides_out.append({**slide, "index": i, "kind": kind,
-                           "tTier": t_tier, "tSize": tier[t_tier],
-                           "bTier": b_tier, "bSize": tier[b_tier],
-                           "dx": dx, "dy": dy, "rot": rot})
+        page = {**slide, "index": i, "kind": kind,
+                "tTier": t_tier, "tSize": tier[t_tier],
+                "bTier": b_tier, "bSize": tier[b_tier],
+                "dx": dx, "dy": dy, "rot": rot}
+        if kind == "content-image":
+            # resolved 里的 variant 必须是具体值（"auto" 是意图不是几何）——
+            # 渲染器的封闭值集没有 auto，漏进去就是 SystemExit。
+            page["variant"] = variant or "visual-right"
+        slides_out.append(page)
 
     # ── Motion：时间轴 ────────────────────────────────────────────────────
     timeline = r.timeline(deck, tokens)
@@ -198,11 +240,27 @@ def main(argv: list[str]) -> int:
                     help="写出 resolved.deck.json（不给则只打印摘要）")
     ap.add_argument("--trace", action="store_true",
                     help="打印决策 trace（每条：阶段/决定/理由）")
+    ap.add_argument("--fit-variants", default=None,
+                    help="fit --recommend --json-out 的落盘产物：variant 为 auto 的页"
+                         "按实测分数选（没喂的 auto 回退默认并留痕）")
     args = ap.parse_args(argv[1:])
 
     deckio = _load_sibling("deckio")
     spec = deckio.read_json(args.spec)
-    resolved = compile_spec(spec)
+    fit_variants = None
+    if args.fit_variants:
+        # 变体产物顶层是 **list**（fit --json-out 落盘形态），deckio 按 spec
+        # 校验会拒 —— json 直读，compile_spec 里已有类型归一化与兜底。
+        import json as _json
+        try:
+            with open(args.fit_variants, encoding="utf-8") as fh:
+                fit_variants = _json.load(fh)
+        except (OSError, _json.JSONDecodeError) as exc:
+            raise SystemExit(
+                f"✗ 读不了变体实测产物 {args.fit_variants}：{exc}\n"
+                f"  先跑：fit.py --from-spec <spec> --recommend --json-out "
+                f"> {args.fit_variants}") from exc
+    resolved = compile_spec(spec, fit_variants=fit_variants)
 
     if args.out:
         deckio.write_json(args.out, resolved)

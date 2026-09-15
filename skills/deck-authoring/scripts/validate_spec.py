@@ -59,7 +59,11 @@ SLIDE_FIELDS = {
 # 就不该把它省掉。
 # content-image 变体的值集（与 render.IMAGE_VARIANTS 一字不差）：
 # visual-right（默认）/ visual-left（图先文后，镜像）/ even（6+6 均分）。
+# spec 还可以写 "auto" —— 意思是"让实测来选"（fit --recommend 落盘 →
+# compile --fit-variants 喂入；没数据回退默认）。auto 是意图不是几何，
+# 不许漏进 resolved。
 IMAGE_VARIANTS = ("visual-right", "visual-left", "even")
+IMAGE_VARIANT_INPUTS = IMAGE_VARIANTS + ("auto",)
 
 REQUIRED_SLIDE_FIELDS = {
     "content-image": {"image"},
@@ -198,10 +202,15 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
             continue
         _check_fields(slide, SLIDE_FIELDS[kind], where, issues)
         variant = slide.get("variant")
-        if variant is not None and variant not in IMAGE_VARIANTS:
+        if variant is not None and variant not in IMAGE_VARIANT_INPUTS:
             issues.error("UNKNOWN_VARIANT", where,
                          f"未知变体 {variant!r}；content-image 支持 "
-                         f"{list(IMAGE_VARIANTS)}")
+                         f"{list(IMAGE_VARIANT_INPUTS)}")
+        if variant == "auto":
+            issues.warn("AUTO_VARIANT", where,
+                        "auto 变体要实测数据：fit --from-spec … --recommend "
+                        "--json-out > variants.json 落盘，再 compile --fit-variants "
+                        "喂入；没数据 compile 回退默认 visual-right（trace 有留痕）")
         for need in REQUIRED_SLIDE_FIELDS.get(kind, ()):
             if not slide.get(need):
                 issues.error("MISSING_FIELD", f"{where}.{need}",
