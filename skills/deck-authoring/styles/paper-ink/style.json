@@ -103,5 +103,21 @@
   "holdMs": 2900,
   "readPerItemMs": 900,
   "note": "运动性格＝翻书：不急、有停顿，每条之间留的时间比其他风格长（readPerItemMs 900）—— 这套的正文是**要读的句子**，不是要扫的短句。"
+ },
+ "colorStructure": {
+  "note": "**存结构，不存 HEX**（规范第 21 条）：色板仍是 colorSets 里的四个角色，其余九个角色由 palette.py 从这四个推导。下面这些值不是写死的愿望 ——色相结构 / 数量 / 明度 / 饱和度 / 冷暖是从 OKLCH 实测出来的，`palette.py --audit` 会拿声明和实测对。",
+  "hue_structure": "neutral-accent",
+  "color_count": "moderate",
+  "lightness_structure": "high-contrast",
+  "saturation_structure": "high-accent",
+  "temperature": "warm",
+  "contrast": "high",
+  "background_strategy": "texture",
+  "accent_strategy": "single",
+  "gradient_strategy": "none",
+  "text_strategy": "dark-on-light",
+  "color_creativity": 0.6,
+  "novelty_target": 0.55,
+  "why": "编辑风：一个高饱和强调色 + 其余克制（规范第 8 条点名的那类）。"
  }
 }

@@ -103,5 +103,21 @@
   "holdMs": 3000,
   "readPerItemMs": 820,
   "note": "运动性格＝舒缓、有停顿（这是「贵」的一部分：急 = 便宜）。收紧的 overshoot 会显得跳，所以是纯 expoOut；停顿给到 420ms，比其余风格都长。"
+ },
+ "colorStructure": {
+  "note": "**存结构，不存 HEX**（规范第 21 条）：色板仍是 colorSets 里的四个角色，其余九个角色由 palette.py 从这四个推导。下面这些值不是写死的愿望 ——色相结构 / 数量 / 明度 / 饱和度 / 冷暖是从 OKLCH 实测出来的，`palette.py --audit` 会拿声明和实测对。",
+  "hue_structure": "analogous",
+  "color_count": "moderate",
+  "lightness_structure": "high-contrast",
+  "saturation_structure": "medium",
+  "temperature": "warm",
+  "contrast": "high",
+  "background_strategy": "texture",
+  "accent_strategy": "dual",
+  "gradient_strategy": "none",
+  "text_strategy": "light-on-dark",
+  "color_creativity": 0.65,
+  "novelty_target": 0.65,
+  "why": "主色与副色都当强调用（暖色系两个层次），所以是 dual。"
  }
 }

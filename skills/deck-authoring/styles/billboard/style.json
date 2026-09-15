@@ -119,5 +119,21 @@
   "holdMs": 1800,
   "readPerItemMs": 520,
   "note": "运动性格＝脆：起快、停快（数字要“拍”上去，不是“滑”上去）。信息密度高，hold 短。"
+ },
+ "colorStructure": {
+  "note": "**存结构，不存 HEX**（规范第 21 条）：色板仍是 colorSets 里的四个角色，其余九个角色由 palette.py 从这四个推导。下面这些值不是写死的愿望 ——色相结构 / 数量 / 明度 / 饱和度 / 冷暖是从 OKLCH 实测出来的，`palette.py --audit` 会拿声明和实测对。",
+  "hue_structure": "neutral-accent",
+  "color_count": "restrained",
+  "lightness_structure": "high-contrast",
+  "saturation_structure": "vibrant",
+  "temperature": "cool",
+  "contrast": "high",
+  "background_strategy": "solid",
+  "accent_strategy": "single",
+  "gradient_strategy": "none",
+  "text_strategy": "adaptive",
+  "color_creativity": 0.7,
+  "novelty_target": 0.65,
+  "why": "四个色板里有深底（ink）也有白底，所以文字策略是自适应的；强调色只有主色一个。"
  }
 }

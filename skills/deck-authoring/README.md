@@ -105,7 +105,7 @@ python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸�
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 235 条，约 4 分钟（负载敏感）（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 269 条，约 5 分钟（负载敏感）（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时约 2.5 分钟，
@@ -190,6 +190,33 @@ OFL 唯一要记住的：**再分发字体文件本身**时要带上版权声明
 不用这款字**、字族真名与清单中文名不是一回事、短记号子串匹配必然误报）见
 `references/fonts.md`。
 
+## 配色
+
+**Style 存结构，不存 HEX**：`colorSets` 里是四个角色（primary / secondary /
+background / text），`colorStructure` 里是结构（色相关系 / 颜色数量 / 明度 / 饱和度 /
+冷暖 / 强调策略 / 创意等级…），其余九个角色由 `palette.py` **推导**。手写会漂，推导可测。
+
+```bash
+python3 scripts/palette.py --audit --topic "AI 大模型架构"   # 审配色 + 按主题判俗套
+python3 scripts/palette.py --novelty swiss-grid blue        # 一个色板的 novelty 与**依据**
+python3 scripts/palette.py --directions swiss-grid blue     # Safe / Creative / Experimental
+python3 scripts/palette.py --roles swiss-grid blue          # 13 个角色的推导结果
+```
+
+用 **OKLCH** 而不是 HSL，因为 HSL 的 L 与感知明度不成正比（提亮之后对比度反而会掉，
+而对比度在这里是硬门槛）。二次变体范围按规范：色相 ±10~30°、彩度 ±5~20%、明度 ±3~12%，
+**中性色不旋色相**（C≈0 时旋了是空操作，实测会产出重复色）。
+
+**俗套会被指出，而且说清是哪一条**（`tech_blue_purple_cyan` / `corporate_blue_white` /
+`premium_black_gold`…）。实测**本仓库 8 套风格里 5 套的某个色板正落在名单上**
+（`swiss-grid/blue` 同时命中前两条、`keynote-dark/blue`、`terminal/cyan`、
+`pastel-geometry/lilac`、`billboard/electric`）—— 所以它是**按主题条件的提示**而不是
+阻塞（规范原文是"不得**自动**绑定"，不是"这个色不许用"）。
+
+配色规范里**大部分讲的是生成过程**（怎么想），代码只能负责结构与校验。哪些是代码强制、
+哪些是流程判断、哪些**还没实现**（渐变渲染、玻璃拟态、强调色占比实测），
+逐条列在 `references/color.md`。
+
 ## 已知限制
 
 1. **贴图版 PPTX 改不了字**：要能改字就走 `pptx_native.py`（原生 shapes）。两者取舍见 `references/delivery-formats.md`。
@@ -221,6 +248,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── plate.py             # 图片 → duotone + 半调（制版）
 │   ├── image_source.py      # 提示词契约(--brief) / 验收(--check) / 生图 / 色块拼贴
 │   ├── fonts.py             # 字体库：清单(--list) / 取字体(--fetch) / 映射(--map) / 内嵌
+│   ├── palette.py           # 配色：OKLCH / 结构实测(--audit) / novelty / 三方向 / 角色
 │   ├── brand.py             # 品牌资产：logo 内嵌 / 色板与字体合并 / SVG 栅格化
 │   ├── fit.py               # 试排：给定一页内容，实测哪些版式装得下（真渲真量）
 │   ├── style.py             # 风格层：列表 / 契约体检 / 摘要 / 联系表（八套拼一张图）

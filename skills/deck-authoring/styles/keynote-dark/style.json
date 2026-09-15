@@ -109,5 +109,21 @@
   "holdMs": 2200,
   "readPerItemMs": 700,
   "note": "运动性格＝戏剧性：起步慢、尾巴长、标题落定后停得久（讲台上要留反应时间）。"
+ },
+ "colorStructure": {
+  "note": "**存结构，不存 HEX**（规范第 21 条）：色板仍是 colorSets 里的四个角色，其余九个角色由 palette.py 从这四个推导。下面这些值不是写死的愿望 ——色相结构 / 数量 / 明度 / 饱和度 / 冷暖是从 OKLCH 实测出来的，`palette.py --audit` 会拿声明和实测对。",
+  "hue_structure": "analogous",
+  "color_count": "moderate",
+  "lightness_structure": "high-contrast",
+  "saturation_structure": "vibrant",
+  "temperature": "cool",
+  "contrast": "high",
+  "background_strategy": "solid",
+  "accent_strategy": "dual",
+  "gradient_strategy": "none",
+  "text_strategy": "adaptive",
+  "color_creativity": 0.7,
+  "novelty_target": 0.65,
+  "why": "主/副色成对出现（深蓝+青光那种），是双强调；paper 板是浅底所以自适应。"
  }
 }

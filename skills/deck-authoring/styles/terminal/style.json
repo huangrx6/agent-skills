@@ -103,5 +103,21 @@
   "holdMs": 2400,
   "readPerItemMs": 700,
   "note": "运动性格＝快、干脆、不拖泥带水 —— 终端的隐喻是「输出」，输出不该有仪式感。停顿只有 180ms（别的风格是 260~420），因为这套的正文更短、更密，等久了像卡住。"
+ },
+ "colorStructure": {
+  "note": "**存结构，不存 HEX**（规范第 21 条）：色板仍是 colorSets 里的四个角色，其余九个角色由 palette.py 从这四个推导。下面这些值不是写死的愿望 ——色相结构 / 数量 / 明度 / 饱和度 / 冷暖是从 OKLCH 实测出来的，`palette.py --audit` 会拿声明和实测对。",
+  "hue_structure": "neutral-accent",
+  "color_count": "moderate",
+  "lightness_structure": "mixed",
+  "saturation_structure": "vibrant",
+  "temperature": "mixed",
+  "contrast": "high",
+  "background_strategy": "solid",
+  "accent_strategy": "single",
+  "gradient_strategy": "none",
+  "text_strategy": "light-on-dark",
+  "color_creativity": 0.6,
+  "novelty_target": 0.55,
+  "why": "终端隐喻：强调就是光标色一个，第二色是中性的状态灰。"
  }
 }

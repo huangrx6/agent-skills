@@ -103,5 +103,21 @@
   "holdMs": 2700,
   "readPerItemMs": 780,
   "note": "运动性格＝轻快、带一点回弹（overshoot）—— 其余七套都是 expoOut 的「稳稳落定」，只有这套允许弹一下。回弹本身是「友好」这个语气的动作化，不是随便加的：一套风格里只用一个性格。"
+ },
+ "colorStructure": {
+  "note": "**存结构，不存 HEX**（规范第 21 条）：色板仍是 colorSets 里的四个角色，其余九个角色由 palette.py 从这四个推导。下面这些值不是写死的愿望 ——色相结构 / 数量 / 明度 / 饱和度 / 冷暖是从 OKLCH 实测出来的，`palette.py --audit` 会拿声明和实测对。",
+  "hue_structure": "neutral-accent",
+  "color_count": "moderate",
+  "lightness_structure": "mixed",
+  "saturation_structure": "medium",
+  "temperature": "cool",
+  "contrast": "high",
+  "background_strategy": "solid",
+  "accent_strategy": "single",
+  "gradient_strategy": "none",
+  "text_strategy": "dark-on-light",
+  "color_creativity": 0.7,
+  "novelty_target": 0.65,
+  "why": "粉彩几何靠色块而不是强调色，所以强调策略是 single。"
  }
 }

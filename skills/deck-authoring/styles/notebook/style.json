@@ -107,5 +107,22 @@
   "holdMs": 2800,
   "readPerItemMs": 820,
   "note": "运动性格＝软：位移小、时间长（像翻册子，不像发布会）。读者会停下来看，hold 最长。"
+ },
+ "colorStructure": {
+  "note": "**存结构，不存 HEX**（规范第 21 条）：色板仍是 colorSets 里的四个角色，其余九个角色由 palette.py 从这四个推导。下面这些值不是写死的愿望 ——色相结构 / 数量 / 明度 / 饱和度 / 冷暖是从 OKLCH 实测出来的，`palette.py --audit` 会拿声明和实测对。",
+  "hue_structure": "triadic",
+  "color_count": "moderate",
+  "lightness_structure": "mixed",
+  "saturation_structure": "vibrant",
+  "temperature": "warm",
+  "contrast": "high",
+  "background_strategy": "solid",
+  "accent_strategy": "single",
+  "gradient_strategy": "none",
+  "text_strategy": "dark-on-light",
+  "color_creativity": 0.6,
+  "novelty_target": 0.55,
+  "why": "笔记体靠手写感与纸色立住，不靠第二强调色。",
+  "hue_structure_note": "这个字段是**实测里出现最多的那个**：本风格各色板实测为 {'triadic': 3, 'complementary': 1} —— 不同色板本来就可以有不同的色相结构（规范允许），审计按'声明须落在实测集合里'判。"
  }
 }

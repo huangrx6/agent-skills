@@ -109,5 +109,21 @@
   "holdMs": 2600,
   "readPerItemMs": 760,
   "note": "运动性格＝精确：时间短、间隔整齐、几乎不带弹性（带弹性就不是瑞士了）。留白多，所以 hold 长。"
+ },
+ "colorStructure": {
+  "note": "**存结构，不存 HEX**（规范第 21 条）：色板仍是 colorSets 里的四个角色，其余九个角色由 palette.py 从这四个推导。下面这些值不是写死的愿望 ——色相结构 / 数量 / 明度 / 饱和度 / 冷暖是从 OKLCH 实测出来的，`palette.py --audit` 会拿声明和实测对。",
+  "hue_structure": "neutral-accent",
+  "color_count": "moderate",
+  "lightness_structure": "mixed",
+  "saturation_structure": "vibrant",
+  "temperature": "cool",
+  "contrast": "high",
+  "background_strategy": "solid",
+  "accent_strategy": "single",
+  "gradient_strategy": "none",
+  "text_strategy": "adaptive",
+  "color_creativity": 0.55,
+  "novelty_target": 0.5,
+  "why": "栅格派最克制的一档；slate 板是浅灰底所以文字策略自适应。"
  }
 }
