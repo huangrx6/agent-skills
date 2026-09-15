@@ -373,7 +373,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
     ├── brand-assets.md         # 品牌与资产协议（v2.0）：四层、优先级链、v2 对照表
     ├── content-intelligence.md  # 内容智能与规划系统（v3.0）：Brief / 论断 / 一页一 Takeaway
     ├── planning.md             # 规划层模块：schema、骨架表、复杂度、到 spec 的桥
-    ├── layout-system.md        # 网格与间距令牌、层级三把尺、路线图
+    ├── layout-system.md        # 布局规则 0-87 全文落地：网格/令牌/层级/约束/路线图
     ├── charts.md               # 图表引擎：意图树、八类、弱化强调、消息先行
     ├── color.md                # OKLCH 色彩结构、novelty、三方向
     ├── fonts.md                # 126 字体库、风格映射、严格 A 级、用户缓存
