@@ -591,9 +591,11 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
         if "riso" in block:
             problems.append("图表容器里出现了错位叠印元素（riso 只允许做容器与背景，不能进图表区）")
 
-    # ③ 错位区间：读产物里真正写进去的值
-    m = tokens["misregistration"]
-    for dx, dy, rot in re.findall(r"--dx:([-\d.]+)px;--dy:([-\d.]+)px;--rot:([-\d.]+)deg", page):
+    # ③ 错位区间：读产物里真正写进去的值（misregistration 是可选 effect ——
+    # 没声明的风格 dx/dy/rot 全 0，区间无从对起，跳过不查）
+    m = tokens.get("misregistration") or {}
+    hits = re.findall(r"--dx:([-\d.]+)px;--dy:([-\d.]+)px;--rot:([-\d.]+)deg", page) if m else []
+    for dx, dy, rot in hits:
         for raw, (lo, hi), name in ((dx, m["offsetRangeX"], "dx"),
                                     (dy, m["offsetRangeY"], "dy"),
                                     (rot, m["rotationRange"], "rot")):

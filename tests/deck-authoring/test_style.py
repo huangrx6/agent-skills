@@ -306,3 +306,33 @@ class TestEveryStyleSurvivesTheStressDeck(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMinimalContract(unittest.TestCase):
+    """四张可选 effect 键（Riso 降级）：缺 = 无该效果，不是"声明一堆零"。
+
+    minimal-baseline 是最小契约的活参照 —— 只有核心键的普通风格（Swiss/Minimal/
+    Glass…）不再需要"声明自己没有颗粒、没有错位"。
+    """
+
+    def test_fixture_has_no_effect_keys_and_audits_clean(self) -> None:
+        raw = deckio.read_json(os.path.join(STYLES, "minimal-baseline", "style.json"))
+        for key in style.EFFECT_KEYS:
+            self.assertNotIn(key, raw, f"{key} 应是可选 effect —— 基线风格不该有它")
+        self.assertEqual(style.audit("minimal-baseline"), [],
+                         "缺 effect 键的风格没过审计")
+
+    def test_renders_without_grain_layer(self) -> None:
+        """无 texture：不发 .grain DOM（不是隐形层），错位全零。"""
+        spec = deckio.read_json(DEMO)
+        spec["deck"]["style"] = "minimal-baseline"
+        html = render.render(spec)
+        self.assertNotIn('<div class="grain"></div>', html,
+                         "没声明纸纹的风格还有 grain 层")
+        self.assertEqual(html.count("--dx:0.0px"), html.count("--dx:"),
+                         "没声明错位的风格 dx 不全零")
+
+    def test_declared_texture_still_emits_grain(self) -> None:
+        """声明了 texture 的风格（swiss-grid）照发纸纹层 —— 可选不是删除。"""
+        html = render.render(deckio.read_json(DEMO))    # 默认 swiss-grid
+        self.assertIn('<div class="grain"></div>', html)

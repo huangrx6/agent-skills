@@ -16,7 +16,10 @@
       // 文字色 = overprint(primary, secondary)，**派生**，不手写
     }
   },
-  "ink": {
+  // ── 以下四键是**可选 effect**（缺 = 该风格没有这个效果，不是"声明一堆零"）：
+  //    ink / texture / decor / misregistration。普通风格（Swiss/Minimal/Glass…）
+  //    照 dev-tools/style-fixture/minimal-baseline 起手即可，一个都不用写。
+  "ink": {                                 // （可选）孔版/印刷系的叠印声明
     "derivation": "srgb-multiply",        // 叠印方式（sRGB 逐通道相乘 = 真实打印混色）
     "forText":    "overprint",            // 文字一律用叠印色
     "note":       "...",                  // 设计缘由（给后人读）
@@ -27,13 +30,13 @@
     "minLarge":     3.0,                  // 大字（≥ largeTextPx）最小对比度
     "largeTextPx":  32
   },
-  "misregistration": {
+  "misregistration": {                     // （可选）错位声明；缺键 = dx/dy/rot 全 0
     "offsetRangeX": [lo, hi],             // 标题层 A 的 X 错位像素区间
     "offsetRangeY": [lo, hi],             // 标题层 A 的 Y 错位像素区间
     "rotationRange": [lo, hi],            // 整组旋转角度区间（度）
     "blendMode": "multiply"               // A / B 两层都用 multiply
   },
-  "texture": {
+  "texture": {                             // （可选）纸纹声明；缺键 = 不发 .grain 层
     "grainOpacity":        [lo, hi],      // 颗粒层不透明度区间
     "grainBaseFrequency": 0.9,            // feTurbulence baseFrequency（颗粒密度）
     "halftoneDotSize":     [lo, hi]       // 装饰墨块的网点直径区间
@@ -173,8 +176,9 @@ styles/<name>/
 #### 换风格需要重审什么
 
 `check.py` 的门槛**全部从所选风格的 token 读**，不用改代码；但要确认新 token 里
-这几项填得合理：`type` 的级数（字号是否匹配观看距离）、`misregistration` 区间
-（不做错位的风格写 `[0,0]`，字段别删 —— ③ 那条区间校验靠它）、`contrast` 门槛。
+这几项填得合理：`type` 的级数（字号是否匹配观看距离）、`contrast` 门槛、
+`misregistration`（要做错位才写区间 —— ③ 那条区间校验只在**写了**时生效；
+不做错位的风格直接不写这个键）。
 
 ## spec 字段集（deck-spec.json）
 

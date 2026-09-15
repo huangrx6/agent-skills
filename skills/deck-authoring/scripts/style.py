@@ -54,9 +54,14 @@ ink = _load_sibling("ink")
 shots = _load_sibling("shots")
 
 # 一套风格必须提供的顶层键。少一个 → 渲染器或校验层会踩空。
+# 契约分两层：核心键（每个风格都必须有）+ **可选 effect 键**。
+# ink/texture/decor/misregistration 是孔版时代的四张烙印 —— 普通风格
+# （Swiss/Minimal/Glass…）不需要"声明自己没有颗粒、没有错位"：缺键 = 该风格
+# 没有这个效果，render/check 按同一默认处理（零错位、无纸纹层）。
+# dev-tools/style-fixture/minimal-baseline 是这份最小契约的活参照。
 REQUIRED_KEYS = ("version", "label", "temperature", "reference", "note", "colorSets",
-                 "ink", "contrast", "type", "fonts", "texture", "decor",
-                 "misregistration", "viewerBackground", "motion")
+                 "contrast", "type", "fonts", "viewerBackground", "motion")
+EFFECT_KEYS = ("ink", "texture", "decor", "misregistration")
 # motion 里的键：时间轴与 JS 引擎都直接取，少一个就是运行时塌掉。
 REQUIRED_MOTION = ("easing", "cssEase", "enterMs", "staggerMs", "titleHoldMs",
                    "holdMs", "readPerItemMs")
@@ -140,7 +145,8 @@ def audit(name: str) -> list[str]:
                             f"{limits['minBody']} —— 换色板，不要放宽门槛")
 
     # decor 声明与落点要一致：声明了类型却没有 zones，装饰就没有地方放。
-    decor = raw["decor"]
+    # （decor 是可选 effect —— 只有写了才查。）
+    decor = raw.get("decor") or {}
     if decor.get("types") and not decor.get("zones"):
         problems.append(f"{name} 声明了 decor.types={decor['types']} 但 decor.zones 是空的")
     if decor.get("zones") and not decor.get("types"):
@@ -164,7 +170,8 @@ def summarize(name: str) -> str:
         f"  字号      {type_bits}",
         f"  运动      {mo['easing']} enter={mo['enterMs']}ms stagger={mo['staggerMs']}ms "
         f"titleHold={mo['titleHoldMs']}ms hold={mo['holdMs']}ms",
-        f"  装饰      types={raw['decor'].get('types')} zones={raw['decor'].get('zones')}",
+        f"  装饰      types={(raw.get('decor') or {}).get('types')} "
+        f"zones={(raw.get('decor') or {}).get('zones')}",
         f"  底色      {raw['viewerBackground']}",
         "",
         "  色板（文字色对比度）",

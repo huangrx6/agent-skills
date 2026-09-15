@@ -171,7 +171,11 @@ def load_style(name: str = DEFAULT_STYLE) -> dict:
 
 
 def misregistration(tokens: dict, seed, *parts) -> tuple[float, float, float]:
-    spec = tokens["misregistration"]
+    # misregistration 是**可选 effect**：风格没写就是"不错位"，不需要为
+    # "没有这个效果"声明一坨零值区间（Swiss/Minimal 不该知道什么叫错位）。
+    spec = tokens.get("misregistration") or {
+        "offsetRangeX": (0.0, 0.0), "offsetRangeY": (0.0, 0.0),
+        "rotationRange": (0.0, 0.0)}
     r = _rng(seed, "mis", *parts)
     return (round(r.uniform(*spec["offsetRangeX"]), 2),
             round(r.uniform(*spec["offsetRangeY"]), 2),
@@ -179,7 +183,11 @@ def misregistration(tokens: dict, seed, *parts) -> tuple[float, float, float]:
 
 
 def grain_opacity(tokens: dict, seed, *parts) -> float:
-    return round(_rng(seed, "grain", *parts).uniform(*tokens["texture"]["grainOpacity"]), 3)
+    # texture 同为可选 effect：没有纸纹层的风格返回 0（壳层据此也不发 .grain）。
+    rng = (tokens.get("texture") or {}).get("grainOpacity")
+    if not rng:
+        return 0.0
+    return round(_rng(seed, "grain", *parts).uniform(*rng), 3)
 
 
 # ── 时间轴：t（秒）→ 每页的位置与时长 ────────────────────────────────────────
@@ -747,8 +755,13 @@ def _head(title: str, style: dict, seed: int, color_set: str) -> str:
 
 
 def _grain_svg(tokens: dict) -> str:
-    """纸纹噪点（data URI）。skin.css 里用 `background-image:url("__GRAIN_SVG__")`。"""
-    freq = tokens["texture"]["grainBaseFrequency"]
+    """纸纹噪点（data URI）。skin.css 里用 `background-image:url("__GRAIN_SVG__")`。
+
+    无 texture 的风格返回空串 —— 占位符必须被替换掉，哪怕替换成"什么都没有"。
+    """
+    freq = (tokens.get("texture") or {}).get("grainBaseFrequency")
+    if freq is None:
+        return ""
     return ("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' "
             "width='220' height='220'><filter id='n'><feTurbulence "
             f"type='fractalNoise' baseFrequency='{freq}' numOctaves='2'/>"
@@ -1049,7 +1062,10 @@ def render_resolved(resolved: dict) -> str:
         if logo_uri and brand_module.shows_logo(brand, kind, i, end_slide):
             out.append(f'<img class="brandlogo" src="{logo_uri}" alt="" '
                        f'{tag(f"s{i}.logo", i, "logo", logo_ref, None, src_base="skill")}>')
-        out.append('<div class="grain"></div>')
+        # 纸纹层只在风格声明了 texture 时发射 —— 没有纸纹的风格**不该**有
+        # 这个 DOM（不是"opacity:0 的隐形层"：看不见不等于不存在）。
+        if tokens.get("texture"):
+            out.append('<div class="grain"></div>')
         out.append("</section>")
 
     # 清单随产物一起走（不另写文件）：渲染、测量、导出读的是同一份事实。
