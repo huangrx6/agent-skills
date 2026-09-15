@@ -134,6 +134,7 @@ PROBE_JS = r"""
       elements: [], images: [], errors: errs, fonts: {}
     };
     var fams = {};
+    var stacks = {};                       // 有文字的元素的字体栈（保留顺序）
     document.querySelectorAll('[data-m]').forEach(function (el) {
       var r = el.getBoundingClientRect();
       var cs = getComputedStyle(el);
@@ -150,12 +151,25 @@ PROBE_JS = r"""
         overflow: cs.overflow,
         visible: cs.visibility !== 'hidden' && cs.display !== 'none' && parseFloat(cs.opacity) > 0
       });
-      cs.fontFamily.split(',').forEach(function (f) {
-        f = f.trim().replace(/^["']|["']$/g, '');
-        if (f) fams[f] = true;
-      });
+      // 只统计**真有文字的**元素。`<figure class="imgwrap">` 这类一个字形都不渲染，
+      // 它的 font-family 只是 Chrome 给 CJK 的 UA 默认值（实测报了 'PingFang SC'，
+      // 而页面上根本没写这个族）—— 对一个不出字的元素谈字体回退没有意义，
+      // 报出来只会把人练成“忽略字体提示”。
+      if ((el.textContent || '').trim()) {
+        stacks[cs.fontFamily] = true;
+        cs.fontFamily.split(',').forEach(function (f) {
+          f = f.trim().replace(/^["']|["']$/g, '');
+          if (f) fams[f] = true;
+        });
+      }
     });
     Object.keys(fams).forEach(function (f) { out.fonts[f] = fontAvailable(f); });
+    // 字体栈**保留顺序**交出去：这样才能说清“首选不可用时谁顶上了”，
+    // 而不是只丢一句“某族不可用”（不够可操作）。
+    out.stacks = Object.keys(stacks).map(function (s) {
+      return s.split(',').map(function (f) { return f.trim().replace(/^["']|["']$/g, ''); })
+              .filter(function (f) { return f; });
+    });
     document.querySelectorAll('img').forEach(function (im) {
       out.images.push({
         src: im.getAttribute('src'), complete: !!im.complete,

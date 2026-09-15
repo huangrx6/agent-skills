@@ -178,17 +178,27 @@ def _check_measured_health(measured: dict) -> list[str]:
 
 
 def _check_font_fallback(measured: dict) -> list[str]:
-    """字体回退**提示**（不判失败）。
+    """字体回退**提示**（不判失败）—— 而且要说清楚**谁顶上了**。
 
-    启发式：拿一个一定不存在的族当基准比宽度，宽度一样 = 声明的族没生效。
-    已经排除了 serif/monospace 这类**通用族**（它们不是字体而是回退目标，
-    不排会误报"缺失"）。即便如此它仍可能误报（衬线撞衬线），所以只提示。 
+    启发式：拿一个一定不存在的族当基准比宽度，宽度一样 = 那个族没生效。
+    通用族（serif / monospace）排除 —— 它们不是字体而是**回退目标**，不排会误报“缺失”。
+    即便如此仍可能误报（衬线撞衬线），所以只提示。
+
+    只跟**有文字的元素**的栈算（探针已经滤掉无文字的，见 `measure.py`）。
+    早先按全部元素统计，结果报了 `<figure>` 的 'PingFang SC' —— 那是 Chrome 给 CJK 的
+     UA 默认值，而那个元素不渲染任何字形（实测踩过）。
     """
+    fonts = measured.get("fonts", {})
     out: list[str] = []
-    for fam, info in sorted(measured.get("fonts", {}).items()):
-        if not info.get("available") and not info.get("generic"):
-            out.append(f"字体回退（启发式提示）：声明的 {fam!r} 在本机不可用"
-                       f" —— 栈里后面的族会顶上；排版会随机器变，交付前确认一下")
+    for stack in measured.get("stacks", []):
+        first = stack[0] if stack else None
+        if not first or fonts.get(first, {}).get("available"):
+            continue                       # 首选能用，没有回退
+        winner = next((f for f in stack if fonts.get(f, {}).get("available")), None)
+        tail = (f"，实际用的是 {winner!r}" if winner
+                else "，栈里没有一个可用 —— 会落到系统默认")
+        out.append(f"字体回退（启发式提示）：声明的 {first!r} 在本机不可用{tail}"
+                   f" —— 排版会随机器变，交付前确认一下")
     return out
 
 

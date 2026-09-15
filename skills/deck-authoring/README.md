@@ -36,15 +36,15 @@ python3 scripts/pptx_native.py out.html -o deck-editable.pptx       # 10) 出 PP
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 59 条
+python3 -m unittest discover -s tests/deck-authoring -v     # 65 条
 ```
 
-钉住十项不变量：墨色推导 + 三套色板门禁、同 spec + 同种子字节一致、校验的
+钉住十一项不变量：墨色推导 + 三套色板门禁、同 spec + 同种子字节一致、校验的
 变异验证（每项都造违规样例，且变异替换的是产物里**真实存在**的值）、半调墨覆盖率
 随灰度单调（100% → 0%）、缓存命中后仍过色板三角形不变量、外壳行为（真开浏览器
 按键翻页 + letterbox 缩放比贴边不溢）、PDF 是矢量且页数/页尺寸对（连"删掉 @page
 能不能拦"都有用例）、可编辑 PPTX 的**字是真字**且坐标是页内坐标（连"`<a:pattFill>`
-空不空"都查）、SKILL.md 的版式表与
+空不空"都查）、字体提示不报废话且要说清谁顶上了、SKILL.md 的版式表与
 `render.py` 实测行为一致、规格字段集真的封闭（坐标/字号/色值必须被指名报出）。
 
 ## 依赖
@@ -112,7 +112,8 @@ tests/deck-authoring/           # 测试住在仓库顶层（不在 skill 目录
 ├── test_validate_spec.py
 ├── test_shell.py
 ├── test_pdf.py
-└── test_pptx_native.py
+├── test_pptx_native.py
+└── test_font_advisory.py
 ```
 
 测试**刻意不放在 skill 目录里** —— AI 调用 skill 时读的是 `skills/deck-authoring/`
