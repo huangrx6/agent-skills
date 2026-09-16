@@ -59,7 +59,13 @@ deckio = _load_sibling("deckio")   # IO 收口：参数写错要报清楚，不�
 # 是开发/测试夹具（demo、stress、测试套件用它跑通全链），**不是交付物**。
 # 发布的 skill 不内置任何风格 —— 每份 deck 的风格按规则自建，
 # 形状与自建指南见 references/style-architecture.md。
-STYLE_ROOTS = (os.path.join(HERE, "..", "styles"),
+# 风格解析三根，顺序有意义：
+#   1. <deck 项目>/styles/   —— 风格跟着 deck 项目走（随项目交付、可移植）；
+#     脚本从项目目录跑时 cwd 就是项目根。工具链写风格也只写这里（style.new）。
+#   2. skill 的 styles/      —— 用户**显式托管**的全局风格；工具链永不写入。
+#   3. dev-tools 夹具        —— 参考实现（demo/测试走它），不是交付物。
+STYLE_ROOTS = (os.path.join(os.getcwd(), "styles"),
+               os.path.join(HERE, "..", "styles"),
                os.path.join(HERE, "..", "dev-tools", "style-fixture"))
 DEFAULT_STYLE = "swiss-grid"
 # content-image 的变体（Family × Variant，值封闭 —— validate_spec 同步）：
@@ -152,7 +158,13 @@ def style_names() -> list[str]:
 
 
 def style_folder(name: str) -> str | None:
-    """风格目录路径（含 style.json 的第一个根）；找不到返回 None。"""
+    """风格目录路径（含 style.json 的第一个根）；找不到返回 None。
+
+    `name` 也可以是**显式目录路径**（含 style.json）—— 三方向预览草稿在
+    /tmp 里也能直接渲，全程不碰任何 styles 根。
+    """
+    if os.path.isdir(name) and os.path.isfile(os.path.join(name, "style.json")):
+        return os.path.abspath(name)
     for root in STYLE_ROOTS:
         folder = os.path.join(root, name)
         if os.path.isfile(os.path.join(folder, "style.json")):

@@ -28,6 +28,7 @@ import copy
 import importlib.util
 import json
 import os
+import shutil
 import sys
 import tempfile
 
@@ -69,6 +70,107 @@ REQUIRED_MOTION = ("easing", "cssEase", "enterMs", "staggerMs", "titleHoldMs",
 REQUIRED_COLORS = ("primary", "secondary", "background")
 
 VALID_EASING = ("expoOut", "overshoot")
+
+
+# ── 方向预设（§三方向）：一个方向 = 结构性格，不是一块色板 ────────────────
+# 三个起手方向在**字号档 / 字栈 / 动效 / 气质**上互斥——拷夹具换色得到的是
+# 三张同构皮肤（用户实测踩过："布局都一样，就是颜色不一样"）。
+# 字号档整体比夹具小一档：屏幕 deck 的"精致"来自克制的字与松的留白。
+PRESETS = {
+    "editorial": {
+        "label": "编辑部 · 精致",
+        "temperature": "安静 · 暖",
+        "type": {"cover": 84, "compact": 62, "small": 54, "end": 84,
+                 "subtitle": 28, "bulletLarge": 30, "bullet": 23,
+                 "bulletSmall": 19, "colTitle": 28, "nodeLabel": 21,
+                 "nodeNote": 17, "chartValue": 16, "chartLabel": 14,
+                 "caption": 18, "foot": 16},
+        "fonts": {"display": "Songti SC / Source Han Serif SC / Georgia, serif",
+                  "body": "Source Han Serif SC / 霞鹜文楷 / Georgia, serif",
+                  "numeral": "Georgia / Source Han Serif SC"},
+        "motion": {"easing": "expoOut", "enterMs": 640, "staggerMs": 90,
+                   "titleHoldMs": 320, "holdMs": 3000, "readPerItemMs": 860},
+        "why": "衬线 + 小字 + 长留白：读的人拿在手里，字是内容不是海报",
+    },
+    "poster": {
+        "label": "海报 · 大字冲击",
+        "temperature": "浓烈 · 暖",
+        "type": {"cover": 150, "compact": 112, "small": 96, "end": 150,
+                 "subtitle": 40, "bulletLarge": 44, "bullet": 34,
+                 "bulletSmall": 28, "colTitle": 44, "nodeLabel": 32,
+                 "nodeNote": 24, "chartValue": 24, "chartLabel": 20,
+                 "caption": 26, "foot": 22},
+        "fonts": {"display": "阿里妈妈数黑体 / 站酷酷黑 / Impact",
+                  "body": "MiSans / HarmonyOS Sans",
+                  "numeral": "阿里妈妈数黑体"},
+        "motion": {"easing": "overshoot", "enterMs": 460, "staggerMs": 60,
+                   "titleHoldMs": 220, "holdMs": 2200, "readPerItemMs": 700},
+        "why": "超粗黑 + 巨字 + 快节奏：三米外看，字本身是图形",
+    },
+    "data": {
+        "label": "数据 · 紧凑",
+        "temperature": "安静 · 冷",
+        "type": {"cover": 92, "compact": 68, "small": 58, "end": 92,
+                 "subtitle": 28, "bulletLarge": 26, "bullet": 21,
+                 "bulletSmall": 18, "colTitle": 26, "nodeLabel": 20,
+                 "nodeNote": 16, "chartValue": 16, "chartLabel": 14,
+                 "caption": 17, "foot": 15},
+        "fonts": {"display": "MiSans / Inter",
+                  "body": "MiSans / Inter",
+                  "numeral": "SF Mono / JetBrains Mono / MiSans"},
+        "motion": {"easing": "expoOut", "enterMs": 380, "staggerMs": 50,
+                   "titleHoldMs": 180, "holdMs": 2000, "readPerItemMs": 620},
+        "why": "无衬线 + 等宽数字 + 高密度：一屏塞得下事实，眼睛不累",
+    },
+}
+
+
+def new_style(name: str, preset: str, directory: str | None = None) -> str:
+    """从方向预设生成一份**契约完整**的风格草稿，返回目录路径。
+
+    风格跟着 **deck 项目**走：默认写到 `<当前目录>/styles/<name>/`（随项目
+    交付、可移植）。**绝不写进本 skill 的 styles/** —— 那里是用户显式托管
+    的全局风格；工具链往里写 = 变相内置，用户明令禁止过（实测踩过两次）。
+
+    底座取夹具 tokens（契约完整性有保证），预设只覆盖结构性格键（type/
+    fonts/motion/temperature/label）；生成后立刻过 audit —— 不过就是预设
+    写错了，当场炸。
+    """
+    if preset not in PRESETS:
+        raise SystemExit(f"✗ 不认识的方向 {preset!r}；可选 {sorted(PRESETS)}")
+    p = PRESETS[preset]
+    base = render.load_style(render.DEFAULT_STYLE)["tokens"]
+    try:
+        raw = json.loads(json.dumps(base))      # 深拷贝当底座
+    except (TypeError, ValueError) as exc:
+        raise SystemExit(f"✗ 夹具 tokens 无法深拷贝：{exc}") from exc
+    raw["label"] = p["label"]
+    raw["temperature"] = p["temperature"]
+    raw["type"].update(p["type"])
+    raw["fonts"] = {**raw["fonts"], **p["fonts"]}
+    raw["motion"].update(p["motion"])
+    raw["note"] = f"方向预设 {preset}：{p['why']}。{name} 专属——按需改字栈/色板/字号档。"
+    out_dir = os.path.abspath(os.path.join(
+        directory or os.path.join(os.getcwd(), "styles"), name))
+    skill_styles = os.path.abspath(os.path.join(HERE, "..", "styles"))
+    if out_dir == skill_styles or out_dir.startswith(skill_styles + os.sep):
+        raise SystemExit(
+            "✗ 拒绝写入 skill 自己的 styles/（工具链写它 = 变相内置，用户明令禁止）。\n"
+            "  风格跟着 deck 项目走：在 deck 目录下跑本命令，或用 --dir 指到项目里。")
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+    except OSError as exc:
+        raise SystemExit(f"✗ 建不了风格目录 {out_dir}：{exc}") from exc
+    if os.path.isfile(os.path.join(out_dir, "style.json")):
+        raise SystemExit(f"✗ {out_dir} 已有 style.json —— 换个名字或先删掉")
+    deckio.write_json(os.path.join(out_dir, "style.json"), raw)
+    fixture_skin = os.path.join(HERE, "..", "dev-tools", "style-fixture",
+                                render.DEFAULT_STYLE, "skin.css")
+    try:
+        shutil.copy(fixture_skin, os.path.join(out_dir, "skin.css"))
+    except OSError as exc:
+        raise SystemExit(f"✗ 拷不动 skin（{fixture_skin}）：{exc}") from exc
+    return out_dir
 
 
 def available() -> list[str]:
@@ -249,7 +351,26 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--pages", default=None,
                     help="配合 --sheet：取哪几页，逗号分隔（如 9,14）")
     ap.add_argument("--json", action="store_true", help="机读输出")
+    ap.add_argument("--new", metavar="NAME",
+                    help="从方向预设生成风格草稿（写 <cwd>/styles/NAME/，随 deck 项目交付）")
+    ap.add_argument("--preset", default=None,
+                    help="配合 --new：editorial（精致衬线）/ poster（大字冲击）/ data（紧凑数据）")
+    ap.add_argument("--dir", default=None,
+                    help="配合 --new：输出位置（缺省 <cwd>/styles/）")
     args = ap.parse_args(argv[1:])
+
+    if args.new:
+        if not args.preset:
+            raise SystemExit("✗ --new 需要 --preset（editorial / poster / data）")
+        out = new_style(args.new, args.preset, args.dir)
+        problems = audit(out)               # audit 吃路径（style_folder 认路径）
+        if problems:
+            print("\n".join(problems))
+            return 1
+        print(f"✓ {out}（方向 {args.preset}，契约体检通过）\n"
+              f"  渲染：render.py spec.json --style {out} -o out.html\n"
+              f"  选定后随 deck 项目走；不要挪进 skill 的 styles/")
+        return 0
 
     if args.sheet:
         picked = None

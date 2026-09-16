@@ -315,6 +315,23 @@ class TestMinimalContract(unittest.TestCase):
     Glass…）不再需要"声明自己没有颗粒、没有错位"。
     """
 
+    def test_new_style_preset_generates_contract_clean(self) -> None:
+        """方向预设生成的草稿当场过契约；写在 **cwd 的 styles/**（随 deck 项目）。"""
+        import os as _os
+        with tempfile.TemporaryDirectory() as tmp:
+            cwd = _os.getcwd()
+            try:
+                _os.chdir(tmp)
+                out = style.new_style("my-deck-style", "editorial")
+                self.assertTrue(_os.path.isfile(_os.path.join(out, "style.json")))
+                self.assertEqual(style.audit(out), [], "生成的风格没过契约")
+                # 拒绝写 skill 自己的 styles/（变相内置，用户明令禁止）
+                skill_styles = _os.path.join(SKILL, "styles")
+                with self.assertRaises(SystemExit):
+                    style.new_style("nope", "poster", skill_styles)
+            finally:
+                _os.chdir(cwd)
+
     def test_junk_directory_is_not_a_style(self) -> None:
         """styles/ 里没有 style.json 的文件夹不是风格 —— 不进任何列表（用户
         目录会攒草稿；一个手滑的探针文件夹不该把工具链拖红）。"""
