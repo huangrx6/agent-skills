@@ -159,6 +159,72 @@ def _num(raw: str, where: str, problems: list[str]) -> float | None:
         return None
 
 
+PRESENTER_IDS = ("__deck_notes", "__deck_outline", "__deck_console",
+                 "__deck_console_clock", "__deck_console_timer",
+                 "__deck_console_step", "__deck_console_notes",
+                 "__deck_console_next", "__deck_blackout")
+
+
+def _check_presenter_contract(page: str, deck: dict) -> list[str]:
+    """演示台的产品级合同（**阻塞**）：讲稿层承诺的东西真的在产物里吗。
+
+    为什么这条是硬错而不是提示：演示台是**自己产的** —— 不是作者的审美选择。
+    缺一个 id = 我们自己拼产物时落下了东西，当场就该拦住（而且它不会误伤：
+    同一份代码每次都出同一份产物）。
+
+    钉四类：① 讲稿/目录两份载荷解析得出来，且页数与 spec 一致；② 讲稿层要求
+    的每个 id 都在（按 id 取不到元素，JS 会静默 return —— 现场才发现讲稿打不开）；
+    ③ 每一页都能被“现在第几页”定位（`data-slide`）；④ 窄接口 `__deck_ui` 在。
+    """
+    out: list[str] = []
+    for anchor in PRESENTER_IDS:
+        if f'id="{anchor}"' not in page:
+            out.append(f"演示台合同：产物里没有 id={anchor} —— 讲稿层会静默失效"
+                       f"（现场才发现）。是不是换了壳但没同步演示台？")
+    if "window.__deck_ui" not in page:
+        out.append("演示台合同：产物里没有 window.__deck_ui（壳与讲稿层的窄接口）"
+                   " —— 讲稿层的翻页/当前页会集体失效")
+
+    slides = deck.get("slides") or []
+    sections = re.findall(r"<section class=\"slide\"([^>]*)>", page)
+    missing_slide_id = [i for i, attrs in enumerate(sections, 1)
+                        if "data-slide=" not in attrs]
+    if missing_slide_id:
+        out.append(f"演示台合同：第 {'、'.join(str(i) for i in missing_slide_id)} 页"
+                   f"的 <section> 没有 data-slide —— “现在第几页”没有稳定的锚点")
+    if len(sections) != len(slides):
+        out.append(f"演示台合同：产里量到 {len(sections)} 页，spec 里是 {len(slides)} 页")
+
+    def payload(tag_id: str):
+        # 形状写死成产物真实的那个（`<script type="application/json" id=...>`）：
+        # 只认 `id=...">` 会把**任何**带这个 id 的元素都匹配上，然后一路吃到下一个
+        # `</script>`，把无关内容当成载荷 —— 那样门就变成了"随便什么都报 JSON 坏了"。
+        hit = re.search(f'<script type="application/json" id="{tag_id}">'
+                        f'(.*?)</script>', page, re.S)
+        if not hit:
+            return None
+        try:
+            return json.loads(hit.group(1))
+        except ValueError:
+            out.append(f"演示台合同：{tag_id} 的载荷不是合法 JSON（讲稿/目录读不出来）")
+            return None
+
+    notes = payload("__deck_notes")
+    if isinstance(notes, dict):
+        declared = [i for i, s in enumerate(slides, 1)
+                    if isinstance(s, dict) and isinstance(s.get("notes"), str)
+                    and s["notes"].strip()]
+        lost = [i for i in declared if str(i) not in notes]
+        if lost:
+            out.append(f"演示台合同：第 {'、'.join(str(i) for i in lost)} 页写了 notes，"
+                       f"但产物里读不到 —— 讲稿会在现场缺那几页")
+    outline = payload("__deck_outline")
+    if isinstance(outline, list) and len(outline) != len(slides):
+        out.append(f"演示台合同：目录载荷 {len(outline)} 条，spec {len(slides)} 页"
+                   f" —— “下一页”会指错页")
+    return out
+
+
 def _check_layout(measured: dict) -> list[str]:
     """② 版面越界 / 容器裁切 —— 全部来自**真浏览器实测**，不是估算。
 
@@ -1135,6 +1201,7 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     problems: list[str] = []
     page = deckio.read_text(html_path)      # 读一次就够（以前读了三次）
     deck = spec["deck"]
+    problems.extend(_check_presenter_contract(page, deck))
     colors = tokens["colorSets"][render_mod.resolve_color_set(tokens, deck)]
     paper = colors["background"]
     ink_text = ink.text_color(colors)

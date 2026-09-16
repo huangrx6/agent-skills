@@ -57,23 +57,26 @@ VISUAL_KEYS = {"kind", "intent", "note", "ratio"}
 RATIO_RANGE = (0.4, 2.6)
 VISUAL_IMAGE_KINDS = ("evidence_image", "diagram")
 
+# `notes`（讲稿）**每一种版式都能写** —— 它是给人看的，不影响排版：
+# 它不发任何元素（所以不进清单、不进测量），只随产物走一份 JSON，由演示台读。
 SLIDE_FIELDS = {
     "title":         {"type", "title", "subtitle", "color", "titleTier", "visual",
-                      "role"},
+                      "role", "notes"},
     "content-text":  {"type", "title", "bullets", "color", "titleTier", "bulletTier",
-                      "visual", "role"},
+                      "visual", "role", "notes"},
     "content-image": {"type", "title", "bullets", "image", "caption", "color",
-                   "layout", "titleTier", "bulletTier", "visual", "role"},
+                   "layout", "titleTier", "bulletTier", "visual", "role", "notes"},
     "two-column":    {"type", "title", "columns", "color", "layout", "titleTier",
-                   "bulletTier", "visual", "role"},
+                   "bulletTier", "visual", "role", "notes"},
     "timeline":      {"type", "title", "nodes", "color", "titleTier", "visual",
-                      "role"},
+                      "role", "notes"},
     # 图表的 DSL：几何/样式/动画都不在 spec 里，AI 只写语义。
     # v3：`chart`（图形类型）**必填** —— 推断已退役，见 CHART_TYPES。
     "chart":         {"type", "title", "data", "unit", "caption", "color",
                       "chart", "intent", "message", "series", "emphasis",
-                      "annotations", "visual", "role"},
-    "end":           {"type", "title", "color", "titleTier", "visual", "role"},
+                      "annotations", "visual", "role", "notes"},
+    "end":           {"type", "title", "color", "titleTier", "visual", "role",
+                      "notes"},
 }
 # **条件必填**：这个版式的全部内容就是那个字段，缺了它这一页不成立。
 #

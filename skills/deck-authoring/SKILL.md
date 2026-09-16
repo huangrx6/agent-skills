@@ -79,7 +79,7 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
    - 实测+判定：`python3 scripts/check.py your.spec.json out.html`（真浏览器量完再判，全过退 0；
      只想单独量就 `measure.py out.html`）
 4. **交付**（**HTML 不能漏** —— 它是唯一带演示态的形态、自包含单文件，也是其余格式的源头）：
-   - HTML：直接把 `out.html` 给人（`?present` 一页一屏、`←/→` 翻页、`F` 全屏）
+   - HTML：直接把 `out.html` 给人（`?present` 一页一屏、`←/→` 翻页、`S` 讲稿层、`F` 全屏）
    - PDF：`python3 scripts/pdf.py out.html -o deck.pdf`（矢量、能打印；脚本会验页数与页尺寸）
    - PNG 截图：`python3 scripts/shots.py out.html --out-dir pages/ --count N`
    - PPTX：观感 100% 用 `pptx_native.py --png-dir pages/ -o deck.pptx`；**对方要改字**用 `pptx_native.py out.html -o deck.pptx`（原生 shapes，字是真字）
@@ -105,6 +105,9 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
 | `timeline` | 时间线 | —（节点标签走数字档） |
 | `chart` | 图表 | 图形由 **`chart` 字段显式声明**（八类：bar/bar-horizontal/line/area/bar-stacked/donut/scatter/combo；HTML 路径由 **AntV G2** 画 —— vendor 锁版本内联、动画关死）；`intent` 是可选语义标注、不参与渲染 |
 | `end` | 收尾 | —（居中大字） |
+
+逐页可选写 `notes`（讲稿）：**给人读的文本，不参与排版**（不发元素、不进清单），
+随产物走一份 JSON 载荷，现成时按 `S` 弹出 —— 它是给你自己看的，投屏时别开。
 
 **结构布局 = 渲染器能力（像图表的八类图形），名字由你定**：写一个表外的
 `layout`（如 `poster-split`）就套缺省结构 + `data-layout="poster-split"`，

@@ -518,6 +518,37 @@ html[data-view="frame"] body{height:auto;overflow:hidden;display:block}
 html[data-view="frame"] .slide{display:none;margin:0}
 html[data-view="frame"] .slide.is-cur{display:block}
 html[data-view="frame"] .hud,html[data-view="frame"] .hint{display:none}
+/* ── 演示台（讲稿层）──────────────────────────────────
+   台上的人要看的是：现在第几页 / 下一页是什么 / 这页要说什么 / 讲了多久。
+   它盖在幻灯片上，但**不进清单、不进测量、不进导出**（没有 data-m；打印与
+   取帧态一律隐藏）—— 演示台是工具，不是内容。 */
+#__deck_console{position:fixed;left:0;right:0;bottom:0;z-index:20;
+  background:#0C0E10;color:#F2F4F6;font:400 19px/1.5 var(--body);
+  padding:18px 24px 14px;display:none;gap:10px;flex-direction:column;max-height:56vh}
+#__deck_console[data-open]{display:flex}
+/* 讲稿层打开时，壳自己的页码条与快捷键条退场：一份屏上两个计数器是噪音，
+   而讲稿层已经有更准的那个（它还知道"下一页是什么"）。 */
+html[data-console] .hud,html[data-console] .hint{opacity:0}
+.pc-head{display:flex;gap:22px;align-items:baseline;font-variant-numeric:tabular-nums;
+  font-size:17px;opacity:.85}
+#__deck_console_clock{font-weight:600;font-size:20px;opacity:1}
+#__deck_console_timer{color:#8FD3A7}
+#__deck_console_step{margin-left:auto}
+#__deck_console_notes{white-space:pre-wrap;font-size:21px;line-height:1.62;
+  max-height:34vh;overflow:auto}
+.pc-next{opacity:.7;font-size:17px;border-top:1px solid rgba(255,255,255,.14);
+  padding-top:8px}
+.pc-btns{display:flex;gap:10px;flex-wrap:wrap}
+.pc-btns button{font:inherit;font-size:16px;padding:6px 14px;border-radius:2px;
+  border:1px solid rgba(255,255,255,.28);background:transparent;color:inherit;
+  cursor:pointer}
+.pc-btns button:hover{background:rgba(255,255,255,.12)}
+/* 黑屏：只盖页面，不盖讲稿层 —— 对着观众黑，对着自己还能看讲稿 */
+#__deck_blackout{position:fixed;inset:0;z-index:15;background:#000}
+#__deck_blackout[hidden],#__deck_console[hidden]{display:none}
+@media print{#__deck_console,#__deck_blackout{display:none !important}}
+html[data-view="frame"] #__deck_console,html[data-view="frame"] #__deck_blackout{
+  display:none !important}
 /* 打印/导 PDF：一页一张 1600×900，不缩放、不留阴影 —— 演示态是给屏幕的，
    纸面要的是原件本身（矢量 PDF 导出走这条路）。
    @page 必须显式给：不给的话 Chrome 用 Letter/A4，deck 会被缩小 + 四周留白
@@ -752,8 +783,18 @@ SHELL_JS = """
     if(doc.getAttribute('data-view')==='present'){ onlyShow(n); fit(); playEnter(n); }
     else { toScroll(); }
     if(hud) hud.textContent=(n+1)+' / '+slides.length;
+    notify(n);
     try{ history.replaceState(null,'','#'+(n+1)); }catch(e){}
   }
+  // ── 演示台接口（窄：三个动作 + 一个订阅）──────────────────────
+  // 讲稿层是**另一个脚本**，它不能摸这里的内部变量（cur/slides/show 都是闭包私有）。
+  // 所以只开一个门：谁知道“现在第几页”，谁能翻页，谁就能做演示台 ——
+  // 而且这个门是可校验的（check 的演示台合同门钉这几个名字）。
+  var subs=[];
+  function notify(n){ for(var i=0;i<subs.length;i++){ try{ subs[i](n); }catch(e){} } }
+  window.__deck_ui={cur:function(){return cur;}, total:slides.length,
+    next:function(){show(cur+1,true);}, prev:function(){show(cur-1,true);},
+    onShow:function(cb){ subs.push(cb); cb(cur); }};
   function setView(v){
     if(v==='present'){ doc.setAttribute('data-view','present'); onlyShow(cur); fit(); playEnter(cur); }
     else { toScroll(); }
@@ -771,6 +812,9 @@ SHELL_JS = """
     } else if(k==='Home'){ if(p) e.preventDefault(); show(0,true); }
     else if(k==='End'){ if(p) e.preventDefault(); show(slides.length-1,true); }
     else if(k==='p'||k==='P'){ setView(p?'scroll':'present'); }
+    else if(k==='s'||k==='S'){ if(typeof presenterToggle==='function') presenterToggle(); }
+    else if(k==='b'||k==='B'){ if(typeof blackoutToggle==='function') blackoutToggle(); }
+    else if(k==='r'||k==='R'){ if(typeof presenterReset==='function') presenterReset(); }
     else if(k==='f'||k==='F'){ toggleFull(); }
     else if(k==='Escape'){ if(p) setView('scroll'); }
   });
@@ -786,6 +830,97 @@ SHELL_JS = """
   }
   if(/[?&]present\\b/.test(location.search)){ doc.setAttribute('data-view','present'); }
   show(start,false);
+})();
+"""
+
+# ── 演示台（讲稿层）─────────────────────────────────────────────
+# 台上的人需要四样东西：现在第几页 / 下一页是什么 / 这一页要说什么 / 讲了多久。
+# 四样都在同一屏内，**不切窗口** —— 现场演出时“切窗口”就是出错的那一步。
+#
+# 它与翻页壳的接口只有 `window.__deck_ui`（四个名字）：壳不知道讲稿层存在，
+# 讲稿层也不摸壳的内部变量。这条窄接口 + 下面这串 id 就是合同，check 钉的就是它。
+#
+# 为什么不做“观众屏 / 第二窗口”：那需要两个窗口、一套跨窗口同步、一套断开恢复
+# 状态机（实测最容易在现场出问题的正是它）。一个 HTML、一个窗口、讲稿盖在上面
+# —— 少一层同步就少一处现场事故。
+CONSOLE_HTML = """
+<div id="__deck_blackout" hidden></div>
+<aside id="__deck_console" hidden>
+  <div class="pc-head">
+    <span id="__deck_console_clock">--:--</span>
+    <span id="__deck_console_timer">00:00</span>
+    <span id="__deck_console_step">1 / 1</span>
+  </div>
+  <div id="__deck_console_notes"></div>
+  <div class="pc-next">下一页 · <span id="__deck_console_next">—</span></div>
+  <div class="pc-btns">
+    <button type="button" data-pc="prev">上一页 ←</button>
+    <button type="button" data-pc="next">下一页 →</button>
+    <button type="button" data-pc="reset">计时归零 (R)</button>
+    <button type="button" data-pc="black">黑屏 (B)</button>
+    <button type="button" data-pc="close">收起 (S)</button>
+  </div>
+</aside>
+"""
+
+CONSOLE_JS = """
+(function(){
+  var box=document.getElementById('__deck_console');
+  var ui=window.__deck_ui;
+  if(!box||!ui) return;
+  var blackout=document.getElementById('__deck_blackout');
+  var elClock=document.getElementById('__deck_console_clock');
+  var elTimer=document.getElementById('__deck_console_timer');
+  var elStep=document.getElementById('__deck_console_step');
+  var elNotes=document.getElementById('__deck_console_notes');
+  var elNext=document.getElementById('__deck_console_next');
+  function read(id,fallback){
+    var el=document.getElementById(id); if(!el) return fallback;
+    try{ return JSON.parse(el.textContent)||fallback; }catch(e){ return fallback; }
+  }
+  var NOTES=read('__deck_notes',{}), OUTLINE=read('__deck_outline',[]);
+  var t0=null;
+  function pad(n){ return (n<10?'0':'')+n; }
+  function fmt(ms){
+    var s=Math.floor(ms/1000);
+    if(s<3600) return pad(Math.floor(s/60))+':'+pad(s%60);
+    return Math.floor(s/3600)+':'+pad(Math.floor(s/60)%60)+':'+pad(s%60);
+  }
+  function tick(){
+    var now=new Date();
+    elClock.textContent=pad(now.getHours())+':'+pad(now.getMinutes());
+    if(t0!==null) elTimer.textContent=fmt(now.getTime()-t0);
+  }
+  // 没写讲稿的页也显示一行字（不是空白）—— 空白看不出“是没写还是没加载”
+  function paint(i){
+    elStep.textContent=(i+1)+' / '+ui.total;
+    var text=NOTES[String(i+1)];
+    elNotes.textContent=(typeof text==='string'&&text)?text:'（这一页没写讲稿）';
+    var nx=OUTLINE[i+1];
+    elNext.textContent=nx?((nx.t||'（无标题）')+(nx.k?' · '+nx.k:'')):'— 最后一页';
+  }
+  function startTimer(){ if(t0===null){ t0=Date.now(); tick(); } }
+  function mark(on){
+    var root=document.documentElement;
+    if(on) root.setAttribute('data-console',''); else root.removeAttribute('data-console');
+  }
+  window.presenterToggle=function(){
+    if(box.hasAttribute('data-open')){ box.removeAttribute('data-open'); box.hidden=true; mark(0); }
+    else { box.hidden=false; box.setAttribute('data-open',''); mark(1); startTimer(); paint(ui.cur()); }
+  };
+  window.presenterReset=function(){ t0=Date.now(); elTimer.textContent='00:00'; };
+  window.blackoutToggle=function(){ if(blackout) blackout.hidden=!blackout.hidden; };
+  box.addEventListener('click',function(e){
+    var b=e.target.closest?e.target.closest('button[data-pc]'):null; if(!b) return;
+    var act=b.getAttribute('data-pc');
+    if(act==='prev') ui.prev();
+    else if(act==='next') ui.next();
+    else if(act==='reset') window.presenterReset();
+    else if(act==='black') window.blackoutToggle();
+    else if(act==='close') window.presenterToggle();
+  });
+  ui.onShow(paint);
+  tick(); setInterval(tick,1000);
 })();
 """
 
@@ -1527,7 +1662,19 @@ def render_resolved(resolved: dict) -> str:
     # 壳：页码 / 快捷键提示 / 翻页脚本。**不给它们打 data-m** ——
     # 它们是壳不是内容，进了清单就会污染“清单条数 == 实测元素数”那条不变量。
     out.append(f'<div class="hud"><span id="__deck_page">1 / {total}</span></div>')
-    out.append('<div class="hint">← → 翻页 · F 全屏 · P 演示/滚动</div>')
+    out.append('<div class="hint">← → 翻页 · S 讲稿 · B 黑屏 · F 全屏 · P 演示/滚动</div>')
+    # 讲稿与目录随产物走（跟清单同一个模式）。演示台是**纯前端**的：打开一个 HTML
+    # 文件就能用，不需要服务器、不需要第二个文件 —— 现场演出时少一个依赖就少一处出错。
+    # 载荷跟清单一样走 \uXXXX 转义（转存/重编码都不会改坏它）。
+    notes = {str(i): s["notes"] for i, s in enumerate(deck["slides"], 1)
+             if isinstance(s.get("notes"), str) and s["notes"].strip()}
+    outline = [{"t": s.get("title", ""), "k": s.get("kind") or s.get("type", "")}
+               for s in deck["slides"]]
+    for tag_id, payload_obj in (("__deck_notes", notes), ("__deck_outline", outline)):
+        blob = json.dumps(payload_obj, ensure_ascii=True,
+                          separators=(",", ":")).replace("<", "\\u003c")
+        out.append(f'<script type="application/json" id="{tag_id}">{blob}</script>')
+    out.append(CONSOLE_HTML)
     # 图表：先内联 G2 vendor（锁版本、离线可用），再实例化每页的 spec。
     # renderer: svg + animation: false —— 确定性（§41：同输入同输出）；
     # 渲染完打 data-chart-ready，测量端据此知道图表 DOM 已就绪。
@@ -1539,6 +1686,7 @@ def render_resolved(resolved: dict) -> str:
             raise SystemExit(f"✗ 读不了 G2 vendor（{G2_VENDOR}）：{exc}") from exc
         out.append("<script>\n" + G2_INIT_JS + "\n</script>")
     out.append(f"<script>{SHELL_JS}</script>")
+    out.append(f"<script>{CONSOLE_JS}</script>")
     out.append("</body></html>")
     return "\n".join(out)
 
