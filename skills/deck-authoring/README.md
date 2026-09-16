@@ -353,7 +353,9 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │                             #   （style.json token + skin.css 视觉层），不碰 .py；
 │                             #   历史八套已整体移除，参数表留在文档里作自建参考
 ├── brands/                   # 品牌资产：一个品牌 = 一个目录，不碰 .py
-│   └── example/              #   示例品牌（logo 正版 + 反白版 + 署名）
+│                             #   （**没有示例品牌** —— 示例资产会被直接当成可用资产，
+│                             #    实测把示例 logo 带进过真实交付。品牌由用户建：
+│                             #    brand.json + logo 文件，契约见 references/brand-assets.md）
 # 注意：没有 dev-tools/ —— 曾经的 demo/stress 样例与两份"可拷的参考风格"已随 v4 移除。
 # 可拷贝的模板必然变成默认答案（用户实测："无论换什么主题，产物永远一个样式"）。
 # 内容样例与测试用风格现在只活在 tests/deck-authoring/fixtures/ 下，不随 skill 发布。

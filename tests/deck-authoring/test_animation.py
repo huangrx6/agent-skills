@@ -39,6 +39,8 @@ FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixture
 # 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
 os.environ.setdefault("DECK_STYLES",
                       os.path.join(FIXTURES_DIR, "styles"))
+os.environ.setdefault("DECK_BRANDS",
+                      os.path.join(FIXTURES_DIR, "brands"))
 SCRIPTS = os.path.join(SKILL, "scripts")
 DEMO = os.path.join(FIXTURES_DIR, "demo.spec.json")
 STYLES = os.path.join(FIXTURES_DIR, "styles")

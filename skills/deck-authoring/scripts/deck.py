@@ -99,7 +99,38 @@ from typing import Any
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 SKILL_DIR = os.path.dirname(HERE)
-BRANDS_DIR = os.path.join(SKILL_DIR, "brands")
+
+
+def brand_roots() -> tuple[str, ...]:
+    """品牌解析根（顺序即优先级，**调用时求值**）：
+
+      1. `DECK_BRANDS` 环境变量（`:` 分隔）—— 测试夹具，或品牌放在 deck
+         项目之外时的显式入口；
+      2. `<当前目录>/brands` —— 品牌跟着 deck 项目走（随项目交付、可移植）；
+      3. skill 的 `brands/` —— 用户显式托管的全局品牌。
+
+    **没有示例品牌**：以前带过一个 `example`（ACME），实测后果是它被直接
+    用进真实交付 —— 示例资产必然被当成可用资产。品牌按
+    references/brand-assets.md 的契约现建；logo 由用户提供。
+    """
+    roots: list[str] = []
+    extra = os.environ.get("DECK_BRANDS")
+    if extra:
+        roots.extend(p for p in extra.split(os.pathsep) if p)
+    roots.append(os.path.join(os.getcwd(), "brands"))
+    roots.append(os.path.join(SKILL_DIR, "brands"))
+    return tuple(roots)
+
+
+def brand_dir(name: str) -> str | None:
+    """品牌目录（含 brand.json 的第一个根）；找不到返回 None。"""
+    if os.path.isdir(name) and os.path.isfile(os.path.join(name, "brand.json")):
+        return os.path.abspath(name)
+    for root in brand_roots():
+        folder = os.path.join(root, name)
+        if os.path.isfile(os.path.join(folder, "brand.json")):
+            return folder
+    return None
 
 BRAND_FIELDS = {"version", "label", "logo", "logoInverse", "logoOn", "footer",
                 "colorSets", "fonts", "note"}
@@ -149,7 +180,12 @@ def is_dark_paper(hex_color: str) -> bool:
 
 def available() -> list[str]:
     """有哪些品牌可用（列出候选，供报错时写清"可选项是什么"）。"""
-    return _deckio().list_dirs(BRANDS_DIR)
+    names: list[str] = []
+    for root in brand_roots():
+        for n in _deckio().list_dirs(root):
+            if n not in names and os.path.isfile(os.path.join(root, n, "brand.json")):
+                names.append(n)
+    return names
 
 
 def load(name: str) -> dict:
@@ -160,14 +196,16 @@ def load(name: str) -> dict:
     """
     if not name:
         return {}
-    path = os.path.join(BRANDS_DIR, name, "brand.json")
-    if not os.path.isfile(path):
+    folder = brand_dir(name)
+    if folder is None:
         have = available()
         raise SystemExit(
-            f"✗ 找不到品牌 {name!r}（找的是 {path}）\n"
+            f"✗ 找不到品牌 {name!r}（在 {list(brand_roots())} 里都没有）\n"
             f"  现有品牌：{have or '（一个都没有）'}\n"
-            f"  新建一个：brands/{name}/brand.json —— 字段见 references/brand-assets.md"
+            f"  新建一个：<deck 项目>/brands/{name}/brand.json（含 logo 文件）—— "
+            f"字段见 references/brand-assets.md"
         )
+    path = os.path.join(folder, "brand.json")
     raw = _deckio().read_json(path)
     version = raw.get("version")
     if version != 1:
@@ -184,15 +222,15 @@ def load(name: str) -> dict:
             f"✗ brands/{name}/brand.json 的 logoOn={mode!r} 不认识\n"
             f"  只能是：{list(LOGO_ON)}")
     if raw.get("logo"):
-        logo_path = os.path.join(BRANDS_DIR, name, str(raw["logo"]))
+        logo_path = os.path.join(folder, str(raw["logo"]))
         if not os.path.isfile(logo_path):
             raise SystemExit(f"✗ brands/{name}/brand.json 指向的 logo 不存在：{logo_path}")
     if raw.get("logoInverse"):
-        inv = os.path.join(BRANDS_DIR, name, str(raw["logoInverse"]))
+        inv = os.path.join(folder, str(raw["logoInverse"]))
         if not os.path.isfile(inv):
             raise SystemExit(f"✗ brands/{name}/brand.json 指向的 logoInverse 不存在：{inv}")
     raw["_name"] = name
-    raw["_dir"] = os.path.join(BRANDS_DIR, name)
+    raw["_dir"] = folder
     return raw
 
 
@@ -387,7 +425,7 @@ def main(argv: list[str]) -> int:
     names = available()
     if not names:
         print(f"还没有品牌。新建 brands/<name>/brand.json —— 见 references/brand-assets.md")
-        print(f"（目录：{BRANDS_DIR}）")
+        print(f"（找的是：{list(brand_roots())}）")
         return 0
     for n in names:
         try:

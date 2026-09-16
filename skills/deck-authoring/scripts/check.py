@@ -318,11 +318,8 @@ def _check_brand(measured: dict, deck: dict, tokens: dict) -> tuple[list[str], l
     if not name:
         return problems, notes
     brand = deck_mod.load(name)
-    if name == "example":
-        notes.append(
-            "deck.brand=example 是**演示品牌**（ACME）——它只该出现在测试夹具里。"
-            "demo/stress 里。做自己的 deck 请删掉这行，或建 brands/<你的品牌>/"
-            "（见 references/brand-assets.md）。示例 logo 出现在真实交付里就是事故")
+    # v5：不再有"演示品牌"提示 —— 仓库里已经没有任何示例品牌可被误用
+    # （那份 example/ACME 被真用进过交付，所以连示例一起删了）。
     els: list[dict] = measured.get("elements", [])
     logos = [e for e in els if e.get("role") == "logo"]
     if not logos:

@@ -73,8 +73,8 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
    `references/style-architecture.md`；**写什么内容**见 `references/content-intelligence.md`
    （一页一个观点 / 容量估算 / 观众距离）。拿不准就先渲出来跑 `check.py`（`fit.py` 试排已退役）。
    `seed` 显式写（默认 1）：错位与颗粒按 (seed, 元素) 派生，否则没法回归。
-   有品牌资产加一行 `deck.brand`（见 brand-assets.md：**品牌赢在“是谁”，风格赢在
-   “怎么表达”**；demo 的 example/ACME 是演示品牌，抄模板记得删）。
+   有品牌资产加一行 `deck.brand`（见 brand-assets.md：**品牌赢在“是谁”，风格赢在“怎么表达”**；
+   品牌由用户提供 —— 仓库里没有示例品牌，示例资产会被直接当成可用资产用进交付）。
 3. **五道门**（顺序有意义：先验输入，再渲，再量，最后判；九站总图见 `references/pipeline.md`）：
    - 规格：`python3 scripts/validate_spec.py your.spec.json`（字段集封闭，未知键直接失败）
    - 墨色：`ink.py styles/<你的风格>/style.json`（deck 项目里跑；任一色板不达标退 1）

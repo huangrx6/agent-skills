@@ -51,10 +51,13 @@ Hard Constraint > Semantic Requirement > Style Grammar > Creative Preference：
 `assets/product|screenshots|official`、`fonts/` 子目录按需自建）。品牌层可以
 不存在：`deck.brand` 不写就全走 Style + Color + Typography + Asset Rules。
 
-> ⚠️ **`example` 是演示品牌（ACME），不是素材库**：它只该出现在测试夹具的
-> demo/stress 里。demo 是 SKILL.md 让人抄的模板 —— 抄完不删 `deck.brand` 就把
-> ACME logo 带进了真实交付。`check.py` 现在会对 `brand: example` 出声提醒
-> （删这行，或建 `brands/<你的品牌>/`）。
+> ⚠️ **仓库里没有任何示例品牌**（v5 起）。曾经带过一个 `example`（ACME）——
+> 它被直接带进了真实交付（有人拿 demo 当模板，忘了删 `deck.brand`）。
+> 结论写进纪律：**示例资产必然被当成可用资产**，所以连示例一起删了（和
+> 风格夹具同一个理由）。品牌一律由用户提供：`brands/<name>/` 放 logo 文件 +
+> `brand.json`（封闭字段集见下）；`deck.brand` 不写就整层不生效 —— 这是合法状态。
+>
+> ⚠️ **logo 与品牌素材一律由用户提供**：不要生成、不要"先放个占位的"。
 
 ## 4. brand.json 结构【✅ 封闭集；嵌套形=约定】
 
