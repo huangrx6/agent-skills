@@ -88,8 +88,19 @@ correlation/progress/deviation/distribution）现在是**可选语义标注**：
      环图整条轴关掉（`axis:false`）；
    - 环图例外地画**右侧颜色图例**（扇区名字必须能对上），其余图形不画图例。
 
-   坐标系的其它杂物（刻度数字 / 网格线）由各图的 `axis` 配置决定 ——
-   柱图未显式关轴，是待收的遗留（见文末「第二阶段」）。
+   坐标系里的其它东西**也从 token 来，不跟 G2 主题默认走**（深底风格里默认轴文字
+   直接看不见）。每个图的 `axis` 都显式写：标签色 = `text`，轴线/刻度线 = muted，
+   网格线 = muted 虚线、柱图 x 轴不画网格；排印三层全部注入 —— 轴标签（色/字号/
+   字体）、数值标签（字号/字体）、环图图例文字（色/字号/字体）：
+   - 字号取 `type.chartLabel`（轴与图例）、`type.chartValue`（数值标签）；
+   - 字体取风格的正文栈（`fonts.body`）—— **图表不是版面飞地**。
+   键名是 `labelFontFamily` / `itemLabelFontFamily`：这两个字符串在 G2 5.2.10 包里
+   搜不到（运行期按「部件 + 通用样式属性」拼出来的），但实测有效 —— 场景图里能读到
+   注入值，且画布像素随之改变。
+
+   柱形圆角**不做**：像素级实测 `radius` / `cornerRadius` / `radiusTopLeft…` 四组在
+   G2 5.2.10 的 interval 上全部被忽略（画布哈希与基线全等）。想要圆角柱只能绕开
+   spec 自绘 —— 不值得：方柱是这套版面的既有语言。
 
 ## 标注（规范第 12 条）—— 不渲染
 
@@ -134,9 +145,7 @@ correlation/progress/deviation/distribution）现在是**可选语义标注**：
 - 组合图的原生输出（目前 combo 在 PPT 层降级为柱）
 - 把 `annotations`（reference / callout / peak）翻译成 G2 的 mark / annotation
   （见上「标注」）
-- 收起柱图未显式关掉的坐标轴刻度 / 网格线（`chart_g2_spec` 的 bar 分支目前只写
-  了 `labels`，`axis` 走 G2 默认）
 - 每根柱子单独的 `data-m`（可以逐根 stagger）
 
-**已取消**：数据驱动动画（growInY / pathIn 接进 `animate.py` 的时间线）—— v4 已
-关死图表动画（G2 `animation: false`），图表在产物里是静态图，只跟随页面容器入场。
+**已取消**：数据驱动动画（growInY / pathIn 接进 `animate.py` 的时间线）—— 图表动画
+关死（G2 `animation: false`）：图表在产物里是静态图，只跟随页面容器入场。

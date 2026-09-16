@@ -138,6 +138,101 @@ class TestCollision(unittest.TestCase):
               "x": "84", "y": 132, "w": 100, "h": 40}]), [])
 
 
+
+class TestChartContract(unittest.TestCase):
+    """图表进产物的两条契约：排印从 token 来；图注的身份是**图注**。
+
+    两条都是实测踩出来的：
+    - 排印：G2 主题的默认字体/字号不跟 deck 走（深底风格里默认轴文字看不见），
+      必须由 `chart_g2_spec` 显式注入。键名 `labelFontFamily` 在 G2 5.2.10 包里
+      搜不到（运行期按「部件 + 通用样式属性」拼出来），但**实测有效** ——
+      这条测试守住"注入了，而且值来自风格 token"。
+    - 身份：图表图注曾被标成 role=bullet → 被字号体检当成正文计入中位数
+      （一次 4 页图注把中位数从 24px 拽到 16px，报了"内页正文偏小"）。
+    """
+
+    def _render(self, spec, tmp):
+        import subprocess
+        scripts = os.path.join(SKILL, "scripts")
+        spec_path = os.path.join(tmp, "chart.spec.json")
+        with open(spec_path, "w", encoding="utf-8") as fh:
+            json.dump(spec, fh, ensure_ascii=False)
+        out = os.path.join(tmp, "out.html")
+        proc = subprocess.run(
+            ["python3", os.path.join(scripts, "render.py"), spec_path, "-o", out],
+            capture_output=True, text=True, timeout=300, env=dict(os.environ))
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        return out
+
+    def test_chart_typography_is_token_driven_and_caption_keeps_its_role(self):
+        import base64  # noqa: F401  (惯例：产物里清单是 JSON，探针才用 base64)
+        import re
+        import tempfile
+
+        style_path = os.path.join(FIXTURES_DIR, "styles", "swiss-grid", "style.json")
+        with open(style_path, encoding="utf-8") as fh:
+            style = json.load(fh)
+        fonts_body = style["fonts"]["body"]
+        tier = style["type"]
+        color_set = sorted(style["colorSets"])[0]
+        spec = {"deck": {
+            "style": "swiss-grid", "colorSet": color_set, "seed": 3,
+            "title": "图表契约",
+            "slides": [{"type": "chart", "title": "等级分布",
+                        "chart": "bar", "caption": "数据来源：运行台账",
+                        "data": [{"label": "甲", "value": 3},
+                                 {"label": "乙", "value": 7}]}]}}
+        with tempfile.TemporaryDirectory() as tmp:
+            out = self._render(spec, tmp)
+            doc = open(out, encoding="utf-8").read()
+
+        found = re.search(
+            r'<script type="application/json" id="__deck_manifest">(.*?)</script>',
+            doc, re.S)
+        if found is None:
+            self.fail("产物里没有语义清单")
+        manifest = json.loads(found.group(1))
+        cap = [e for e in manifest if e["id"].endswith(".caption")]
+        self.assertEqual(len(cap), 1)
+        self.assertEqual(cap[0]["role"], "caption",
+                         "图注被当成正文，会污染字号体检的中位数")
+
+        bar = re.search(r"data-g2='(.*?)'", doc)
+        if bar is None:
+            self.fail("产物里没有图表 spec")
+        g2 = json.loads(bar.group(1).replace("&#39;", "'"))
+        self.assertEqual(g2["axis"]["x"]["labelFontFamily"], fonts_body)
+        self.assertEqual(g2["axis"]["x"]["labelFontSize"], tier["chartLabel"])
+        self.assertEqual(g2["labels"][0]["style"]["fontFamily"], fonts_body)
+        self.assertEqual(g2["labels"][0]["style"]["fontSize"], tier["chartValue"])
+        self.assertNotIn("radius", g2.get("style", {}),
+                         "柱形圆角在 G2 5.2.10 的 spec 路径下被忽略，写了就是骗自己")
+
+    def test_size_gate_ignores_captions_when_measuring_body(self):
+        """字号体检的"正文"= role=bullet；图注再小也不是正文。"""
+        import importlib.util as ilu
+        check_path = os.path.join(SKILL, "scripts", "check.py")
+        found_spec = ilu.spec_from_file_location("_deck_test_check_gate", check_path)
+        if found_spec is None or found_spec.loader is None:
+            self.fail(f"加载不了 check.py：{check_path}")
+        module = ilu.module_from_spec(found_spec)
+        sys.modules["_deck_test_check_gate"] = module
+        found_spec.loader.exec_module(module)
+        deck = {"slides": [{"type": "chart"}, {"type": "content-text"}]}
+
+        def measured(bullet_px):
+            els = [{"slide": 2, "role": "bullet", "fontSize": bullet_px}
+                   for _ in range(4)]
+            els.append({"slide": 1, "role": "caption", "fontSize": 12})
+            return {"elements": els}
+
+        small = module._check_type_size(measured(16), deck, None)
+        self.assertTrue(any("偏小" in n for n in small), small)
+        ok = module._check_type_size(measured(24), deck, None)
+        self.assertFalse(any("偏小" in n for n in ok),
+                         f"图注（12px）不该把正文中位数拽低：{ok}")
+
+
 if __name__ == "__main__":
     unittest.main()
 

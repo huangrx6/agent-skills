@@ -864,7 +864,8 @@ def _chart_norm_series(slide: dict) -> list[dict]:
     return [{"name": "", "data": list(slide.get("data", []))}]
 
 
-def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None) -> dict:
+def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None,
+                  tier: dict | None = None, fonts_body: str = "") -> dict:
     """Chart Resolver 的 G2 产物（§19：链路不绑技术——HTML 路径用 AntV G2）。
 
     输出 G2 5 的 chart spec（renderer 由壳层指定 svg + animation off——
@@ -879,7 +880,20 @@ def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None) -> dic
     # 坐标轴配色：G2 主题的轴标签/轴名是**theme 自带的深色**，不跟 paper 走。
     # 实测后果：深底反白风格里轴标签与轴名直接看不见（柱在、刻度没了）。
     # 轴是图的一部分，颜色同样从 token 取 —— 这里只覆盖已实测生效的两项。
-    axis_ink = {"labelFill": text, "titleFill": text}
+    # 排印注入：G2 默认主题的字体/字号/轴样式**不跟 deck 走**（默认轴字一族、
+    # 默认尺寸，深底风格里轴名直接看不见）。字体栈与字号全部从风格 token 来：
+    # 图表是版面的一部分，不是一块飞地。
+    label_px = (tier or {}).get("chartLabel", 14)
+    value_px = (tier or {}).get("chartValue", 16)
+    typo_axis = {
+        "labelFill": text, "labelFontFamily": fonts_body,
+        "labelFontSize": label_px,
+        "titleFill": text, "titleFontFamily": fonts_body,
+        "titleFontSize": label_px,
+        "tickStroke": muted_c, "lineStroke": muted_c,
+        "gridStroke": muted_c, "gridLineWidth": 1, "gridLineDash": [3, 3],
+    }
+    typo_label = {"fill": text, "fontSize": value_px, "fontFamily": fonts_body}
 
     def enc_color(d):
         return primary if (not emphasis or str(d.get("label")) in emphasis) else muted_c
@@ -892,7 +906,7 @@ def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None) -> dic
         # 实测后果：canvas 退到 G2 默认 640×480，撑出 .g2 的 330px 容器、
         # 压住图注，而且只占满左侧不到一半宽度。
         "padding": "auto",
-        "axis": {"x": dict(axis_ink), "y": dict(axis_ink)},
+        "axis": {"x": {**typo_axis, "grid": False}, "y": dict(typo_axis)},
     }
     if kind in ("bar", "bar-horizontal"):
         rows = sorted(data, key=lambda d: -d.get("value", 0)) \
@@ -903,8 +917,10 @@ def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None) -> dic
             "data": rows,
             "encode": {"x": "label", "y": "value", "color": "c"},
             "scale": {"color": {"type": "identity"}},
-            "labels": [{"text": "value", "style": {"fill": text},
-                        "position": "outside"}],
+            "style": {"lineWidth": 0},
+            "labels": [{"text": "value", "style": {**typo_label,
+                                                   "fontWeight": 600,
+                                                   "position": "outside"}}],
         })
         if kind == "bar-horizontal":
             spec["coordinate"] = {"transform": [{"type": "transpose"}]}
@@ -918,7 +934,10 @@ def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None) -> dic
             "encode": {"y": "value", "color": "label"},
             "scale": {"color": {"range": [d["c"] for d in rows]}},
             "axis": False,
-            "legend": {"color": {"position": "right"}},
+            "legend": {"color": {"position": "right",
+                                 "itemLabelFill": text,
+                                 "itemLabelFontFamily": fonts_body,
+                                 "itemLabelFontSize": label_px}},
         })
     elif kind in ("line", "area"):
         spec.update({
@@ -926,9 +945,10 @@ def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None) -> dic
             "data": data,
             "encode": {"x": "label", "y": "value"},
             "style": {"stroke": primary, "lineWidth": 2.5},
-            "labels": [{"text": "value", "style": {"fill": text},
-                        "selector": "last"}],
-            "axis": {"x": {"title": False}, "y": {"title": False}},
+            "labels": [{"text": "value", "style": {**typo_label,
+                                                   "selector": "last"}}],
+            "axis": {"x": {**typo_axis, "title": False, "grid": False},
+                     "y": {**typo_axis, "title": False}},
         })
     elif kind == "scatter":
         spec.update({
@@ -936,7 +956,8 @@ def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None) -> dic
             "data": data,
             "encode": {"x": "label", "y": "value", "size": 4},
             "style": {"fill": primary, "stroke": muted_c},
-            "axis": {"x": {"title": False}, "y": {"title": False}},
+            "axis": {"x": {**typo_axis, "title": False, "grid": False},
+                     "y": {**typo_axis, "title": False}},
         })
     elif kind in ("bar-stacked", "combo"):
         series = slide.get("series") or []
@@ -952,7 +973,8 @@ def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None) -> dic
             "transform": [{"type": "stackY"}] if kind == "bar-stacked" else [],
             "scale": {"color": {"range": chart_series_colors(primary, colors.get(
                 "background", "#FFFFFF"), max(1, len(series)))}},
-            "axis": {"x": {"title": False}, "y": {"title": False}},
+            "axis": {"x": {**typo_axis, "title": False, "grid": False},
+                     "y": {**typo_axis, "title": False}},
         })
     return spec
 
@@ -1310,13 +1332,14 @@ def render_resolved(resolved: dict) -> str:
             # 里层 .g2 拿 data-g2（G2 spec JSON）—— 文档末尾统一实例化：
             # 声明式图形语法只出 spec，几何由 G2 算（v4：手写 SVG 渲染器已删除）。
             g2_json = json.dumps(
-                chart_g2_spec(slide, colors, chart_emphasis_set(slide)),
+                chart_g2_spec(slide, colors, chart_emphasis_set(slide),
+                              tier=tier, fonts_body=tokens["fonts"]["body"]),
                 ensure_ascii=True, separators=(",", ":")).replace("'", "&#39;")
             g2_specs.append(g2_json)
             out.append(f'<div class="chartwrap" {chart_attrs}>'
                        f'<div class="g2" data-g2=\'{g2_json}\'></div></div>')
             if slide.get("caption"):
-                cap_attrs = tag(f"s{i}.caption", i, "bullet", slide["caption"],
+                cap_attrs = tag(f"s{i}.caption", i, "caption", slide["caption"],
                                 tier["caption"])
                 out.append(f'<div class="chartcap" {cap_attrs}>{html.escape(slide["caption"])}</div>')
         else:
