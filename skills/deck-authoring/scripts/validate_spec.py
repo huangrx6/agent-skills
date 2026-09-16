@@ -36,8 +36,8 @@ STYLES_DIR = os.path.join(HERE, "..", "styles")
 # 封闭字段集。加字段要同时改这里与 `references/style-architecture.md` ——
 # 这正是设计意图：让"顺手加一个"变得有摩擦。
 DECK_FIELDS = {"colorSet", "seed", "title", "slides", "style", "brand", "note"}
-# v3：colorSet **必填具名**（auto/mood 的语义决策链已退役 —— 配色由作者定，
-# 门 ③ 给候选；对比度由 ink.py/check.py 验收）。
+# colorSet **必填具名**（配色由作者定：先看候选，选定后写名字；
+# 对比度由 ink.py/check.py 验收）。门里没有"自动配色"这条路。
 CHART_TYPES = ("bar", "bar-horizontal", "line", "area", "bar-stacked",
                "donut", "scatter", "combo")
 # 视觉载体：每页**显式决定**这页靠什么立住。不写下来就等于没决定 ——
@@ -71,7 +71,7 @@ SLIDE_FIELDS = {
     "timeline":      {"type", "title", "nodes", "color", "titleTier", "visual",
                       "role", "notes"},
     # 图表的 DSL：几何/样式/动画都不在 spec 里，AI 只写语义。
-    # v3：`chart`（图形类型）**必填** —— 推断已退役，见 CHART_TYPES。
+    # `chart`（图形类型）**必填** —— 只认 CHART_TYPES 里的八个值，没有推断。
     "chart":         {"type", "title", "data", "unit", "caption", "color",
                       "chart", "intent", "message", "series", "emphasis",
                       "annotations", "visual", "role", "notes"},
@@ -88,7 +88,8 @@ SLIDE_FIELDS = {
 # 渲染器认识的结构布局（能力，非枚举禁令）：content-image 的
 # visual-right/visual-left/even/hero，two-column 的 even/lean-left/lean-right。
 # 其它字符串 = 作者/风格自造的布局名 —— 渲染套缺省结构 + data-layout 钩子，
-# 排法由 skin.css 写。validate 不封值集（"auto" 除外：实测选择已退役）。
+# 排法由 skin.css 写。validate 不封值集（"auto" 除外 —— 那是"让脚本替你选"，
+# 而选布局是内容决策）。
 # 拼写检查在 check.py：风格在 style.json 声明 `layouts` 词表时按词表验。
 STRUCTURAL_LAYOUTS = ("visual-right", "visual-left", "even", "hero",
                       "lean-left", "lean-right")
@@ -123,10 +124,10 @@ HINTS = {
     "size": "同上 —— 字号 / 尺寸由脚本派生。",
     "font": "字体族在 token.fonts 里，不在规格里。",
     "x": "坐标是刻意不存在的字段。一旦 schema 里有 x/y，模型就会开始填数字 —— 而版式计算正是交给脚本的那部分。",
-    "variant": "v3 起字段是 layout（自由字符串）。结构布局：content-image 的 "
+    "variant": "字段名是 layout（自由字符串）。结构布局：content-image 的 "
                "visual-right/visual-left/even/hero；two-column 的 even/lean-left/"
                "lean-right；其它名字由 skin.css 排。",
-    "mood": "v3 起 mood 已退役 —— 配色方向不再由语义推导，直接写 colorSet 名字。",
+    "mood": "不是字段 —— 配色方向直接写 colorSet 名字，没有语义推导这一步。",
     "titleTier": "标题档名（风格 type 块里的键）：风格 titleTiers 定缺省映射，"
                  "这里逐页覆盖。",
     "bulletTier": "条目档名；v3 无按条数自动升降档，缺省取风格 bulletDefault。",
@@ -229,15 +230,15 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
     # 风格必填（工具链不内置任何风格 —— 见 references/style-architecture.md）
     if not deck.get("style"):
         issues.error("MISSING_STYLE", "deck.style",
-                     "v4 起 deck.style 必填 —— 工具链不内置任何风格，也没有可拷的"
+                     "deck.style 必填 —— 工具链不内置任何风格，也没有可拷的"
                      "参考实现：在 deck 项目的 styles/<名>/ 里放 style.json + skin.css，"
                      "spec 写 \"style\": \"<名>\"（形状见 references/style-architecture.md）")
 
-    # 配色必填具名（v3：auto/mood 退役）
+    # 配色必填具名（auto/mood 不是字段）
     if deck.get("colorSet") in (None, "auto"):
         issues.error("MISSING_COLOR_SET", "deck.colorSet",
-                     "v3 起 colorSet 必填具名（auto 已退役）—— 配色由作者定："
-                     "先看候选（门 ③），选定后写名字；对比度由 ink.py 验收")
+                     "colorSet 必填具名 —— 配色由作者定：先看候选（门 ③），"
+                     "选定后写名字；对比度由 ink.py 验收")
 
     if color_sets is not None:
         chosen = deck.get("colorSet")
@@ -315,7 +316,7 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
                 issues.error("BAD_ROLE", f"{where}.role",
                              f"未知角色 {role!r}；支持 {list(ROLES)} —— "
                              f"角色说这一页在干什么（配版式、看重复都靠它）")
-        # 布局：自由字符串，只拦 "auto"（实测选择已退役）与非字符串
+        # 布局：自由字符串，只拦 "auto"（"让脚本替你选"）与非字符串
         layout = slide.get("layout")
         if layout is not None:
             if not isinstance(layout, str) or not layout:
@@ -323,15 +324,15 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
                              f"layout 要是非空字符串，得到 {layout!r}")
             elif layout == "auto":
                 issues.error("BAD_LAYOUT", where,
-                             "layout 不支持 auto（v3：实测选布局已退役）—— "
-                             "直接写布局名；自造名由 skin.css 排（缺省结构 + "
+                             "layout 不支持 auto —— 选布局是内容决策，直接写"
+                             "布局名；自造名由 skin.css 排（缺省结构 + "
                              "data-layout 钩子）")
-        # 图形类型必填且封闭八类（v3：推断已退役）
+        # 图形类型必填且封闭八类（没有任何推断路径）
         if kind == "chart":
             ctype = slide.get("chart")
             if not ctype:
                 issues.error("MISSING_CHART_TYPE", where,
-                             f"图表页必须写 chart —— v3 起图形类型由作者声明"
+                             f"图表页必须写 chart —— 图形类型由作者声明"
                              f"（八类：{list(CHART_TYPES)}）；intent 仍是可选语义标注")
             elif ctype not in CHART_TYPES:
                 issues.error("UNKNOWN_CHART_TYPE", f"{where}.chart",
@@ -375,7 +376,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # token 读不到**不算** spec 的错（可能只是没带对路径）—— 那就跳过 colorSet 存在性校验，
     # 而不是把一件读不到的事报成"规格有问题"。
-    # 风格从 spec 的 deck.style 解析（v4：必填，无内置风格）：多风格之后，色板名单必须
+    # 风格从 spec 的 deck.style 解析（必填，无内置风格）：色板名单必须
     # 按**这一份 deck 选的风格**去查，拿别的风格的名单去核会误报。
     tokens_path = args.tokens
     if tokens_path is None:

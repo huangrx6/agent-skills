@@ -45,7 +45,7 @@ DSL 的边界仍设计成**渲染器可替换**：`chart_g2_spec()` 的输入是
 
 散点的 `data` 项是 `{label, x, y}`（`value` 视同 `y`，向后兼容）。
 
-渲一张图表页就是渲一份 deck（图表不再有单独的 CLI）：
+渲一张图表页就是渲一份 deck（图表没有单独的 CLI）：
 
 ```bash
 python3 scripts/render.py your.spec.json -o out.html   # 图表页在产物里由 G2 现渲染
@@ -75,7 +75,7 @@ correlation/progress/deviation/distribution）现在是**可选语义标注**：
 
 1. **muted + 1 accent**（规范第 4 条）：给了 `emphasis` 就只有被强调的那根是
    Accent，其余降成 muted（主色向纸色褪 55%）。八根柱子八种颜色是业余的第一特征。
-   **没写 emphasis 时不悄悄改观感** —— 全部主色，与从前一致。
+   **没写 emphasis 时不悄悄改观感** —— 全部走主色，观感不变。
 2. **结论先行**（规范第 5 条）：`message` 当大标题（"DeepSeek 调用量领先"），
    `title` 降为小标签（数据集名）（render.py:1252-1258）。没写 message 时维持旧行为。
 3. **图形上只标数值，不画坐标系杂物**：数值直接标在图形上（这本来就是本仓库

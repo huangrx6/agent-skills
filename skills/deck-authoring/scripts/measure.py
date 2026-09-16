@@ -3,7 +3,7 @@
 
 ## 为什么必须有这一层
 
-原先 `check.py` 判断"文字放不放得下"靠一个估算函数：
+**判据必须是实测，不是估算。** 估算函数长这样：
 
     text_width(text, size) = (CJK 个数 + ASCII 个数 × 0.55) × size
 
@@ -380,7 +380,8 @@ def measure(html_path: str, budget_ms: int = 2500, chrome: str = CHROME) -> dict
     html = deckio.read_text(html_path)
     # 缓存键必须**带上产物所在目录**：同一份 HTML 放在不同目录，量出来的结果可能不同
     # （相对路径的图片在不在旁边）。只拿 HTML 内容做键会把 A 目录的结果错给 B 目录 ——
-    # 实际上坑过：测试里先量了“图不存在”的目录，缓存在那里，后来把图放好了仍然报缺图。
+    # 缓存要跟**这次量到的事实**走：先量了"图不存在"的目录、把结果缓存下来，
+    # 之后把图放好了仍然会报缺图。
     directory = os.path.dirname(os.path.abspath(html_path)) or "."
     cache_key = hashlib.sha256((directory + "\x00" + html).encode("utf-8")).hexdigest()
     if cache_key in _CACHE:

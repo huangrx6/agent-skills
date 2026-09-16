@@ -16,8 +16,8 @@
 
 ## 编译（spec → resolved）
 
-纯函数：同 spec + 同 seed（+ 同资产清单）恒等。v3 起**档位 / 布局 / 配色 / 图形类型
-都是作者声明**，这里只做合并、解析与留痕（trace）——不再有自动推断与枚举选择。
+纯函数：同 spec + 同 seed（+ 同资产清单）恒等。**档位 / 布局 / 配色 / 图形类型
+都是作者声明**，这里只做合并、解析与留痕（trace）——编译层不推断、不枚举选择。
 assetId → `assets/<file>` 的映射只在这里发生，渲染器只见最终路径。
 
 ---
@@ -109,9 +109,8 @@ def brand_roots() -> tuple[str, ...]:
       2. `<当前目录>/brands` —— 品牌跟着 deck 项目走（随项目交付、可移植）；
       3. skill 的 `brands/` —— 用户显式托管的全局品牌。
 
-    **没有示例品牌**：以前带过一个 `example`（ACME），实测后果是它被直接
-    用进真实交付 —— 示例资产必然被当成可用资产。品牌按
-    references/brand-assets.md 的契约现建；logo 由用户提供。
+    **没有示例品牌**：可拷贝的资产必然被直接当可用资产用进真实交付。
+    品牌按 references/brand-assets.md 的契约现建；logo 由用户提供。
     """
     roots: list[str] = []
     extra = os.environ.get("DECK_BRANDS")
@@ -256,9 +255,8 @@ def shows_logo(brand: dict, slide_kind: str, slide_no: int, end_slide: int) -> b
     """这一页要不要上 logo。brand 决定"出现在哪些页"，风格决定"放哪里"。
 
     `end_slide` 是**尾页的页号**，由 render.py 算好传进来 —— 不是"数组最后一页"。
-    两者在常见的 deck 里恰好重合，但不等价（附件页跟在谢谢页后面很常见）。
-    第一版就是写的 `slide_no == total`，测试里那个"尾页不是 end 的 deck"
-    当场就把它拆了：logo 跑到了附件页上，而谢谢页没有。
+    两者在常见的 deck 里恰好重合，但不等价（附件页跟在谢谢页后面很常见）：
+    写成 `slide_no == total` 会让 logo 跑到附件页上，而谢谢页反而没有。
     """
     mode = brand.get("logoOn", "cover+end")
     if not brand.get("logo") or mode == "none":
@@ -326,7 +324,7 @@ def rasterize(logo_path: str, width_px: float, height_px: float) -> str:
       2. 当场栅格化（Chrome 就在机器上）
     选 2。栅格化不了就**如实报**，让调用方决定是跳过还是失败 —— 不静默少一个 logo。
 
-    ⚠️ 第一版直接用 `--window-size=W,W` 截 SVG 文件，结果是**正方形**：
+    ⚠️ 用 `--window-size=W,W` 截 SVG 会得到**正方形**：
       一是丢了宽高比（贴进 PPTX 变成一个方框，图被拉／留大片透明），
       二是 SVG 作为文档打开时按**自身尺寸**渲染（本仓库那个是 420×100），
       在 235 宽的窗口里右边直接**被截掉**。两个毛病都不会报错，只会默默地丑。
@@ -477,10 +475,10 @@ def compile_spec(deck_spec: dict, style: dict | None = None,
                  assets: dict | None = None) -> dict:
     """spec → resolved（决策层）。纯函数：同 spec + 同 seed（+ 同资产清单）恒等。
 
-    v3：档位 / 布局 / 配色 / 图形类型都是**作者声明**（spec 或风格数据），
-    这里只做合并、解析与留痕 —— 不再有自动推断与枚举选择。
+    档位 / 布局 / 配色 / 图形类型都是**作者声明**（spec 或风格数据），
+    这里只做合并、解析与留痕 —— 不做自动推断与枚举选择。
     assets：`render.load_assets` 的产物 —— assetId → "assets/<file>" 的映射
-    只在这里发生（§14 Asset Resolver v1：manifest 即选择），页对象携带
+    只在这里发生（§14 Asset Resolver：manifest 即选择），页对象携带
     解析后的最终路径，渲染器不见 assetId。
     """
     r = _render()
@@ -503,7 +501,7 @@ def compile_spec(deck_spec: dict, style: dict | None = None,
 
     color_set = r.resolve_color_set(tokens, deck)
     trace.append({"stage": "theme", "decision": color_set,
-                  "reason": ["spec 显式声明 colorSet（v3：配色由作者定，"
+                  "reason": ["spec 显式声明 colorSet（配色由作者定，"
                              "对比度由 ink/check 验收）"]})
     colors = tokens["colorSets"][color_set]
     paper = colors.get("background", "#FFFFFF")
@@ -518,7 +516,7 @@ def compile_spec(deck_spec: dict, style: dict | None = None,
     # ── Typography + 几何种子：逐页档位与错位 ─────────────────────────────
     tier = tokens["type"]
     # 标题档映射：风格数据 titleTiers 覆盖缺省映射；spec 可逐页写 titleTier。
-    # v3：映射不是脚本法条 —— 它是风格可以改的数据（值域仍锁在字号档名里）。
+    # 映射不是脚本法条 —— 它是风格可以改的数据（值域仍锁在字号档名里）。
     title_tiers = {**r.TITLE_TIER, **(tokens.get("titleTiers") or {})}
     # 条目默认档：风格 bulletDefault，缺省 "bullet"；两栏页固定窄档（结构事实）。
     bullet_default = tokens.get("bulletDefault") or r.DEFAULT_BULLET_TIER
@@ -538,7 +536,7 @@ def compile_spec(deck_spec: dict, style: dict | None = None,
             trace.append({"stage": "typography", "slide": i,
                           "decision": f"bulletTier:{b_tier}",
                           "reason": ["spec 逐页声明条目档（v3 无按条数自动升降档）"]})
-        # v3：档名是作者/风格数据 —— 拼错必须当场报，不能掉进 tier[...] 的 KeyError
+        # 档名是作者/风格数据 —— 拼错必须当场报，不能掉进 tier[...] 的 KeyError
         for role, tier_name in (("标题", t_tier), ("条目", b_tier)):
             if tier_name not in tier:
                 raise SystemExit(
@@ -549,7 +547,7 @@ def compile_spec(deck_spec: dict, style: dict | None = None,
         # variant 本身在 spec 里，{**slide} 合并页对象时自动带进 resolved ——
         # compile 的职责是**留痕**：谁选的变体、为什么。自动选变体（按内容形状
         # 派生）要等 fit 的候选实测给数据，现在是显式才记、默认静默。
-        # ── Asset：assetId → 最终路径（§14 优先级链 v1：manifest 即选择）────
+        # ── Asset：assetId → 最终路径（§14 优先级链：manifest 即选择）────
         # spec 里的 image 写 assetId（语义引用）；清单里的 id → "assets/<file>"，
         # 不在清单里 → 原样（旧路径语义，demo/stress 全兼容）。
         image_val = slide.get("image")
@@ -566,7 +564,7 @@ def compile_spec(deck_spec: dict, style: dict | None = None,
                                          "缺文件由 check 的「图片加载」门实测拦"]})
         # ── Chart：图形类型是作者声明（v3）—— 显式值已在页对象里，不再推断
 
-        # ── Layout：作者声明的布局（v3：结构布局是渲染器能力，其余是 skin 自由层）
+        # ── Layout：作者声明的布局（结构布局是渲染器能力，其余是 skin 自由层）
         layout = slide.get("layout")
         if layout:
             known = layout in r.IMAGE_LAYOUTS or layout in r.TWO_COL_LAYOUTS

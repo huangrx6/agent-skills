@@ -191,7 +191,7 @@ pptx_native 的原生图表是第二种执行器）。**总链路不绑定具体
 
 独立于 Chart；页面 Layout 只管 Container，内部自算 Node/Edge。落地：timeline
 容器宽从网格算、节点自管；独立 diagram 引擎未建（页型表原也没有 architecture，
-该表 v4 随 plan.py 退役；映射过去是死路——见 planning.md 未做清单）。
+映射过去是死路——见 planning.md 的未做清单）。
 
 ## 21. Layout Resolver【✅】
 
@@ -224,7 +224,7 @@ Effect Registry/Motion Creativity → Resolved Timeline（`timeline()` + 编排�
 系统核心：语义 DSL 编译为可直接渲染的 Resolved Deck，含 resolver decisions/
 fallback decisions/warnings/geometry/theme/typography/assets/charts/motion。
 本仓库 = `deck.py` 的 `compile_spec` 把语义 spec 编译成 `resolved.deck.json`
-（v1：内容与决策合并的自足层——`resolved = read_json(...); html = render(resolved)`），
+（内容与决策合并的自足层——`resolved = read_json(...); html = render(resolved)`），
 再由 `render_resolved` 直渲。render 入口内置编译（要中间产物用
 `render.py … --resolved resolved.deck.json`）；**决策 trace 已系统化**（§26）。
 
@@ -241,7 +241,7 @@ assetId→路径 / **作者声明的**档位与布局 / logo 选版）；消费�
 Resolved 后先做：Hard = bounds/overlap/text overflow/min font/logo collision/
 image distortion/chart clipping/required region missing；Soft = grid/hierarchy/
 whitespace/balance/density/repetition/focal clarity。`check.py`（硬，阻塞；软项并入
-其提示流）。原 `hierarchy.py` 的层级三条（文本预算/焦点/密度）v4 随脚本退役。
+其提示流）。层级三条（文本预算/焦点/密度）是提示，由作者自查。
 
 ## 28. Renderer【✅】
 
@@ -279,7 +279,7 @@ render → check 循环每轮秒级；转了几轮还在报同一错 = 停下来
 
 只在 Content QA ✓ + Asset QA ✓ + Layout/Visual QA ✓ 后执行。原 `deliver.py` 在
 `check.py` 失败时**直接中止**（"把一份已知有问题的 deck 做成五种格式只是把问题
-复制五份"）；该编排脚本 v4 退役，这条承诺落到交付步骤本身：Hard 失败不得导出
+复制五份"）。这条承诺落在交付步骤本身：Hard 失败不得导出
 （§58），交付按 delivery-formats.md 手工逐条跑，任一步退出码非零即停。
 
 ## 34. Export Targets【✅】
@@ -302,7 +302,7 @@ HTML；自动播放→MP4/GIF；归档→PNG。对照表在 delivery-formats.md�
 
 ## 37. Decision Freeze Gates【✅ 四门齐】
 
-Gate A Content Freeze = 作者/AI 自审（原 `plan.py --check` 全绿，v4 退役）；
+Gate A Content Freeze = 作者/AI 自审（`validate_spec.py` 全绿）；
 Gate B Asset Freeze = `--check` 验图 + brand 加载通过；Gate C Design Freeze = `check.py` 全绿
 （硬约束零错）；Gate D Delivery Freeze = 导出回读通过。上游门不过，下游
 不开工（§1 的站序即门序）。
@@ -366,7 +366,7 @@ Chart Data=spec data（渲染只读）；Build Manifest=内嵌 manifest。
 ## 47. Closed Schema【✅】
 
 核心协议字段集封闭，未知字段=ERROR：`validate_spec`（spec）、`BRAND_FIELDS`
-（品牌）；原 `plan.py` 的枚举集（brief/页型/source_type/骨架）v4 随脚本退役。
+（品牌）；brief / 页型 / source_type / 骨架都由作者写字，没有脚本级枚举集。
 **避免 LLM 发明字段** ✓。
 
 ## 48. Tooling 与规则分离【✅ 见顶部注②】
@@ -379,8 +379,7 @@ Chart Data=spec data（渲染只读）；Build Manifest=内嵌 manifest。
 ## 49. Registry 思路【部分 ✅】
 
 Style Registry=styles/ 目录；Font Registry=fonts/catalog.json（126 款）；
-Chart Type 由 spec 的 `chart` 字段封闭八类（原 `chart.py` 类型表 v4 退役，判据在
-`validate_spec.py`）；Effect 面小无需 Registry（animation §5）。
+Chart Type 由 spec 的 `chart` 字段封闭八类（判据在 `validate_spec.py`）；Effect 面小无需 Registry（animation §5）。
 **禁止业务逻辑硬编码数量** ✓（版式数/骨架数都在表里，代码只遍历）。
 
 ## 50. 反 AI-Slop 总规则【✅ 分层落地】
@@ -396,10 +395,10 @@ Chart Type 由 spec 的 `chart` 字段封闭八类（原 `chart.py` 类型表 v4
 
 | 层 | AI 负责 | 程序负责 |
 | --- | --- | --- |
-| Brief | 理解目的与受众 | 原 `plan.py` 拦 Schema，v4 退役（人/AI 自审） |
-| Content | 提炼与推理 | 原 `plan.py` 的引用校验、来源三分，v4 退役 |
-| Storyline | 选择叙事 | 原 `plan.py` 的骨架表 / 配额，v4 退役 |
-| Page Plan | 页面意图 | 原 `plan.py` 的合法页型 / 复杂度，v4 退役 |
+| Brief | 理解目的与受众 | 人 / AI 自审（Schema 由 `validate_spec.py` 在 ④ 站拦） |
+| Content | 提炼与推理 | 人审：引用校验、来源三分 |
+| Storyline | 选择叙事 | 人审：骨架表 / 配额 |
+| Page Plan | 页面意图 | 人审：合法页型 / 复杂度 |
 | Slide DSL | 语义结构 | 封闭 Schema（`validate_spec.py`） |
 | Color | 选色板（显式具名 colorSet） | 色板名解析（`render.resolve_color_set`）/ 对比度门禁（`ink.py` + `check.py` ①） |
 | Typography | 字体意图 / 档位声明（titleTier·bulletTier） | 字体文件 / 档值 / 档名拼错当场报 |
@@ -431,7 +430,7 @@ Chart-heavy / Image-heavy / 全部版式）+ 一份八类图形展示面。没�
 （`check.py` 的 `check()` 只返回阻塞清单，没有 notes 指标）、script_errors、
 render_ms（机器相关仅参考）、字节可复现/编译确定性（§41）、逐页密度分布、
 focal/budget issues、unique_kinds/max_consecutive（版式/布局多样性 /
-repetition rate）。指标定义随 `benchmark.py` 退役，需要时照这份清单重写脚本；
+repetition rate）。这份清单就是指标定义：要有基线，照它写采集脚本；
 留白项：repair iterations（Repair 引擎未建）、export 回读（测试套件盖着，慢
 不进常规基线）、human rating。
 
@@ -483,7 +482,7 @@ Repair 保证质量，Export QA 保证最终交付。本仓库的兑现度见各
 
 | 站 | 产物 | 跑什么 | **阻塞** | 提示 |
 | --- | --- | --- | --- | --- |
-| ①-③ 规划 | 三份 JSON | 作者/AI 自审（原 `plan.py --check`，v4 退役） | 见 content-intelligence 落点表 | 推断当事实讲 / 空话无数字 / 同一句话两遍 |
+| ①-③ 规划 | 三份 JSON | 作者/AI 自审 | 见 content-intelligence 落点表 | 推断当事实讲 / 空话无数字 / 同一句话两遍 |
 | ④ DSL | deck.spec.json | `validate_spec.py` | 封闭字段 / 缺必填字段 / 图表缺类型或数据 / 图页无图 / colorSet 没具名 | 字体回退 / 没封面 |
 | ⑤⑥ 图像 | brief + 真图 | `image_source --brief/--check` | 缺图 / 宽度 / 比例 / 重复 | 零插槽建议 |
 | ⑦⑧ 渲染+QA | deck.html | `render.py` + `check.py` | 越界 / 重叠 / 溢出 / 对比度 / 全页图 / 图表就绪 | 字体回退 / 对齐 / 档位 / 布局轮换 |

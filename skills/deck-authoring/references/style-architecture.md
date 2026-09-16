@@ -339,7 +339,7 @@ var(--s-bullet)/1.55 var(--body)` 这种写法，一旦 `--s-bullet` 在某个�
   `layouts` 时，把不在词表里、又不是结构布局的 `spec.layout` 判成**阻塞** problem
   —— 自造名写错一个字母，skin 里那条规则就永远不生效，最难查的那种静默。
 
-这三者的校验**随 `style.py --check` 退役后分给了两处**：`titleTiers` / `bulletDefault`
+这三者的校验**分在两处**：`titleTiers` / `bulletDefault`
 的档名由 `deck.py::compile_spec`（deck.py:504-509）在编译时报 —— 档名不在风格的
 `type` 块里直接 SystemExit；`layouts` 的词表门由 `check.py::_layout_vocab_problems`
 （check.py:405）在产物校验时按词表拦拼写。形状的其余部分（如 `layouts` 必须是
@@ -433,8 +433,8 @@ mkdir -p <deck项目>/styles/<名> && $EDITOR <deck项目>/styles/<名>/style.js
 （坐标 / 字号 / 色值三类各有自己的话）。所以 `fontSize` / `x` / `y` 这类写法一开始
 就被挡下来 —— 不用等到产物那里才发现"它根本没生效"。
 
-v3 退役的两个字段现在都是未知键，写它们会被判 `UNKNOWN_FIELD`，提示里各有一条
-指路：`variant`（改叫 `layout`）、`mood`（配色不再由语义推导，直接写 `colorSet`）。
+两个被淘汰的字段名是未知键，写它们会被判 `UNKNOWN_FIELD`，提示里各有一条
+指路：`variant`（字段名是 `layout`）、`mood`（配色不由语义推导，直接写 `colorSet`）。
 
 `check.py` **不管**字段集（它验的是产物）；它唯一会主动拦的字段是 `color`：第 ① 条
 只接受 `"overprint"`，写成色值（如 `"#FF0000"`）会判失败。

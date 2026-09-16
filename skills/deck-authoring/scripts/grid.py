@@ -47,7 +47,7 @@ FOOT_BOTTOM = 52
 FOOT_H = 24
 
 # 内容带（正文允许出现的竖直区间）。**这是"内容下边界"的唯一数字** ——
-# check.py 从前手写过 838，与 render.py 的 824 差 14px（发现时已经漂了）。
+# 几何只能有一个来源：两处各写一个值就会漂（838 vs 824 差 14px）。
 CONTENT_TOP = PAD_Y
 CONTENT_BOTTOM = SLIDE_H - FOOT_BOTTOM - FOOT_H      # 824
 CONTENT_W = SLIDE_W - 2 * PAD_X                       # 1432

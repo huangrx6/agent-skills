@@ -121,9 +121,9 @@ FETCHABLE = [
     ("霞鹜文楷 TC", "lxgw/LxgwWenKaiTC", r"LXGWWenKaiTC-Regular\.ttf$", "OFL-1.1"),
     ("清松手写体 1", "jasonhandwriting/JasonHandwriting", r"[Jj]asonHandwriting1.*\.(ttf|otf|zip)$", "OFL-1.1"),
     # 资产名有 66 个变体：bdf / dfont / otb / pcf / woff / woff2 / ms.bitmap.ttf
-    # 都不是能直接用的字体。第一版用了宽松的 `.*(12px|font).*\.zip$`，
-    # 结果抓到一个 16MB 的 **BDF 点阵**包（不能用，也没解出任何字体）——
-    # 所以要**钉住 -(proportional|monospaced)-ttf-v** 这一段。
+    # 都不是能直接用的字体。宽松的正则 `.*(12px|font).*\.zip$` 会抓到 16MB 的
+    # **BDF 点阵**包（不能用，也解不出任何字体）—— 所以要**钉住
+    # -(proportional|monospaced)-ttf-v** 这一段。
     ("Fusion Pixel Font", "TakWolf/fusion-pixel-font",
      r"fusion-pixel-font-12px-proportional-ttf-v.*\.zip$", "MIT"),
 ]
@@ -294,9 +294,9 @@ def installed_names() -> set[str]:
     判据是"本地真有一个字族名 / 文件名配得上它"，两边都**归一化后**比。
 
     **宁漏不错**：报"已就位"但其实是回退，会静默渲出一份字体不对的 deck；而漏报
-    只是让人多看一眼 `--installed`。第一版就是错的 —— 用短记号做子串匹配，
-    `AR PL UKai` 的 `ar` 撞上 `Regul**ar**`、`OPPO **Sans**` 撞上 `Smiley**Sans**`，
-    只下了 4 款却报"已就位 8 款"。所以现在要求记号 **≥5 个字符**，
+    只是让人多看一眼 `--installed`。用短记号做子串匹配会撞车 ——
+    `AR PL UKai` 的 `ar` 会撞上 `Regul**ar**`、`OPPO **Sans**` 撞上 `Smiley**Sans**`，
+    只下了 4 款却报"已就位 8 款"。所以要求记号 **≥5 个字符**，
     且比对对象是字体**自己声明的**字族名 + 文件名（都去掉非字母数字、转小写）。
     """
     haystacks = [_norm(f) for f in local_families()]
@@ -528,11 +528,10 @@ def face_css(font_stacks: list[str]) -> str:
       · 本地没取的字体**静默跳过** —— 栈里还有回退项，不会画出裂图，
         具体谁顶上由 `check.py` 的字体回退提示说清楚。
 
-    **按本地文件走，不按清单条目走** —— 这是一个改对了的地方：原先每个清单条目只挑
-    一个文件（`_local_path_for` 按格式优先级选一个），于是"霞鹜文楷的等宽变体"
-    永远选不中，`terminal` 那套写 `LXGW WenKai Mono` 时**一条 @font-face 都没注入**，
-    浏览器静默回退（实测）。改成遍历本地文件、按它**自己声明的**每个字族名注入，
-    三种写法就都能对上了。
+    **按本地文件走，不按清单条目走** —— 每个清单条目只挑一个文件（`_local_path_for`
+    按格式优先级选一个）的话，"霞鹜文楷的等宽变体"永远选不中：风格写
+    `LXGW WenKai Mono` 时**一条 @font-face 都不会注入**，浏览器静默回退（实测）。
+    所以遍历本地文件、按它**自己声明的**每个字族名注入，三种写法就都能对上。
 
     用**绝对路径**：产物与字体不在同一个目录，相对路径会随产物移动而断。
     要单文件 HTML 就再跑 `fonts.py --embed`。
@@ -615,8 +614,8 @@ def _names_font(entry: dict, raw_stacks: str, norm: str) -> bool:
       · 写字体**自己的字族名**（`LXGW WenKai`、`Smiley Sans Oblique`）—— 手写
         style.json 的人很自然会这么写。
 
-    第一版只查了拉丁记号，于是中文名的写法全落空 —— 而且 `_norm` 会把中文整个
-    抹掉（只留 `[a-z0-9]`），所以"霞鹜文楷"归一化之后是空串，**永远不可能匹配**。
+    只查拉丁记号的话中文名的写法全落空 —— `_norm` 会把中文整个抹掉
+    （只留 `[a-z0-9]`），"霞鹜文楷"归一化之后是空串，**永远不可能匹配**。
     实测：一个 display 用得意黑、body 用霞鹜文楷的风格，只注入了前者。
     """
     if entry["name"] in raw_stacks:
@@ -655,7 +654,7 @@ def mapping() -> dict:
 def print_map(as_md: bool = False, a_only: bool = False) -> None:
     """字体 ↔ **字感性格**映射表。
 
-    v5：不再按风格名查 —— 风格名每份 deck 都不同，而且按名查的那张表实测变成了
+    **按本地文件查，不按风格名查** —— 风格名每份 deck 都不同，按名查的那张表会变成
     菜单（确认门②的方向永远是那几个历史名字）。现在按方向四轴里的「字感」轴查：
     bold-sans / editorial-serif / poster-heavy / neutral-grotesk /
     humanist-round / mono-engineering。

@@ -46,7 +46,7 @@ python3 scripts/ink.py styles/<你的风格>/style.json   # 逐色板验对比�
 脚本只做验收：
 `validate_spec.py` 把缺失或不具名的 `colorSet` 判 `MISSING_COLOR_SET`（名字不在
 `colorSets` 里判 `BAD_COLOR_SET`），`render.resolve_color_set` 再拦一道直接 SystemExit
-—— 不再有第二条取色路径，也不再读 `mood` / `color_creativity`。
+—— 取色只有这一条路径。
 
 所以 colorSets 是**人类手调的家底**（不是与规则冲突的"硬编码颜色"）；品牌色仍经由
 `deck.merge_color_sets` 同名覆盖进入（品牌协议 §5）。从语法凭空生成全新主题（不要基准）

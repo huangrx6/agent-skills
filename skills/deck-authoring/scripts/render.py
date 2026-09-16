@@ -95,9 +95,9 @@ def style_roots() -> tuple[str, ...]:
 # 另外两类自由，渲染**不拦**：
 #   · two-column 的结构布局见 TWO_COL_LAYOUTS；
 #   · 任何其它字符串 = 作者/风格自造的布局名 —— 渲染套缺省结构并加
-#     `data-layout="<名>"`，怎么排由 skin.css 写（v3：布局语言是作者的自由，
+#     `data-layout="<名>"`，怎么排由 skin.css 写（布局语言是作者的自由，
 #     脚本只提供结构与验收）。
-# 历史备注：这里原叫"变体"（值封闭 + 自动实测选择）。v3 起自动选择退役，
+# 自动选择这条路不存在：
 # 名字改为布局；spec 字段 `layout`，`variant` 不再接受。
 IMAGE_LAYOUTS = ("visual-right", "visual-left", "even", "visual-wide", "hero")
 
@@ -140,11 +140,10 @@ REQUIRED_TYPE_TIERS = frozenset({
     "chartValue", "chartLabel",
 })
 
-# 条目默认档：**作者/风格声明**，不按条数自动升降档（v3）。
+# 条目默认档：**作者/风格声明**，不按条数自动升降档。
 # slide 可写 `bulletTier` 覆盖；风格可写 `bulletDefault`；都没有 → "bullet"。
-# 历史备注：这里原有一条按条数自适应（≤3 大字 / ≥6 小字）的自动降档 ——
-# 正是规范里"不要第一步缩字号"的反例，v3 退役：内容多就拆页/收短，
-# 不靠脚本把字悄悄缩小。
+# 内容多就拆页 / 收短 —— 不靠脚本把字悄悄缩小。
+DEFAULT_BULLET_TIER = "bullet"
 DEFAULT_BULLET_TIER = "bullet"
 
 def _rng(seed, *parts) -> random.Random:
@@ -432,7 +431,7 @@ html,body{margin:0;background:var(--viewer)}
 .hero-bullets{margin-top:var(--sp-item)}
 /* 内容图：**展示比例由槽位定，不由图片自身比例定**。
    生图工具出成 1:1 / 4:3 / 2:1 是常态（提示词按不住比例，各家默认都不同）——
-   以前这里只写 width，于是高度跟着图片比例走：1:1 撑出页底（实测溢出 109px）、
+   只写 width 的话高度会跟着图片比例走：1:1 撑出页底（实测溢出 109px）、
    2:1 留出一个空洞。现在高度由槽位比例定，多出来的部分按内容类型处理：
      · 照片 / 插画 / 截图 → cover（按中心裁切，主体居中几乎无损）
      · 结构图 / 流程图     → contain（留边不裁 —— 图里每一笔都是信息）
@@ -455,7 +454,7 @@ html,body{margin:0;background:var(--viewer)}
 .cols.v-lean-hard-right .col:last-child{flex:none;width:461.33px}
 .tl{display:flex;gap:var(--sp-item);list-style:none;padding:0;margin:0}
 /* 条目列表：壳只管**结构**（无默认圆点、无浏览器缩进）——标记是装饰，归皮肤
-   （`.bullets li::before`）。壳不再发标记：以前每条前面有一个方块元素，皮肤再画
+   （`.bullets li::before`）。壳**不发**条目标记：
    自己的短横时就成了两个标记，而那个方块没有间距、直接贴住正文（实测截图）。 */
 .bullets{list-style:none;padding:0;margin:0}
 .tl li{flex:1;min-width:0;width:var(--tl-node,300px)}
@@ -472,7 +471,7 @@ html,body{margin:0;background:var(--viewer)}
 /* box-sizing:border-box 必须有：1432 是**含内边距**的栅格宽。content-box 下
    总宽 = 1432+48 = 1480，右缘冲出内容界 48px —— 皮肤一留横向 padding 就现形
    （不留的皮肤恰好把它掩盖了）。 */
-/* 图表容器高度**由壳给死**（330px）—— v4 起图表是 G2（默认 canvas 渲染器），
+/* 图表容器高度**由壳给死**（330px）—— 图表是 G2（默认 canvas 渲染器），
    而 G2 的 autoFit 从容器取尺寸：容器没有高度就会在渲染时抛错（实测）。
    高度钉在 .g2 上而不是 .chartwrap svg 上：canvas/svg 都由 G2 自己塞进去。
    为什么不让它 width:100% 自己撑：那样高度会跟着容器宽度变 —— 而各风格的
@@ -1038,7 +1037,7 @@ CHART_TYPES = ("bar", "bar-horizontal", "line", "area", "bar-stacked",
 
 
 def chart_declared_type(slide: dict) -> str:
-    """图形类型 —— **spec 显式声明**（v3 起无推断）。"""
+    """图形类型 —— **spec 显式声明**，没有推断。"""
     declared = slide.get("chart")
     if not declared:
         raise SystemExit(
@@ -1261,17 +1260,17 @@ G2_INIT_JS = """
 """
 
 def resolve_color_set(tokens: dict, deck: dict) -> str:
-    """colorSet 名 —— **spec 显式声明**（v3：配色由作者定，脚本只验收）。
+    """colorSet 名 —— **spec 显式声明**（配色由作者定，脚本只验收）。
 
-    历史上这里有一条 auto 路径（mood/风格语法 → 方向），已退役：选色是审美
+    这里没有 auto 路径：选色是审美
     决策（门 ③ 给候选，作者定）。validate_spec 会先拦住缺失；这里也拦一道，
     给直调入口干净报错。check.py 也用它 —— 两边看到同一套色。
     """
     name = deck.get("colorSet")
     if not name or name == "auto":
         raise SystemExit(
-            "✗ 这份 deck 没写 colorSet —— v3 起配色由作者显式声明（缺省的"
-            "`auto` 已退役）；对比度由 ink.py/check.py 验收，选哪套是你的决定。")
+            "✗ 这份 deck 没写 colorSet —— 配色由作者显式声明，没有自动配色；"
+            "对比度由 ink.py/check.py 验收，选哪套是你的决定。")
     if name not in tokens.get("colorSets", {}):
         raise SystemExit(
             f"✗ colorSet={name!r} 不在风格的 colorSets 里"
@@ -1326,7 +1325,7 @@ def load_assets(spec_path: str) -> dict | None:
 def resolve_asset(assets: dict | None, image_value: str) -> str | None:
     """assetId → "assets/<file>"；不是清单里的 id → None（按旧路径语义走）。
 
-    §14 优先级链 v1：manifest 即选择（selected 的落点）；generated/provided
+    §14 优先级链：manifest 即选择（selected 的落点）；generated/provided
     的区分由 entry.source 记录。禁止缺图联网找图 —— 这里只做映射，不碰网络。
     """
     entry = ((assets or {}).get("assets") or {}).get(image_value)
@@ -1439,7 +1438,7 @@ def render_resolved(resolved: dict) -> str:
         elif kind == "content-image":
             # 布局判定要在 titleblock 之前：hero 的标题只住 herobar，
             # 顶部再立一个 titleblock 就是双标题（而且把 648px 的图顶出正文带）。
-            # v3：IMAGE_LAYOUTS 是渲染器**结构能力**（像图表的八类图形）；
+            # IMAGE_LAYOUTS 是渲染器**结构能力**（像图表的八类图形）；
             # 其它字符串 = 作者自造的布局名 —— 套缺省结构 + `data-layout` 钩子，
             # 具体怎么排由 skin.css 写（脚本不枚举审美）。
             layout = slide.get("layout")
@@ -1598,7 +1597,7 @@ def render_resolved(resolved: dict) -> str:
                               unit=slide.get("unit", ""))
             # ⚠️ 外层 chartwrap 是**结构**：校验与测量的锚点（tag_attr 挂它身上）。
             # 里层 .g2 拿 data-g2（G2 spec JSON）—— 文档末尾统一实例化：
-            # 声明式图形语法只出 spec，几何由 G2 算（v4：手写 SVG 渲染器已删除）。
+            # 声明式图形语法只出 spec，几何由 G2 算。
             g2_json = json.dumps(
                 chart_g2_spec(slide, colors, chart_emphasis_set(slide),
                               tier=tier, fonts_body=tokens["fonts"]["body"]),
@@ -1651,7 +1650,7 @@ def render_resolved(resolved: dict) -> str:
     # animate.py 还要拿它去分配帧）。
     # ensure_ascii 只针对**这两个内嵌 JSON 载荷**（正文里的中文当然是 UTF-8 原文）——
     # 载荷走 \uXXXX 转义，是为了它在任何转存/重编码环节都不会被改坏。
-    # （早先这里写成“保持产物是纯 ASCII”，不实：`<title>` 与正文本来就是 UTF-8。）
+    # （`<title>` 与正文是 UTF-8；转义的只是这两个内嵌 JSON 载荷。）
     spans = resolved["timeline"]            # compile 已定（Python 算，可测可回归）
     motion = {k: v for k, v in tokens["motion"].items() if k != "note"}
     out.append("<script>window.__deck_timeline="

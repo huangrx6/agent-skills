@@ -107,7 +107,7 @@ def check(tokens: dict) -> int:
 
 
 def main(argv: list[str]) -> int:
-    # 风格 token 必须显式给（夹具已删，没有默认路径）—— 通常是
+    # 风格 token 必须显式给（没有默认路径）—— 通常是
     # `<deck 项目>/styles/<名>/style.json`。
     if len(argv) <= 1:
         raise SystemExit("✗ 要给风格 token 路径：ink.py styles/<名>/style.json")

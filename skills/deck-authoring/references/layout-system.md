@@ -82,9 +82,9 @@ CSS flex/grid：父容器 padding/gap 全走 `--sp-*` 令牌，子元素内容�
 ## 9. Spacing Tokens【✅】
 
 Global Ramp：8/12/16/24/32/48/64/96；Alias：inner 16 / item 24 / group 48 /
-section 64（+hero 96）。注入产物为 CSS 变量 `--sp-*`；壳里的 gap 全部走令牌。
-实测改前 10 个 gap 出现 7 种值（48/68/45/74/101/16/0），改后结构性 gap 全落
-在令牌上。
+section 64（+hero 96）。注入产物为 CSS 变量 `--sp-*`；壳里的 gap **全部**走令牌 —— 不出现裸数字。
+（这条有测试守着：`test_grid.py` 扫 `SHELL_CSS`，25~64px 区间的裸间距直接判失败 ——
+间距无律就是这样长出来的。）
 
 ## 10. 间距关系【✅】
 
@@ -95,9 +95,8 @@ inner < item < group < section；**组距 ≥ 1.5 × 条目距**（Gestalt 接�
 
 ## 11. Style 与 Spacing【✅】
 
-Style 不重定义任意 spacing，只允许覆盖语义档（spacingOverrides）。禁止
-gap=57/73/101——改后 skin 的手写值收敛到令牌（残余 6~8 处手写值在路线图里
-继续清）。
+Style 不重定义任意 spacing，只允许覆盖语义档（spacingOverrides）。skin 里的
+`gap` 只能引用 `--sp-*`，`gap=57` 这种手写值没有合法来源。
 
 ## 11b. 安全盒（Clearance Box）与碰撞政策【✅ layout/ 包】
 
@@ -195,9 +194,9 @@ python3 scripts/render.py spec.json -o out.html --repair
 
 必须检查：标题/正文/卡片/图/图表/表格/题注的左缘与 baseline。落地：锚点元素
 （标题、subtitle（副标题）、图、图表——`check.py` 的 anchors 表，check.py:248）
-左缘必须吸附到列——提示级。实测改前左缘 7 个任意值
-（418/752/800/909/1086/1281/84），改后全部落列（84=边距、448=col4、812=col7、
-933=col8、1176=col10）。优先序：同 Region 左缘 > 网格列 > baseline > 光学对齐。
+左缘必须吸附到列——提示级。锚点元素的合法左缘是这 5 个位置：
+**84**（边距）、**448**（col4）、**812**（col7）、**933**（col8）、**1176**（col10）。
+优先序：同 Region 左缘 > 网格列 > baseline > 光学对齐。
 
 ## 13. Optical Alignment【✅】
 
@@ -337,9 +336,8 @@ python3 scripts/render.py spec.json -o out.html --contract        # 人读
 python3 scripts/render.py spec.json -o out.html --contract --json  # 程序读
 ```
 
-**先读预算再写字**。以前只有"写完 → 渲 → 量 → 发现装不下"这条回路，而修复梯里
-"缩字号"排在第 13 位 —— 于是"装不下"最常见的结果就是先压字号，而不是先改文案。
-预算把这个数字提前（`layout/contracts.py`）：
+**先读预算再写字**。修复梯里"缩字号"排在第 13 位，而"装不下"最省事的动作就是
+先压字号 —— 容量必须在落笔前就拿到，不能等渲完再发现（`layout/contracts.py`）：
 
 | 给什么 | 怎么算 |
 | --- | --- |
@@ -432,8 +430,8 @@ tier**（权威表：`pipeline.md` §31 的 13 步修复顺序，这里是同一
 风格 `bulletDefault`，再缺省 `"bullet"`）；`render.DEFAULT_BULLET_TIER="bullet"`，
 two-column 条目档固定 `bulletSmall`（结构事实）。**没有按条数自动升降档**
 ）：内容多就拆页/收短或显式换小档，
-不让字自己变小（§28）。风格阶梯的形状（同级/倒挂）原由 `style.py` 校验，v4 随
-脚本退役——阶梯封闭这条规则保留，由作者守（色板对比度另有 `ink.py`）。
+不让字自己变小（§28）。风格阶梯的形状（同级/倒挂）由作者守
+（色板对比度另有 `ink.py`）——没有脚本门，因为这是审美判断。
 
 ## 30. Component Constraints【约定】
 
@@ -459,8 +457,7 @@ Chart Container 负责 chart box/title box/标注区/标签安全区；**Chart E
 
 页面布局只负责 Diagram Container，内部 node/edge/connector/间距由引擎自管，
 **页面网格不强行控制每个节点**。落地：timeline 容器宽从网格算，节点内部排布
-自管；独立 diagram 引擎未建（无架构图版式——原 plan.py 页型表里故意没有它，
-该表 v4 随脚本退役，规则不变）。
+自管；独立 diagram 引擎未建（无架构图版式——页型表里就没有它）。
 
 ## 34. Table Constraints【约定】
 
@@ -474,9 +471,9 @@ Chart Container 负责 chart box/title box/标注区/标签安全区；**Chart E
 clipping（= G2 真渲染出来了 + 数据形状，见 `validation.md` 第 ⑤ 条）✓、
 logo overlap（logo 压字）✓、decor overlap（墨块压文字栏）✓、unresolved asset
 （图没加载/脚本报错）✓、full-page image（图盖整页，hero role-aware）✓ ——
-`check.py` 阻塞 10 余条，原 `deliver.py` 在 check 失败时直接中止（"把已知有问题
-的 deck 做成五种格式只是把问题复制五份"）；该编排脚本 v4 退役，中止改由交付
-步骤守（任一步非零即停，见 `delivery-formats.md`）。
+`check.py` 阻塞 10 余条。`check.py` 失败时**不得导出**（"把已知有问题的 deck
+做成五种格式只是把问题复制五份"）——这条由交付步骤守（任一步非零即停，
+见 `delivery-formats.md`）。
 
 四项**承诺未落地**（路线图，先别当已有的牙）：unreadable min font 的**最小字号**
 半边、overlap（**文字互压**——重叠类阻塞目前只有 logo 压文字一条）、footer
@@ -487,8 +484,8 @@ excessive upscale（图放大）是 **notes 提示**不是阻塞（渲染宽 > �
 
 进入提示不阻塞：grid alignment / whitespace / focal clarity /
 density / style consistency / decoration restraint —— `check.py` 的提示流
-（`advisories()`）。层级三条（文本预算/焦点/密度）原由 `hierarchy.py` 给，v4 随
-脚本退役。做成阻塞的话第一份正常 deck 就被挡住，然后所有人开始忽略检查。
+（`advisories()`）。层级三条（文本预算/焦点/密度）是提示，由作者自查 ——
+做成阻塞的话第一份正常 deck 就被挡住，然后所有人开始忽略检查。
 
 ## 37. Layout Score【约定】
 
@@ -500,13 +497,13 @@ invalid。未实现分数引擎；等价物：Hard Fail = 退出 1（invalid 的
 ## 38. Score Threshold【约定】
 
 ≥90 excellent / 85-89 pass / 75-84 repair recommended / <75 repair required。
-未实现；阈值要等有分数引擎时才有意义（原计划用 `benchmark.py` 校准，该脚本 v4 退役，§83）。
+未实现；阈值要等有分数引擎时才有意义（§83）。
 
 ## 39. Decoration Restraint【部分 ✅】
 
 检查装饰面积占比/是否穿正文/假焦点/重复/匹配风格。落地：装饰压文字=阻塞；
-decor 类型与角位由风格 token 限定（版心已满的版式不放装饰）；面积占比审计原在
-`style.py`，v4 随脚本退役（改人审）。不能只看"装饰少不少"。
+decor 类型与角位由风格 token 限定（版心已满的版式不放装饰）；面积占比由人审。
+不能只看"装饰少不少"。
 
 ## 40. Deck-level Rhythm【约定】
 
@@ -561,9 +558,8 @@ timeline（语义=顺序），没有装饰线。
 ## 49. Layout Intent【部分 ✅】
 
 Page Planner 输出 layoutIntent（family/composition/density/direction/
-focalPoint/visualWeight/whitespace）。落地：原 `plan.py` 的 PAGE_TYPES 行携带
-visual（主视觉类型）与 density 提示，v4 随脚本退役；family/composition 字段
-未建。
+focalPoint/visualWeight/whitespace）。落地：`visual`（主视觉类型）与 density
+由作者写；family/composition 字段未建。
 
 ## 50. Resolved Layout【✅ 架构差异见顶部注】
 
@@ -580,8 +576,8 @@ Slide DSL=语义层、Resolved Slide=几何层，**禁止混合**。落地：spe
 ## 52. Repair Engine【✅ 等价形】
 
 Repair 不重生成整页，输出 Patch（switch_copy_level / switch_layout…）。
-落地：`check.py` 的提示就是诊断（指名哪个元素、什么问题、按 §28 顺序修）；原
-`hierarchy.py` 的提示 v4 随脚本退役。Patch=人改 spec 的那几行，重跑门。无机器
+落地：`check.py` 的提示就是诊断（指名哪个元素、什么问题、按 §28 顺序修）。
+Patch=人改 spec 的那几行，重跑门。无机器
 自动改写（人在环是刻意的：修复决策里"删什么内容"是价值判断）。
 
 ## 53. Repair Priority【✅ 成文】
@@ -589,8 +585,7 @@ Repair 不重生成整页，输出 Patch（switch_copy_level / switch_layout…�
 R1 删无关装饰 → R2 短 Copy → R3 删低优先级 → R4 调 gap → R5 调 padding →
 R6 调区域比 → R7 换 layout → R8 换组件档 → R9 缩非核心视觉 → R10 拆内容
 → R11 拆页 → **R12 降字号 tier**——在统一表里这是**第 13 位**（第 1 位
-"修事实/必需内容"属内容层，见 `pipeline.md` §31）。与 §28 同一张表（原写进
-`hierarchy.py` 报错，v4 随脚本退役）。
+"修事实/必需内容"属内容层，见 `pipeline.md` §31）。与 §28 同一张表（靠作者按序修，没有脚本门）。
 
 ## 54. Repair Loop【✅ 人在环版】
 
@@ -647,20 +642,18 @@ Cover 允许 hero/大量留白/非对称/full-bleed/overlap/editorial 构图；�
 ## 62. Comparison Layout【✅】
 
 优先 split/成对卡/图表/前后对照，**必须真正表达"对照"**。落地：对照页用
-`chart:bar`（含 emphasis 弱化对照）或 `two-column` 双栏（原 plan.py 页型表的
-comparison→chart 映射随脚本退役，做法保留）。
+`chart:bar`（含 emphasis 弱化对照）或 `two-column` 双栏。
 
 ## 63. Process Layout【✅】
 
 优先 timeline/sequence/pipeline，必须明确方向。落地：顺序/流程页用 `timeline`，
-方向=自左向右（DOM 序=阅读序；原 plan.py 页型表的 process→timeline 映射随脚本
-退役，做法保留）。
+方向=自左向右（DOM 序=阅读序）。
 
 ## 64. Architecture Layout【约定】
 
 优先 layered/hub-spoke/左到右/matrix/cluster，页面布局优先给 Diagram 足够
-面积。**渲染器没有架构图版式**：映射过去是死路（原 plan.py 页型表也没有它，
-该表 v4 随脚本退役；等 diagram 引擎，见 planning.md 的未做清单）。
+面积。**渲染器没有架构图版式**：映射过去是死路（页型表里也没有它；等 diagram 引擎，
+见 planning.md 的未做清单）。
 
 ## 65. Chart Layout【✅】
 
@@ -696,8 +689,7 @@ hero 40-75% / evidence 30-55 / supporting 20-40 / decoration <20（不是硬
 每页硬查：bounds/overlap/text overflow/min font/image distortion/chart
 clipping/logo collision/required region missing；软查：grid/hierarchy/
 whitespace/focal/balance/density/repetition/style consistency/decoration
-restraint。落地：`check.py`（硬，阻塞 + 软项进其提示流）。原 `hierarchy.py`
-的软尺 v4 随脚本退役。
+restraint。落地：`check.py`（硬，阻塞 + 软项进其提示流）；软尺由作者守。
 
 ## 71. QA 输出【✅ 等价形】
 
@@ -707,9 +699,8 @@ restraint。落地：`check.py`（硬，阻塞 + 软项进其提示流）。原 
 ## 72. 与 Content Rules 的边界【✅】
 
 Content 决定 message/claim/evidence/copy/contentBudget；Layout 决定放哪里/
-占多大/是否换版/是否拆页。复杂度 ≥0.70 该拆原由 `plan.py` 拦（内容层，v4
-退役改人审），装不装得下原由 `fit.py` 量（布局层，v4 退役改 `measure.py` 实测的
-越界/裁切，§55）——同一张表的两侧，规则不变。
+占多大/是否换版/是否拆页。复杂度 ≥0.70 该拆由作者判断（内容层）；装不装得下
+由 `measure.py` 实测的越界/裁切判（布局层，§55）——同一张表的两侧。
 
 ## 73. 与 Typography Rules 的边界【✅】
 
@@ -719,7 +710,7 @@ Typography 决定 font family/type scale/line height/tracking/最小字号；
 ## 74. 与 Color Rules 的边界【✅】
 
 Color 决定 theme/accent/surface/contrast；Layout 只读视觉权重用于焦点评分
-（原 hierarchy 的 weights 用墨量、不定义颜色；该模块 v4 退役）。
+（权重看墨量，不定义颜色）。
 
 ## 75. 与 Brand Rules 的边界【✅】
 
@@ -785,12 +776,11 @@ iterations、layout diversity、repetition rate、human rating。
 LLM 不写坐标（§0）；页型与族分离（§14）；Region 先于组件（§7）；网格/间距/
 几何单一来源（§79）；所有间距来自令牌（§9）；层级显式 priority 化（§19）；
 每页最多一个主要焦点（§21）；**留白是结构不是剩余空间**（§24）；布局由
-作者声明、脚本只验收（§17-18，v3）；Hard 失败不得导出（§35；原 deliver.py 的
-中止 v4 退役，改由交付步骤守）；Soft 用评分不宜全阻塞（§36）；Content Fit 不得
+作者声明、脚本只验收（§17-18，v3）；Hard 失败不得导出（§35；由交付步骤守）；Soft 用评分不宜全阻塞（§36）；Content Fit 不得
 第一步缩字号（§28）；Repair 必须 patch 不重生成（§52）；坐标只在 Resolved 层
 （§50-51）；Chart/Diagram 内部归各自引擎（§32-33）；Style 管性格不管几何（§43）；
 Deck 级查节奏（§40 约定）；测量渲染同一套 Token（§80）；复杂布局提供安全
-fallback（原 fit 兜底，v4 退役：不写 `layout` 就走缺省结构，§16）。最终目标
+fallback（不写 `layout` 就走缺省结构，§16）。最终目标
 不是"把内容塞下"，而是**清晰结构、正确关系、明确焦点、稳定可读**。
 
 ## 86. 推荐运行流程【✅ 对应】
@@ -821,7 +811,7 @@ Measurement；Family×Layout 已落地第一片（content-image 4 + two-column 3
   7 任意值 → 全落列）；subtitle==bullet 同级碰撞修复。风格契约由
   ink.py 与 check.py 覆盖。
 - **阶段 3**（路线图）：版式族 × 布局表全量铺开（§15-18/§57-59；content-image/
-  two-column 两片结构布局已先行落地）+ 档位已归作者声明（`bullet_tier` 退役：
+  two-column 两片结构布局已先行落地）+ 档位由作者声明（没有自动降档：
   换布局/拆页优先，缩字号由作者显式写，脚本不再自动兜底）。
 - **阶段 4**（路线图）：Shape 8 参数（§44）+ Layout Score/Repair 引擎
   （§37-38/§52-54）+ skin 残余手写间距清零。

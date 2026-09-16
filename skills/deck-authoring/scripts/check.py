@@ -15,8 +15,9 @@
 
 **提示**（`advisories()`，不阻塞）：字体回退 —— 启发式，衬线撞衬线会误报。
 
-2~4 条的数字来自 `measure.py`（真浏览器实测），**不是估算**：原先用
-`text_width()` 估宽，对同一行汉字能差 2 倍多，而且偏差随字体/字距/折行变。
+2~4 条的数字来自 `measure.py`（真浏览器实测），**不是估算**：按字符数估宽
+对同一行汉字能差 2 倍多，而且偏差随字体/字距/折行变 —— 估出来的门只能
+吓唬人，判不了真实版面。
 
 跑法：python3 check.py deck-spec.json out.html      # 全过退出 0，任一不过退出 1
 """
@@ -76,7 +77,7 @@ layout_mod = _load_layout()  # 安全盒碰撞（几何模型 + 政策 + 验收�
 
 
 
-# **两个不同的框，别混用**（我自己第一版就混了 ✗，导致正常产物被误判"溢出"）：
+# **两个不同的框，别混用**（混起来会把正常产物误判成"溢出"）：
 #   内容区 = 版面减去内边距，量"放不放得下"（宽 1600-2×84 = 1432）
 #   文字栏 = 文字实际占的窄带，只用来判"墨块进没进栏"（更保守）
 # 几何从 grid.py 取（**唯一来源**）。这里曾手写过 (…, 838) —— 与 render.py
@@ -88,12 +89,12 @@ TEXT_BAND = (render_mod.PAD_X, render_mod.CONTENT_TOP,
 SLIDE_W, SLIDE_H = 1600.0, 900.0
 # 内容只占正文带这么少 → 提示“这页几乎没有内容”。
 #
-# ⚠️ 这个阈值只能抓**近于空的页**，不能拿来判“太稀”。第一版写的是 0.55，
-# 结果它在 demo 的 3 个正常页上全部开火（41% / 45% / 37%）—— 而那几页看着
-# 一点都不像没做完（左轨 + 实线 + 巨号页码都在）。当初用户抱怨 swiss 第一版
-# “下半页 55% 是死的”，真正原因不是内容少，而是**没有构图锚点**；修法也是加锚点，
-# 不是加内容。所以：留白是不是问题，取决于风格有没有锚点，**像素密度算不出来**。
-# 密度这个量不该在每次校验时拿一个不懂风格的阈值去喷人。
+# ⚠️ 这个阈值只能抓**近于空的页**，不能拿来判“太稀”。阈值给到 0.55 就会在
+# 正常页上开火（实测 41% / 45% / 37%），而那几页看着一点都不像没做完
+# （左轨 + 实线 + 巨号页码都在）。下半页空着的原因通常不是内容少，而是
+# **没有构图锚点**；修法是加锚点，不是加内容。所以：留白是不是问题，取决于
+# 风格有没有锚点，**像素密度算不出来** —— 密度这个量不该在每次校验时拿一个
+# 不懂风格的阈值去喷人。
 #
 # 但仍然要分两层开口（都是提示，不阻塞）：
 #   < DEAD_SPACE_NOTE —— 一页几乎什么都没排（通常是漏了条目）
@@ -228,9 +229,9 @@ def _check_presenter_contract(page: str, deck: dict) -> list[str]:
 def _check_layout(measured: dict) -> list[str]:
     """② 版面越界 / 容器裁切 —— 全部来自**真浏览器实测**，不是估算。
 
-    为什么必须实测：原先靠 `text_width()` 估算（CJK 1em / ASCII 0.55em），对同一行
-    12 个汉字标题，估算给 1032px、真渲出来是 2124px —— **低估 2 倍多**，于是
-    end 页（180px 字号）越出版面 612px、被 `overflow:hidden` 静静裁掉，而校验说"全过"。
+    为什么必须实测：按字符数估算（CJK 1em / ASCII 0.55em）对同一行 12 个汉字标题
+    给 1032px，真渲出来是 2124px —— **低估 2 倍多**。用估算量，end 页（180px 字号）
+    越出版面 612px、被 `overflow:hidden` 静静裁掉，而校验仍然说"全过"。
 
     两条判据（都是"已经发生的事"，不是推测）：
     甲・越出版面：`.slide` 是 overflow:hidden，元素盒子出去就是被裁。
@@ -359,8 +360,9 @@ def _check_grid_alignment(measured: dict) -> list[str]:
     为什么是提示：skin 可以有正当理由偏移（比如装饰性出血），拿它挡交付会把
     有意的偏移当成错误。但它得开口 —— 网格是"整齐"的地基，吸没吸上要看得见。
 
-    实测改网格前：左缘出现 7 个任意值（418/752/800/909/1086/1281/84）；
-    改后全部落在列上（84 / 448=col4 / 812=col7 / 933=col8 / 1176=col10）。
+    合法左缘只有这 5 个位置：84（边距）/ 448=col4 / 812=col7 / 933=col8 /
+    1176=col10；其余值出现在锚点上就是没吸附（418/752/800/909/1086/1281 这类
+    任意值不该再出现）。
     """
     anchors = ("title", "subtitle", "image", "chart")
     starts = [round(v, 1) for v in grid_mod.column_starts()]
@@ -453,7 +455,7 @@ def _pair_alignment_notes(measured: dict) -> list:
 
 
 def _check_measured_health(measured: dict) -> list[str]:
-    """产物健康度：页面报错 / 图片没加载 —— 这两类以前根本没人看。"""
+    """产物健康度：页面报错 / 图片没加载 —— 这两类最容易没人看。"""
     out: list[str] = []
     for err in measured.get("errors", []):
         out.append(f"产物里的脚本报错：{err}")
@@ -507,8 +509,8 @@ def _check_type_size(measured: dict, deck: dict, tokens: dict | None) -> list[st
     意图和实际渲染对不上时，要看的是观众看到的那一个。
     """
     # 位置与键名照 spec 的真实形状：slides 在 deck 下，版式键是 type（不是 layout）。
-    # 第一版写成 spec["slides"]，取不到就直接返回空 —— 整个体检静默失效。这正是
-    # 本仓库反复踩的坑：**取不到数据时不报错就等于没做**。
+    # 写成 spec["slides"] 会让这个体检静默失效（取不到就直接返回空）。
+    # 这就是这条规矩：**取不到数据时不报错就等于没做**。
     slides = deck.get("slides")
     if not isinstance(slides, list):
         return []
@@ -830,7 +832,7 @@ def _check_brand(measured: dict, deck: dict, tokens: dict) -> tuple[list[str], l
     if not name:
         return problems, notes
     brand = deck_mod.load(name)
-    # v5：不再有"演示品牌"提示 —— 仓库里已经没有任何示例品牌可被误用
+    # 没有"演示品牌"提示：仓库里没有任何示例品牌可被误用
     # （那份 example/ACME 被真用进过交付，所以连示例一起删了）。
     els: list[dict] = measured.get("elements", [])
     logos = [e for e in els if e.get("role") == "logo"]
@@ -914,7 +916,7 @@ def _layout_vocab_problems(deck: dict, tokens: dict, slides: list) -> list[str]:
     """布局词表验收：风格在 style.json 声明 layouts 时，spec.layout 必须落在词表里。
 
     v3 的纪律：**作者自己封闭自己的词表**（风格声明它认哪些布局名）——
-    脚本不再有一张全局枚举，但拼写错误仍然当场拦（自造名写错一个字母，
+    脚本没有一张全局枚举，但拼写错误仍然当场拦（自造名写错一个字母，
     skin 里那条规则就永远不生效，最难查的那种静默）。
     """
     vocab = tokens.get("layouts")
@@ -1042,7 +1044,7 @@ def _role_notes(deck: dict) -> list[str]:
 def _tier_notes(deck: dict) -> list[str]:
     """字号档提示：条目多的 content-text 页在缺省档下会偏挤。
 
-    v3 起**没有按条数自动降档** —— 档位由作者声明（slide.bulletTier 或
+    **没有按条数自动降档** —— 档位由作者声明（slide.bulletTier 或
     风格 bulletDefault）。这里只在"条目多 + 没显式声明档位"时提示一声：
     内容多就拆页 / 收短，或显式写一个小档，别让字自己变小。
     纯函数：只看 spec，不碰测量。
@@ -1063,10 +1065,9 @@ def _check_deck_shape(measured: dict, deck: dict,
                       tokens: dict | None = None) -> tuple[list[str], list[str]]:
     """deck 级：**半页死白**（提示）+ 版式单一（提示）+ 没有封面（提示）。
 
-    为什么“半页死白”必须在这里补：以前只有“装不下”那半边有牙（越界检查）。
-    另半边一直是绿的 —— 一页内容只占正文带 40% 的话，渲染成功、校验全过，
-    但人一眼就看出“这页没做完”。本仓库 swiss-grid 第一版正是这么死的：
-    “白底 + 左上标题 + 编号列表”，下半页 55% 是死的。
+    为什么“半页死白”必须在这里补：只盯“装不下”那半边的话，另半边永远是绿的
+    —— 一页内容只占正文带 40% 时，渲染成功、校验全过，但人一眼就看出
+    “这页没做完”。典型形态：白底 + 左上标题 + 编号列表，下半页 55% 是死的。
 
     为什么是**提示**而不是阻塞：留白是风格的一部分（安静派就是靠留白），
     把“不够满”当硬错误会逼着人把每页塞满 —— 那是另一头错。
@@ -1199,7 +1200,7 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     """
     tokens = style_tokens(spec, tokens)
     problems: list[str] = []
-    page = deckio.read_text(html_path)      # 读一次就够（以前读了三次）
+    page = deckio.read_text(html_path)      # 只读一次，校验与提示共用
     deck = spec["deck"]
     problems.extend(_check_presenter_contract(page, deck))
     colors = tokens["colorSets"][render_mod.resolve_color_set(tokens, deck)]
@@ -1225,7 +1226,7 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     problems.extend(_check_empty_content(deck))
     # ⑥ 安全盒碰撞：不同视觉组之间，安全盒相交即违规（deny 默认）。
     # 判据全来自实测元素盒 + layout 包的安全距离表；「图表本体没撞、
-    # 标签撞了」「图片没撞、caption 撞了」这两类以前全是沉默的。
+    # 标签撞了」「图片没撞、caption 撞了」这两类最容易没人报。
     hero_pages = frozenset(
         i for i, s in enumerate(deck.get("slides", []), 1)
         if isinstance(s, dict) and s.get("layout") == "hero")
@@ -1235,7 +1236,7 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
             f"第 {v['slide']} 页 {v['a']} 与 {v['b']} 太近"
             f"（{v['group']}：需要 ≥{v['required']:.0f}px，实际 {v['actual']:.0f}px）—— "
             f"安全盒相交按重叠处理；要么拉开间距（父容器 gap 档），要么这页内容该拆")
-    # 布局词表：风格声明了 layouts 时，spec 里拼错的布局名当场拦（v3 起布局是
+    # 布局词表：风格声明了 layouts 时，spec 里拼错的布局名当场拦（布局是
     # 自由字符串，拼错会让 skin 里那条规则永远不生效 —— 最难查的那种静默）。
     problems.extend(_layout_vocab_problems(deck, tokens, deck.get("slides", [])))
 
@@ -1247,7 +1248,7 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     # ④ 图表：**G2 就绪 + 数据形状**（v4 —— 图表改由 AntV G2 渲染）
     #
     # 为什么不检查"柱高与数据成比例"了：那条门是为**手写 SVG 渲染器**设的
-    # （我们自己算柱高，就得自己复核）。v4 起几何由 G2 的编码算 —— 再量它的
+    # （我们自己算柱高，就得自己复核）。几何由 G2 的编码算 —— 再量它的
     # 像素等于用手量尺子。换成的两件事：
     #   a) G2 真的渲染出来了（容器里有 canvas/svg，且没有 data-chart-error）；
     #   b) 数据本身是对的（label 非空、value 是数字）—— 数据错才是真错。
@@ -1416,15 +1417,15 @@ def advisories(measured: dict, spec: dict | None = None,
         _, shape_notes = _check_deck_shape(measured, spec.get("deck", {}), tokens)
         notes.extend(shape_notes)
         # 字号体检：这是“每份 deck 字号都偏大”唯一能被当场看见的地方 ——
-        # 装得下就不报错，所以以前没有任何一条会开口。
+        # 装得下就不报错，所以这里必须有人开口。
         notes.extend(_check_type_size(measured, spec.get("deck", {}), tokens))
         notes.extend(_visual_decision_notes(spec.get("deck", {})))
         notes.extend(_ornament_notes(spec.get("deck", {})))
         notes.extend(_markdown_notes(spec.get("deck", {})))
-        # 信息层级（文本预算 / 焦点 / 密度）那三条曾由 hierarchy.py 提供，v4 随
-        # 该模块一起退役：阈值取决于语境（封面就该空、看板就该满），做成阻塞会
-        # 把第一份正常的 deck 挡住；而**装不装得下**这件事已由 measure 实测那两道
-        # （越界 / 裁切）定死。腾出的「构图节奏」类提示保留在 _layout_rotation_notes。
+        # 信息层级（文本预算 / 焦点 / 密度）由作者自查：阈值取决于语境
+        # （封面就该空、看板就该满），做成阻塞会挡住第一份正常的 deck；
+        # 「装不装得下」则由实测（越界 / 裁切）定死。「构图节奏」类提示保留在
+        # _layout_rotation_notes。
     return notes
 
 

@@ -496,8 +496,8 @@ def _build(vars_: dict, measured: dict, manifest: list, base_dir: str,
                 # 栅格化不了会**明说**（异常带原因），不静默少一个 logo。
                 if role == "logo" and deck_mod.need_raster(src):
                     try:
-                        # 传**实测的盒子尺寸**：栅格化要保住宽高比（第一版传了个标量，
-                        # 出来是正方形，图要么被拉要么大片透明）。
+                        # 传**实测的盒子尺寸**：栅格化要保住宽高比（传标量会得到
+                        # 正方形，图要么被拉、要么一片透明）。
                         path = deck_mod.rasterize(path, box[2], box[3])
                     except SystemExit as exc:
                         counts["skipped"] += 1
