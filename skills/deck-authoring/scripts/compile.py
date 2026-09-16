@@ -293,7 +293,7 @@ def main(argv: list[str]) -> int:
 
     if args.out:
         deckio.write_json(args.out, resolved)
-        print(f"✓ {args.out}（{len(resolved['slides'])} 页决策 · "
+        print(f"✓ {args.out}（{len(resolved['deck']['slides'])} 页决策 · "
               f"{len(resolved['trace'])} 条 trace · colorSet={resolved['colorSet']}）")
     if args.trace or not args.out:
         if not args.out:

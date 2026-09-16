@@ -391,17 +391,22 @@ Gate1 Content（plan --check）/ Gate2 Asset（--check）/ Gate3 Layout（check.
 errors（阻塞清单）+ warnings（提示流）；score 未建【约定】；info 由 manifest
 承担一部分。
 
-## 53. Benchmark【部分 ✅】
+## 53. Benchmark【✅ 已落地（benchmark.py）】
 
-固定测试集：stress.spec.json 21 页（长中文/长英文/中英混排/Chart-heavy/
-Image-heavy/全部版式）+ demo + fit 矩阵。缺：Table-heavy/Diagram-heavy 版式、
+固定基线集 = demo + stress（21 页：长中文/长英文/中英混排/Chart-heavy/
+Image-heavy/全部版式）+ chart-intents（Chart Resolver v2 展示：composition
+>5 条 / progress 温度计 / distribution 时间桶）。`benchmark.py` 一次跑全
+集、指标落盘、`--compare` 对基线（计数类指标变多即回归，退出非零）。
+缺：Table-heavy/Diagram-heavy 版式（版式本身未建，建了才进基线）、
 五类真实场景语料。
 
-## 54. Benchmark 指标【部分 ✅】
+## 54. Benchmark 指标【✅ 已落地（数值化）】
 
-已记录（测试形态）：hard fail rate / overflow / overlap / render time /
-export 回读。未记录：layout score / repair iterations / variant diversity /
-repetition rate / human rating——等 §22/§37 的引擎才有数据源。
+benchmark.py 逐 fixture 记录（全实测）：check_problems/notes、script_errors、
+render_ms（机器相关仅参考）、字节可复现/编译确定性（§41）、逐页密度分布、
+focal/budget issues、unique_kinds/max_consecutive（variant diversity /
+repetition rate）。不采的（诚实留白）：repair iterations（Repair 引擎
+未建）、export 回读（测试套件盖着，慢不进常规基线）、human rating。
 
 ## 55. 最高层目录 ↔ 本仓库映射
 

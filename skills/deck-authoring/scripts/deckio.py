@@ -36,6 +36,14 @@ def write_text(path: str, text: str) -> None:
         raise SystemExit(f"✗ 写不了 {path}：{exc}") from exc
 
 
+def write_json(path: str, data: dict) -> None:
+    """写 JSON（utf-8 / 中文不转义 / 两空格缩进 + 结尾换行）—— 与 read_json 对偶。
+
+    compile.py 的 -o 与 benchmark.py 的 --out 共用这一处，别各写一份 dumps。
+    """
+    write_text(path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+
+
 def ensure_dir(path: str) -> None:
     try:
         os.makedirs(path, exist_ok=True)

@@ -1,0 +1,120 @@
+{
+  "deck": {
+    "title": "图表意图基准",
+    "style": "swiss-grid",
+    "colorSet": "blue",
+    "seed": 5,
+    "slides": [
+      {
+        "type": "title",
+        "title": "图表意图基准",
+        "subtitle": "Chart Resolver v2 的固定输入"
+      },
+      {
+        "type": "chart",
+        "title": "七路占比",
+        "message": "头部两组合计过半",
+        "intent": "composition",
+        "unit": "%",
+        "data": [
+          {
+            "label": "组1",
+            "value": 32
+          },
+          {
+            "label": "组2",
+            "value": 24
+          },
+          {
+            "label": "组3",
+            "value": 14
+          },
+          {
+            "label": "组4",
+            "value": 9
+          },
+          {
+            "label": "组5",
+            "value": 7
+          },
+          {
+            "label": "组6",
+            "value": 5
+          },
+          {
+            "label": "组7",
+            "value": 3
+          }
+        ]
+      },
+      {
+        "type": "chart",
+        "title": "季度达成",
+        "message": "Q4 已达七成",
+        "intent": "progress",
+        "data": [
+          {
+            "label": "Q4 进度",
+            "value": 72
+          }
+        ],
+        "annotations": [
+          {
+            "type": "reference",
+            "target": "Q4 进度",
+            "text": "目标",
+            "value": 100
+          }
+        ]
+      },
+      {
+        "type": "chart",
+        "title": "季度分布",
+        "message": "逐季走高",
+        "intent": "distribution",
+        "data": [
+          {
+            "label": "Q1",
+            "value": 8
+          },
+          {
+            "label": "Q2",
+            "value": 12
+          },
+          {
+            "label": "Q3",
+            "value": 19
+          },
+          {
+            "label": "Q4",
+            "value": 26
+          }
+        ]
+      },
+      {
+        "type": "chart",
+        "title": "三路占比",
+        "message": "三分天下",
+        "intent": "composition",
+        "data": [
+          {
+            "label": "甲",
+            "value": 45
+          },
+          {
+            "label": "乙",
+            "value": 33
+          },
+          {
+            "label": "丙",
+            "value": 22
+          }
+        ]
+      },
+      {
+        "type": "end",
+        "title": "谢谢"
+      }
+    ]
+  }
+}

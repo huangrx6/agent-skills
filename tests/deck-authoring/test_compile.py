@@ -205,6 +205,25 @@ class TestTierAdvisoryAtTheGate(unittest.TestCase):
         self.assertEqual(check_mod._tier_notes(deck), [])
 
 
+class TestCliRoundTrip(unittest.TestCase):
+    """compile CLI 的 -o：退出 0、产物可读、与 compile_spec 全等。
+
+    钉死的回归：写完文件后 print 里取 resolved['slides']（不存在，在
+    deck 下）—— 文件成功、退出非零，调用方以为失败。benchmark.py 落盘
+    时顺带炸出来的（deckio 也因此补了 write_json）。
+    """
+
+    def test_out_file_matches_compile_spec(self) -> None:
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            out = os.path.join(tmp, "resolved.deck.json")
+            code = compile_mod.main(["compile", DEMO, "-o", out])
+            self.assertEqual(code, 0, "CLI 写完文件后崩了（打印键错/写法错）")
+            with open(out, encoding="utf-8") as fh:
+                written = json.load(fh)
+            self.assertEqual(written, compile_mod.compile_spec(_demo()))
+
+
 if __name__ == "__main__":
     unittest.main()
 
