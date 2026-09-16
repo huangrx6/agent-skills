@@ -280,7 +280,8 @@ def _aspect_box(w: int, h: int) -> str:
 
 
 def build_brief(spec_path: str, out_dir: str, style: str | None = None) -> dict:
-    """产出提示词契约（人读的 markdown + 机读的 JSON 一起给）。"""
+    """产出提示词契约（人读的 markdown + 机读的 JSON 一起给；后者写进
+    out_dir/assets/requests/，md 由 main() 调 write_brief_md 写）。"""
     info, style_name = _slot_geometry(spec_path, style, out_dir)
     if not info:
         # 不直接失败：先说清"你这份 spec 一张图都没有"，再指出哪几页可能该有 ——
@@ -305,6 +306,9 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None) -> dict:
     # 按**文件名**合并：同一个文件名用在多页是合法的（复用同一张图）。
     # 第一版按页列 —— 于是同一张图被列了三遍，人会出三张、互相覆盖（实测）。
     by_file: dict[str, dict] = {}
+    # 槽位 id → 实测槽位 (w, h)。机读合同（assets/requests/）要用数字的宽高比，
+    # 不能从 entry["measured"] 那句**给人看的**话里倒着解析 —— 量的时候顺手存。
+    measured_px: dict[str, tuple[float, float] | None] = {}
     for page, s in sorted(info["slides"].items()):
         box = s["box"] or {}
         entry = by_file.setdefault(s["file"], {
@@ -318,6 +322,9 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None) -> dict:
             # **参考材料**（标题/条目/说明文字），不进提示词。
             "caption": s.get("caption", ""), "layout": s.get("type", ""),
         })
+        # 与 entry["measured"] 同一条规则：取**首次出现**那页的实测值
+        if s["file"] not in measured_px:
+            measured_px[s["file"]] = (box["w"], box["h"]) if box else None
         entry["pages"].append(page)
         entry["titles"].append(s["title"])
         entry["bullets"].extend(str(b) for b in s["bullets"][:3])
@@ -327,6 +334,9 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None) -> dict:
         "reference": reference, "target_px": [w, h], "aspect": _aspect_box(*BRIEF_ASPECT),
         "slots": slots, "colors": info["colors"],
     }
+    # 机读的那一半落盘（人读的 md 由 main() 调 write_brief_md 写）。out_dir 缺省
+    # 就是 spec 同目录（main 里的缺省），与 manifest（render.load_assets）同根。
+    _write_asset_requests(brief, measured_px, os.path.join(out_dir, "assets", "requests"))
     return brief
 
 
@@ -527,6 +537,39 @@ def api_params(brief: dict) -> list[str]:
         "不需要透明通道（整张不透明照片）",
         "质量 / seed 随意 —— 这张图是外部素材，不参与 deck 的确定性渲染",
     ]
+
+
+def _write_asset_requests(brief: dict, measured_px: dict, requests_dir: str) -> None:
+    """写机读的资产请求：`assets/requests/<槽位id>.json`（槽位 id = spec 里的 image 值）。
+
+    manifest（`render.load_assets`，见 references/images.md）是"图已到位"的登记册；
+    requests 是它的**上游合同**：`--brief` 自动写，人按 prompt 出图，再把选中的文件
+    登记进 manifest —— assetId 就是这里的槽位 id，闭环。schema 封闭 v1，封闭集外的
+    字段不许写：{schemaVersion, slide, role, aspect, focal, negative_space, prompt,
+    required, note}。
+    """
+    for slot in brief["slots"]:
+        box = measured_px.get(slot["file"])
+        note = slot["measured"]
+        if slot["caption"]:
+            cap = f"说明文字「{slot['caption']}」由版面排"
+            note = f"{note}；{cap}" if note else cap
+        request = {
+            "schemaVersion": 1,
+            "slide": slot["pages"],      # 该槽位用到的页（同图复用多页时全列）
+            "role": slot["layout"],      # 版式 —— 这个槽位在页里的角色
+            "aspect": round(box[0] / box[1], 3) if box else None,   # 实测槽位宽高比
+            # focal 留空：画面主体是什么工具不知道 —— 与契约 md 的〈…〉同一条规则，
+            # 不许自己编（"用户未提供且会影响事实准确性的内容，不得擅自补充"）。
+            "focal": "",
+            # negative_space 是工具**知道**的那一半：文字不压在图上，图内不必为文字留白。
+            "negative_space": "背景干净不杂；说明文字排在旁边的另一栏、不压在图上，"
+                              "图内不必为文字留白",
+            "prompt": render_prompt(slot, brief, "zh"),
+            "required": True,            # 版式要图就必须给图（check 的输入门是阻塞级）
+            "note": note,
+        }
+        deckio.write_json(os.path.join(requests_dir, f"{slot['file']}.json"), request)
 
 
 def write_brief_md(brief: dict, out_path: str) -> str:

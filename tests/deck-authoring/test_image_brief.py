@@ -21,6 +21,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import sys
 import tempfile
 import unittest
@@ -229,6 +230,72 @@ class TestBrief(unittest.TestCase):
         self.assertTrue(ref, "这套风格本该有 reference")
         body = self.md.split("**中文说明**")[1] if "**中文说明**" in self.md else ""
         self.assertNotIn(ref, body, "把风格文献塞进提示词了")
+
+
+class TestAssetRequests(unittest.TestCase):
+    """机读的资产请求（`assets/requests/<槽位id>.json`）—— manifest 的上游合同。
+
+    `--brief` 在人读的 image-brief.md 之外，给每个图槽位写一份请求 JSON：
+    先有请求 → 人出图 → 登记进 manifest，assetId 即槽位 id（spec 的 image 值），
+    管线闭环（见 references/images.md 的 requests 节）。
+    """
+
+    # 封闭集：封闭集外字段不许写（与 render.py 的 manifest 同一套现法）
+    FIELDS = frozenset({"schemaVersion", "slide", "role", "aspect", "focal",
+                        "negative_space", "prompt", "required", "note"})
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls._tmp.cleanup)
+        cls.brief = image_source.build_brief(STRESS, cls._tmp.name)
+        cls.requests_dir = os.path.join(cls._tmp.name, "assets", "requests")
+
+    def _load(self, slot: dict) -> dict:
+        with open(os.path.join(self.requests_dir, f"{slot['file']}.json"),
+                  encoding="utf-8") as fh:
+            return json.load(fh)
+
+    def test_one_request_per_image_slot_named_by_the_slot_id(self) -> None:
+        """槽位数与图槽位一致，文件名 = 槽位 id（spec 的 image 值）+ .json ——
+        这个 id 就是将来登记进 manifest 的 assetId，不另起一套。"""
+        spec = deckio.read_json(STRESS)
+        wanted = {str(s["image"]) for s in spec["deck"]["slides"] if s.get("image")}
+        self.assertTrue(wanted, "压测 deck 本该有图槽位 —— 用例前提变了")
+        self.assertEqual(set(os.listdir(self.requests_dir)),
+                         {f"{name}.json" for name in wanted})
+
+    def test_schema_is_closed_v1_and_required_is_always_true(self) -> None:
+        for slot in self.brief["slots"]:
+            with self.subTest(file=slot["file"]):
+                data = self._load(slot)         # 能 json.load 本身就是要验的
+                self.assertEqual(set(data), self.FIELDS, "封闭集外字段不许写")
+                self.assertEqual(data["schemaVersion"], 1)
+                self.assertIs(data["required"], True)
+                self.assertEqual(data["slide"], slot["pages"])
+                self.assertEqual(data["role"], slot["layout"])
+
+    def test_aspect_is_the_measured_slot_ratio(self) -> None:
+        """aspect 是实测槽位宽高比（来自 _slot_geometry），不是推荐的 3:2 拍脑袋数 ——
+        从 brief 自己的实测字符串交叉验。容差 ±0.01：字符串是 :.0f 取整后的展示值，
+        JSON 里存的是原始测量值，取整会差这么点。"""
+        for slot in self.brief["slots"]:
+            with self.subTest(file=slot["file"]):
+                m = re.search(r"实测槽位 (\d+)×(\d+)px", slot["measured"])
+                if m is None:
+                    self.fail(f"槽位没有实测值：{slot['measured']!r}")
+                else:
+                    self.assertGreater(self._load(slot)["aspect"], 0)
+                    self.assertAlmostEqual(self._load(slot)["aspect"],
+                                           int(m.group(1)) / int(m.group(2)),
+                                           delta=0.01)
+
+    def test_prompt_is_render_prompt_of_the_slot(self) -> None:
+        """prompt 就是 render_prompt 的产物 —— 同一份契约的两个视图，不许各说各的。"""
+        for slot in self.brief["slots"]:
+            with self.subTest(file=slot["file"]):
+                self.assertEqual(self._load(slot)["prompt"],
+                                 image_source.render_prompt(slot, self.brief, "zh"))
 
 
 class TestCheck(unittest.TestCase):

@@ -43,6 +43,15 @@ spec 同目录放 `assets/manifest.json` 时，图文页的 `image` 写的是 **
 **联网找图与静默造占位都禁止** —— `deliver.py` 缺必需图默认 ERROR，要空跑演练
 显式 `--allow-placeholder`（合成测试卡会大声提醒"这不是内容"）。
 
+### 资产请求（requests，manifest 的上游合同）
+
+`--brief` 除了人读的 `image-brief.md`，还在 spec 同目录给每个图槽位写机读的
+`assets/requests/<槽位id>.json`（槽位 id 即 spec 里的 `image` 值，也用作 assetId）。
+schema 封闭 v1：`{schemaVersion, slide, role, aspect, focal, negative_space, prompt,
+required, note}`（`aspect` 是实测槽位宽高比，`prompt` 即契约里的中文提示词）。
+先有请求、再出图：图回来后把选中的文件登记进 `manifest.json`，assetId 就用这个
+槽位 id —— 请求说"要什么"，manifest 说"有什么"，管线闭环。
+
 **该要就要，别嫌麻烦少要，多了也没事。** 这条在这里的含义是：`--brief` 不该因为
 "图少"而显得多余 —— 一份 spec 有多少图位，就出多少份契约，逐张写全。反过来，遇到
 **一张图都没有**的 spec，`--brief` 也不会甩一句"没有要出图的地方"就完事：它按版式
