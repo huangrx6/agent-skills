@@ -412,7 +412,7 @@ def report(result: dict, content: dict, style: str, brand: str | None) -> str:
 
 
 def build_variant_probe(spec: dict, spec_dir: str | None = None) -> tuple[dict, dict]:
-    """把 spec 里所有 content-image 页 × 三变体摆进**一份**探针产物。
+    """把 spec 里所有 content-image 页 × 四变体摆进**一份**探针产物。
 
     与 build_probe_deck 的分工：那个答"哪类版式装得下"（带条目扫描）；这个答
     "这一页用哪个变体"（只摆变体、带**真图** —— 图的高宽比是变体选择的真实
@@ -565,7 +565,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--columns", type=int, default=2, help="two-column 试几栏（缺省 2）")
     ap.add_argument("--json-out", action="store_true", help="输出机读 JSON（给脚本用）")
     ap.add_argument("--recommend", action="store_true",
-                    help="逐页实测 content-image 三变体并选最佳（配合 --from-spec；"
+                    help="逐页实测 content-image 四变体并选最佳（配合 --from-spec；"
                          "--json-out 的产物喂给 compile --fit-variants）")
     args = ap.parse_args(argv[1:])
 
