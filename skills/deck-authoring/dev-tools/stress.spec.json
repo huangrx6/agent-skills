@@ -19,7 +19,8 @@
           "留存是今年的唯一真问题，其余都是它的副作用",
           "获客成本下降 34%，但这条曲线已经走到头了",
           "组织从 12 人扩到 31 人，协作成本开始吃掉增长"
-        ]
+        ],
+        "bulletTier": "bulletLarge"
       },
       {
         "type": "content-text",
@@ -32,14 +33,16 @@
           "数据看板重做了一遍，口径统一之后发现之前一半结论是错的",
           "渠道预算重新分配，把低效渠道的钱挪到了内容上",
           "把每周一次的流失客户回访固化成机制，不再靠自觉"
-        ]
+        ],
+        "bulletTier": "bulletSmall"
       },
       {
         "type": "content-text",
         "title": "一句话",
         "bullets": [
           "我们把增长当成了目标，而它其实是结果 —— 这是今年所有错误判断的同一个源头，也是明年所有安排要围绕的那一件事"
-        ]
+        ],
+        "bulletTier": "bulletLarge"
       },
       {
         "type": "two-column",
@@ -89,47 +92,103 @@
         "type": "timeline",
         "title": "这一年",
         "nodes": [
-          {"label": "Q1 立项", "note": "确定了两个方向"},
-          {"label": "Q2 上线", "note": "灰度 10%"},
-          {"label": "Q3 放量", "note": "全量铺开"},
-          {"label": "Q4 复盘", "note": "留存 +23%"}
+          {
+            "label": "Q1 立项",
+            "note": "确定了两个方向"
+          },
+          {
+            "label": "Q2 上线",
+            "note": "灰度 10%"
+          },
+          {
+            "label": "Q3 放量",
+            "note": "全量铺开"
+          },
+          {
+            "label": "Q4 复盘",
+            "note": "留存 +23%"
+          }
         ]
       },
       {
         "type": "timeline",
         "title": "明年的六个节点",
         "nodes": [
-          {"label": "1 月 定方向", "note": "两个行业，只留一个"},
-          {"label": "2 月 拆指标", "note": "口径统一到人"},
-          {"label": "3 月 重建引导", "note": "前七天再拆一遍"},
-          {"label": "5 月 定价切换", "note": "按用量，分三档"},
-          {"label": "8 月 组织调整", "note": "中台独立成组"},
-          {"label": "11 月 年度复盘", "note": "只看留存一条线"}
+          {
+            "label": "1 月 定方向",
+            "note": "两个行业，只留一个"
+          },
+          {
+            "label": "2 月 拆指标",
+            "note": "口径统一到人"
+          },
+          {
+            "label": "3 月 重建引导",
+            "note": "前七天再拆一遍"
+          },
+          {
+            "label": "5 月 定价切换",
+            "note": "按用量，分三档"
+          },
+          {
+            "label": "8 月 组织调整",
+            "note": "中台独立成组"
+          },
+          {
+            "label": "11 月 年度复盘",
+            "note": "只看留存一条线"
+          }
         ]
       },
       {
         "type": "chart",
         "title": "月度留存率",
         "data": [
-          {"label": "1 月", "value": 31},
-          {"label": "3 月", "value": 38},
-          {"label": "5 月", "value": 44},
-          {"label": "7 月", "value": 49},
-          {"label": "9 月", "value": 54},
-          {"label": "11 月", "value": 57}
+          {
+            "label": "1 月",
+            "value": 31
+          },
+          {
+            "label": "3 月",
+            "value": 38
+          },
+          {
+            "label": "5 月",
+            "value": 44
+          },
+          {
+            "label": "7 月",
+            "value": 49
+          },
+          {
+            "label": "9 月",
+            "value": 54
+          },
+          {
+            "label": "11 月",
+            "value": 57
+          }
         ],
         "unit": "%",
-        "caption": "口径：注册后 30 天仍有活跃行为的比例，分母排除了刷量账号"
+        "caption": "口径：注册后 30 天仍有活跃行为的比例，分母排除了刷量账号",
+        "chart": "bar"
       },
       {
         "type": "chart",
         "title": "两个渠道",
         "data": [
-          {"label": "内容", "value": 62},
-          {"label": "投放", "value": 38}
+          {
+            "label": "内容",
+            "value": 62
+          },
+          {
+            "label": "投放",
+            "value": 38
+          }
         ],
         "unit": "%",
-        "caption": "内容渠道的获客成本是投放的三分之一"
+        "caption": "内容渠道的获客成本是投放的三分之一",
+        "chart": "bar"
       },
       {
         "type": "content-image",
@@ -149,7 +208,8 @@
           "把现场图处理成两色，纸面成本降一半，而且和文字用同一套墨"
         ],
         "image": "sample-treated.png",
-        "caption": "图注：处理链在 plate.py 里，可重复、可回归。"
+        "caption": "图注：处理链在 plate.py 里，可重复、可回归。",
+        "bulletTier": "bulletLarge"
       },
       {
         "type": "content-text",
@@ -157,7 +217,8 @@
         "bullets": [
           "跨组沟通的平均等待时间从 4 小时涨到了 31 小时",
           "同一个指标在三个组里算出三个不同的数"
-        ]
+        ],
+        "bulletTier": "bulletLarge"
       },
       {
         "type": "content-text",
@@ -166,7 +227,8 @@
           "CAC 从 ¥480 降到 ¥317（-34%），但 LTV/CAC 只从 2.1 涨到 2.4",
           "NPS 从 31 涨到 52，同期流失率从 8.4% 降到 5.1%",
           "MRR 从 ¥1.2M 到 ¥3.8M，ARR 口径下是 ¥45.6M"
-        ]
+        ],
+        "bulletTier": "bulletLarge"
       },
       {
         "type": "content-text",
@@ -175,7 +237,8 @@
           "把留存做成产品能力，而不是运营活动",
           "把两个行业做透，不再接第三个行业的需求",
           "把交付标准化，让新人两周内能独立交付"
-        ]
+        ],
+        "bulletTier": "bulletLarge"
       },
       {
         "type": "content-text",
@@ -194,7 +257,8 @@
         "bullets": [
           "如果明年上半年留存没有继续改善，行业深耕就是空谈",
           "如果组织调整拖过 8 月，第四季度的交付会直接掉档"
-        ]
+        ],
+        "bulletTier": "bulletLarge"
       },
       {
         "type": "content-image",
@@ -204,18 +268,29 @@
           "处理链是确定性的：同样的输入永远出同样的输出",
           "这一步让整份 deck 的墨色只有两种，装订成本降了一半"
         ],
-        "image": "sample-treated.png"
+        "image": "sample-treated.png",
+        "bulletTier": "bulletLarge"
       },
       {
         "type": "chart",
         "title": "三条渠道的贡献占比",
         "data": [
-          {"label": "内容与 SEO", "value": 46},
-          {"label": "付费投放", "value": 33},
-          {"label": "渠道与生态", "value": 21}
+          {
+            "label": "内容与 SEO",
+            "value": 46
+          },
+          {
+            "label": "付费投放",
+            "value": 33
+          },
+          {
+            "label": "渠道与生态",
+            "value": 21
+          }
         ],
         "unit": "%",
-        "caption": "口径：按首次归因，观察窗口 90 天"
+        "caption": "口径：按首次归因，观察窗口 90 天",
+        "chart": "bar"
       },
       {
         "type": "end",
@@ -228,7 +303,8 @@
           "留存：注册后 30 天仍有活跃行为，分母排除刷量账号",
           "CAC：同期市场费用除以新增付费客户数",
           "LTV：按 24 个月观察窗的毛利折算，不折现"
-        ]
+        ],
+        "bulletTier": "bulletLarge"
       }
     ]
   }

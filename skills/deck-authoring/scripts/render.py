@@ -69,22 +69,23 @@ STYLE_ROOTS = (os.path.join(os.getcwd(), "styles"),
                os.path.join(HERE, "..", "styles"),
                os.path.join(HERE, "..", "dev-tools", "style-fixture"))
 DEFAULT_STYLE = "swiss-grid"
-# content-image 的变体（Family × Variant，值封闭 —— validate_spec 同步）：
-#   visual-right = 文 7 栅 + 图 5 栅（默认，历史上唯一的那一种）
-#   visual-left  = 图先文后（镜像，宽度不动 —— 阅读从图开始/连续图页换侧换节奏）
-#   even         = 6+6 均分（图与文等权，statement 用）
-#   hero         = 图就是这一页的主角：满幅 12 栅 + 底部实心标题条
-#                 （check 的全页图禁令对 hero role-aware 放行 —— 标题/条目
-#                  仍是真 DOM 文本，"信息烤进图里"的禁止不适用）
-IMAGE_VARIANTS = ("visual-right", "visual-left", "even", "hero")
+# content-image 的**结构布局**（渲染器能力 —— 像图表的八类图形，不是审美枚举）：
+#   visual-right = 文 7 栅 + 图 5 栅（缺省结构）
+#   visual-left  = 图先文后（镜像）
+#   even         = 6+6 均分
+#   hero         = 图为主角：满幅 12 栅 + 底部实心标题条
+# 另外两类自由，渲染**不拦**：
+#   · two-column 的结构布局见 TWO_COL_LAYOUTS；
+#   · 任何其它字符串 = 作者/风格自造的布局名 —— 渲染套缺省结构并加
+#     `data-layout="<名>"`，怎么排由 skin.css 写（v3：布局语言是作者的自由，
+#     脚本只提供结构与验收）。
+# 历史备注：这里原叫"变体"（值封闭 + 自动实测选择）。v3 起自动选择退役，
+# 名字改为布局；spec 字段 `layout`，`variant` 不再接受。
+IMAGE_LAYOUTS = ("visual-right", "visual-left", "even", "hero")
 
-# two-column 的变体（第二片，模式与 IMAGE_VARIANTS 相同 —— 值封闭，validate_spec
-# 同步）。宽度全由 12 列网格派生（规则在骨架 CSS 的 .cols.v-* 里）：
-#   even       = 6+6 均分（默认，历史上唯一的那一种 —— flex 等分即 704px=span(6)）
-#   lean-left  = 左栏 7 栅 + 右栏 5 栅（左栏承重：对照页的主张在左、细节在右）
-#   lean-right = 左 5 + 右 7（镜像 —— 承重换到右栏）
-# 没有 auto：two-column 没有 fit 实测候选，写变体就是显式选择，不猜。
-TWO_COL_VARIANTS = ("even", "lean-left", "lean-right")
+# two-column 的结构布局（同上：渲染器能力，非审美枚举）：
+#   even = 6+6 均分（缺省） / lean-left = 左 7 栅右 5 栅 / lean-right = 镜像
+TWO_COL_LAYOUTS = ("even", "lean-left", "lean-right")
 
 # ── 版面几何：壳里那些数字的**唯一出处** ─────────────────────────────
 # `SHELL_CSS` 里的 `.pad{padding:132px 84px}` 与 `.footrow{bottom:52px}` 是这几个值；
@@ -104,37 +105,28 @@ CONTENT_BOTTOM = SLIDE_H - FOOT_BOTTOM - FOOT_H
 TITLE_TIER = {"title": "cover", "content-text": "compact", "end": "end"}
 DEFAULT_TITLE_TIER = "small"
 
-# 条目根据**条数**选字号档：(上限, 档名)。
-#
-# 为什么按条数自适应：固定字号下，稀疏页（2 条）会留出半页死白，
-# 密集页（7 条）又会撞出下缘 —— 同一档字号不可能同时服务两者。
-# 这不是“好看一点”，是**构图问题**：留白必须是构图（有视觉锚点），不是内容缺席。
-# （实测：瑞士栅格那版图文页只有 2 条、字号 32，页面下半 55% 是空的。）
-BULLET_TIERS = ((3, "bulletLarge"), (5, "bullet"), (99, "bulletSmall"))
-
 # `type` 级数里**渲染器与 skin 必读**的那些档位。
 #
 # 为什么要一个名单：新增风格时漏一档，渲染器不会报错 —— `tier["caption"]` 会
 # KeyError（还算好），而 skin 里 `var(--t-something)` 拿不到值只会**静默地退回默认字号**，
-# 那一页看着“就是有点怪”，查起来极贵。拿这份名单在 `style.py` 里当场报出来。
+# 那一页看着"就是有点怪"，查起来极贵。拿这份名单在 `style.py` 里当场报出来。
 #
 # 注意这是**下限**：skin 可以用 `--t-<任意键>` 再多拿几档（比如那张表里的 chartValue），
 # 那些是自由的，不在名单里。
 REQUIRED_TYPE_TIERS = frozenset({
     "cover", "compact", "small", "end",        # TITLE_TIER 的取值
     "subtitle", "caption", "foot",
-    "bulletLarge", "bullet", "bulletSmall",    # BULLET_TIERS 的取值
+    "bulletLarge", "bullet", "bulletSmall",    # 条目档（含风格 bulletDefault 的取值）
     "colTitle", "nodeLabel", "nodeNote",
     "chartValue", "chartLabel",
 })
 
-
-def bullet_tier(n_items: int) -> str:
-    for limit, tier in BULLET_TIERS:
-        if n_items <= limit:
-            return tier
-    return "bulletSmall"
-
+# 条目默认档：**作者/风格声明**，不按条数自动升降档（v3）。
+# slide 可写 `bulletTier` 覆盖；风格可写 `bulletDefault`；都没有 → "bullet"。
+# 历史备注：这里原有一条按条数自适应（≤3 大字 / ≥6 小字）的自动降档 ——
+# 正是规范里"不要第一步缩字号"的反例，v3 退役：内容多就拆页/收短，
+# 不靠脚本把字悄悄缩小。
+DEFAULT_BULLET_TIER = "bullet"
 
 def _rng(seed, *parts) -> random.Random:
     return random.Random("|".join([str(seed)] + [str(p) for p in parts]))
@@ -809,7 +801,7 @@ ink_module = _load_sibling("ink")  # 叠印与对比度只有一处定义，不�
 brand_module = _load_sibling("brand")
 fonts_module = _load_sibling("fonts")  # 字体清单与 @font-face（清单是数据，不是硬编码）
 chart_module = _load_sibling("chart")   # 图表引擎：DSL → 确定性 SVG（八类）
-palette_module = _load_sibling("palette")  # 色彩语法与派生（auto 主题从这里出）
+palette_module = _load_sibling("palette")  # 色彩语法与 OKLCH 数学（验收用）
 compile_module = _load_sibling("compile")  # 决策层：spec→resolved（render 只画）
 
 
@@ -833,17 +825,21 @@ def _apply_brand(style: dict, brand: dict) -> dict:
 
 
 def resolve_color_set(tokens: dict, deck: dict) -> str:
-    """colorSet 名；省略 / "auto" → 语义决策方向（mood → 风格语法 → safe）。
+    """colorSet 名 —— **spec 显式声明**（v3：配色由作者定，脚本只验收）。
 
-    规则口径（总编排 §17 / 品牌协议 §5）：Style 出**语法与手调基准**，方向由
-    spec 的 mood 或风格的 color_creativity 决定 —— seed 只管可复现，不做
-    审美决策（"换 deck 换配色看 seed"是已修掉的老根因）。
-    check.py 也用它，保证两边看到同一套色（几何唯一来源的同款纪律）。
+    历史上这里有一条 auto 路径（mood/风格语法 → 方向），已退役：选色是审美
+    决策（门 ③ 给候选，作者定）。validate_spec 会先拦住缺失；这里也拦一道，
+    给直调入口干净报错。check.py 也用它 —— 两边看到同一套色。
     """
     name = deck.get("colorSet")
-    if name in (None, "auto"):
-        name, _ = palette_module.auto_set(tokens, deck.get("seed", 1),
-                                          deck.get("mood"))
+    if not name or name == "auto":
+        raise SystemExit(
+            "✗ 这份 deck 没写 colorSet —— v3 起配色由作者显式声明（缺省的"
+            "`auto` 已退役）；对比度由 ink.py/check.py 验收，选哪套是你的决定。")
+    if name not in tokens.get("colorSets", {}):
+        raise SystemExit(
+            f"✗ colorSet={name!r} 不在风格的 colorSets 里"
+            f"（{sorted(tokens.get('colorSets', {}))}）")
     return name
 
 
@@ -1004,14 +1000,18 @@ def render_resolved(resolved: dict) -> str:
                 for bi, b in enumerate(slide.get("bullets", [])))
             out.append(f'<ul class="bullets" style="--s-bullet:{bsize}px">{items}</ul>')
         elif kind == "content-image":
-            # variant 判定要在 titleblock 之前：hero 的标题只住 herobar，
+            # 布局判定要在 titleblock 之前：hero 的标题只住 herobar，
             # 顶部再立一个 titleblock 就是双标题（而且把 648px 的图顶出正文带）。
-            variant = slide.get("variant") or "visual-right"
-            if variant not in IMAGE_VARIANTS:
+            # v3：IMAGE_LAYOUTS 是渲染器**结构能力**（像图表的八类图形）；
+            # 其它字符串 = 作者自造的布局名 —— 套缺省结构 + `data-layout` 钩子，
+            # 具体怎么排由 skin.css 写（脚本不枚举审美）。
+            layout = slide.get("layout")
+            if layout is not None and not isinstance(layout, str):
                 raise SystemExit(
-                    f"✗ 第 {i} 页（content-image）未知变体 {variant!r}；"
-                    f"支持 {list(IMAGE_VARIANTS)}（validate_spec.py 会先拦住）。")
-            if variant != "hero":
+                    f"✗ 第 {i} 页 layout 要是字符串，得到 {type(layout).__name__}")
+            custom_layout = layout is not None and layout not in IMAGE_LAYOUTS
+            layout = layout or "visual-right"
+            if layout != "hero":
                 out.append(f'<div class="titleblock tb-{t_tier}" '
                            f'style="--s-title:{tsize}px">{th}</div>')
             items = "".join(
@@ -1044,11 +1044,11 @@ def render_resolved(resolved: dict) -> str:
                          f'style="--s-bullet:{bsize}px">{items}</ul></div>')
             img_html = (f'<figure class="imgwrap" {img_attrs}>'
                         f'<img src="{html.escape(src)}" alt="">{cap}</figure>')
-            if variant == "visual-left":       # 图先文后
+            if layout == "visual-left":       # 图先文后
                 out.append(f'<div class="two v-left">{img_html}{main_html}</div>')
-            elif variant == "even":            # 6+6 均分
+            elif layout == "even":            # 6+6 均分
                 out.append(f'<div class="two v-even">{main_html}{img_html}</div>')
-            elif variant == "hero":            # 图为主角：满幅 + 实心标题条
+            elif layout == "hero":            # 图为主角：满幅 + 实心标题条
                 # 无条目 648px（占整页 64% —— check 对 hero 放行，标题仍是
                 # 真 DOM 文本）；带条目压到 520px 给正文留位。caption/条目
                 # 跟在图后的普通流里（对比度走纸面，不走图上）。
@@ -1061,17 +1061,18 @@ def render_resolved(resolved: dict) -> str:
                            f'<img src="{html.escape(src)}" alt="">'
                            f'<div class="herobar">{th}</div></figure>'
                            f'{bullets_html}{cap}')
-            else:                              # 默认：文 7 + 图 5，图在右
-                out.append(f'<div class="two">{main_html}{img_html}</div>')
+            else:                              # 缺省：文 7 + 图 5，图在右
+                hook = f' data-layout="{html.escape(layout)}"' if custom_layout else ""
+                out.append(f'<div class="two"{hook}>{main_html}{img_html}</div>')
         elif kind == "two-column":
-            # Family(two-column) × Variant：与 content-image 同一模式 —— 值封闭、
-            # 未知变体干净报错（validate_spec 会先拦住，这里防直调入口）、
-            # 非默认变体才加类（默认路径逐字节不变，黄金对照钉着）。
-            variant = slide.get("variant") or "even"
-            if variant not in TWO_COL_VARIANTS:
+            # 与 content-image 同一模式：TWO_COL_LAYOUTS 是渲染器结构能力；
+            # 其它字符串 = 作者自造布局名（缺省结构 + data-layout 钩子）。
+            layout = slide.get("layout")
+            if layout is not None and not isinstance(layout, str):
                 raise SystemExit(
-                    f"✗ 第 {i} 页（two-column）未知变体 {variant!r}；"
-                    f"支持 {list(TWO_COL_VARIANTS)}（validate_spec.py 会先拦住）。")
+                    f"✗ 第 {i} 页 layout 要是字符串，得到 {type(layout).__name__}")
+            custom_layout = layout is not None and layout not in TWO_COL_LAYOUTS
+            layout = layout or "even"
             out.append(f'<div class="titleblock tb-{t_tier}" '
                        f'style="--s-title:{tsize}px">{th}</div>')
             cols = []
@@ -1088,10 +1089,15 @@ def render_resolved(resolved: dict) -> str:
                             f'<h3 {h3_attrs} style="--s-colTitle:{tier["colTitle"]}px">'
                             f'{html.escape(coltitle)}</h3>'
                             f'<ul class="bullets small">{li}</ul></div>')
-            # 非默认变体加 v-<variant> 类（宽度规则在骨架 CSS）；even 是默认，
-            # 不加类 —— 旧输出（flex 等分 6+6）一个字节都不动。
-            vclass = "" if variant == "even" else f" v-{variant}"
-            out.append(f'<div class="cols{vclass}">' + "".join(cols) + "</div>")
+            # 非默认结构布局加 v-<layout> 类（宽度规则在骨架 CSS）；even 是缺省，
+            # 不加类 —— 旧输出（flex 等分 6+6）一个字节都不动。自造布局名则加
+            # data-layout 钩子（结构仍是缺省，排法交给 skin）。
+            if custom_layout:
+                vclass, hook = "", f' data-layout="{html.escape(layout)}"'
+            else:
+                vclass = "" if layout == "even" else f" v-{layout}"
+                hook = ""
+            out.append(f'<div class="cols{vclass}"{hook}>' + "".join(cols) + "</div>")
         elif kind == "timeline":
             out.append(f'<div class="titleblock tb-{t_tier}" '
                        f'style="--s-title:{tsize}px">{th}</div>')
@@ -1131,7 +1137,7 @@ def render_resolved(resolved: dict) -> str:
             chart_attrs = tag(f"s{i}.chart", i, "chart", "", None,
                               data=slide.get("data", []),
                               series=slide.get("series", []),
-                              chart=chart_module.infer_chart_type(slide)[0],
+                              chart=chart_module.declared_type(slide),
                               emphasis=slide.get("emphasis", {}),
                               unit=slide.get("unit", ""))
             # ⚠️ 外层 chartwrap 是**结构**：校验与测量的锚点（tag_attr 挂它身上），

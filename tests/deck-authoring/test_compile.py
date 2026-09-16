@@ -108,82 +108,81 @@ class TestDecisionTrace(unittest.TestCase):
         resolved = compile_mod.compile_spec(_demo())       # demo 显式 blue
         entry = next(t for t in resolved["trace"]
                      if t["stage"] == "theme" and t["decision"] == "blue")
-        self.assertIn("显式指定", "".join(entry["reason"]))
+        self.assertIn("显式声明", "".join(entry["reason"]))
 
-    def test_auto_color_set_trace_explains_derivation(self) -> None:
-        """无 mood → 风格语法决策（swiss color_creativity=0.55 < 0.66 → safe）。"""
+    def test_auto_color_set_is_gone(self) -> None:
+        """v3：auto 配色退役 —— 直调 compile 也要人话报错，不静默回退。"""
         spec = _demo()
         spec["deck"]["colorSet"] = "auto"
-        resolved = compile_mod.compile_spec(spec)
-        entry = next(t for t in resolved["trace"]
-                     if t["stage"] == "theme" and t["decision"].startswith("auto:"))
-        self.assertEqual(entry["decision"], "auto:safe")
-        joined = "".join(entry["reason"])
-        self.assertIn("color_creativity", joined, "理由里没说风格语法依据")
-        self.assertIn("不参与方向决策", joined, "没写明 seed 不做审美决策")
-        self.assertIn("纸色文字不动", joined, "理由里没说对比度保证")
+        with self.assertRaises(SystemExit) as cm:
+            compile_mod.compile_spec(spec)
+        self.assertIn("colorSet", str(cm.exception))
 
-    def test_mood_overrides_style_grammar(self) -> None:
-        """mood 是第一优先级：bold 压过风格的克制声明 → auto:creative。"""
+    def test_missing_color_set_is_gone(self) -> None:
         spec = _demo()
-        spec["deck"]["colorSet"] = "auto"
-        spec["deck"]["mood"] = "bold"
-        resolved = compile_mod.compile_spec(spec)
-        entry = next(t for t in resolved["trace"]
-                     if t["stage"] == "theme" and t["decision"].startswith("auto:"))
-        self.assertEqual(entry["decision"], "auto:creative")
-        self.assertIn("mood=bold", "".join(entry["reason"]))
+        spec["deck"].pop("colorSet", None)
+        with self.assertRaises(SystemExit):
+            compile_mod.compile_spec(spec)
 
-    def test_down_tier_reason_cites_repair_order(self) -> None:
-        """降档（bulletSmall）的理由必须引用修复顺序第 13 位 —— 缩字号不许静默。"""
+    def test_style_bullet_default_applies_without_trace(self) -> None:
+        """风格 bulletDefault 决定缺省条目档；缺省值不值得一行 trace。"""
         spec = _demo()
-        spec["deck"]["slides"] = [
-            {"type": "content-text", "title": "长页",
-             "bullets": [f"条目{i}" for i in range(7)]}]
+        spec["deck"]["slides"] = [{"type": "content-text", "title": "页",
+                                   "bullets": ["a", "b", "c"]}]
         resolved = compile_mod.compile_spec(spec)
-        entry = next(t for t in resolved["trace"]
-                     if t.get("slide") == 1 and t["stage"] == "typography")
-        self.assertIn("bulletSmall", entry["decision"])
-        self.assertIn("第 13 位", "".join(entry["reason"]),
-                      "降档理由没引修复顺序 —— 静默缩字又回来了")
+        self.assertEqual(resolved["deck"]["slides"][0]["bTier"], "bullet")
+        self.assertFalse(any(t["stage"] == "typography" for t in resolved["trace"]))
 
-    def test_up_tier_reason_is_positive_not_a_repair_signal(self) -> None:
-        """升档（bulletLarge）是好事（内容少字就该大），理由不许写成修复警告。"""
+    def test_two_column_defaults_to_narrow_tier(self) -> None:
+        """两栏栏宽固定为窄栏 —— 结构事实（不是按条数缩字）。"""
         spec = _demo()
         spec["deck"]["slides"] = [
-            {"type": "content-text", "title": "短页", "bullets": ["仅两条", "很疏"]}]
+            {"type": "two-column", "title": "对照",
+             "columns": [{"title": "A", "bullets": ["a"]},
+                         {"title": "B", "bullets": ["b"]}]}]
         resolved = compile_mod.compile_spec(spec)
-        entry = next(t for t in resolved["trace"]
-                     if t.get("slide") == 1 and t["stage"] == "typography")
-        self.assertIn("bulletLarge", entry["decision"])
-        joined = "".join(entry["reason"])
-        self.assertIn("内容少字就该大", joined)
-        self.assertNotIn("第 13 位", joined, "升档被写成了降档警告 —— trace 在撒谎")
+        self.assertEqual(resolved["deck"]["slides"][0]["bTier"], "bulletSmall")
 
-    def test_explicit_variant_is_traced_and_carried(self) -> None:
-        """显式 variant：layout 决策进 trace，页对象带变体（{**slide} 自动合并）。"""
+    def test_explicit_layout_is_traced_and_carried(self) -> None:
+        """显式 layout：决策进 trace，页对象带布局（{**slide} 自动合并）。"""
         spec = _demo()
-        spec["deck"]["slides"][2]["variant"] = "visual-left"   # 第 3 页 content-image
+        spec["deck"]["slides"][2]["layout"] = "visual-left"   # 第 3 页 content-image
         resolved = compile_mod.compile_spec(spec)
         entry = next(t for t in resolved["trace"] if t["stage"] == "layout")
         self.assertIn("content-image:visual-left", entry["decision"])
-        self.assertEqual(resolved["deck"]["slides"][2].get("variant"), "visual-left")
+        self.assertEqual(resolved["deck"]["slides"][2].get("layout"), "visual-left")
 
-    def test_default_variant_is_silent(self) -> None:
-        """不写 variant：不记 layout trace（默认不值得一行日志，留痕只给偏离）。"""
+    def test_custom_layout_says_it_is_free_form(self) -> None:
+        """自造布局名：trace 说清"缺省结构 + data-layout，排法交给 skin"。"""
+        spec = _demo()
+        spec["deck"]["slides"][2]["layout"] = "poster-split"
+        resolved = compile_mod.compile_spec(spec)
+        entry = next(t for t in resolved["trace"] if t["stage"] == "layout")
+        self.assertIn("poster-split", entry["decision"])
+        self.assertIn("skin", "".join(entry["reason"]))
+
+    def test_default_layout_is_silent(self) -> None:
+        """不写 layout：不记 layout trace（默认不值得一行日志，留痕只给偏离）。"""
         resolved = compile_mod.compile_spec(_demo())
         self.assertFalse(any(t["stage"] == "layout" for t in resolved["trace"]))
 
-    def test_chart_type_decision_is_traced(self) -> None:
-        """图表页的 intent→type 决策进 trace（§19 v2，与渲染同源的纯函数）。"""
+    def test_declared_tier_is_traced(self) -> None:
+        """作者声明档位进 trace；不声明则无声（v3：无自动升降档）。"""
         spec = _demo()
-        spec["deck"]["slides"] = [
-            {"type": "chart", "title": "季度达成", "intent": "progress",
-             "data": [{"label": "Q4", "value": 72}]}]
+        spec["deck"]["slides"] = [{"type": "content-text", "title": "页",
+                                   "bullets": ["a", "b"],
+                                   "bulletTier": "bulletSmall"}]
         resolved = compile_mod.compile_spec(spec)
-        entry = next(t for t in resolved["trace"] if t["stage"] == "chart")
-        self.assertEqual(entry["decision"], "chart:bar-horizontal")
-        self.assertIn("温度计", "".join(entry["reason"]))
+        entry = next(t for t in resolved["trace"] if t["stage"] == "typography")
+        self.assertIn("bulletSmall", entry["decision"])
+        self.assertEqual(resolved["deck"]["slides"][0]["bTier"], "bulletSmall")
+
+    def test_unknown_tier_name_is_a_clean_error(self) -> None:
+        spec = _demo()
+        spec["deck"]["slides"][2]["bulletTier"] = "bulletTiny"
+        with self.assertRaises(SystemExit) as cm:
+            compile_mod.compile_spec(spec)
+        self.assertIn("bulletTiny", str(cm.exception))
 
     def test_brand_merge_is_traced(self) -> None:
         resolved = compile_mod.compile_spec(_demo())       # demo 引 example 品牌
@@ -191,48 +190,69 @@ class TestDecisionTrace(unittest.TestCase):
 
 
 class TestTierAdvisoryAtTheGate(unittest.TestCase):
-    """check 门禁的降档提示：compile 记 trace 之外的第二声。"""
+    """check 门禁的档位提示：内容多 + 没声明档位时提醒（v3 无自动降档）。"""
 
     def test_dense_text_page_gets_called_out(self) -> None:
         deck = {"slides": [
             {"type": "content-text", "title": "密", "bullets": [f"b{i}" for i in range(7)]}]}
         notes = check_mod._tier_notes(deck)
-        self.assertTrue(any("最小字号档" in n for n in notes), notes)
+        self.assertTrue(any("未声明 bulletTier" in n for n in notes), notes)
+
+    def test_declaring_a_small_tier_is_silent(self) -> None:
+        """已经声明了小档 → 提示闭嘴（作者已经做过决定）。"""
+        deck = {"slides": [
+            {"type": "content-text", "title": "密", "bulletTier": "bulletSmall",
+             "bullets": [f"b{i}" for i in range(7)]}]}
+        self.assertEqual(check_mod._tier_notes(deck), [])
 
     def test_slim_page_is_silent(self) -> None:
         deck = {"slides": [
             {"type": "content-text", "title": "疏", "bullets": ["a", "b"]}]}
         self.assertEqual(check_mod._tier_notes(deck), [])
 
-    def test_same_variant_run_gets_rotation_note(self) -> None:
-        """连排同型同变体 → 轮换提示（"每页同构图"是反 slop 第一条）。"""
+    def test_same_layout_run_gets_rotation_note(self) -> None:
+        """连排同型同布局 → 轮换提示（"每页同构图"是反 slop 第一条）。"""
         deck = {"slides": [
             {"type": "content-image", "title": "a", "image": "x.png"},
             {"type": "content-image", "title": "b", "image": "y.png"},
             {"type": "content-image", "title": "c", "image": "z.png"}]}
-        notes = check_mod._variant_rotation_notes(deck)
+        notes = check_mod._layout_rotation_notes(deck)
         self.assertEqual(len(notes), 1)
-        self.assertIn("轮换变体", notes[0])
+        self.assertIn("布局", notes[0])
         self.assertIn("第 1~3 页", notes[0])
 
-    def test_rotated_variants_stay_silent(self) -> None:
-        """变体有轮换（right/left/even/hero）→ 不提示；单页也不提示。"""
+    def test_rotated_layouts_stay_silent(self) -> None:
+        """布局有轮换（缺省/left/hero）→ 不提示；单页也不提示。"""
         rotated = {"slides": [
             {"type": "content-image", "title": "a", "image": "x.png"},
             {"type": "content-image", "title": "b", "image": "y.png",
-             "variant": "visual-left"},
+             "layout": "visual-left"},
             {"type": "content-image", "title": "c", "image": "z.png",
-             "variant": "hero"}]}
-        self.assertEqual(check_mod._variant_rotation_notes(rotated), [])
+             "layout": "hero"}]}
+        self.assertEqual(check_mod._layout_rotation_notes(rotated), [])
         single = {"slides": [{"type": "content-image", "title": "a", "image": "x.png"}]}
-        self.assertEqual(check_mod._variant_rotation_notes(single), [])
+        self.assertEqual(check_mod._layout_rotation_notes(single), [])
 
-    def test_variantless_types_not_flagged(self) -> None:
-        """没有变体的版式连排不提示（content-text 无变体可换）。"""
+    def test_layout_free_for_other_types(self) -> None:
+        """没有结构布局的版式连排不提示（content-text 无可换结构）。"""
         deck = {"slides": [
             {"type": "content-text", "title": "a", "bullets": ["1"]},
             {"type": "content-text", "title": "b", "bullets": ["2"]}]}
-        self.assertEqual(check_mod._variant_rotation_notes(deck), [])
+        self.assertEqual(check_mod._layout_rotation_notes(deck), [])
+
+    def test_layout_vocabulary_gate(self) -> None:
+        """风格声明 layouts 词表 → spec 里的布局名必须落在表内（拼错当场拦）。"""
+        tokens = {"layouts": ["poster-split", "visual-left"]}
+        deck = {"slides": [
+            {"type": "content-image", "title": "a", "image": "x.png",
+             "layout": "poster-splti"},
+            {"type": "content-image", "title": "b", "image": "y.png",
+             "layout": "poster-split"},
+            {"type": "content-image", "title": "c", "image": "z.png",
+             "layout": "hero"}]}          # 结构布局永远放行（渲染器能力）
+        problems = check_mod._layout_vocab_problems(deck, tokens, deck["slides"])
+        self.assertEqual(len(problems), 1)
+        self.assertIn("poster-splti", problems[0])
 
 
 class TestCliRoundTrip(unittest.TestCase):
@@ -258,20 +278,21 @@ if __name__ == "__main__":
     unittest.main()
 
 
-class TestVariantRendering(unittest.TestCase):
-    """三个变体真实几何不同；显式默认 == 隐式默认（字节级契约）。"""
+class TestLayoutRendering(unittest.TestCase):
+    """结构布局真实几何不同；缺省 == 显式缺省（字节级契约）；
+    自造布局名走缺省结构 + data-layout 钩子（skin 的接入点）。"""
 
-    def _page_html(self, variant: str | None) -> str:
+    def _page_html(self, layout: str | None) -> str:
         spec = _demo()
         page = spec["deck"]["slides"][2]              # 第 3 页 content-image
-        page.pop("variant", None)
-        if variant:
-            page["variant"] = variant
+        page.pop("layout", None)
+        if layout:
+            page["layout"] = layout
         out = render.render(spec)
         # 页码是补零的（data-idx="03"）—— 第 3 页的片段切到第 4 页之前
         return out.split('data-idx="03"')[1].split('data-idx="04"')[0]
 
-    def test_variants_differ_in_geometry_and_order(self) -> None:
+    def test_layouts_differ_in_geometry_and_order(self) -> None:
         right = self._page_html("visual-right")
         left = self._page_html("visual-left")
         even = self._page_html("even")
@@ -279,13 +300,22 @@ class TestVariantRendering(unittest.TestCase):
         self.assertNotEqual(right, even)
         self.assertIn('class="two v-left"', left)
         self.assertIn('class="two v-even"', even)
-        self.assertIn('class="two">', right, "默认不该带变体类（保持旧字节）")
+        self.assertIn('class="two">', right, "缺省不该带布局类（保持旧字节）")
         # visual-left：figure（图）在 main（文）之前 —— DOM 顺序即阅读顺序
         self.assertLess(left.index("<figure"), left.index('class="main"'))
         self.assertGreater(right.index("<figure"), right.index('class="main"'))
 
     def test_explicit_default_equals_implicit(self) -> None:
         self.assertEqual(self._page_html(None), self._page_html("visual-right"))
+
+    def test_custom_layout_gets_default_structure_plus_hook(self) -> None:
+        """作者自造布局名：结构照缺省，只多一个 data-layout（skin 靠它重排）。"""
+        custom = self._page_html("poster-split")
+        plain = self._page_html(None)
+        self.assertIn('data-layout="poster-split"', custom)
+        self.assertNotIn("data-layout", plain)
+        self.assertEqual(custom.replace(' data-layout="poster-split"', ""), plain,
+                         "自造布局名不许改变结构 —— 结构是渲染器能力")
 
     def test_hero_renders_single_title_in_bar(self) -> None:
         """hero：标题只住 herobar，顶部不许再立 titleblock（双标题 = 溢出元凶）。"""
@@ -299,85 +329,33 @@ class TestVariantRendering(unittest.TestCase):
         # 实心标题条的反转色对 CSS 在壳的 <style> 里，断言要看整份产物
         no_bullets = _demo()
         no_bullets["deck"]["slides"][2].pop("bullets", None)
-        no_bullets["deck"]["slides"][2]["variant"] = "hero"
+        no_bullets["deck"]["slides"][2]["layout"] = "hero"
         full = render.render(no_bullets)
         self.assertIn("height:648px", full)
         self.assertIn("background:var(--text)", full)   # --text 底 / --paper 字
 
 
-class TestAutoVariant(unittest.TestCase):
-    """variant:"auto"：吃实测数据选变体；没数据回退默认 —— 都不猜。"""
+class TestTwoColLayoutRendering(unittest.TestCase):
+    """two-column 三种结构布局几何分叉；显式 even == 隐式不写（字节级契约）；
+    缺省双栏字节不变（上一条黄金测试钉着）。"""
 
-    REC = {"page": 3, "variant": "even", "score": 0.42, "density": 0.6,
-           "parts": {"fit": 1.0, "whitespace": 1.0, "semantic": 1.0},
-           "penalties": [],
-           "alternatives": [{"variant": "visual-right", "score": 0.31, "density": 0.5},
-                            {"variant": "visual-left", "score": 0.31, "density": 0.5}]}
-
-    def _spec(self, variant: str | None) -> dict:
-        spec = _demo()
-        page = spec["deck"]["slides"][2]              # 第 3 页 content-image
-        page.pop("variant", None)
-        if variant:
-            page["variant"] = variant
-        return spec
-
-    def test_auto_with_data_uses_measured_best(self) -> None:
-        resolved = compile_mod.compile_spec(self._spec("auto"),
-                                            fit_variants=[self.REC])
-        self.assertEqual(resolved["deck"]["slides"][2]["variant"], "even")
-        entry = next(t for t in resolved["trace"] if t["stage"] == "layout")
-        self.assertIn("实测最佳", entry["decision"])
-        self.assertIn("0.42", "".join(entry["reason"]), "理由里没带分数对比")
-
-    def test_auto_without_data_falls_back_to_default(self) -> None:
-        resolved = compile_mod.compile_spec(self._spec("auto"))
-        self.assertEqual(resolved["deck"]["slides"][2]["variant"], "visual-right")
-        entry = next(t for t in resolved["trace"] if t["stage"] == "layout")
-        self.assertIn("默认", entry["decision"])
-        self.assertIn("回退默认而不是猜", "".join(entry["reason"]))
-
-    def test_explicit_beats_data(self) -> None:
-        """显式 variant 永远赢 —— 实测数据不越权改内容决策。"""
-        resolved = compile_mod.compile_spec(self._spec("visual-left"),
-                                            fit_variants=[self.REC])
-        self.assertEqual(resolved["deck"]["slides"][2]["variant"], "visual-left")
-
-    def test_dict_form_accepted(self) -> None:
-        """{页码: rec} 形态也认（页码 str/int 都行）。"""
-        resolved = compile_mod.compile_spec(self._spec("auto"),
-                                            fit_variants={"3": self.REC})
-        self.assertEqual(resolved["deck"]["slides"][2]["variant"], "even")
-
-    def test_resolved_never_carries_auto(self) -> None:
-        """auto 是意图不是几何：resolved 里不许出现（渲染器值集没有它）。"""
-        for fv in (None, [self.REC]):
-            resolved = compile_mod.compile_spec(self._spec("auto"), fit_variants=fv)
-            for page in resolved["deck"]["slides"]:
-                self.assertNotEqual(page.get("variant"), "auto")
-
-
-class TestTwoColVariantRendering(unittest.TestCase):
-    """two-column 三变体几何分叉；显式 even == 隐式不写（字节级契约）；
-    默认双栏字节不变（上一条黄金测试钉着）。"""
-
-    def _page_html(self, variant: str | None) -> str:
+    def _page_html(self, layout: str | None) -> str:
         spec = _demo()
         page = spec["deck"]["slides"][3]              # 第 4 页 two-column
-        page.pop("variant", None)
-        if variant:
-            page["variant"] = variant
+        page.pop("layout", None)
+        if layout:
+            page["layout"] = layout
         out = render.render(spec)
         return out.split('data-idx="04"')[1].split('data-idx="05"')[0]
 
-    def test_variants_differ_in_geometry(self) -> None:
+    def test_layouts_differ_in_geometry(self) -> None:
         even = self._page_html("even")
         lean_l = self._page_html("lean-left")
         lean_r = self._page_html("lean-right")
         self.assertIn('class="cols v-lean-left"', lean_l)
         self.assertIn('class="cols v-lean-right"', lean_r)
-        self.assertIn('class="cols">', even, "默认不该带变体类（保持旧字节）")
-        self.assertNotEqual(lean_l, lean_r, "两个 lean 变体渲成了同一份 DOM")
+        self.assertIn('class="cols">', even, "缺省不该带布局类（保持旧字节）")
+        self.assertNotEqual(lean_l, lean_r, "两个 lean 布局渲成了同一份 DOM")
         self.assertNotEqual(even, lean_l)
         self.assertNotEqual(even, lean_r)
 
@@ -391,21 +369,17 @@ class TestTwoColVariantRendering(unittest.TestCase):
     def test_explicit_even_equals_implicit(self) -> None:
         self.assertEqual(self._page_html(None), self._page_html("even"))
 
-    def test_explicit_variant_is_traced_without_compile_changes(self) -> None:
-        """compile.py 未改：layout trace 对任何带 variant 的页自动留痕。"""
+    def test_explicit_layout_is_traced(self) -> None:
         spec = _demo()
-        spec["deck"]["slides"][3]["variant"] = "lean-left"
+        spec["deck"]["slides"][3]["layout"] = "lean-left"
         resolved = compile_mod.compile_spec(spec)
         entry = next(t for t in resolved["trace"] if t["stage"] == "layout")
         self.assertIn("two-column:lean-left", entry["decision"])
-        self.assertEqual(resolved["deck"]["slides"][3].get("variant"), "lean-left")
+        self.assertEqual(resolved["deck"]["slides"][3].get("layout"), "lean-left")
 
-    def test_unknown_variant_exits_cleanly(self) -> None:
-        """渲染器也可能被直调（不经 validate_spec）：未知变体要人话报错，不甩栈。"""
-        spec = _demo()
-        spec["deck"]["slides"][3]["variant"] = "left-lean"
-        with self.assertRaises(SystemExit) as ctx:
-            render.render(spec)
-        msg = str(ctx.exception)
-        self.assertIn("two-column", msg)
-        self.assertIn("lean-left", msg, "报错必须给出路：可用值要列出来")
+    def test_custom_layout_on_two_col_gets_the_hook(self) -> None:
+        """自造布局名：缺省列宽结构 + data-layout，skin 负责改排。"""
+        custom = self._page_html("poster-two")
+        self.assertIn('data-layout="poster-two"', custom)
+        self.assertEqual(custom.replace(' data-layout="poster-two"', ""),
+                         self._page_html(None), "自造布局名不许改变结构")

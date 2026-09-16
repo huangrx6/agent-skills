@@ -50,7 +50,8 @@ VALID_SLIDES = [
     {"type": "two-column", "title": "W",
      "columns": [{"title": "A", "bullets": ["a"]}, {"title": "B", "bullets": ["b"]}]},
     {"type": "timeline", "title": "L", "nodes": [{"label": "Q1", "note": "n"}]},
-    {"type": "chart", "title": "G", "data": [{"label": "A", "value": 10}], "unit": "%"},
+    {"type": "chart", "title": "G", "chart": "bar",
+     "data": [{"label": "A", "value": 10}], "unit": "%"},
     {"type": "end", "title": "E"},
 ]
 
@@ -223,53 +224,8 @@ if __name__ == "__main__":
     unittest.main()
 
 
-class TestImageVariants(unittest.TestCase):
-    """content-image 的 variant 字段：键与值都封闭（Family × Variant 第一片）。"""
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        with open(TOKENS, encoding="utf-8") as fh:
-            cls.color_sets = set(json.load(fh)["colorSets"])
-
-    def _codes(self, spec: dict) -> set[str]:
-        return {i["code"] for i in vs.validate(spec, self.color_sets).errors}
-
-    def test_known_variant_passes(self) -> None:
-        for variant in ("visual-left", "even", "hero"):
-            slides = [{"type": "content-image", "title": "图", "bullets": ["a"],
-                       "image": "x.png", "variant": variant}]
-            codes = self._codes(_spec(slides))
-            self.assertNotIn("UNKNOWN_VARIANT", codes, f"合法变体 {variant} 被拒")
-            self.assertNotIn("UNKNOWN_FIELD", codes, "variant 不在封闭字段集里")
-
-    def test_unknown_variant_is_rejected(self) -> None:
-        slides = [{"type": "content-image", "title": "图", "bullets": ["a"],
-                   "image": "x.png", "variant": "center-stage"}]
-        self.assertIn("UNKNOWN_VARIANT", self._codes(_spec(slides)),
-                      "变体值不封闭 —— 拼错会一路漏到渲染器")
-
-    def test_mood_closed_enum(self) -> None:
-        """mood 是 Theme Resolver 的语义输入：合法值过，拼错的拦。"""
-        spec = _spec()
-        spec["deck"]["mood"] = "bold"
-        self.assertNotIn("UNKNOWN_MOOD", self._codes(spec))
-        spec["deck"]["mood"] = "vibrant"
-        self.assertIn("UNKNOWN_MOOD", self._codes(spec),
-                      "mood 不封闭 —— 拼错会漏进 palette 的 SystemExit")
-
-    def test_auto_accepted_with_reminder(self) -> None:
-        """auto 是合法值（意图：让实测来选），但门禁要提醒喂数据的链路。"""
-        slides = [{"type": "content-image", "title": "图", "bullets": ["a"],
-                   "image": "x.png", "variant": "auto"}]
-        result = vs.validate(_spec(slides), self.color_sets)
-        self.assertNotIn("UNKNOWN_VARIANT", {i["code"] for i in result.errors})
-        warns = {i["code"] for i in result.items if i["level"] == "warn"}
-        self.assertIn("AUTO_VARIANT", warns, "auto 没提醒实测链路 —— 用例会忘了喂数据")
-
-
-class TestTwoColVariants(unittest.TestCase):
-    """two-column 的 variant 字段（Family × Variant 第二片）：合法值过、
-    拼错拦、auto 不开放（没有 fit 实测候选）。"""
+class TestLayoutField(unittest.TestCase):
+    """v3：layout 是**自由字符串**（结构布局是渲染器能力，其余交给 skin）。"""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -280,34 +236,108 @@ class TestTwoColVariants(unittest.TestCase):
         return {i["code"] for i in vs.validate(spec, self.color_sets).errors}
 
     @staticmethod
-    def _slide(variant: str) -> dict:
-        return {"type": "two-column", "title": "对照",
-                "columns": [{"title": "A", "bullets": ["a"]},
-                            {"title": "B", "bullets": ["b"]}],
-                "variant": variant}
+    def _slide(kind: str, layout) -> dict:
+        base = {"type": kind, "title": "页", "layout": layout}
+        if kind == "content-image":
+            base.update({"bullets": ["a"], "image": "x.png"})
+        else:
+            base["columns"] = [{"title": "A", "bullets": ["a"]},
+                               {"title": "B", "bullets": ["b"]}]
+        return base
 
-    def test_known_variant_passes(self) -> None:
-        for variant in ("even", "lean-left", "lean-right"):
-            with self.subTest(variant=variant):
-                codes = self._codes(_spec([self._slide(variant)]))
-                self.assertNotIn("UNKNOWN_VARIANT", codes, f"合法变体 {variant} 被拒")
-                self.assertNotIn("UNKNOWN_FIELD", codes,
-                                 "variant 不在 two-column 的封闭字段集里")
+    def test_structural_layouts_pass(self) -> None:
+        for kind, lay in (("content-image", "visual-left"), ("content-image", "even"),
+                          ("content-image", "hero"), ("two-column", "lean-right")):
+            with self.subTest(lay=lay):
+                codes = self._codes(_spec([self._slide(kind, lay)]))
+                self.assertNotIn("BAD_LAYOUT", codes)
+                self.assertNotIn("UNKNOWN_FIELD", codes, "layout 不在封闭字段集里")
 
-    def test_unknown_variant_is_rejected(self) -> None:
-        """值不封闭 —— 拼错（如把 lean-left 写反）会一路漏到渲染器的 SystemExit。"""
-        self.assertIn("UNKNOWN_VARIANT", self._codes(_spec([self._slide("left-lean")])),
-                      "two-column 变体值不封闭")
+    def test_custom_layout_name_passes(self) -> None:
+        """作者自造布局名合法（渲染套缺省结构 + data-layout，skin 负责排）。"""
+        codes = self._codes(_spec([self._slide("content-image", "poster-split")]))
+        self.assertNotIn("BAD_LAYOUT", codes, "自造布局名被当成错误拦住了")
 
-    def test_auto_is_not_open_for_two_column(self) -> None:
-        """auto 是 content-image 的意图链路（fit --recommend）；two-column 没有
-        fit 候选 —— 写了 auto 就是拼错，当 UNKNOWN_VARIANT 拦，不提醒不猜。"""
-        slides = [{"type": "two-column", "title": "对照",
-                   "columns": [{"title": "A", "bullets": ["a"]},
-                               {"title": "B", "bullets": ["b"]}],
-                   "variant": "auto"}]
-        result = vs.validate(_spec(slides), self.color_sets)
-        self.assertIn("UNKNOWN_VARIANT", {i["code"] for i in result.errors},
-                      "two-column 的 auto 被放行 —— 会漏到渲染器的封闭值集外")
-        self.assertNotIn("AUTO_VARIANT", {i["code"] for i in result.items},
-                         "auto 提醒是 content-image 的实测链路，two-column 没有这条链")
+    def test_auto_is_rejected(self) -> None:
+        """auto（实测选布局）已随 fit --recommend 一起退役。"""
+        codes = self._codes(_spec([self._slide("content-image", "auto")]))
+        self.assertIn("BAD_LAYOUT", codes)
+
+    def test_non_string_is_rejected(self) -> None:
+        codes = self._codes(_spec([self._slide("content-image", 3)]))
+        self.assertIn("BAD_LAYOUT", codes)
+
+    def test_variant_field_is_gone_with_a_hint(self) -> None:
+        slide = self._slide("content-image", "even")
+        slide["variant"] = "even"
+        result = vs.validate(_spec([slide]), self.color_sets)
+        codes = {i["code"] for i in result.errors}
+        self.assertIn("UNKNOWN_FIELD", codes, "旧 variant 字段还在放行")
+        hints = " ".join(i["message"] for i in result.errors)
+        self.assertIn("layout", hints, "旧字段的错误没指路新字段")
+
+
+class TestColorSetRequired(unittest.TestCase):
+    """v3：colorSet 必填具名（auto/mood 的语义决策链已退役）。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        with open(TOKENS, encoding="utf-8") as fh:
+            cls.color_sets = set(json.load(fh)["colorSets"])
+
+    def _codes(self, deck_extra: dict) -> set[str]:
+        deck = {"title": "t", "colorSet": "blue",
+                "slides": [{"type": "title", "title": "封面"}]}
+        deck.update(deck_extra)
+        return {i["code"] for i in vs.validate({"deck": deck}, self.color_sets).errors}
+
+    def test_missing_color_set_is_blocked(self) -> None:
+        deck = {"title": "t", "slides": [{"type": "title", "title": "封面"}]}
+        codes = {i["code"] for i in vs.validate({"deck": deck}, self.color_sets).errors}
+        self.assertIn("MISSING_COLOR_SET", codes)
+
+    def test_auto_is_blocked(self) -> None:
+        self.assertIn("MISSING_COLOR_SET", self._codes({"colorSet": "auto"}))
+
+    def test_mood_field_is_gone(self) -> None:
+        self.assertIn("UNKNOWN_FIELD", self._codes({"mood": "bold"}))
+
+    def test_named_but_unknown_set_is_blocked(self) -> None:
+        self.assertIn("BAD_COLOR_SET", self._codes({"colorSet": "nope"}))
+
+
+class TestChartTypeRequired(unittest.TestCase):
+    """v3：图表页必须显式声明图形类型（推断层退役）。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        with open(TOKENS, encoding="utf-8") as fh:
+            cls.color_sets = set(json.load(fh)["colorSets"])
+
+    def _codes(self, slide: dict) -> set[str]:
+        spec = _spec([slide])
+        return {i["code"] for i in vs.validate(spec, self.color_sets).errors}
+
+    def test_all_chart_types_pass(self) -> None:
+        for t in vs.CHART_TYPES:
+            with self.subTest(t=t):
+                codes = self._codes({"type": "chart", "title": "图", "chart": t,
+                                     "data": [{"label": "a", "value": 1}]})
+                self.assertNotIn("MISSING_CHART_TYPE", codes)
+                self.assertNotIn("UNKNOWN_CHART_TYPE", codes)
+
+    def test_missing_type_is_blocked(self) -> None:
+        codes = self._codes({"type": "chart", "title": "图",
+                             "data": [{"label": "a", "value": 1}]})
+        self.assertIn("MISSING_CHART_TYPE", codes)
+
+    def test_unknown_type_is_blocked(self) -> None:
+        codes = self._codes({"type": "chart", "title": "图", "chart": "pie3d",
+                             "data": [{"label": "a", "value": 1}]})
+        self.assertIn("UNKNOWN_CHART_TYPE", codes)
+
+    def test_intent_alone_is_not_enough(self) -> None:
+        """intent 是语义标注，不再是类型来源。"""
+        codes = self._codes({"type": "chart", "title": "图", "intent": "trend",
+                             "data": [{"label": "a", "value": 1}]})
+        self.assertIn("MISSING_CHART_TYPE", codes)

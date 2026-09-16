@@ -37,23 +37,25 @@ DEFAULT_TOKENS = os.path.join(STYLES_DIR, DEFAULT_STYLE, "style.json")
 
 # 封闭字段集。加字段要同时改这里与 `references/style-architecture.md` ——
 # 这正是设计意图：让"顺手加一个"变得有摩擦。
-DECK_FIELDS = {"colorSet", "seed", "title", "slides", "style", "brand", "note",
-               "mood"}
-# mood 是 Theme Resolver 的语义输入（palette.MOOD_DIRECTIONS 一字不差）：
-# 方向决策的**第一优先级**，值封闭。
-MOODS = ("calm", "neutral", "bold", "experimental")
+DECK_FIELDS = {"colorSet", "seed", "title", "slides", "style", "brand", "note"}
+# v3：colorSet **必填具名**（auto/mood 的语义决策链已退役 —— 配色由作者定，
+# 门 ③ 给候选；对比度由 ink.py/check.py 验收）。
+CHART_TYPES = ("bar", "bar-horizontal", "line", "area", "bar-stacked",
+               "donut", "scatter", "combo")
 SLIDE_FIELDS = {
-    "title":         {"type", "title", "subtitle", "color"},
-    "content-text":  {"type", "title", "bullets", "color"},
+    "title":         {"type", "title", "subtitle", "color", "titleTier"},
+    "content-text":  {"type", "title", "bullets", "color", "titleTier", "bulletTier"},
     "content-image": {"type", "title", "bullets", "image", "caption", "color",
-                   "variant"},
-    "two-column":    {"type", "title", "columns", "color", "variant"},
-    "timeline":      {"type", "title", "nodes", "color"},
-    # 图表的 DSL：几何/样式/动画都不在 spec 里（chart.py 决定），AI 只写语义。
+                   "layout", "titleTier", "bulletTier"},
+    "two-column":    {"type", "title", "columns", "color", "layout", "titleTier",
+                   "bulletTier"},
+    "timeline":      {"type", "title", "nodes", "color", "titleTier"},
+    # 图表的 DSL：几何/样式/动画都不在 spec 里，AI 只写语义。
+    # v3：`chart`（图形类型）**必填** —— 推断已退役，见 CHART_TYPES。
     "chart":         {"type", "title", "data", "unit", "caption", "color",
                       "chart", "intent", "message", "series", "emphasis",
                       "annotations"},
-    "end":           {"type", "title", "color"},
+    "end":           {"type", "title", "color", "titleTier"},
 }
 # **条件必填**：这个版式的全部内容就是那个字段，缺了它这一页不成立。
 #
@@ -61,20 +63,14 @@ SLIDE_FIELDS = {
 # 不给 `image` 会一路放行到渲染器，然后 `KeyError: 'image'` 崩栈。实测撞到过。
 # 与"图片该要就要，别为了省事少要"是同一条：这一页的版式已经说了要图，
 # 就不该把它省掉。
-# content-image 变体的值集（与 render.IMAGE_VARIANTS 一字不差）：
-# visual-right（默认）/ visual-left（图先文后，镜像）/ even（6+6 均分）/
-# hero（图为主角：满幅 + 实心标题条；check 的全页图禁令对它 role-aware）。
-# spec 还可以写 "auto" —— 意思是"让实测来选"（fit --recommend 落盘 →
-# compile --fit-variants 喂入；没数据回退默认）。auto 是意图不是几何，
-# 不许漏进 resolved。
-IMAGE_VARIANTS = ("visual-right", "visual-left", "even", "hero")
-IMAGE_VARIANT_INPUTS = IMAGE_VARIANTS + ("auto",)
-
-# two-column 变体的值集（与 render.TWO_COL_VARIANTS 一字不差）：
-# even（默认 6+6 均分）/ lean-left（左 7 栅右 5 栅，左栏承重）/ lean-right
-# （左 5 右 7，镜像）。**没有 auto** —— two-column 没有 fit 实测候选，
-# 栅格分配是显式内容决策，写了 auto 就当拼错拦住。
-TWO_COL_VARIANTS = ("even", "lean-left", "lean-right")
+# 布局：**自由字符串**（v3）。
+# 渲染器认识的结构布局（能力，非枚举禁令）：content-image 的
+# visual-right/visual-left/even/hero，two-column 的 even/lean-left/lean-right。
+# 其它字符串 = 作者/风格自造的布局名 —— 渲染套缺省结构 + data-layout 钩子，
+# 排法由 skin.css 写。validate 不封值集（"auto" 除外：实测选择已退役）。
+# 拼写检查在 check.py：风格在 style.json 声明 `layouts` 词表时按词表验。
+STRUCTURAL_LAYOUTS = ("visual-right", "visual-left", "even", "hero",
+                      "lean-left", "lean-right")
 
 REQUIRED_SLIDE_FIELDS = {
     "content-image": {"image"},
@@ -99,13 +95,20 @@ COLOR_FIELDS = {"primary", "secondary", "background", "ink", "inkText", "paper",
                 "fg", "bg", "fill", "stroke"}
 
 HINTS = {
-    "fontSize": "字号不在规格里：它由 render.py 派生，对比度分档由 token.contrast.largeTextPx 判定。",
+    "fontSize": "字号档在风格的 type 块里（作者数据）；spec 只能选档名（titleTier/bulletTier），不写数字。",
     "font_size": "同上 —— 字号由脚本派生，不是写进来的。",
     "fontSizePx": "同上 —— 字号由脚本派生，不是写进来的。",
     "textSize": "同上 —— 字号由脚本派生，不是写进来的。",
     "size": "同上 —— 字号 / 尺寸由脚本派生。",
     "font": "字体族在 token.fonts 里，不在规格里。",
     "x": "坐标是刻意不存在的字段。一旦 schema 里有 x/y，模型就会开始填数字 —— 而版式计算正是交给脚本的那部分。",
+    "variant": "v3 起字段是 layout（自由字符串）。结构布局：content-image 的 "
+               "visual-right/visual-left/even/hero；two-column 的 even/lean-left/"
+               "lean-right；其它名字由 skin.css 排。",
+    "mood": "v3 起 mood 已退役 —— 配色方向不再由语义推导，直接写 colorSet 名字。",
+    "titleTier": "标题档名（风格 type 块里的键）：风格 titleTiers 定缺省映射，"
+                 "这里逐页覆盖。",
+    "bulletTier": "条目档名；v3 无按条数自动升降档，缺省取风格 bulletDefault。",
     "y": "同上 —— 用 type 表达版式，不要给坐标。",
     "dx": "错位量由 (seed, 元素) 派生，规格里没有它。",
     "dy": "同上 —— 错位量由脚本派生。",
@@ -188,20 +191,18 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
         return issues
     _check_fields(deck, DECK_FIELDS, "deck", issues)
 
-    # mood 校验不依赖 token（枚举封闭在协议里），放到 color_sets 分支外 ——
-    # CLI 没带 token 时也要拦拼错的 mood。
-    mood = deck.get("mood")
-    if mood is not None and mood not in MOODS:
-        issues.error("UNKNOWN_MOOD", "deck.mood",
-                     f"未知 mood {mood!r}；可用 {list(MOODS)}")
+    # 配色必填具名（v3：auto/mood 退役）
+    if deck.get("colorSet") in (None, "auto"):
+        issues.error("MISSING_COLOR_SET", "deck.colorSet",
+                     "v3 起 colorSet 必填具名（auto 已退役）—— 配色由作者定："
+                     "先看候选（门 ③），选定后写名字；对比度由 ink.py 验收")
 
     if color_sets is not None:
         chosen = deck.get("colorSet")
-        if (isinstance(chosen, str) and chosen not in color_sets
-                and chosen != "auto"):
+        if isinstance(chosen, str) and chosen not in color_sets:
             issues.error("BAD_COLOR_SET", "deck.colorSet",
                          f"{chosen!r} 不在 token 的 colorSets 里，可用 "
-                         f"{sorted(color_sets) + ['auto']}（auto=语义决策方向：mood → 风格语法）")
+                         f"{sorted(color_sets)}")
 
     slides = deck.get("slides")
     if not isinstance(slides, list) or not slides:
@@ -219,20 +220,27 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
                          f"未知版式 {kind!r}；支持 {sorted(SLIDE_FIELDS)}")
             continue
         _check_fields(slide, SLIDE_FIELDS[kind], where, issues)
-        # 变体值集**按版式分别封闭**：content-image 开放 auto（fit 实测链路在）；
-        # two-column 没有 fit 候选 —— auto 写了就是拼错，同样拦在 UNKNOWN_VARIANT。
-        variant_inputs = (TWO_COL_VARIANTS if kind == "two-column"
-                          else IMAGE_VARIANT_INPUTS)
-        variant = slide.get("variant")
-        if variant is not None and variant not in variant_inputs:
-            issues.error("UNKNOWN_VARIANT", where,
-                         f"未知变体 {variant!r}；{kind} 支持 "
-                         f"{list(variant_inputs)}")
-        if variant == "auto" and kind == "content-image":
-            issues.warn("AUTO_VARIANT", where,
-                        "auto 变体要实测数据：fit --from-spec … --recommend "
-                        "--json-out > variants.json 落盘，再 compile --fit-variants "
-                        "喂入；没数据 compile 回退默认 visual-right（trace 有留痕）")
+        # 布局：自由字符串，只拦 "auto"（实测选择已退役）与非字符串
+        layout = slide.get("layout")
+        if layout is not None:
+            if not isinstance(layout, str) or not layout:
+                issues.error("BAD_LAYOUT", where,
+                             f"layout 要是非空字符串，得到 {layout!r}")
+            elif layout == "auto":
+                issues.error("BAD_LAYOUT", where,
+                             "layout 不支持 auto（v3：实测选布局已退役）—— "
+                             "直接写布局名；自造名由 skin.css 排（缺省结构 + "
+                             "data-layout 钩子）")
+        # 图形类型必填且封闭八类（v3：推断已退役）
+        if kind == "chart":
+            ctype = slide.get("chart")
+            if not ctype:
+                issues.error("MISSING_CHART_TYPE", where,
+                             f"图表页必须写 chart —— v3 起图形类型由作者声明"
+                             f"（八类：{list(CHART_TYPES)}）；intent 仍是可选语义标注")
+            elif ctype not in CHART_TYPES:
+                issues.error("UNKNOWN_CHART_TYPE", f"{where}.chart",
+                             f"未知图形 {ctype!r}；支持 {list(CHART_TYPES)}")
         for need in REQUIRED_SLIDE_FIELDS.get(kind, ()):
             if not slide.get(need):
                 issues.error("MISSING_FIELD", f"{where}.{need}",

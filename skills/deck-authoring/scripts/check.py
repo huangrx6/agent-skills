@@ -196,10 +196,10 @@ def _check_layout(measured: dict) -> list[str]:
 
 
 def _check_full_page_image(measured: dict, deck: dict) -> list[str]:
-    """一张图盖住整页 —— **阻塞**，但对 hero 变体 role-aware（见注释）。
+    """一张图盖住整页 —— **阻塞**，但对 hero 布局 role-aware（见注释）。
 
     为什么这条要有牙：它是"不要把所有东西都生成到一张图上、再让图片覆盖整页"这条
-    硬规则的落点。**role-aware 之后它可达了**：hero 变体的无条目形态图占整页 64%
+    硬规则的落点。**role-aware 之后它可达了**：hero 布局的无条目形态图占整页 64%
     —— 那一页图就是主角，且标题/条目仍是真 DOM 文本，四失禁止不适用。但守卫
     对其余一切照旧：手改 skin 把配图撑到全页、或者哪个新变式忘了声明角色，
     这条会失败。logo 永远不放行（品牌标盖满整页没有合法场景）。
@@ -210,7 +210,7 @@ def _check_full_page_image(measured: dict, deck: dict) -> list[str]:
         return out
     hero_pages = {
         i for i, s in enumerate(deck.get("slides", []), 1)
-        if s.get("type") == "content-image" and s.get("variant") == "hero"}
+        if s.get("type") == "content-image" and s.get("layout") == "hero"}
     for el in measured.get("elements", []):
         if el.get("role") not in ("logo", "image"):
             continue
@@ -370,59 +370,80 @@ def _check_brand(measured: dict, deck: dict, tokens: dict) -> tuple[list[str], l
     return problems, notes
 
 
-# 有变体的版式（提示轮换用；与 render.IMAGE_VARIANTS / TWO_COL_VARIANTS 对应）
-VARIANT_TYPES = ("content-image", "two-column")
+# 有结构布局的版式（提示轮换用；布局词表由作者/风格定，渲染器只认结构能力）
+LAYOUT_TYPES = ("content-image", "two-column")
 
 
-def _variant_rotation_notes(deck: dict) -> list[str]:
-    """同型页连排且变体一个不换 → 提示轮换（构图节奏的可测代理）。
+def _layout_rotation_notes(deck: dict) -> list[str]:
+    """同型页连排且布局一个不换 → 提示轮换（构图节奏的可测代理）。
 
     反 slop 清单第一条就是"每页同构图"。同 type 连排本身合法（对比页天然
-    成对），但变体全相同是把同一张构图复印几遍 —— hero/镜像/均分这些零成本
-    换法都不用，多半是写 spec 时不知道变体存在（提示里直接指路 SKILL.md）。
+    成对），但布局全相同是把同一张构图复印几遍 —— hero/镜像/均分这些零成本
+    换法都不用，多半是写 spec 时不知道布局存在（提示里直接指路 SKILL.md）。
     纯函数：只看 spec。
     """
     out: list[str] = []
     slides = deck.get("slides", [])
     start = 0
     for i in range(1, len(slides) + 1):
-        # 段尾判定：i 越界，或 (type, variant) 对不同 → 收一段
+        # 段尾判定：i 越界，或 (type, layout) 对不同 → 收一段
         if i < len(slides):
             a, b = slides[i - 1], slides[i]
             if (a.get("type") == b.get("type")
-                    and a.get("variant") == b.get("variant")):
+                    and a.get("layout") == b.get("layout")):
                 continue
         kind = slides[start].get("type")
         n = i - start
-        if n >= 2 and kind in VARIANT_TYPES:
-            out.append(f"第 {start + 1}~{i} 页连排 {n} 个 {kind} 且变体全相同"
-                       f"（{slides[start].get('variant') or '默认'}）—— 连排同型页"
-                       f"请轮换变体换构图节奏（支持的变体见 SKILL.md 版式表）")
+        if n >= 2 and kind in LAYOUT_TYPES:
+            out.append(f"第 {start + 1}~{i} 页连排 {n} 个 {kind} 且布局全相同"
+                       f"（{slides[start].get('layout') or '缺省'}）—— 连排同型页"
+                       f"请换布局换构图节奏（结构布局与自造布局见 SKILL.md 版式表）")
         start = i
     return out
 
 
-def _tier_notes(deck: dict) -> list[str]:
-    """字号降档提示：content-text 页条目 >5 会触发 bullet_tier 自动降档。
+def _layout_vocab_problems(deck: dict, tokens: dict, slides: list) -> list[str]:
+    """布局词表验收：风格在 style.json 声明 layouts 时，spec.layout 必须落在词表里。
 
-    此前它是**静默**的 —— 内容多→字变小→装得下→check 全绿，视觉质量下降
-    没人拦（hierarchy.py 注释里自己都写了这是"绝对不要第一步缩字号"的反例）。
-    compile 的 trace 记了决策，这里是门禁处的第二声：缩字号是修复顺序
-    第 13 位（先删条目 / 拆页 / 换变式）。纯函数：只看 spec，不碰测量。
+    v3 的纪律：**作者自己封闭自己的词表**（风格声明它认哪些布局名）——
+    脚本不再有一张全局枚举，但拼写错误仍然当场拦（自造名写错一个字母，
+    skin 里那条规则就永远不生效，最难查的那种静默）。
     """
+    vocab = tokens.get("layouts")
+    if not isinstance(vocab, list) or not vocab:
+        return []
+    allowed = set(vocab) | set(render_mod.IMAGE_LAYOUTS) | set(render_mod.TWO_COL_LAYOUTS)
     out: list[str] = []
-    for i, s in enumerate(deck.get("slides", []), 1):
-        if s.get("type") != "content-text":
-            continue
-        n = len(s.get("bullets") or [])
-        if n > 5:
-            out.append(f"第 {i} 页 {n} 条将触发最小字号档（bulletSmall 自动降档）——"
-                       f"缩字号是修复顺序第 13 位：先删条目 / 拆页 / 换变式"
-                       f"（compile --trace 有同一决策的完整理由）")
+    for i, s in enumerate(slides, 1):
+        lay = s.get("layout")
+        if isinstance(lay, str) and lay and lay not in allowed:
+            out.append(f"第 {i} 页 layout={lay!r} 不在风格的 layouts 词表里"
+                       f"（{vocab}）—— 拼写错误会让 skin 里那条规则永远不生效")
     return out
 
 
-def _check_deck_shape(measured: dict, deck: dict) -> tuple[list[str], list[str]]:
+def _tier_notes(deck: dict) -> list[str]:
+    """字号档提示：条目多的 content-text 页在缺省档下会偏挤。
+
+    v3 起**没有按条数自动降档** —— 档位由作者声明（slide.bulletTier 或
+    风格 bulletDefault）。这里只在"条目多 + 没显式声明档位"时提示一声：
+    内容多就拆页 / 收短，或显式写一个小档，别让字自己变小。
+    纯函数：只看 spec，不碰测量。
+    """
+    out: list[str] = []
+    for i, s in enumerate(deck.get("slides", []), 1):
+        if s.get("type") != "content-text" or s.get("bulletTier"):
+            continue
+        n = len(s.get("bullets") or [])
+        if n > 5:
+            out.append(f"第 {i} 页 {n} 条且未声明 bulletTier —— 缺省档下会偏挤。"
+                       f"先考虑拆页 / 收短（缩字号是修复顺序第 13 位）；"
+                       f"确实要小字就显式写 bulletTier: \"bulletSmall\"")
+    return out
+
+
+def _check_deck_shape(measured: dict, deck: dict,
+                      tokens: dict | None = None) -> tuple[list[str], list[str]]:
     """deck 级：**半页死白**（提示）+ 版式单一（提示）+ 没有封面（提示）。
 
     为什么“半页死白”必须在这里补：以前只有“装不下”那半边有牙（越界检查）。
@@ -442,10 +463,11 @@ def _check_deck_shape(measured: dict, deck: dict) -> tuple[list[str], list[str]]
     if slides and "title" not in kinds:
         notes.append("这份 deck 没有封面页（没有 type=title）—— 是漏了，还是有意？")
 
-    # 字号降档可见化（纯函数抽出，便于单测）：compile 的 trace 是第一声，
-    # 这里是门禁处的第二声。
+    # 档位提示（纯函数抽出，便于单测）：风格/作者声明档位，脚本不再自动升降。
     notes.extend(_tier_notes(deck))
-    notes.extend(_variant_rotation_notes(deck))
+    notes.extend(_layout_rotation_notes(deck))
+    problems.extend(_layout_vocab_problems(deck, tokens or {},
+                                           deck.get("slides", [])))
 
     # 版式单一：全是一种版式时，视线没有落点变化。
     content_kinds = [k for k in kinds if k not in ("title", "end")]
@@ -669,7 +691,7 @@ def advisories(measured: dict, spec: dict | None = None,
     if spec is not None and tokens is not None:
         _, brand_notes = _check_brand(measured, spec.get("deck", {}), tokens)
         notes.extend(brand_notes)
-        _, shape_notes = _check_deck_shape(measured, spec.get("deck", {}))
+        _, shape_notes = _check_deck_shape(measured, spec.get("deck", {}), tokens)
         notes.extend(shape_notes)
         # 信息层级那三条（预算 / 焦点 / 密度）**全是提示**，理由见 hierarchy.py：
         # 它们的阈值取决于语境（封面就该空、看板就该满），做成阻塞的话第一份正常的

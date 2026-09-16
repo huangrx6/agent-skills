@@ -320,105 +320,6 @@ NOVELTY_MIN = {"plain": 0.45, "design": 0.65, "cover": 0.75}
 # 两次跑出不同的色，那就没法回归了（仓库的老规矩）。
 # ═══════════════════════════════════════════════════════════════════════════
 
-DIRECTIONS = {
-    # name: (色相偏移, 彩度倍数, 明度偏移)  —— 都落在第 19 条给的范围内
-    "safe": {"hue": 0.0, "chroma": 1.00, "lightness": 0.0,
-             "why": "原样。稳定、克制、可用于正式汇报"},
-    "creative": {"hue": 18.0, "chroma": 1.12, "lightness": 0.02,
-                 "why": "色相挪 18°、彩度提 12%、明度微提 —— 与常见解拉开距离但仍协调"},
-    "experimental": {"hue": -28.0, "chroma": 1.20, "lightness": -0.04,
-                     "why": "色相反方向挪 28°、彩度提 20% —— 制造冷暖反差，用在封面/视觉页"},
-}
-
-
-def variant(colors: dict, direction: str) -> dict:
-    """按某个方向做一次 OKLCH 二次变体（第 19 条：Hue ±10~30、Chroma ±5~20%、L ±3~12%）。"""
-    spec = DIRECTIONS.get(direction)
-    if spec is None:
-        raise SystemExit(f"✗ 不认识的方向 {direction!r}；可选 {sorted(DIRECTIONS)}")
-    out = dict(colors)
-    for role in ("primary", "secondary"):
-        value = colors.get(role)
-        if not value:
-            continue
-        L, C, H = oklch(value)
-        if C < NEUTRAL_CHROMA:
-            continue                     # 中性色不参与色相变化（挪了会变脏）
-        out[role] = to_hex((_clamp(L + spec["lightness"]), C * spec["chroma"],
-                            (H + spec["hue"]) % 360))
-    return out
-
-
-def directions(colors: dict) -> dict[str, dict]:
-    """三套方向 + 各自该选什么时候用。"""
-    out = {}
-    for name in ("safe", "creative", "experimental"):
-        out[name] = {"colors": variant(colors, name), "why": DIRECTIONS[name]["why"],
-                     "novelty": novelty(variant(colors, name))[0]}
-    return out
-
-
-# mood → 方向：spec 的**显式语义意图**（总编排 §17 Theme Resolver 的输入）。
-# 值封闭 —— validate_spec 同步校验。
-MOOD_DIRECTIONS = {
-    "calm": "safe",             # 克制、正式汇报
-    "neutral": "safe",          # 不表态：用风格的手调基准
-    "bold": "creative",         # 与常见解拉开距离但仍协调
-    "experimental": "experimental",
-}
-
-
-def choose_direction(tokens: dict, mood: str | None = None) -> tuple[str, list[str]]:
-    """auto 主题的**方向决策**（§17 Theme Resolver 第一片）。
-
-    决策链（每步带理由；seed 不在其中）：
-      1. spec 的 mood（显式语义意图）→ 方向映射
-      2. 风格语法 colorStructure.color_creativity（风格声明的配色胆量）
-      3. 都没有 → safe（手调基准原样）
-
-    老根因：方向曾是 `crc32(seed) % 3` —— "换 deck 自动换配色"取决于 seed，
-    那是没有理由的掷骰子。seed 现在只负责可复现，不再做审美决策。
-    """
-    if mood is not None:
-        pick = MOOD_DIRECTIONS.get(mood)
-        if pick is None:
-            raise SystemExit(f"✗ 不认识的 mood {mood!r}；可选 {sorted(MOOD_DIRECTIONS)}")
-        return pick, [f"spec mood={mood} → {pick} 档（语义意图，显式给定）",
-                      "seed 只管可复现，不参与方向决策"]
-    creativity = (tokens.get("colorStructure") or {}).get("color_creativity")
-    if isinstance(creativity, (int, float)):
-        pick = "creative" if creativity >= 0.66 else "safe"
-        tail = ("（≥0.66）→ creative 档" if pick == "creative"
-                else "（<0.66）→ safe 档：手调基准原样")
-        return pick, [f"风格语法 color_creativity={creativity}{tail}",
-                      "风格声明了自己的配色胆量；seed 不参与方向决策"]
-    return "safe", ["风格未声明 color_creativity → safe 档（手调基准原样）"]
-
-
-def auto_set(tokens: dict, seed: int, mood: str | None = None) -> tuple[str, dict]:
-    """colorSet 省略 / "auto" 时的解析：方向由语义决定（choose_direction），
-    变体是纯函数 —— 同输入同结果（可回归）。只动 primary/secondary
-    （variant 的保证），纸色/文字不动，对比度结构原样保住。
-    派生结果注入 tokens.colorSets，消费方统一按名取（不留第二套取色路径）。
-
-    （seed 参数保留在签名里是为了 API 稳定；它不再决定方向。）
-    """
-    pick, _reasons = choose_direction(tokens, mood)
-    names = list(tokens["colorSets"])
-    base = tokens["colorSets"][names[0]]
-    label = f"auto:{pick}"
-    tokens["colorSets"][label] = dict(base) if pick == "safe" else variant(base, pick)
-    return label, tokens["colorSets"][label]
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# 5. 角色映射 —— 第 20 条那 13 个角色，从四个推出来
-#
-# 为什么不手写：手写会在换色板时漂（改 primary 忘了改 accent）。推导是**可测**的，
-# 而且推出来的关系一定自洽（surface 永远比 background 偏一点、border 永远在中间）。
-# ═══════════════════════════════════════════════════════════════════════════
-
-
 def roles(colors: dict) -> dict:
     """四个色 → 第 20 条的完整角色表（含 chart_colors 与 gradient）。"""
     primary = colors.get("primary", "#0033CC")
@@ -629,7 +530,7 @@ def audit(style: dict, topic: str = "", only: str | None = None,
         if floor_value is not None and score < floor_value:
             notes.append(f"{tag}：novelty {score:.2f} < 目标 {floor_value:.2f} —— "
                          f"想拉高就换一套非常规冷暖的组合，或做一次 OKLCH 变体"
-                         f"（`--directions`）")
+                         )
 
     # ④ 结构声明与实测要对得上（声明是承诺，实测是事实）。比对是**风格级**的：
     #    一套风格的几个色板可以有不同的色相结构（实测：notebook 的 rule 是三角、
@@ -650,15 +551,13 @@ def audit(style: dict, topic: str = "", only: str | None = None,
 def main(argv: list[str]) -> int:
     render = _load_sibling("render")
 
-    ap = argparse.ArgumentParser(description="配色：结构 / 角色 / novelty / 三方向")
+    ap = argparse.ArgumentParser(description="配色：结构 / 角色 / novelty 验收")
     ap.add_argument("--audit", action="store_true", help="审 8 套风格的配色")
     ap.add_argument("--style", default=None, help="只审这一套风格")
     ap.add_argument("--color-set", default=None, help="只审这一个色板")
     ap.add_argument("--topic", default="", help="主题（用来判'科技=蓝紫青'那条俗套）")
     ap.add_argument("--novelty", nargs=2, metavar=("STYLE", "SET"),
                     help="打印某个色板的 novelty 与依据")
-    ap.add_argument("--directions", nargs=2, metavar=("STYLE", "SET"),
-                    help="打印 Safe / Creative / Experimental 三套变体")
     ap.add_argument("--roles", nargs=2, metavar=("STYLE", "SET"),
                     help="打印 13 个角色的推导结果")
     ap.add_argument("--min-novelty", type=float, default=None,
@@ -672,15 +571,6 @@ def main(argv: list[str]) -> int:
         tokens = deckio.read_json(os.path.join(render.style_folder(style),
                                              "style.json"))
         print(_dump(roles(tokens["colorSets"][set_name])))
-        return 0
-
-    if args.directions:
-        style, set_name = args.directions
-        tokens = deckio.read_json(os.path.join(render.style_folder(style),
-                                             "style.json"))
-        for name, row in directions(tokens["colorSets"][set_name]).items():
-            print(f"── {name}（novelty {row['novelty']:.2f}）{row['why']}")
-            print("   " + _dump(row["colors"]))
         return 0
 
     if args.novelty:

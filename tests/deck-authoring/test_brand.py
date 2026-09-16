@@ -336,8 +336,10 @@ class TestExampleBrandIsCalledOut(unittest.TestCase):
     """
 
     def test_advisory_fires_for_example_brand(self) -> None:
-        deck = {"brand": "example"}
+        # v3：colorSet 必填（check 读它算纸色）；写真正的夹具色板名
         tokens = render.load_style("swiss-grid")["tokens"]
+        deck = {"brand": "example",
+                "colorSet": next(iter(tokens["colorSets"]))}
         problems, notes = check_mod._check_brand(
             {"elements": [{"id": "lg", "slide": 1, "role": "logo", "x": 10,
                            "y": 10, "w": 50, "h": 20, "intendedText": "logo.svg"}]},

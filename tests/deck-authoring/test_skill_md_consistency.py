@@ -50,7 +50,8 @@ PROBE_SLIDES = {
     "two-column": {"type": "two-column", "title": "W",
                    "columns": [{"title": "A", "bullets": ["a"]}, {"title": "B", "bullets": ["b"]}]},
     "timeline": {"type": "timeline", "title": "L", "nodes": [{"label": "Q1", "note": "n"}]},
-    "chart": {"type": "chart", "title": "G", "data": [{"label": "A", "value": 10}], "unit": "%"},
+    "chart": {"type": "chart", "title": "G", "chart": "bar",
+              "data": [{"label": "A", "value": 10}], "unit": "%"},
     "end": {"type": "end", "title": "E"},
 }
 

@@ -45,7 +45,8 @@
             "label": "组7",
             "value": 3
           }
-        ]
+        ],
+        "chart": "bar-horizontal"
       },
       {
         "type": "chart",
@@ -65,7 +66,8 @@
             "text": "目标",
             "value": 100
           }
-        ]
+        ],
+        "chart": "bar-horizontal"
       },
       {
         "type": "chart",
@@ -89,7 +91,8 @@
             "label": "Q4",
             "value": 26
           }
-        ]
+        ],
+        "chart": "line"
       },
       {
         "type": "chart",
@@ -109,7 +112,8 @@
             "label": "丙",
             "value": 22
           }
-        ]
+        ],
+        "chart": "donut"
       },
       {
         "type": "end",

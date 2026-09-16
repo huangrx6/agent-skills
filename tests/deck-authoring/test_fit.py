@@ -252,17 +252,6 @@ class TestFitEndToEnd(unittest.TestCase):
         for c in self.result["candidates"]:
             self.assertIn(c["kind"].split(":")[0], fit.CANDIDATES)
 
-    def test_probe_deck_includes_image_variants(self) -> None:
-        """content-image 是家族不是单一版式：探针把 visual-left / even 摆进同一份
-        产物 —— CandidateScore 有真候选可比，compile 的自动选变体从这里取数。"""
-        _deck, labels = fit.build_probe_deck(
-            {"title": "T", "bullets": ["a", "b", "c"], "image": "x.png"})
-        kinds = [v["kind"] for v in labels.values()]
-        self.assertIn("content-image:visual-left", kinds)
-        self.assertIn("content-image:even", kinds)
-        self.assertIn("content-image:hero", kinds)
-
-
 class TestFitCli(unittest.TestCase):
     def test_exit_code_reflects_whether_anything_fits(self) -> None:
         ok = subprocess.run(
@@ -386,77 +375,6 @@ class TestPlateSampleHasNoHardcodedColorSet(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-class TestRecommend(unittest.TestCase):
-    """fit.recommend：变体实测推荐 —— compile auto 的数据源（§22 候选测量的第一片）。
-
-    图的高宽比是变体选择的真实输入，所以探针必须带**真图**：
-    demo 引用的 sample-treated.png 不在仓库里，这里手写一张最小 PNG
-    （800×600，stdlib zlib —— 渲染器要的是能解码的图，不是好看的图）。
-    """
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        import tempfile
-        import zlib
-        cls.tmp = tempfile.mkdtemp(prefix="deck-rec-")
-        w, h = 800, 600
-        raw = b"".join(b"\x00" + bytes((200, 80, 60)) * w for _ in range(h))
-
-        def chunk(tag: bytes, data: bytes) -> bytes:
-            head = tag + data
-            return (len(data).to_bytes(4, "big") + head
-                    + (zlib.crc32(head) & 0xFFFFFFFF).to_bytes(4, "big"))
-
-        png = (b"\x89PNG\r\n\x1a\n"
-               + chunk(b"IHDR", w.to_bytes(4, "big") + h.to_bytes(4, "big")
-                       + b"\x08\x02\x00\x00\x00")
-               + chunk(b"IDAT", zlib.compress(raw))
-               + chunk(b"IEND", b""))
-        with open(os.path.join(cls.tmp, "img.png"), "wb") as fh:
-            fh.write(png)
-
-    def test_probe_resolves_image_to_absolute(self) -> None:
-        """相对路径必须解析成绝对：探针 HTML 在临时目录，裂图量出来是错的。"""
-        spec = {"deck": {"slides": [{"type": "content-image", "title": "t",
-                                     "bullets": ["a"], "image": "img.png"}]}}
-        probe, labels = fit.build_variant_probe(spec, self.tmp)
-        self.assertEqual(len(probe["deck"]["slides"]), 4)   # 三分栏变体 + hero
-        self.assertEqual(probe["deck"]["slides"][0]["image"],
-                         os.path.join(self.tmp, "img.png"))
-        kinds = [m["kind"] for m in labels.values()]
-        self.assertIn("content-image:even", kinds)
-        self.assertIn("content-image:visual-left", kinds)
-        self.assertIn("content-image:hero", kinds)
-
-    def test_probe_empty_without_image_pages(self) -> None:
-        probe, _labels = fit.build_variant_probe(
-            {"deck": {"slides": [{"type": "content-text", "title": "t",
-                                 "bullets": ["a"]}]}}, self.tmp)
-        self.assertEqual(probe["deck"]["slides"], [])
-
-    def test_recommend_picks_and_is_deterministic(self) -> None:
-        """浏览器实测：结构正确（最佳+两个对手+分数不劣于对手）、同输入恒等。"""
-        spec = {"deck": {"title": "变体", "seed": 3, "slides": [
-            {"type": "content-image", "title": "图页",
-             "bullets": ["要点一", "要点二", "要点三"],
-             "image": "img.png", "variant": "auto"}]}}
-        probe, labels = fit.build_variant_probe(spec, self.tmp)
-        html_path = os.path.join(self.tmp, "probe.html")
-        fit.deckio.write_text(html_path, fit.render.render(probe))
-        recs = fit.recommend(fit.measure_mod.measure(html_path), labels, spec)
-        self.assertEqual(len(recs), 1)
-        rec = recs[0]
-        self.assertEqual(rec["page"], 1)
-        self.assertIn(rec["variant"], fit.render.IMAGE_VARIANTS)
-        self.assertEqual(len(rec["alternatives"]), 3)   # 四变体：最佳 + 三个对手
-        for alt in rec["alternatives"]:
-            self.assertGreaterEqual(rec["score"], alt["score"],
-                                    "最佳变体分数反而落后 —— 排序坏了")
-        # 纯函数：同一份测量再算一遍必须恒等；重测一次也恒等（确定性链路）
-        again = fit.recommend(fit.measure_mod.measure(html_path), labels, spec)
-        self.assertEqual(recs, again)
 
 
 class TestHeroScoring(unittest.TestCase):

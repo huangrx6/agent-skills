@@ -38,11 +38,9 @@ G2 渲染器，把这层换成 `g2.js` 生成器即可，DSL 与 PPT 层都不�
 | deviation 偏差 | bar | 从基线的正负柱 |
 | distribution 分布 | bar（离散桶）/ line（时间桶） | 直方图语义；桶是时间时走向更重要 |
 
-映射不是 1:1 死表 —— `resolve_type` 按数据形状（条目数 / 标签是否像时间）
-分支，每步带理由，`--explain` 与 compile 的 Decision Trace 同源。
-
-没写 `chart` 也没写 `intent` 时，按**数据形状**推：多系列 → line；单系列且标签
-像时间（Q1/月份/年份）→ line；否则 bar。推出来的会在 `--explain` 里说明理由。
+上表只是**同一份 intent 下常见的好选择**，不是自动映射 —— v3 起图形类型由
+作者在 spec 里显式声明（`chart: "bar"`），`intent` 是可选的语义标注，不参与
+渲染。`--explain` 打印每页声明的类型与缺 `message` 的提醒。
 
 ## 好看的三条硬规则（规范第 4 / 5 条）
 
@@ -131,7 +129,7 @@ def g2_spec(slide: dict, colors: dict, emphasis: set | None = None) -> dict:
     def enc_color(d):
         return primary if (not emphasis or str(d.get("label")) in emphasis) else muted_c
 
-    kind = infer_chart_type(slide)[0]
+    kind = declared_type(slide)
     spec: dict = {
         "animation": False,                      # 确定性：动画关死（§41/42）
         "autoFit": False,
@@ -200,83 +198,21 @@ def g2_spec(slide: dict, colors: dict, emphasis: set | None = None) -> dict:
     return spec
 
 
-def resolve_type(intent: str, slide: dict) -> tuple[str, list[str]]:
-    """intent + 数据形状 → 图形类型（§19 Chart Resolver v2）。
+def declared_type(slide: dict) -> str:
+    """这一页用什么图形 —— **spec 显式声明**（v3：类型是内容决策，作者写）。
 
-    旧的 1:1 死表（composition 一律 donut / progress 一律 donut）在可视化
-    语义上太粗：donut 的角度差在切片多时读不出来；progress 用 donut 既占
-    地方又读不出"到哪了"。这里按数据形状走，每步带理由 —— `--explain`
-    与 compile 的 Decision Trace 同源（规范：Resolver 决策可追踪）。
-    """
-    data = slide.get("data") or []
-    n = len(data)
-    labels = [d.get("label", "") for d in data]
-    if intent == "composition":
-        if n > 5:
-            return ("bar-horizontal",
-                    [f"{n} 条切片超出 donut 的可读上限（5）→ 排序横条",
-                     "比长度比比角度准（Cleveland & McGill 1984）；渲染器大的在上"])
-        return ("donut", [f"{n} 条切片 ≤5 → donut（少量切片的角度差可读）"])
-    if intent == "progress":
-        return ("bar-horizontal",
-                ["进度 → 横条温度计：条的位置就是「到哪了」，donut 读不出位置",
-                 "达成率/目标值走 annotations 与 caption，不占图形本体"])
-    if intent == "distribution":
-        if looks_temporal(labels):
-            return ("line", ["分布的桶是时间 → line：走向比逐桶高低更该被看见"])
-        return ("bar", ["分布的桶是离散类别 → bar（直方图语义）"])
-    one_to_one = {
-        "trend": ("line", "时间横向展开"),
-        "ranking": ("bar-horizontal", "大的排上面"),
-        "comparison": ("bar", "类别并排比高度"),
-        "correlation": ("scatter", "两变量逐点，看聚合形状"),
-        "deviation": ("bar", "从基线的正负柱，离 0 的距离就是偏差"),
-    }
-    ctype, why = one_to_one[intent]
-    return ctype, [f"{INTENT_ZH[intent]}语义 → {ctype}：{why}"]
-
-
-def infer_chart_type(slide: dict) -> tuple[str, str]:
-    """决定这一页用什么图形。返回 (chart 类型, 理由)。
-
-    顺序：显式 `chart` > `intent` 映射 > 按**数据形状**推。理由会写进 `--explain`，
-    因为"为什么是这张图"本身是信息（AI 改了意图，图就该跟着换）。
+    历史上这里有一层 `intent`→类型/数据形状的自动推断，已按 v3 退役：
+    推断等于替作者选图形。`intent` 仍可作为语义标注写进 spec（封闭八值，
+    validate_spec 校验），但不再影响渲染。
     """
     declared = slide.get("chart")
-    if declared:
-        if declared not in CHART_TYPES:
-            raise SystemExit(f"✗ chart={declared!r} 不在八类里（{list(CHART_TYPES)}）")
-        return declared, "spec 里显式写了 chart"
-    intent = slide.get("intent")
-    if intent:
-        if intent not in INTENTS:
-            raise SystemExit(f"✗ intent={intent!r} 不认识（{list(INTENTS)}）")
-        ctype, reasons = resolve_type(intent, slide)
-        return ctype, (f"intent={intent}（{INTENT_ZH[intent]}）→ {ctype}："
-                       + "；".join(reasons))
-    # ⚠️ 什么都不写时**缺省是 bar** —— 与历史行为一致，不悄悄改观感。
-    #
-    # 第一版在这里按数据形状推：标签像时间就给 line。实测后果：压测 deck 的
-    # 图表页（标签是 Q1/Q2…）从柱状图静默变成折线图，八套风格全挂 —— 旧 spec
-    # 没写 chart/intent，它没同意被改。形状推断只当**建议**（--explain 会说），
-    # 不当缺省。要折线就写 intent: trend 或 chart: line。
-    series = slide.get("series") or []
-    data = slide.get("data") or []
-    # 多系列**必须声明**：bar 只画第一系列 —— 猜错就是静默丢数据，那比报错糟。
-    # line / area / bar-stacked / combo 都合理，选哪个是表达意图，不是数据形状能定的。
-    if series:
+    if not declared:
         raise SystemExit(
-            "✗ 多系列图表需要写 chart 或 intent —— line / area / bar-stacked / combo "
-            "都合理，缺省会只画第一系列（静默丢数据）。想看各系列走势就 intent: trend")
-    why = "没写 chart 也没写 intent → 缺省 bar（与历史一致）"
-    if looks_temporal([d.get("label", "") for d in data]):
-        why += "；标签像时间 → 建议 intent: trend（line）"
-    return "bar", why
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# 颜色：muted + 1 accent（规范第 4 条）—— 图表配色从色板推，不自立一套
-# ═══════════════════════════════════════════════════════════════════════════
+            "✗ 图表页缺 `chart` —— v3 起图形类型由作者显式声明（八类："
+            f"{list(CHART_TYPES)}）。validate_spec.py 会先拦住这种 spec。")
+    if declared not in CHART_TYPES:
+        raise SystemExit(f"✗ chart={declared!r} 不在八类里（{list(CHART_TYPES)}）")
+    return declared
 
 
 def _hex_mix(a: str, b: str, t: float) -> str:
@@ -351,7 +287,7 @@ def _values(series: list[dict]) -> list[float]:
 
 def svg(slide: dict, colors: dict, tag_attr: str = "") -> str:
     """按这一页的 DSL 渲 SVG。几何是纯函数 —— 同输入同输出（MP4 依赖这一点）。"""
-    kind, _why = infer_chart_type(slide)
+    kind = declared_type(slide)
     primary = colors["primary"]
     background = colors["background"]
     text = colors.get("text") or "#0A0A0A"
@@ -758,8 +694,8 @@ def main(argv: list[str]) -> int:
         for i, slide in enumerate(spec.get("deck", {}).get("slides", []), 1):
             if slide.get("type") != "chart":
                 continue
-            kind, why = infer_chart_type(slide)
-            print(f"第 {i} 页 → {kind}（{why}）")
+            kind = declared_type(slide)
+            print(f"第 {i} 页 → {kind}（spec 显式声明）")
             if slide.get("message"):
                 print(f"        message：{slide['message']}")
             else:

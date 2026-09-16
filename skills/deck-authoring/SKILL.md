@@ -26,8 +26,9 @@ skill 目录永不写入；参考实现在 `dev-tools/style-fixture/`），加�
 
 1. **内容大纲**：页序 + 每页一个观点，先过目；点头才写 spec（见 `references/planning.md`）。
 2. **风格方向**：三版真出图并排（见下），停下等选择；选完记进 spec。
-3. **配色**：从所选风格的 `colorSets` 挑（或 auto/mood），三版小样给用户选；品牌色优先。
-4. **布局+配图合同**：批量出交付物前，关键页预览过目（变体轮换可见）；
+3. **配色**：从所选风格的 `colorSets` 挑一套具名色板（**spec 必须写名字**），
+   三版小样给用户选；品牌色优先。
+4. **布局+配图合同**：批量出交付物前，关键页预览过目（布局轮换可见）；
    `--brief` 的**每个图位提示词一并交给用户**（那是他要拿去出图的东西）。
 
 ### 三方向：真出图，但不落盘
@@ -41,18 +42,19 @@ for s in a b c; do cp -r dev-tools/style-fixture/swiss-grid /tmp/dir-$s   # 改�
   python3 scripts/render.py spec.json --style $s -o $s.html && python3 scripts/shots.py $s.html --out-dir shots-$s --count 2; done
 ```
 
-并排摆出来，每版标：**风格名 + 温度 + 一句话适合什么场合**；摆完**停下等选择**。
+**方向不是预设、也不只是色板**——它在字号档 / 字栈 / 动效 / 气质上互斥（拷夹具
+换成三张同构皮肤是用户实测踩过的坑）。改的是 `style.json` 的 `type`/`fonts`/`motion`
+与 `skin.css` 的排法；摆出来每版标：**风格名 + 温度 + 适合什么场合**，停下等选择。
 
 ### 风格：自建，无内置
 
-**内置八套已整体移除**（styles/ 删除，按用户决定）——风格是每份 deck 的表达层，
-不该预置。自建：**deck 项目**的 `styles/<名>/` 放 `style.json + skin.css`（形状与逐键说明见
+**内置八套已整体移除**（styles/ 删除，按用户决定）——风格是每份 deck 的表达层。
+自建：**deck 项目**的 `styles/<名>/` 放 `style.json + skin.css`（形状与逐键说明见
 `references/style-architecture.md`；字栈参考 `fonts/mapping.json`）。参考实现：
-`dev-tools/style-fixture/swiss-grid`（demo/测试走它，可拷改）。`style.py` 列出
-全部（用户 + 夹具）并逐套过契约；`style.py --sheet -o s.png` 拼对照图。
-每个风格可带多个 `colorSet`；省略 colorSet 或写 auto = 按语义决策方向
-（mood → 风格语法；seed 只管可复现，不做审美决策）。换风格/换色板只改 spec
-两个字段，内容一字不动。
+`dev-tools/style-fixture/swiss-grid`（可拷改）。`style.py` 列全部并逐套过契约；
+`style.py --new <名>` 拷一份脚手架到 `<cwd>/styles/`。
+每个风格可带多个 `colorSet`；**spec 的 `colorSet` 必填具名**（auto/mood 已退役 ——
+选色是审美决策，脚本只验对比度）。换风格/换色板只改 spec 两个字段，内容一字不动。
 
 ## 为什么不能让你写坐标或色值
 
@@ -67,13 +69,12 @@ for s in a b c; do cp -r dev-tools/style-fixture/swiss-grid /tmp/dir-$s   # 改�
 
 1. **先读 demo**：`dev-tools/demo.spec.json` 以它为准（逐键说明见
    `references/style-architecture.md`；写完跑 `validate_spec.py`）。
-2. **写 spec**（前置：大纲已过确认门 ①）：每页只有 `type` + 内容（标题 / 条目 / 时间点 / 数据），见
-   `references/style-architecture.md`；**写什么内容**见 `references/content-intelligence.md`（内容智能 / 内容规划系统）
-   （一页一个观点 / 容量估算 / 观众距离）。拿不准一页装不装得下就先跑 `fit.py`，别猜。
-   `seed` 显式写（默认 1）：错位与颗粒按 (seed, 元素) 派生，不靠全局 random（否则没法回归）。
-   有品牌资产加一行 `deck.brand`（见 brand-assets.md：**品牌赢在"是谁"，风格赢在
-   "怎么表达"**；demo 的 example/ACME 是演示品牌，抄模板记得删）。字体与配色见
-   `references/fonts.md`（--fetch）与 `references/color.md`（--audit）。
+2. **写 spec**（前置：大纲已过确认门 ①）：每页只有 `type` + 内容，见
+   `references/style-architecture.md`；**写什么内容**见 `references/content-intelligence.md`
+   （一页一个观点 / 容量估算 / 观众距离）。拿不准一页装不装得下就先跑 `fit.py`。
+   `seed` 显式写（默认 1）：错位与颗粒按 (seed, 元素) 派生，否则没法回归。
+   有品牌资产加一行 `deck.brand`（见 brand-assets.md：**品牌赢在“是谁”，风格赢在
+   “怎么表达”**；demo 的 example/ACME 是演示品牌，抄模板记得删）。
 3. **五道门**（顺序有意义：先验输入，再渲，再量，最后判；九站总图见 `references/pipeline.md`）：
    - 规格：`python3 scripts/validate_spec.py your.spec.json`（字段集封闭，未知键直接失败）
    - 墨色：`ink.py styles/<你的风格>/style.json`（deck 项目里跑；任一色板不达标退 1）
@@ -95,27 +96,28 @@ for s in a b c; do cp -r dev-tools/style-fixture/swiss-grid /tmp/dir-$s   # 改�
 
 `type` 字段支持：
 
-| type | 用途 | 变体（`variant`，不写=默认） |
+| type | 用途 | 布局（`layout`，不写=缺省） |
 | --- | --- | --- |
 | `title` | 封面 | —（副标题一行内） |
-| `content-text` | 全文页 | —（条目太多实测判） |
-| `content-image` | 图文页 | `visual-right` 默认 / `visual-left` 图先文后 / `even` 6+6 / `hero` 图为主角满幅+标题条；写 `auto` = fit 实测选（见下） |
-| `two-column` | 双栏 | `even` 默认 / `lean-left` 左栏宽 / `lean-right` 右栏宽 |
+| `content-text` | 全文页 | —（条目太多给提示，档位作者声明） |
+| `content-image` | 图文页 | 结构布局：`visual-right` 缺省 / `visual-left` 图先文后 / `even` 6+6 / `hero` 图为主角满幅+标题条 |
+| `two-column` | 双栏 | 结构布局：`even` 缺省 / `lean-left` 左栏宽 / `lean-right` 右栏宽 |
 | `timeline` | 时间线 | —（节点标签走数字档） |
-| `chart` | 图表 | 图形由 `intent` 决定（composition 按条数分档、progress 温度计…） |
+| `chart` | 图表 | 图形由 **`chart` 字段显式声明**（八类：bar/bar-horizontal/line/area/bar-stacked/donut/scatter/combo）；`intent` 是可选语义标注 |
 | `end` | 收尾 | —（居中大字） |
 
-**同型页连排时换变体换节奏**（右图页接一个左图页、纯文页后配一个 hero）——
-每页同构图是反 slop 清单第一条；安静派偏 `even`/留白多的变体，浓烈派偏满幅。
-图位要出图：`image_source.py --brief spec.json` 出提示词合同（人拿去出图）。
-变体选 `auto` 时两步：`fit.py --from-spec spec --recommend --json-out > variants.json`
-→ `compile.py spec --fit-variants variants.json --trace`（实测分数进决策留痕）。
+**结构布局 = 渲染器能力（像图表的八类图形），名字由你定**：写一个表外的
+`layout`（如 `poster-split`）就套缺省结构 + `data-layout="poster-split"`，
+怎么排由 `skin.css` 写（`[data-layout=...] .main{...}`）—— 脚本不枚举审美。
+风格可声明 `layouts: [...]` 自封闭词表，`check.py` 按表验拼写。
+**同型页连排换布局换节奏**（右图页接左图页、纯文页后配 hero）——每页同构图是
+反 slop 第一条。图位要出图：`image_source.py --brief spec.json` 出提示词合同。
+**字号档也由你声明**（无按条数自动升降）：`titleTier`/`bulletTier` 逐页覆写，
+风格可写 `titleTiers`/`bulletDefault` 定缺省；内容多就拆页/收短，不靠悄悄缩字。
 
-「放不放装饰」是**风格**的属性（`decor.types`），不是版式的 —— 写死的对照表只会
-对出错的前提。
+「放不放装饰」是**风格**的属性（`decor.types`），不是版式的。
 
-版面判断全部靠实测（`measure.py` 真浏览器量真盒子）：越出该页边界、或被会裁的
-容器切掉都报。文字宽不估算 —— 汉字折行的估算差 2 倍多，永远修不准。
+版面判断全靠实测（`measure.py` 真浏览器量真盒子）；文字宽不估算（汉字折行误差 2 倍多）。
 
 ## 动画：同一段画代码，三种时钟
 
@@ -128,7 +130,7 @@ for s in a b c; do cp -r dev-tools/style-fixture/swiss-grid /tmp/dir-$s   # 改�
 - **渲染路径上不许有 CSS `transition`**：走墙钟，逐帧 seek 不可复现（测试盯着；壳除外）。
 - **位移用 `translate`/`scale` 独立属性**：skin 用 `transform`，两边都写会动画期互相覆盖。
 
-导出前抽帧看：`animate.py out.html -o x.mp4 --stills 0,1.5,22.4,32.3`（走同一条路径）。
+导出前抽帧看：`animate.py out.html -o x.mp4 --stills 0,1.5,22.4,32.3`。
 
 ## Do NOT
 
@@ -142,16 +144,14 @@ for s in a b c; do cp -r dev-tools/style-fixture/swiss-grid /tmp/dir-$s   # 改�
   `style.json` 里 `ink.rule` 已经写了"每套色板必须含一个深墨" —— 两墨都亮就压不深。
 - **不要把品牌色/字体写进 spec**：`deck` 里只有 `brand` 一个入口；要改品牌去改
   `brands/<name>/brand.json`。logo 放哪个角也**不归品牌管**（那是构图，归风格）。
-- **不要在 spec 里写 `color: <hex>`**：`color` 字段只接受 `"overprint"`；主 / 副色
-  单独写 `color` 会被 `check.py` 第 ① 条判失败。
-- **不要把生图模型的彩照直接塞进 image 字段**：必须先走 `image_source.py`，
-  否则 check 不会有事，但视觉上立刻露馅（方案 §2 图文页那条）。
-- **不要绕过 ink.py 去手写叠印色**：颜色 = `overprint(primary, secondary)`；写死的
-  `#xxxxxx` 在改色板时会"看起来没变"（实际已变），调试半天找不出原因。
+- **不要在 spec 里写 `color: <hex>`**：`color` 只接受 `"overprint"`（主/副色载不住正文）。
+- **不要把生图模型的彩照直接塞进 image 字段**：先走 `image_source.py`（`--brief`）。
+- **不要绕过 ink.py 手写叠印色**：颜色 = `overprint(primary, secondary)`；写死的
+  `#xxxxxx` 在改色板时会“看起来没变”（实际已变），调试半天找不出原因。
 
 ## 出错时去哪查
 
-- **字段不存在** → 刻意不留的三类（坐标/字号/色值）：版式用 `type`+`variant` 表达，
+- **字段不存在** → 刻意不留的三类（坐标/字号/色值）：版式用 `type`+`layout` 表达，
   换色板改 style.json；别把字段删了就交差。
 - **对比度不达标** → `ink.py styles/<你的风格>/style.json` 查色板；换色板别动阈值。
 - **`... 越出版面：下缘 ... 越出该页下边界 ...`** → 内容真的撑出这页了（实测）。跑
@@ -161,5 +161,5 @@ for s in a b c; do cp -r dev-tools/style-fixture/swiss-grid /tmp/dir-$s   # 改�
 - **字体回退提示** → 声明的族本机没有，后面栈顶上；不阻塞，交付前确认。
 - **错位值越界** → spec 不能硬塞 `--dx/--dy/--rot`，只能脚本派生。
 - **装饰压文字** → validation.md 第 ⑤ 条；墨块只落右侧两角。
-- **图表柱高不成比例** → 数据 `value` 是不是数字、是不是都被图渲染了；
-  `references/validation.md` 第 ⑤ 条里"两两比例"那段解释了为什么不按峰值归一。
+- **图表柱高不成比例** → 数据 `value` 是不是数字、是不是都被图渲染了
+  （`references/validation.md` 第 ⑤ 条）。

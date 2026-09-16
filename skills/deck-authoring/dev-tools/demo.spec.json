@@ -18,7 +18,8 @@
           "用户留存提升 23%",
           "核心链路耗时下降 40%",
           "新增渠道贡献 15% 增量"
-        ]
+        ],
+        "bulletTier": "bulletLarge"
       },
       {
         "type": "content-image",
@@ -27,7 +28,8 @@
           "原始照片降噪后重新制版",
           "分色版 → 高对比双色调"
         ],
-        "image": "sample-treated.png"
+        "image": "sample-treated.png",
+        "bulletTier": "bulletLarge"
       },
       {
         "type": "two-column",

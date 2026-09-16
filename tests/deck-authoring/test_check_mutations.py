@@ -44,7 +44,7 @@ TOKENS = os.path.join(SKILL, "dev-tools", "style-fixture", "swiss-grid", "style.
 DEMO = os.path.join(SKILL, "dev-tools", "demo.spec.json")
 
 CHART_SLIDE = {
-    "type": "chart", "title": "占比",
+    "type": "chart", "title": "占比", "chart": "bar",
     "data": [{"label": "A", "value": 10}, {"label": "B", "value": 20},
              {"label": "C", "value": 30}, {"label": "D", "value": 40}],
     "unit": "%",
@@ -225,9 +225,9 @@ class TestFullPageImageRoleAware(unittest.TestCase):
     def _measured(w: float, h: float, slide: int = 1, role: str = "image") -> dict:
         return {"elements": [{"role": role, "slide": slide, "w": w, "h": h}]}
 
-    HERO_DECK = {"slides": [{"type": "content-image", "variant": "hero",
+    HERO_DECK = {"slides": [{"type": "content-image", "layout": "hero",
                              "image": "x.png"}]}
-    PLAIN_DECK = {"slides": [{"type": "content-image", "variant": "visual-right",
+    PLAIN_DECK = {"slides": [{"type": "content-image", "layout": "visual-right",
                               "image": "x.png"}]}
 
     def test_non_hero_giant_image_still_blocks(self) -> None:
@@ -237,7 +237,7 @@ class TestFullPageImageRoleAware(unittest.TestCase):
         self.assertTrue(problems, "全页图禁令被静默解除了")
 
     def test_hero_giant_image_passes(self) -> None:
-        """hero 变体：图是主角、标题/条目仍是真 DOM 文本 —— 放行。"""
+        """hero 布局：图是主角、标题/条目仍是真 DOM 文本 —— 放行。"""
         self.assertEqual(
             check._check_full_page_image(self._measured(1600, 900), self.HERO_DECK),
             [])

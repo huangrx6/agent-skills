@@ -47,7 +47,8 @@ SLIDE_H_PX = 900
 TEXT_ROLES = {"title", "subtitle", "bullet", "caption", "foot", "brandfoot"}
 
 CHART_SLIDE = {
-    "type": "chart", "title": "渠道占比", "unit": "%", "caption": "数据可改",
+    "type": "chart", "title": "渠道占比", "chart": "donut", "unit": "%",
+    "caption": "数据可改",
     "data": [{"label": "自然", "value": 38}, {"label": "投放", "value": 27},
              {"label": "合作", "value": 20}, {"label": "其他", "value": 15}],
 }

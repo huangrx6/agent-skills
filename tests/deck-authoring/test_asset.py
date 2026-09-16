@@ -133,39 +133,3 @@ class TestCompileResolvesAssetIds(unittest.TestCase):
         self.assertNotIn('src="cover-photo"', html, "assetId 漏进了产物")
 
 
-class TestFitProbeKnowsManifest(unittest.TestCase):
-    """变体探针也认 manifest：assetId 页能实测（真图路径解析对了）。"""
-
-    def test_probe_resolves_asset_id(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            assets_dir = os.path.join(tmp, "assets")
-            os.makedirs(os.path.join(assets_dir, "generated"), exist_ok=True)
-            with open(os.path.join(assets_dir, "manifest.json"), "w",
-                      encoding="utf-8") as fh:
-                json.dump(MANIFEST, fh)
-            # 探针要真图（高宽比是变体选择的真实输入）—— 造一张
-            import zlib
-            w, h = 400, 300
-            raw = b"".join(b"\x00" + bytes((90, 90, 160)) * w for _ in range(h))
-
-            def chunk(tag: bytes, data: bytes) -> bytes:
-                head = tag + data
-                return (len(data).to_bytes(4, "big") + head
-                        + (zlib.crc32(head) & 0xFFFFFFFF).to_bytes(4, "big"))
-
-            with open(os.path.join(assets_dir, "generated", "cover.png"), "wb") as fh:
-                fh.write(b"\x89PNG\r\n\x1a\n"
-                         + chunk(b"IHDR", w.to_bytes(4, "big")
-                                 + h.to_bytes(4, "big") + b"\x08\x02\x00\x00\x00")
-                         + chunk(b"IDAT", zlib.compress(raw))
-                         + chunk(b"IEND", b""))
-            spec = {"deck": {"slides": [
-                {"type": "content-image", "title": "t", "bullets": ["a"],
-                 "image": "cover-photo"}]}}
-            probe, _labels = fit.build_variant_probe(spec, tmp)
-            self.assertEqual(probe["deck"]["slides"][0]["image"],
-                             os.path.join(tmp, "assets", "generated", "cover.png"))
-
-
-if __name__ == "__main__":
-    unittest.main()

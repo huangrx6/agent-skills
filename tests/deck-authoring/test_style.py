@@ -109,7 +109,10 @@ class TestContractListStaysInSyncWithTheRenderer(unittest.TestCase):
         src = open(os.path.join(SCRIPTS, "render.py"), encoding="utf-8").read()
         used = set(re.findall(r'tier\["([a-zA-Z]+)"\]', src))
         used |= set(render.TITLE_TIER.values())          # title/content-text/end 的档
-        used |= {tier for _limit, tier in render.BULLET_TIERS}
+        used.add(render.DEFAULT_BULLET_TIER)             # 条目缺省档（v3：作者声明）
+        # 其余条目档由**作者/风格声明**进来（slide.bulletTier / style.titleTiers）——
+        # v3 没有按条数自动升降档，但声明值必须在这份契约里（否则 tier[...] KeyError）
+        used |= {"bulletLarge", "bulletSmall"}
         used.add(render.DEFAULT_TITLE_TIER)              # 其余版式的档（直接赋值，不是取值）
         return used
 
@@ -315,20 +318,25 @@ class TestMinimalContract(unittest.TestCase):
     Glass…）不再需要"声明自己没有颗粒、没有错位"。
     """
 
-    def test_new_style_preset_generates_contract_clean(self) -> None:
-        """方向预设生成的草稿当场过契约；写在 **cwd 的 styles/**（随 deck 项目）。"""
+    def test_new_style_scaffold_generates_contract_clean(self) -> None:
+        """脚手架草稿当场过契约；写在 **cwd 的 styles/**（随 deck 项目）。
+
+        v3：不再有方向预设 —— 方向由模型读规则后按题自造（预设 = 内置）。
+        这里只保证起手就过契约。
+        """
         import os as _os
         with tempfile.TemporaryDirectory() as tmp:
             cwd = _os.getcwd()
             try:
                 _os.chdir(tmp)
-                out = style.new_style("my-deck-style", "editorial")
+                out = style.new_style("my-deck-style")
                 self.assertTrue(_os.path.isfile(_os.path.join(out, "style.json")))
+                self.assertTrue(_os.path.isfile(_os.path.join(out, "skin.css")))
                 self.assertEqual(style.audit(out), [], "生成的风格没过契约")
                 # 拒绝写 skill 自己的 styles/（变相内置，用户明令禁止）
                 skill_styles = _os.path.join(SKILL, "styles")
                 with self.assertRaises(SystemExit):
-                    style.new_style("nope", "poster", skill_styles)
+                    style.new_style("nope", skill_styles)
             finally:
                 _os.chdir(cwd)
 

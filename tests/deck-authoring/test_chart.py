@@ -57,89 +57,36 @@ def _svg(slide: dict) -> str:
     return chart.svg(slide, COLORS)
 
 
-class TestIntentTree(unittest.TestCase):
-    """意图 → 图形：确定性映射，AI 改了意图图就该换。"""
+class TestDeclaredType(unittest.TestCase):
+    """v3：图形类型由作者显式声明（推断层已退役）。"""
 
-    def test_explicit_chart_wins(self) -> None:
-        self.assertEqual(chart.infer_chart_type({"chart": "donut"})[0], "donut")
+    def test_declared_type_is_used(self) -> None:
+        for t in chart.CHART_TYPES:
+            with self.subTest(t=t):
+                self.assertEqual(chart.declared_type({"chart": t}), t)
 
-    def test_intent_maps_deterministically(self) -> None:
-        """1:1 的意图稳定映射（数据形状无关的那五个）。"""
-        cases = {"trend": "line", "ranking": "bar-horizontal", "comparison": "bar",
-                 "correlation": "scatter", "deviation": "bar"}
-        for intent, want in cases.items():
-            with self.subTest(intent=intent):
-                ctype, why = chart.infer_chart_type({"intent": intent})
-                self.assertEqual(ctype, want)
-                self.assertIn("→", why, "理由里没写类型推导")
+    def test_missing_type_is_a_clean_error(self) -> None:
+        """不写 chart → 干净报错（不是猜 bar，也不是 KeyError 栈）。"""
+        for slide in ({}, {"data": [{"label": "a", "value": 1}]},
+                      {"intent": "trend"}):
+            with self.subTest(slide=slide):
+                with self.assertRaises(SystemExit) as cm:
+                    chart.declared_type(slide)
+                self.assertIn("chart", str(cm.exception))
 
-    def test_composition_splits_by_slice_count(self) -> None:
-        """组成：≤5 条 donut（角度差可读），>5 条排序横条（比长度比角度准）。"""
-        few = {"intent": "composition", "data": [
-            {"label": f"g{i}", "value": v} for i, v in enumerate([40, 30, 20, 10], 1)]}
-        many = {"intent": "composition", "data": [
-            {"label": f"g{i}", "value": v}
-            for i, v in enumerate([32, 24, 14, 9, 7, 5, 3], 1)]}
-        self.assertEqual(chart.resolve_type("composition", few)[0], "donut")
-        ctype, reasons = chart.resolve_type("composition", many)
-        self.assertEqual(ctype, "bar-horizontal")
-        self.assertTrue(any("可读上限" in r for r in reasons))
-
-    def test_progress_leaves_donut(self) -> None:
-        """进度不再用 donut：横条温度计，条的位置就是「到哪了」。"""
-        ctype, reasons = chart.resolve_type("progress", {
-            "data": [{"label": "Q4", "value": 72}]})
-        self.assertEqual(ctype, "bar-horizontal")
-        self.assertTrue(any("温度计" in r for r in reasons))
-
-    def test_distribution_splits_by_temporal_labels(self) -> None:
-        """分布：桶是时间 → line（走向优先），离散类别 → bar（直方图语义）。"""
-        temporal = {"intent": "distribution", "data": [
-            {"label": l, "value": v}
-            for l, v in (("Q1", 8), ("Q2", 12), ("Q3", 19), ("Q4", 26))]}
-        discrete = {"intent": "distribution", "data": [
-            {"label": l, "value": v}
-            for l, v in (("0-10 岁", 8), ("11-20 岁", 12), ("21-30 岁", 19))]}
-        self.assertEqual(chart.resolve_type("distribution", temporal)[0], "line")
-        self.assertEqual(chart.resolve_type("distribution", discrete)[0], "bar")
-
-    def test_resolve_reasons_always_present(self) -> None:
-        """每条决策都带理由 —— Resolver 决策可追踪（§26 同款纪律）。"""
-        for intent in chart.INTENTS:
-            _ctype, reasons = chart.resolve_type(
-                intent, {"data": [{"label": "a", "value": 1}]})
-            self.assertTrue(reasons, f"{intent} 的决策没有理由")
-
-    def test_undeclared_defaults_to_bar_not_line(self) -> None:
-        """**回归**：什么都不写时缺省 bar，与历史一致 —— 不悄悄改观感。
-
-        第一版按数据形状推（标签像时间 → line），实测后果：压测 deck 的图表页
-        从柱状图静默变成折线图，八套风格全挂。形状推断只当建议写进 reason。
-        """
-        slide = {"data": [{"label": "1月", "value": 1}, {"label": "2月", "value": 2}]}
-        kind, why = chart.infer_chart_type(slide)
-        self.assertEqual(kind, "bar")
-        self.assertIn("建议 intent: trend", why)          # 建议在，但不当缺省
-
-    def test_categorical_labels_infer_bar(self) -> None:
-        slide = {"data": [{"label": "华东", "value": 1}, {"label": "华南", "value": 2}]}
-        self.assertEqual(chart.infer_chart_type(slide)[0], "bar")
-
-    def test_multi_series_must_declare(self) -> None:
-        """多系列不声明类型 → 报错。缺省 bar 只画第一系列 —— 猜错就是静默丢数据。"""
-        slide = {"series": [{"name": "a", "data": []}, {"name": "b", "data": []}]}
+    def test_unknown_type_is_rejected(self) -> None:
         with self.assertRaises(SystemExit):
-            chart.infer_chart_type(slide)
+            chart.declared_type({"chart": "pie3d"})
 
-    def test_unknown_chart_or_intent_is_rejected(self) -> None:
-        for bad in ({"chart": "pie3d"}, {"intent": "vibes"}):
-            with self.subTest(bad=bad):
-                self.assertRaises(SystemExit, chart.infer_chart_type, bad)
+    def test_intent_is_annotation_only(self) -> None:
+        """intent 仍是合法语义标注，但**不影响**图形（类型看 chart）。"""
+        self.assertEqual(chart.declared_type({"chart": "donut", "intent": "trend"}),
+                         "donut")
 
-    def test_the_reason_is_reported(self) -> None:
-        """`--explain` 的依据 —— "为什么是这张图"本身是信息。"""
-        _kind, why = chart.infer_chart_type({"intent": "ranking"})
-        self.assertIn("ranking", why)
+    def test_svg_uses_the_declared_type(self) -> None:
+        html = _svg({"chart": "donut", "data": [{"label": "a", "value": 3}],
+                     "title": "t"})
+        self.assertIn('data-chart="donut"', html)
 
 
 class TestMutedAccent(unittest.TestCase):
@@ -283,10 +230,13 @@ class TestMessageFirst(unittest.TestCase):
         self.assertEqual(html.count('class="chartsrc"'), 1)      # 只有第一页有小标签
 
     def test_missing_message_is_called_out_by_explain(self) -> None:
-        """没有 message 时 `--explain` 要点名（标题退回数据集名是违规）。"""
+        """没有 message 时 `--explain` 要点名（标题退回数据集名是违规）。
+
+        v3：`--explain` 只报声明的类型与缺 message 的提醒，不再有类型推导。
+        """
         slide = {"type": "chart", "chart": "bar",
                  "data": [{"label": "A", "value": 1}]}
-        _kind, _why = chart.infer_chart_type(slide)
+        self.assertEqual(chart.declared_type(slide), "bar")
         self.assertFalse(slide.get("message"))
 
 
