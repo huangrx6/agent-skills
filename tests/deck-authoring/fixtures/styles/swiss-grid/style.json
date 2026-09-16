@@ -3,7 +3,7 @@
  "label": "瑞士栅格 Swiss Grid",
  "temperature": "安静",
  "reference": "Massimo Vignelli / Müller-Brockmann 栅格系统 / Vercel·Geist / Sequoia 的 10 页 pitch 模板",
- "note": "为什么是这个风格：前两套都有自己的「质感」（孔版的墨、剧场的黑），它**没有任何质感** —— 全部表达力都来自栅格、字号层级和一条细线。它适合「内容本身要经得起看」的场合：路演、评审、研报、需要被反复翻阅的文档型 deck。代价是它对**内容和排印纪律**要求最高：骨架乱一点、字距松一点，它就从「克制」变成「没做完」—— 这个风格不提供任何掩饰。",
+ "note": "测试夹具用字号（**不是推荐值**：这是海报尺度，内页照抄会偏大 —— 见 references/style-architecture.md 的「字号怎么定」）。\n\n字号层级靠**跨度**而不是绝对值：相邻档 ≥1.15 倍才分得出来。bulletLarge / bullet / bulletSmall 三档由**作者在 spec 声明**（slide.bulletTier / 风格 bulletDefault；v3 起不再按条数自动升档）。",
  "colorSets": {
   "blue": {
    "primary": "#0033CC",

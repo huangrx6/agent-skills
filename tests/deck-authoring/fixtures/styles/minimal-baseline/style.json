@@ -3,7 +3,7 @@
   "label": "极简基线 Minimal Baseline",
   "temperature": "安静",
   "reference": "Massimo Vignelli / Müller-Brockmann 栅格系统 / Vercel·Geist / Sequoia 的 10 页 pitch 模板",
-  "note": "最小契约的活参照：只有核心键（colorSets/contrast/type/fonts/viewerBackground/motion），没有 ink/texture/decor/misregistration 四张可选 effect 键 —— 缺键=没有这个效果。普通自建风格照这个起手，想要纸纹/错位/装饰再补键。",
+  "note": "测试夹具用字号（**不是推荐值**：这是海报尺度，内页照抄会偏大 —— 见 references/style-architecture.md 的「字号怎么定」）。\n\n字号层级靠**跨度**而不是绝对值：相邻档 ≥1.15 倍才分得出来。bulletLarge / bullet / bulletSmall 三档由**作者在 spec 声明**（slide.bulletTier / 风格 bulletDefault；v3 起不再按条数自动升档）。",
   "colorSets": {
     "blue": {
       "primary": "#0033CC",

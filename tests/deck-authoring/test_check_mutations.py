@@ -310,3 +310,75 @@ class TestFullPageImageRoleAware(unittest.TestCase):
         problems = check._check_full_page_image(
             self._measured(1600, 900, slide=2), deck)
         self.assertTrue(problems)
+
+
+class TestTypeSizeNotes(unittest.TestCase):
+    """字号体检（`check._check_type_size`）—— 四条线各自会开口，且**正确的大字不误报**。
+
+    为什么这份测试重要：字号偏大能长期存在，正是因为“装得下就没人报错”。所以这一项
+    一半在测“会报”，另一半在测“封面/宣言页的大字不许报” —— 只测前者会把作者逼到
+    永远不敢用大字。
+    """
+
+    # 那组“海报尺度”字号（= 用户实测产物里的真实值）
+    TOKENS = {"type": {
+        "cover": 128, "compact": 96, "small": 84, "end": 128, "subtitle": 36,
+        "bulletLarge": 46, "bullet": 32, "bulletSmall": 26, "colTitle": 40,
+        "nodeLabel": 28, "nodeNote": 22, "chartValue": 20, "chartLabel": 18,
+        "caption": 24, "foot": 20}}
+
+    @staticmethod
+    def _measured(titles: dict[int, float], bullets: dict[int, list[float]]) -> dict:
+        els = [
+            {"slide": n, "role": "title", "fontSize": px, "x": 84, "y": 132}
+            for n, px in titles.items()]
+        els += [
+            {"slide": n, "role": "bullet", "fontSize": px, "x": 84, "y": 300 + i * 80}
+            for n, pxs in bullets.items() for i, px in enumerate(pxs)]
+        return {"elements": els}
+
+    def _notes(self, titles, bullets, kinds):
+        deck = {"slides": [{"type": k} for k in kinds]}
+        return check._check_type_size(self._measured(titles, bullets), deck,
+                                      self.TOKENS)
+
+    def test_content_title_at_cover_scale_is_reported(self) -> None:
+        notes = self._notes({1: 128, 2: 96}, {}, ["title", "content-text"])
+        text = " ".join(notes)
+        self.assertIn("封面尺度", text)
+        self.assertIn("第2页", text)
+        self.assertNotIn("第1页", text, "封面用 128 是对的，不该被点名")
+        self.assertIn("type.compact", text, "提示必须点名是哪一档，否则作者要自己反查")
+
+    def test_cover_and_end_are_exempt(self) -> None:
+        # 封面（第1页）与封底（末页）用 128 是对的。注意 slide 编号必须真的
+        # 落在 spec 里 —— 编号超出 spec 的标题元素按“未知版式”处理（宁报不漏）。
+        self.assertEqual(self._notes({1: 128, 2: 128}, {}, ["title", "end"]), [])
+
+    def test_dense_page_with_poster_body_is_reported(self) -> None:
+        notes = self._notes({2: 84}, {2: [46] * 5}, ["title", "content-text"])
+        self.assertIn("宣言档", " ".join(notes))
+
+    def test_statement_page_with_big_body_is_fine(self) -> None:
+        """1~2 条的宣言页用大字号是对的 —— 不许报“条目多”。"""
+        notes = self._notes({2: 84}, {2: [46, 46]}, ["title", "content-text"])
+        self.assertNotIn("宣言档", " ".join(notes))
+
+    def test_median_is_weighted_by_bullets(self) -> None:
+        """少数宣言页不该把整体结论顶成“偏大”（按条目加权）。"""
+        notes = self._notes(
+            {2: 84, 3: 84},
+            {2: [46, 46], 3: [24] * 8},
+            ["title", "content-text", "content-text"])
+        self.assertNotIn("整体偏大", " ".join(notes))
+
+    def test_mostly_big_body_is_reported(self) -> None:
+        notes = self._notes({2: 84}, {2: [46] * 6}, ["title", "content-text"])
+        self.assertIn("整体偏大", " ".join(notes))
+
+    def test_missing_slides_does_not_throw(self) -> None:
+        """spec 形状不对时不许抛 —— check 是交付前最后一道，它崩了比漏报更糟。"""
+        self.assertEqual(
+            check._check_type_size({"elements": [{"slide": 1, "role": "title",
+                                                  "fontSize": 200}]},
+                                   {}, self.TOKENS), [])

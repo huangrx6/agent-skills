@@ -359,7 +359,7 @@ html,body{margin:0;background:var(--viewer)}
 .herofig .herobar{position:absolute;left:0;right:0;bottom:0;
   padding:18px 30px 18px 0;background:var(--text);color:var(--paper)}
 .herofig .herobar .title{color:var(--paper);
-  font-size:var(--s-colTitle,40px);line-height:1.3;white-space:normal}
+  font-size:var(--s-colTitle,26px);line-height:1.3;white-space:normal}
 .hero-bullets{margin-top:24px}
 .imgwrap img{width:100%;display:block}
 .cols{display:flex;gap:var(--sp-item);margin-top:var(--sp-item)}
@@ -373,7 +373,7 @@ html,body{margin:0;background:var(--viewer)}
 .tl{display:flex;gap:var(--sp-item);list-style:none;padding:0;margin:var(--sp-group) 0 0}
 .tl li{flex:1;min-width:0;width:var(--tl-node,300px)}
 .chartsrc{margin:calc(var(--sp-inner) * -0.5) 0 0;color:var(--text);opacity:.55;
-  font:400 var(--s-caption,22px)/1.4 var(--body)}
+  font:400 var(--s-caption,16px)/1.4 var(--body)}
 .chartwrap{margin-top:var(--sp-item);width:1432px;padding:var(--sp-item);position:relative}
 /* 图表容器高度**由壳给死**（330px）—— v4 起图表是 G2（默认 canvas 渲染器），
    而 G2 的 autoFit 从容器取尺寸：容器没有高度就会在渲染时抛错（实测）。
@@ -394,7 +394,7 @@ html,body{margin:0;background:var(--viewer)}
    约束**高度**而不是宽度：logo 多是横长条，锁高度才能让宽高比自然展开
    （给宽会有的被拉横、有的被压扁）。 */
 .brandlogo{position:absolute;right:84px;top:58px;height:56px;width:auto}
-.brandfoot{font:400 var(--s-foot, 20px)/1 var(--body);color:var(--text);opacity:0.42;
+.brandfoot{font:400 var(--s-foot, 14px)/1 var(--body);color:var(--text);opacity:0.42;
   letter-spacing:0.04em}
 """
 

@@ -16,9 +16,9 @@ description: >-
 
 # Deck authoring
 
-把一份 `deck-spec.json` 渲成能直接拿去讲的 deck。**你只写内容，脚本算一切坐标、
-字号与颜色**；风格自建无内置（风格放 **deck 项目**的 `styles/<名>/`，随项目交付；
-skill 目录永不写入），加一套＝加一个目录，不改渲染器。
+把一份 `deck-spec.json` 渲成能直接拿去讲的 deck。**你只写内容，脚本算一切坐标、字号
+与颜色**；风格自建无内置（放 **deck 项目**的 `styles/<名>/`，随项目交付，skill 目录永不
+写入），加一套＝加一个目录，不改渲染器。
 
 ## 确认门：四样大事，用户点头才动
 
@@ -42,17 +42,17 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
   python3 scripts/render.py spec.json --style $s -o $s.html && python3 scripts/shots.py $s.html --out-dir shots-$s --count 2; done
 ```
 
-**方向不是预设、也不只是色板**——它在字号档 / 字栈 / 动效 / 气质上互斥（拷夹具
-换成三张同构皮肤是用户实测踩过的坑）。改的是 `style.json` 的 `type`/`fonts`/`motion`
-与 `skin.css` 的排法；摆出来每版标：**风格名 + 温度 + 适合什么场合**，停下等选择。
+**方向不是预设、也不只是色板**——它在字号档 / 字栈 / 动效 / 气质上互斥（三版只差色板
+= 三张同构皮肤，用户实测踩过的坑）。改 `style.json` 的 `type`/`fonts`/`motion` 与 `skin.css`
+的排法；字号按 style-architecture.md「字号怎么定」**用算术夹出来**（内页标题 40~56，不是
+封面尺度）；每版标：**风格名 + 温度 + 适合什么场合**，停下等选择。
 
 ### 风格：自建，无内置
 
 **内置八套已整体移除**（styles/ 删除，按用户决定）——风格是每份 deck 的表达层。
 自建：**deck 项目**的 `styles/<名>/` 放 `style.json + skin.css`（形状与逐键说明见
-`references/style-architecture.md`；字栈参考 `fonts/mapping.json`）。脚手架 = 拷夹具：
-在 `<deck项目>/styles/<名>/` 里放 `style.json` + `skin.css`。列风格 / 契约体检 / 联系表
-（`style.py` 全部子命令）已退役 —— 对比度归 `ink.py`，实测门归 `check.py`。
+`references/style-architecture.md`；字栈参考 `fonts/mapping.json`）。**没有可拷的参考实现**
+（夹具也删了：能拷就会拷，拷出来每份 deck 一样）；按契约现写。列风格 / 契约体检 / 联系表（`style.py` 全部子命令）已退役 —— 对比度归 `ink.py`，实测门归 `check.py`。
 每个风格可带多个 `colorSet`；**spec 的 `colorSet` 必填具名**（auto/mood 已退役 ——
 选色是审美决策，脚本只验对比度）。换风格/换色板只改 spec 两个字段，内容一字不动。
 

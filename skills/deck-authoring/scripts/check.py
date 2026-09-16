@@ -278,8 +278,114 @@ def _check_measured_health(measured: dict) -> list[str]:
     return out
 
 
+# ── 字号体检的四条线 ────────────────────────────────────────────────
+# 依据是画布几何本身，不是审美偏好：1600×900，正文带 = 900−132(上边)−52(下边距)
+# −24(页脚) = 692px（grid.py）。四条线各自对应一类实测过的失败：
+#
+#   TITLE_POSTER_PX —— 内页标题用了**封面尺度**。128/96 那种数是给一页一句话的
+#     封面/宣言页准备的；内页照抄它，每页都像标题页：读起来累、信息密度反而低。
+#     内页标题的合理区是 40~56。
+#   BODY_DENSE_PX —— **一页 4 条以上还用宣言档正文**。大字配 1~2 条是气质，
+#     配 4~6 条是挤：行距被压、目光没有落点，观众不知道该先看哪条。
+#   BODY_MEDIAN_PX —— 内页正文档的推荐区间（观众距离 = 笔记本/一臂之内；
+#     投影到 3m 外才需要整体加 6~8px）。上限管“整体偏大”，下限管“整体偏小
+#     到看不清”—— 两头都会出现，所以两头都报。
+TITLE_POSTER_PX = 72
+BODY_DENSE_PX = 30
+BODY_MEDIAN_PX = (20, 28)
+
+# 封面 / 封底用大字号是**对的**，不体检这两类版式的标题。
+TITLE_SIZE_EXEMPT = frozenset({"title", "end"})
+
+
+def _tier_of(tokens: dict | None, px: float) -> str:
+    """这个像素值来自哪一档（给修法用）。改字号要去 style 的 type 里改，
+    所以提示里必须点名是哪一档 —— 只报“96px 太大”，作者得自己反查。"""
+    if not isinstance(tokens, dict):
+        return ""
+    tiers = tokens.get("type")
+    if not isinstance(tiers, dict):
+        return ""
+    hits = [k for k, v in tiers.items() if isinstance(v, (int, float)) and v == px]
+    return f"（= type.{hits[0]}）" if hits else ""
+
+
+def _check_type_size(measured: dict, deck: dict, tokens: dict | None) -> list[str]:
+    """字号体检（**提示**，不阻塞）。
+
+    为什么提示而不是阻塞：字号是设计决定，大字放在宣言页上完全正确；脚本只该把
+    “这页的字号跟你这页的内容量明显不搭”说出来，不该替作者拍板。但**必须开口** ——
+    这正是“每份 deck 字号都偏大”能长期存在的原因：装得下就没人报错。
+
+    判据全部来自实测（`measure.py` 的 fontSize / role / slide），不读 style 的意图值：
+    意图和实际渲染对不上时，要看的是观众看到的那一个。
+    """
+    # 位置与键名照 spec 的真实形状：slides 在 deck 下，版式键是 type（不是 layout）。
+    # 第一版写成 spec["slides"]，取不到就直接返回空 —— 整个体检静默失效。这正是
+    # 本仓库反复踩的坑：**取不到数据时不报错就等于没做**。
+    slides = deck.get("slides")
+    if not isinstance(slides, list):
+        return []
+    layouts: dict[int, str] = {}
+    for i, sl in enumerate(slides, start=1):
+        if isinstance(sl, dict):
+            layouts[i] = str(sl.get("type") or "content-text")
+    # 按页收：标题字号 / 条目字号 / 条目数
+    titles: dict[int, float] = {}
+    bodies: dict[int, list[float]] = {}
+    for el in measured.get("elements", []):
+        slide_no, role, px = el.get("slide"), el.get("role"), el.get("fontSize")
+        if not isinstance(slide_no, int) or not isinstance(px, (int, float)) or px <= 0:
+            continue
+        if role == "title":
+            titles[slide_no] = max(titles.get(slide_no, 0.0), px)
+        elif role == "bullet":
+            bodies.setdefault(slide_no, []).append(px)
+    notes: list[str] = []
+    # ① 内页标题用了封面尺度
+    big_titles = [
+        (n, px) for n, px in sorted(titles.items())
+        if px >= TITLE_POSTER_PX and layouts.get(n) not in TITLE_SIZE_EXEMPT
+    ]
+    if big_titles:
+        head = "、".join(f"第{n}页 {px:.0f}px{_tier_of(tokens, px)}" for n, px in big_titles[:4])
+        notes.append(
+            f"内页标题是封面尺度：{head}（共 {len(big_titles)} 页超过 {TITLE_POSTER_PX}px）—— "
+            f"内页标题的合理区是 40~56px。层级靠**标题与正文的倍数**（2~3 倍）立住，"
+            f"不靠绝对值堆大；改 style 的 type.compact / type.small")
+    # ② 条目多还用宣言档
+    dense = [
+        (n, max(pxs), len(pxs)) for n, pxs in sorted(bodies.items())
+        if len(pxs) >= 4 and max(pxs) > BODY_DENSE_PX
+    ]
+    if dense:
+        head = "、".join(f"第{n}页 {cnt}条×{px:.0f}px" for n, px, cnt in dense[:4])
+        notes.append(
+            f"条目多但用的是宣言档字号：{head} —— 大字配 1~2 条是气质，配 4 条以上就挤"
+            f"（行距被压、目光没落点）。这一页要么降档（type.bullet / type.bulletSmall），"
+            f"要么拆页")
+    # ③ 整体偏大 / 偏小：按**条目**取中位数（不是每页取最大值再取中位）——
+    # 宣言页是少数派：一页 2 条×46px 不该把整体结论顶成“偏大”。中位数按条目数
+    # 加权后，
+    # 只有“大多数条目都大”才会报，那才是真的整体偏大。
+    per_bullet = sorted(px for pxs in bodies.values() for px in pxs)
+    if per_bullet:
+        mid = per_bullet[len(per_bullet) // 2]
+        lo, hi = BODY_MEDIAN_PX
+        if mid > hi:
+            notes.append(
+                f"内页正文整体偏大：中位数 {mid:.0f}px{_tier_of(tokens, mid)}（推荐 {lo}~{hi}px）"
+                f"—— 1600×900 上正文超过 {hi}px，一页就装不下几句话，密度会掉。"
+                f"想保留大字就减少每页内容，否则把 type.bullet 降下来")
+        elif mid < lo:
+            notes.append(
+                f"内页正文整体偏小：中位数 {mid:.0f}px{_tier_of(tokens, mid)}（推荐 {lo}~{hi}px）"
+                f"—— 一臂之内都得费劲看。改 type.bullet / type.bulletSmall")
+    return notes
+
+
 def _check_font_fallback(measured: dict) -> list[str]:
-    """字体回退**提示**（不判失败）—— 而且要说清楚**谁顶上了**。
+    """字体回退**提示**（不判失败）—— 而且要说清楚**谁顶上了**。"
 
     启发式：拿一个一定不存在的族当基准比宽度，宽度一样 = 那个族没生效。
     通用族（serif / monospace）排除 —— 它们不是字体而是**回退目标**，不排会误报“缺失”。
@@ -673,6 +779,9 @@ def advisories(measured: dict, spec: dict | None = None,
         notes.extend(brand_notes)
         _, shape_notes = _check_deck_shape(measured, spec.get("deck", {}), tokens)
         notes.extend(shape_notes)
+        # 字号体检：这是“每份 deck 字号都偏大”唯一能被当场看见的地方 ——
+        # 装得下就不报错，所以以前没有任何一条会开口。
+        notes.extend(_check_type_size(measured, spec.get("deck", {}), tokens))
         # 信息层级（文本预算 / 焦点 / 密度）那三条曾由 hierarchy.py 提供，v4 随
         # 该模块一起退役：阈值取决于语境（封面就该空、看板就该满），做成阻塞会
         # 把第一份正常的 deck 挡住；而**装不装得下**这件事已由 measure 实测那两道
