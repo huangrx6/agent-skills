@@ -71,6 +71,14 @@ DEFAULT_STYLE = "swiss-grid"
 #                  仍是真 DOM 文本，"信息烤进图里"的禁止不适用）
 IMAGE_VARIANTS = ("visual-right", "visual-left", "even", "hero")
 
+# two-column 的变体（第二片，模式与 IMAGE_VARIANTS 相同 —— 值封闭，validate_spec
+# 同步）。宽度全由 12 列网格派生（规则在骨架 CSS 的 .cols.v-* 里）：
+#   even       = 6+6 均分（默认，历史上唯一的那一种 —— flex 等分即 704px=span(6)）
+#   lean-left  = 左栏 7 栅 + 右栏 5 栅（左栏承重：对照页的主张在左、细节在右）
+#   lean-right = 左 5 + 右 7（镜像 —— 承重换到右栏）
+# 没有 auto：two-column 没有 fit 实测候选，写变体就是显式选择，不猜。
+TWO_COL_VARIANTS = ("even", "lean-left", "lean-right")
+
 # ── 版面几何：壳里那些数字的**唯一出处** ─────────────────────────────
 # `SHELL_CSS` 里的 `.pad{padding:132px 84px}` 与 `.footrow{bottom:52px}` 是这几个值；
 # check.py（判越界/死白）与 fit.py（试排）都读这里，不各自再拄一份。
@@ -320,6 +328,12 @@ html,body{margin:0;background:var(--viewer)}
 .imgwrap img{width:100%;display:block}
 .cols{display:flex;gap:var(--sp-item);margin-top:var(--sp-item)}
 .col{flex:1;min-width:0}
+/* two-column 变体：lean-left 左栏 7 栅（825.33px=span(7)），右栏由 flex:1 补齐
+   （582.67px=span(5)，825.33+582.67+24=1432 不变）；lean-right 镜像。
+   默认 even 不加类 —— 上面的 flex:1 等分就是 (1432−24)/2=704px=span(6)，
+   默认路径逐字节不变（test_compile 的黄金对照钉着）。 */
+.cols.v-lean-left .col:first-child{flex:none;width:825.33px}
+.cols.v-lean-right .col:last-child{flex:none;width:825.33px}
 .tl{display:flex;gap:var(--sp-item);list-style:none;padding:0;margin:var(--sp-group) 0 0}
 .tl li{flex:1;min-width:0;width:var(--tl-node,300px)}
 .chartsrc{margin:calc(var(--sp-inner) * -0.5) 0 0;color:var(--text);opacity:.55;
@@ -1029,6 +1043,14 @@ def render_resolved(resolved: dict) -> str:
             else:                              # 默认：文 7 + 图 5，图在右
                 out.append(f'<div class="two">{main_html}{img_html}</div>')
         elif kind == "two-column":
+            # Family(two-column) × Variant：与 content-image 同一模式 —— 值封闭、
+            # 未知变体干净报错（validate_spec 会先拦住，这里防直调入口）、
+            # 非默认变体才加类（默认路径逐字节不变，黄金对照钉着）。
+            variant = slide.get("variant") or "even"
+            if variant not in TWO_COL_VARIANTS:
+                raise SystemExit(
+                    f"✗ 第 {i} 页（two-column）未知变体 {variant!r}；"
+                    f"支持 {list(TWO_COL_VARIANTS)}（validate_spec.py 会先拦住）。")
             out.append(f'<div class="titleblock tb-{t_tier}" '
                        f'style="--s-title:{tsize}px">{th}</div>')
             cols = []
@@ -1045,7 +1067,10 @@ def render_resolved(resolved: dict) -> str:
                             f'<h3 {h3_attrs} style="--s-colTitle:{tier["colTitle"]}px">'
                             f'{html.escape(coltitle)}</h3>'
                             f'<ul class="bullets small">{li}</ul></div>')
-            out.append('<div class="cols">' + "".join(cols) + "</div>")
+            # 非默认变体加 v-<variant> 类（宽度规则在骨架 CSS）；even 是默认，
+            # 不加类 —— 旧输出（flex 等分 6+6）一个字节都不动。
+            vclass = "" if variant == "even" else f" v-{variant}"
+            out.append(f'<div class="cols{vclass}">' + "".join(cols) + "</div>")
         elif kind == "timeline":
             out.append(f'<div class="titleblock tb-{t_tier}" '
                        f'style="--s-title:{tsize}px">{th}</div>')

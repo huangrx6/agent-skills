@@ -265,3 +265,49 @@ class TestImageVariants(unittest.TestCase):
         self.assertNotIn("UNKNOWN_VARIANT", {i["code"] for i in result.errors})
         warns = {i["code"] for i in result.items if i["level"] == "warn"}
         self.assertIn("AUTO_VARIANT", warns, "auto 没提醒实测链路 —— 用例会忘了喂数据")
+
+
+class TestTwoColVariants(unittest.TestCase):
+    """two-column 的 variant 字段（Family × Variant 第二片）：合法值过、
+    拼错拦、auto 不开放（没有 fit 实测候选）。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        with open(TOKENS, encoding="utf-8") as fh:
+            cls.color_sets = set(json.load(fh)["colorSets"])
+
+    def _codes(self, spec: dict) -> set[str]:
+        return {i["code"] for i in vs.validate(spec, self.color_sets).errors}
+
+    @staticmethod
+    def _slide(variant: str) -> dict:
+        return {"type": "two-column", "title": "对照",
+                "columns": [{"title": "A", "bullets": ["a"]},
+                            {"title": "B", "bullets": ["b"]}],
+                "variant": variant}
+
+    def test_known_variant_passes(self) -> None:
+        for variant in ("even", "lean-left", "lean-right"):
+            with self.subTest(variant=variant):
+                codes = self._codes(_spec([self._slide(variant)]))
+                self.assertNotIn("UNKNOWN_VARIANT", codes, f"合法变体 {variant} 被拒")
+                self.assertNotIn("UNKNOWN_FIELD", codes,
+                                 "variant 不在 two-column 的封闭字段集里")
+
+    def test_unknown_variant_is_rejected(self) -> None:
+        """值不封闭 —— 拼错（如把 lean-left 写反）会一路漏到渲染器的 SystemExit。"""
+        self.assertIn("UNKNOWN_VARIANT", self._codes(_spec([self._slide("left-lean")])),
+                      "two-column 变体值不封闭")
+
+    def test_auto_is_not_open_for_two_column(self) -> None:
+        """auto 是 content-image 的意图链路（fit --recommend）；two-column 没有
+        fit 候选 —— 写了 auto 就是拼错，当 UNKNOWN_VARIANT 拦，不提醒不猜。"""
+        slides = [{"type": "two-column", "title": "对照",
+                   "columns": [{"title": "A", "bullets": ["a"]},
+                               {"title": "B", "bullets": ["b"]}],
+                   "variant": "auto"}]
+        result = vs.validate(_spec(slides), self.color_sets)
+        self.assertIn("UNKNOWN_VARIANT", {i["code"] for i in result.errors},
+                      "two-column 的 auto 被放行 —— 会漏到渲染器的封闭值集外")
+        self.assertNotIn("AUTO_VARIANT", {i["code"] for i in result.items},
+                         "auto 提醒是 content-image 的实测链路，two-column 没有这条链")

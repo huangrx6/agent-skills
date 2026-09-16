@@ -47,7 +47,7 @@ SLIDE_FIELDS = {
     "content-text":  {"type", "title", "bullets", "color"},
     "content-image": {"type", "title", "bullets", "image", "caption", "color",
                    "variant"},
-    "two-column":    {"type", "title", "columns", "color"},
+    "two-column":    {"type", "title", "columns", "color", "variant"},
     "timeline":      {"type", "title", "nodes", "color"},
     # 图表的 DSL：几何/样式/动画都不在 spec 里（chart.py 决定），AI 只写语义。
     "chart":         {"type", "title", "data", "unit", "caption", "color",
@@ -69,6 +69,12 @@ SLIDE_FIELDS = {
 # 不许漏进 resolved。
 IMAGE_VARIANTS = ("visual-right", "visual-left", "even", "hero")
 IMAGE_VARIANT_INPUTS = IMAGE_VARIANTS + ("auto",)
+
+# two-column 变体的值集（与 render.TWO_COL_VARIANTS 一字不差）：
+# even（默认 6+6 均分）/ lean-left（左 7 栅右 5 栅，左栏承重）/ lean-right
+# （左 5 右 7，镜像）。**没有 auto** —— two-column 没有 fit 实测候选，
+# 栅格分配是显式内容决策，写了 auto 就当拼错拦住。
+TWO_COL_VARIANTS = ("even", "lean-left", "lean-right")
 
 REQUIRED_SLIDE_FIELDS = {
     "content-image": {"image"},
@@ -213,12 +219,16 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
                          f"未知版式 {kind!r}；支持 {sorted(SLIDE_FIELDS)}")
             continue
         _check_fields(slide, SLIDE_FIELDS[kind], where, issues)
+        # 变体值集**按版式分别封闭**：content-image 开放 auto（fit 实测链路在）；
+        # two-column 没有 fit 候选 —— auto 写了就是拼错，同样拦在 UNKNOWN_VARIANT。
+        variant_inputs = (TWO_COL_VARIANTS if kind == "two-column"
+                          else IMAGE_VARIANT_INPUTS)
         variant = slide.get("variant")
-        if variant is not None and variant not in IMAGE_VARIANT_INPUTS:
+        if variant is not None and variant not in variant_inputs:
             issues.error("UNKNOWN_VARIANT", where,
-                         f"未知变体 {variant!r}；content-image 支持 "
-                         f"{list(IMAGE_VARIANT_INPUTS)}")
-        if variant == "auto":
+                         f"未知变体 {variant!r}；{kind} 支持 "
+                         f"{list(variant_inputs)}")
+        if variant == "auto" and kind == "content-image":
             issues.warn("AUTO_VARIANT", where,
                         "auto 变体要实测数据：fit --from-spec … --recommend "
                         "--json-out > variants.json 落盘，再 compile --fit-variants "

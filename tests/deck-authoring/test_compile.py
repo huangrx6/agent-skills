@@ -325,3 +325,57 @@ class TestAutoVariant(unittest.TestCase):
             resolved = compile_mod.compile_spec(self._spec("auto"), fit_variants=fv)
             for page in resolved["deck"]["slides"]:
                 self.assertNotEqual(page.get("variant"), "auto")
+
+
+class TestTwoColVariantRendering(unittest.TestCase):
+    """two-column 三变体几何分叉；显式 even == 隐式不写（字节级契约）；
+    默认双栏字节不变（上一条黄金测试钉着）。"""
+
+    def _page_html(self, variant: str | None) -> str:
+        spec = _demo()
+        page = spec["deck"]["slides"][3]              # 第 4 页 two-column
+        page.pop("variant", None)
+        if variant:
+            page["variant"] = variant
+        out = render.render(spec)
+        return out.split('data-idx="04"')[1].split('data-idx="05"')[0]
+
+    def test_variants_differ_in_geometry(self) -> None:
+        even = self._page_html("even")
+        lean_l = self._page_html("lean-left")
+        lean_r = self._page_html("lean-right")
+        self.assertIn('class="cols v-lean-left"', lean_l)
+        self.assertIn('class="cols v-lean-right"', lean_r)
+        self.assertIn('class="cols">', even, "默认不该带变体类（保持旧字节）")
+        self.assertNotEqual(lean_l, lean_r, "两个 lean 变体渲成了同一份 DOM")
+        self.assertNotEqual(even, lean_l)
+        self.assertNotEqual(even, lean_r)
+
+    def test_lean_widths_come_from_the_grid(self) -> None:
+        """宽度是栅格算的：span(7)=825.33（另一侧由 flex:1 补齐 582.67=span(5)，
+        825.33+582.67+24=1432 不变）；规则在骨架 CSS 里，每个产物只有一份。"""
+        out = render.render(_demo())
+        self.assertIn(".cols.v-lean-left .col:first-child{flex:none;width:825.33px}", out)
+        self.assertIn(".cols.v-lean-right .col:last-child{flex:none;width:825.33px}", out)
+
+    def test_explicit_even_equals_implicit(self) -> None:
+        self.assertEqual(self._page_html(None), self._page_html("even"))
+
+    def test_explicit_variant_is_traced_without_compile_changes(self) -> None:
+        """compile.py 未改：layout trace 对任何带 variant 的页自动留痕。"""
+        spec = _demo()
+        spec["deck"]["slides"][3]["variant"] = "lean-left"
+        resolved = compile_mod.compile_spec(spec)
+        entry = next(t for t in resolved["trace"] if t["stage"] == "layout")
+        self.assertIn("two-column:lean-left", entry["decision"])
+        self.assertEqual(resolved["deck"]["slides"][3].get("variant"), "lean-left")
+
+    def test_unknown_variant_exits_cleanly(self) -> None:
+        """渲染器也可能被直调（不经 validate_spec）：未知变体要人话报错，不甩栈。"""
+        spec = _demo()
+        spec["deck"]["slides"][3]["variant"] = "left-lean"
+        with self.assertRaises(SystemExit) as ctx:
+            render.render(spec)
+        msg = str(ctx.exception)
+        self.assertIn("two-column", msg)
+        self.assertIn("lean-left", msg, "报错必须给出路：可用值要列出来")

@@ -122,7 +122,7 @@ content-image/two-column/timeline/chart/end）+ 自建风格。**content-image �
 成为显式家族**：`variant` 字段进 spec（封闭值集），其余 type 仍是单版式 ——
 family 命名层全量铺开在路线图阶段 3。
 
-## 16. Layout Variant【✅ 已落地（4 变体，含 hero）】
+## 16. Layout Variant【✅ 已落地（content-image 4 变体 + two-column 3 变体）】
 
 每个 Family 多 Variant（split_40_60 / split_50_50 / split_left_visual / …；
 hero_center / hero_left / hero_full_bleed / …）。**content-image 已有显式变体**：
@@ -133,7 +133,14 @@ hero_center / hero_left / hero_full_bleed / …）。**content-image 已有显�
 hero —— 满图是特性，fit 对 hero 用 _hero_whitespace 另一把留白尺子）——
 键值双封闭（validate_spec），显式/auto 均进 Decision Trace（compile layout 段），
 fit 探针把四变体摆进同一份产物供评分（实测：图即陈述的页面 hero 0.45 胜
-分栏 0.40）。其余 type（两栏 6+6、时间线）仍隐式 —— 等候选实测铺开。
+分栏 0.40）。**two-column 已有显式变体**：`even`（6+6 均分，默认 —— flex 等分
+即 704px=span(6)，不加类，默认路径逐字节不变）/ `lean-left`（左 7 栅 825.33px
+
++ 右 5 栅 582.67px，左栏承重 —— 对照页主张在左、细节在右）/ `lean-right`
+（左 5 右 7，镜像）—— 键值双封闭（validate_spec，值集与 content-image 分开），
+显式变体进 Decision Trace（compile layout 段自动留痕，无需改）；宽度全由网格
+算（825.33+582.67+24=1432 不变）。auto 不开放：two-column 没有 fit 实测候选，
+栅格分配是显式内容决策。其余 type（时间线）仍隐式 —— 等候选实测铺开。
 
 ## 17. Variant 选择依据【✅ 第一片已落地（content-image）】
 
