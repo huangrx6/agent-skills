@@ -514,6 +514,183 @@ SYSTEM_UI_FAMILIES = {
 }
 
 
+# ── 风格语法门 ────────────────────────────────────────────
+# 风格自己声明语法（style.json 的 `rules`），门拿**实测**去对账。
+#
+# 为什么需要：皮肤是 CSS，它能在任何选择器上冒出圆角/阴影/渐变 —— 静态读 CSS
+# 说不清"最终生效的是哪一条"（继承、覆盖、!important）。而"这套风格的语法"
+# （直角、无阴影、无渐变、字重不超过三档）正是它区别于别的风格的东西：
+# 一旦皮肤自己漂移，风格就不再是它声明的那套东西了。
+#
+# **没声明就不检查**：风格没表态，门不能替它发明一套语法（那是审美偏好）。
+#
+# 字号地板**不在这个门里**：它已经被 `_check_type_size` 的四条线管着，
+# 同一件事报两遍只会让人不知道该听哪句。
+STYLE_RULE_VALUES = {"corners": ("square", "rounded", "any"),
+                     "shadow": ("none", "soft", "any"),
+                     "gradients": ("none", "any")}
+STYLE_RULE_NUMBERS = ("weightSteps",)
+
+
+def _length_nonzero(part) -> bool:
+    """`0` / `0px` / `0%` → False；其余长度 → True（判不准也算非零）。"""
+    if not isinstance(part, str):
+        return False
+    num = part.strip()
+    for unit in ("px", "rem", "em", "%", "vh", "vw", "pt"):
+        if num.endswith(unit):
+            num = num[: -len(unit)]
+            break
+    try:
+        return float(num) != 0
+    except ValueError:
+        return True
+
+
+def _style_px(value) -> float | None:
+    """从 computed 的长度里取最大像素值；有非 px 的非零长度就返回 None。
+
+    `12px 12px 0 0` → 12；`0px` → 0；`50%` → None（百分比换不成像素，不猜）。
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        try:
+            return float(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+    if not isinstance(value, str):
+        return None
+    out = 0.0
+    for part in value.split():
+        if not _length_nonzero(part):
+            continue
+        if not part.endswith("px"):
+            return None
+        try:
+            out = max(out, float(part[:-2]))
+        except ValueError:
+            return None
+    return out
+
+
+def _shadow_blur(value) -> float | None:
+    """box-shadow 的模糊半径（px）；判不出来 → None。
+
+    浏览器把 box-shadow 归一化成「色值 offset-x offset-y blur spread」，
+    长度里的第 3 个就是 blur。长度不足三位 = 没有 blur 位 = 硬边阴影。
+    """
+    if not isinstance(value, str) or not value.strip() or value.strip() == "none":
+        return None
+    lengths = re.findall(r"(-?\d+(?:\.\d+)?)px", value)
+    if len(lengths) < 3:
+        return 0.0
+    try:
+        return float(lengths[2])
+    except ValueError:
+        return None
+
+
+def _style_hits(pairs: list, limit: int = 3) -> str:
+    """把「哪页哪个元素（实测多少）」排成人读的一段；多了就折叠计数。"""
+    shown = "、".join(f"第 {el.get('slide')} 页 {el.get('id')}（{value}）"
+                     for el, value in pairs[:limit])
+    if len(pairs) > limit:
+        return f"{shown} 等 {len(pairs)} 处"
+    return shown
+
+
+def _check_style_rules(measured: dict, tokens: dict | None) -> list[str]:
+    """风格声明的语法 vs 实测（提示级）—— 只查声明过的项。
+
+    声明与实测不一致 = 皮肤漂移了：它已经不是这套风格声称的那个样子。
+    提示里给出**页号 + 元素 + 实测值**，因为"改哪个选择器"得看着这些数字定。
+    """
+    rules = (tokens or {}).get("rules")
+    if not isinstance(rules, dict) or not rules:
+        return []
+    out: list[str] = []
+    for key, allowed in STYLE_RULE_VALUES.items():
+        value = rules.get(key)
+        if value is None:
+            continue
+        if value not in allowed:
+            out.append(f"风格 rules.{key} 写的是 {value!r}，只认 "
+                       f"{'、'.join(allowed)} —— 门不知道该按哪条判，先把这个值改对")
+    for key in STYLE_RULE_NUMBERS:
+        value = rules.get(key)
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+            out.append(f"风格 rules.{key} 应是正整数，写的是 {value!r}")
+    unknown = [k for k in rules
+               if k not in STYLE_RULE_VALUES and k not in STYLE_RULE_NUMBERS]
+    if unknown:
+        out.append(f"风格 rules 里有不认识的键：{'、'.join(sorted(unknown))}"
+                   f"（只认 {'、'.join(list(STYLE_RULE_VALUES) + list(STYLE_RULE_NUMBERS))}）")
+    if out:
+        return out                    # 声明本身写错了，先别拿它去判别人
+
+    els = [e for e in (measured.get("elements") or [])
+           if isinstance(e, dict) and e.get("visible", True)]
+    if rules.get("corners") == "square":
+        pairs = []
+        for el in els:
+            raw = el.get("borderRadius")
+            if not isinstance(raw, str):
+                continue
+            px = _style_px(raw)
+            if px is None:
+                if any(_length_nonzero(p) for p in raw.split()):
+                    pairs.append((el, raw))
+            elif px > 0.5:
+                pairs.append((el, f"{px:g}px"))
+        if pairs:
+            out.append(f"风格声明 corners=square，但实测有圆角：{_style_hits(pairs)} —— "
+                       f"要么把皮肤的选择器改成直角，要么把声明改成 rounded")
+    if rules.get("shadow") == "none":
+        pairs = [(el, el.get("boxShadow")) for el in els
+                 if isinstance(el.get("boxShadow"), str)
+                 and el["boxShadow"].strip() not in ("", "none")]
+        if pairs:
+            out.append(f"风格声明 shadow=none，但实测有阴影：{_style_hits(pairs)} —— "
+                       f"换回描边/底色，或把声明改成 soft")
+    elif rules.get("shadow") == "soft":
+        pairs = []
+        for el in els:
+            blur = _shadow_blur(el.get("boxShadow"))
+            if blur == 0.0:
+                pairs.append((el, "border 硬边（blur 0）"))
+        if pairs:
+            out.append(f"风格声明 shadow=soft，但实测有硬边阴影：{_style_hits(pairs)}")
+    if rules.get("gradients") == "none":
+        pairs = [(el, "渐变") for el in els
+                 if isinstance(el.get("backgroundImage"), str)
+                 and "gradient(" in el["backgroundImage"]]
+        if pairs:
+            out.append(f"风格声明 gradients=none，但实测有渐变：{_style_hits(pairs)}")
+    steps = rules.get("weightSteps")
+    if isinstance(steps, (int, float)) and not isinstance(steps, bool):
+        weights = set()
+        for el in els:
+            weight = el.get("fontWeight")
+            text_w = el.get("textW")
+            if not isinstance(weight, (int, float)) or isinstance(weight, bool):
+                continue
+            if not isinstance(text_w, (int, float)) or text_w <= 0:
+                continue                  # 没文字的盒子没有字重概念
+            try:
+                weights.add(int(weight))
+            except (TypeError, ValueError, OverflowError):
+                continue
+        if len(weights) > steps:
+            ordered = sorted(weights)
+            out.append(f"风格声明 weightSteps={steps:g}，但全片实测 "
+                       f"{len(ordered)} 档字重（{'、'.join(str(w) for w in ordered)}）"
+                       f" —— 字重档数就是层次：档越多，越没有层次")
+    return out
+
+
 def _declared_families(tokens: dict | None) -> set[str]:
     """style.json 的 fonts 里声明过的族（display / body / numeral / mono …）。"""
     out: set[str] = set()
@@ -1164,6 +1341,7 @@ def advisories(measured: dict, spec: dict | None = None,
     """
     notes = _check_font_fallback(measured, tokens)
     notes.extend(_check_page_box(measured))
+    notes.extend(_check_style_rules(measured, tokens))
     notes.extend(_check_grid_alignment(measured))
     if spec is not None and tokens is not None:
         _, brand_notes = _check_brand(measured, spec.get("deck", {}), tokens)

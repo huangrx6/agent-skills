@@ -335,6 +335,94 @@ class TestRoleNotes(unittest.TestCase):
         self.assertEqual(check._role_notes(deck), [])
 
 
+class TestStyleRules(unittest.TestCase):
+    """风格语法门（`check._check_style_rules`）：风格声明的语法 vs 实测。
+
+    钉两件事：**没声明就不检查**（门不能替风格发明语法），以及声明与实测不一致时
+    提示里必须有**页号 + 元素 + 实测值**（不然不知道该改哪个选择器）。
+    """
+
+    @staticmethod
+    def _el(eid: str, slide: int = 3, **kw) -> dict:
+        base = {"id": eid, "slide": slide, "visible": True,
+                "borderRadius": "0px", "boxShadow": "none",
+                "backgroundImage": "none", "fontWeight": 400, "textW": 80.0}
+        base.update(kw)
+        return base
+
+    def test_without_declaration_nothing_is_checked(self) -> None:
+        rounded = {"elements": [self._el("s3.card", borderRadius="12px")]}
+        self.assertEqual(check._check_style_rules(rounded, {}), [])
+        self.assertEqual(check._check_style_rules(rounded, {"rules": {}}), [])
+        self.assertEqual(check._check_style_rules(rounded, None), [])
+
+    def test_square_declaration_catches_radius_and_percent(self) -> None:
+        measured = {"elements": [self._el("s3.card", borderRadius="12px"),
+                                 self._el("s3.badge", borderRadius="50%"),
+                                 self._el("s3.plain")]}
+        notes = check._check_style_rules(measured, {"rules": {"corners": "square"}})
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("s3.card", notes[0])
+        self.assertIn("12px", notes[0])
+        self.assertIn("50%", notes[0], "百分比圆角换不成像素，但确实是圆角")
+
+    def test_shadow_none_and_soft_are_different_checks(self) -> None:
+        measured = {"elements": [
+            self._el("s3.quote", boxShadow="rgba(0,0,0,.2) 0px 4px 0px 0px")]}
+        none_notes = check._check_style_rules(measured, {"rules": {"shadow": "none"}})
+        soft_notes = check._check_style_rules(measured, {"rules": {"shadow": "soft"}})
+        self.assertEqual(len(none_notes), 1, none_notes)
+        self.assertIn("换回描边/底色", none_notes[0])
+        self.assertEqual(len(soft_notes), 1, soft_notes)
+        self.assertIn("硬边", soft_notes[0], "blur 0 = 硬边：soft 声明下也要报")
+        blurred = {"elements": [self._el("s3.quote",
+                                       boxShadow="rgba(0,0,0,.2) 0px 4px 8px 0px")]}
+        self.assertEqual(check._check_style_rules(blurred, {"rules": {"shadow": "soft"}}), [])
+
+    def test_weight_steps_counts_only_text_elements(self) -> None:
+        measured = {"elements": [
+            self._el("s3.t", fontWeight=400),
+            self._el("s3.u", fontWeight=700),
+            self._el("s3.deco", fontWeight=900, textW=0.0)]}
+        self.assertEqual(
+            check._check_style_rules(measured, {"rules": {"weightSteps": 2}}), [])
+        notes = check._check_style_rules(measured, {"rules": {"weightSteps": 1}})
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("2 档字重", notes[0])
+
+    def test_gradients_declaration(self) -> None:
+        measured = {"elements": [self._el(
+            "s3.band", backgroundImage="linear-gradient(90deg, #111, #333)")]}
+        notes = check._check_style_rules(measured, {"rules": {"gradients": "none"}})
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("s3.band", notes[0])
+
+    def test_bad_declaration_is_reported_before_judging(self) -> None:
+        measured = {"elements": [self._el("s3.card", borderRadius="12px")]}
+        notes = check._check_style_rules(
+            measured, {"rules": {"corners": "圆角", "sizeFloor": 16}})
+        self.assertEqual(len(notes), 2, notes)
+        joined = " ".join(notes)
+        self.assertIn("corners", joined)
+        self.assertIn("sizeFloor", joined, "不认识的键要说出来（封闭键集）")
+        self.assertNotIn("12px", joined, "声明写错了就不拿它去判别人")
+
+    def test_broken_measured_values_are_skipped(self) -> None:
+        measured = {"elements": [self._el("s3.a", borderRadius=None),
+                                 self._el("s3.b", borderline=1),
+                                 {"id": "s3.c"},
+                                 "不是字典"]}
+        rules = {"rules": {"corners": "square", "shadow": "none",
+                           "gradients": "none", "weightSteps": 2}}
+        self.assertEqual(check._check_style_rules(measured, rules), [])
+
+    def test_invisible_elements_do_not_count(self) -> None:
+        measured = {"elements": [self._el("s3.gone", borderRadius="12px",
+                                         visible=False)]}
+        self.assertEqual(
+            check._check_style_rules(measured, {"rules": {"corners": "square"}}), [])
+
+
 class TestContentBudget(unittest.TestCase):
     """写前预算的事后核对（`check._content_budget_notes`）。
 

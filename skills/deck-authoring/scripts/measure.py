@@ -179,6 +179,12 @@ PROBE_JS = r"""
         naturalH: el.naturalHeight || (el.querySelector && el.querySelector('img')
                    ? el.querySelector('img').naturalHeight : 0) || 0,
         color: cs.color,
+        // 风格语法门（`check._check_style_rules`）要用的三样：圆角 / 阴影 / 渐变。
+        // 它们**只能实测**：皮肤可以给任何一个选择器加圆角或阴影，静态读 CSS
+        // 判不出"最终生效的是哪一条"（还有继承与覆盖）。
+        borderRadius: cs.borderRadius,
+        boxShadow: cs.boxShadow,
+        backgroundImage: cs.backgroundImage,
         overflow: cs.overflow,
         visible: cs.visibility !== 'hidden' && cs.display !== 'none' && parseFloat(cs.opacity) > 0,
         // 图表就绪（v4）：G2 在浏览器里现渲染 —— 容器里有没有 canvas/svg、

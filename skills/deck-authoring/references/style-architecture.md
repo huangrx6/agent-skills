@@ -82,6 +82,12 @@
     // display / body 少一键渲染器直接 KeyError（render.py:704、726 读的就是这两键）
   },
   "viewerBackground": "#141414",         // 浏览器外底色（让纸色边能看见）
+  "rules": {                            // （可选）**语法声明**：这套风格不许出现什么
+    "corners":    "square",              // square | rounded | any
+    "shadow":     "none",                // none | soft | any
+    "gradients":  "none",                // none | any
+    "weightSteps": 3                      // 全片字重最多几档（正整数）
+  },
   "motion": {                            // 动效时间轴 —— 7 键必填；缺键 render.timeline 直接 KeyError（render.py:227）
     "easing":      "expoOut",                       // 只认 expoOut / overshoot（render.py:501 的 ease()）
     "cssEase":     "cubic-bezier(0.16, 1, 0.3, 1)", // 注入 CSS；现在无脚本校验（写 linear/ease 系显似 AI slop，自查）
@@ -91,6 +97,33 @@
   }
 }
 ```
+
+### 语法声明（`rules`）：让皮肤守住自己声称的语法
+
+“这套风格是什么”最硬的部分不是颜色，是**它不许出现什么**：直角就没有圆角、
+浅墨风就没有阴影、单色场就没有渐变、层次靠字号就不靠字重。这些话写在 `rules` 里，
+`check.py` 把**实测**（computed style，`measure.py` 新采的 `borderRadius` /
+`boxShadow` / `backgroundImage`）拿回来对账。
+
+为什么必须实测：皮肤是 CSS，它能在任何选择器上冒出圆角或阴影 —— 静态读 CSS
+说不清“最终生效的是哪一条”（继承、覆盖、`!important`）。
+
+**没声明就不检查**：风格没表态，门不能替它发明一套语法 —— 那叫审美偏好。
+
+```text
+· 风格声明 corners=square，但实测有圆角：第 3 页 s3.card（12px）、s3.badge（50%）
+  —— 要么把皮肤的选择器改成直角，要么把声明改成 rounded
+· 风格声明 weightSteps=2，但全片实测 3 档字重（400、600、700）—— 字重档数就是层次
+```
+
+提示里一定带**页号 + 元素 + 实测值** —— “改哪个选择器”得看着这些数字定。
+
+两个**没放进来**的键，都是“硬放会误伤”：
+
+- **字号地板**：`_check_type_size` 的四条线已经在管字号（而且管得更细：标题尺度、
+  正文中位数、条数与字号的关系）。同一个毛病报两遍，人不知道该听哪句。
+- **强调色数量**：要判“这是强调色还是墨色”，得有纸/墨/强调的角色模型；
+  门没有这个模型，硬按亮度猜会在每套色板上误报一次。
 
 ### 字号怎么定：**算术夹出来的，不是审美挑的**
 
