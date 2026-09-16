@@ -134,12 +134,20 @@ def _rng(seed, *parts) -> random.Random:
 
 
 def style_names() -> list[str]:
-    """全部可用风格名（用户根在前，保持插入序去重）。"""
+    """全部可用风格名（用户根在前，保持插入序去重）。
+
+    只认**含 style.json 的目录**：styles/ 是用户目录，会攒实验草稿和无关
+    文件夹（实测：一个手滑的 `__probe/t.txt` 就把整个工具链拖红）—— 没有
+    清单的目录是"还没成风格的文件夹"，不是坏风格，不该出现在任何列表里。
+    """
     names: list[str] = []
     for root in STYLE_ROOTS:
         for n in deckio.list_dirs(root):
-            if n not in names:
-                names.append(n)
+            if n in names:
+                continue
+            if not os.path.isfile(os.path.join(root, n, "style.json")):
+                continue
+            names.append(n)
     return names
 
 

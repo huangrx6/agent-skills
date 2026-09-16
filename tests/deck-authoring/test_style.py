@@ -315,6 +315,16 @@ class TestMinimalContract(unittest.TestCase):
     Glass…）不再需要"声明自己没有颗粒、没有错位"。
     """
 
+    def test_junk_directory_is_not_a_style(self) -> None:
+        """styles/ 里没有 style.json 的文件夹不是风格 —— 不进任何列表（用户
+        目录会攒草稿；一个手滑的探针文件夹不该把工具链拖红）。"""
+        junk = os.path.join(STYLES, "zz_junk_dir")
+        os.makedirs(junk, exist_ok=True)
+        self.addCleanup(shutil.rmtree, junk, ignore_errors=True)
+        with open(os.path.join(junk, "t.txt"), "w") as fh:
+            fh.write("date 输出之类的草稿")
+        self.assertNotIn("zz_junk_dir", style.available())
+
     def test_fixture_has_no_effect_keys_and_audits_clean(self) -> None:
         raw = deckio.read_json(os.path.join(STYLES, "minimal-baseline", "style.json"))
         for key in style.EFFECT_KEYS:
