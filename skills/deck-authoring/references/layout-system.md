@@ -259,14 +259,29 @@ HINTS 指路 layout）、`auto` 被 `validate_spec.py` 拦（`BAD_LAYOUT`）。�
 visual-right、two-column 缺省 even，§16）；写自造名由 skin.css 排。
 其余 type 仍页型查表（确定性，不随机）。
 
-## 18. Layout Candidate Ranking【约定 —— 脚本不做】
+## 18. Layout Candidate Ranking【✅ --candidates（声明页钉死）】
 
-规范设想 Page Planner 输出候选+分数、Resolver 实测后定版。**没有这层自动排名**：
-选布局是内容决策，脚本排名会越权替作者做审美判断。布局由
-作者在 spec 声明（§17），脚本只执行与验收（拼写由风格的 `layouts` 词表兜，
-见 `validation.md` 的 `_layout_vocab_problems`）。要做"候选并测"也只在**人环**
-里：先手写几版 spec、各自 `check` 看一眼（越界/裁切实测给你容量答案，§55）
-再定 —— 没有自动评分选版链。
+```bash
+python3 scripts/render.py spec.json -o out.html --candidates        # 只出表
+python3 scripts/render.py spec.json -o out.html --candidates --pick  # 选优落盘
+```
+
+**边界**：只搜**未声明** `layout` 的页（content-image 4 候选 / two-column 3 候选，
+来自渲染器能力清单）；声明过 = 钉死不搜。每轮给全部可搜页套同一候选序号、
+整渲实测（页与页独立测）。
+
+**打分（可测维度，实测驱动）**：
+
+| 维度 | 权重 | 判据 |
+| --- | --- | --- |
+| 密度 | 0.30 | **区间满意度**（content-image 40~68% / two-column 45~72%），两端线性衰减 —— 越满不是越好 |
+| 可读 | 0.25 | 条目换行惩罚（实测行数 − 1 每行 −0.18） |
+| 视觉 | 0.25 | 视觉占比区间 [0.35, 0.60]；满幅（hero 的 1.0）在区间外 → 0 分：hero 是作者声明的设计，不是自动选优的答案 |
+| 平衡 | 0.20 | 视觉质量中心偏离版心的距离（图按面积折半计质量） |
+
+**作废**：竖向溢出 / 标题写出列 / 安全盒碰撞，任一命中即无效（不进排序）。
+语义契合、风格契合、deck 节奏**不打分** —— 表摆出来（`*.candidates.json`），
+决定权在作者；`--pick` 才把最优写进 `*.candidates.spec.json` 并渲染。
 
 ## 19. Information Hierarchy【部分 ✅】
 
@@ -515,9 +530,8 @@ resolve → measure → check → score → repair → resolve again，最多 3~
 
 fit 只做真实测量：text height / line count / occupied area / overflow /
 image fit / chart fit；**不决定内容价值**（值不值得说是 content-intelligence
-的事——元规则 14）。落地：原 `fit.py` 把候选版式与条目数档位摆进同一产物渲
-一次量一次、报实测溢出与占比——v4 整文件退役。现在"装不装得下"由 `measure.py`
-实测（越界/裁切）在 `check.py` 里定死（§56）。
+的事——元规则 14）。落地："装不装得下"由 `measure.py` 实测（越界/裁切）在 `check.py` 里定死
+（§56）；候选并测见 §18/§57。
 
 ## 56. Browser Measurement【✅】
 
@@ -526,17 +540,18 @@ DOM rect / image natural size。落地：`measure.py` 注入探针脚本、`--du
 取回（不走 CDP，见文件头注），拿真矩形；
 **字符宽度估算只能做预判**，最终判断全靠实测。
 
-## 57. Candidate Testing【约定 —— 脚本不做】
+## 57. Candidate Testing【✅ --candidates（§18）】
 
-规范设想：一次生成多个 Variant，同一浏览器批量测量后排名。**没有这条自动链**：
-选布局是作者的内容决策（§17/§18）。"装不装得下"由 `measure.py` 实测
-（越界/裁切）在 `check.py` 里定死（§55/§56）。要做"候选并测"只发生在**人环**：
-手写几版 spec、各自 `check` 看一眼再定。
+落地：`render --candidates`（§18）—— 未声明布局的页把结构候选各渲一遍、
+整渲实测（每轮套同一候选序号）、打分出表；`--pick` 才落盘。"装不装得下"
+由 `measure.py` 实测在 `check.py` 里定死（§55/§56）。
 
-## 58. Candidate Score【约定 —— 不做】
+## 58. Candidate Score【✅ 可测子集（§18 的表）】
 
-不实现候选打分：分数替作者做审美判断（层级/焦点/平衡各占多少，本身就是
-风格立场）。要看好坏，渲出来看图。
+只打**可测**维度（密度区间满意 / 换行 / 视觉占比区间 / 平衡），权重见 §18；
+语义契合、风格契合、deck 节奏不打分 —— 表摆出来，决定权在作者。
+分数的价值观显式声明：**越满不是越好**（区间满意度），满幅 hero 不加分
+（那是作者声明的设计）。
 
 ## 59. Deck-level Layout Planner【约定】
 

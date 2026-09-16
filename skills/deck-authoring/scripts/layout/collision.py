@@ -95,8 +95,12 @@ CLEARANCE = {
     "logo":     Insets(top=16, right=16, bottom=16, left=16),
 }
 
-# hero 版式：标题条压图是设计本身（实心反色条，对比度由 token 保证）
-INTENTIONAL_PAIRS = {frozenset({"title", "visual"})}
+# hero 版式：实心反色条上的**文字（标题与条目）压图**是设计本身 ——
+# 条用 --text 底 / --paper 字，对比度与正文同一个 token 保证。
+# 只在 hero 声明的页生效（violations 的 hero_slides 参数控制）。
+INTENTIONAL_PAIRS = {frozenset({"title", "visual"}),
+                     frozenset({"body", "visual"}),
+                     frozenset({"title", "body"})}   # 实心条内部：标题与条目的堆叠
 
 
 def build_boxes(elements: list):

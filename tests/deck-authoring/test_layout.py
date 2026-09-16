@@ -324,3 +324,95 @@ class TestRepairCLI(unittest.TestCase):
             # 声明页保持原样：repaired spec 里仍是作者声明的 bulletLarge
             self.assertEqual(repaired["deck"]["slides"][1]["bulletTier"],
                              "bulletLarge")
+
+
+class TestCandidates(unittest.TestCase):
+    """候选搜索（layout/candidates.py）：搜什么、怎么打分、什么作废。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.pkg = _load_layout()
+        cls.c = cls.pkg.candidates
+
+    def test_searchable_pages(self) -> None:
+        img, two = ("visual-right", "visual-left", "even", "hero"), ("even", "lean-left", "lean-right")
+        self.assertEqual(self.c.searchable({"type": "content-image"}, img, two),
+                         list(img))
+        self.assertEqual(self.c.searchable({"type": "two-column"}, img, two),
+                         list(two))
+        # 声明过 = 钉死（主权）；无结构布局的页型 = 没得搜
+        self.assertEqual(self.c.searchable(
+            {"type": "content-image", "layout": "even"}, img, two), [])
+        self.assertEqual(self.c.searchable({"type": "content-text"}, img, two), [])
+
+    @staticmethod
+    def _page(els, top=0.0):
+        return els, top
+
+    def _els(self, bottom, image=None, bullets=1):
+        top = 0.0
+        els = [{"id": "s1.title", "role": "title", "x": 84, "y": top + 140,
+                "w": 600, "h": 48, "fontSize": 42,
+                "scrollW": 600, "clientW": 600}]
+        y = top + 300
+        for i in range(bullets):
+            els.append({"id": f"s1.bullet.{i}", "role": "bullet", "x": 84,
+                        "y": y, "w": 825, "h": 40, "fontSize": 26,
+                        "scrollW": 825, "clientW": 825})
+            y += 52
+        if image is not None:
+            w, h = image
+            els.append({"id": "s1.image", "role": "image", "x": 933,
+                        "y": top + 300, "w": w, "h": h})
+        return els, top
+
+    def test_overflow_candidate_is_invalid(self) -> None:
+        els, top = self._els(bottom=None, image=None, bullets=1)
+        els[1]["y"] = 900                    # 内容底 940 > 带底 824
+        r = self.c.score_page("content-text", els, top)
+        self.assertFalse(r["valid"])
+        self.assertTrue(any(i.startswith("v_overflow") for i in r["invalid_reason"]))
+
+    def test_raw_density_and_scores_are_separate(self) -> None:
+        """占带 53% 是原始值；区间得分 1.0 是另一回事 —— 混读会当成「塞满」。"""
+        els, top = self._els(None, image=(583, 200), bullets=2)   # 图底 500 最深
+        r = self.c.score_page("content-image", els, top)
+        self.assertTrue(r["valid"])
+        self.assertAlmostEqual(r["density"], (500 - 132) / 692, places=2)
+        self.assertEqual(r["scores"]["density"], 1.0)
+
+    def test_overfull_scores_lower_not_higher(self) -> None:
+        """反「最满优先」：占带超出区间上沿（仍不溢出），密度分必须往下走。"""
+        mid, top = self._els(None, image=(583, 200), bullets=2)          # 53%
+        full = [dict(e) for e in mid]
+        full[1]["y"] = 700                     # bullet.0 → 底 740
+        full[2]["y"] = 752                     # bullet.1 → 底 792（≤824 不溢出）
+        full[3]["h"] = 492                     # 图底 792
+        r_mid = self.c.score_page("content-image", mid, top)
+        r_full = self.c.score_page("content-image", full, top)
+        self.assertTrue(r_full["valid"], r_full["invalid_reason"])
+        # 原始占带确实更满（0.95 vs 0.53）—— 但**得分**更低：满不是优点
+        self.assertGreater(r_full["density"], r_mid["density"])
+        self.assertLess(r_full["scores"]["density"], r_mid["scores"]["density"])
+
+    def test_hero_trial_gets_intentional_exemption(self) -> None:
+        """试 hero = 试用即声明：条上文字压图按 intentional 豁免；非 hero 同样布局作废。"""
+        els = [
+            {"id": "s1.image", "role": "image", "x": 84, "y": 200,
+             "w": 1432, "h": 560},
+            {"id": "s1.title", "role": "title", "x": 114, "y": 640,
+             "w": 900, "h": 60, "fontSize": 42, "scrollW": 900, "clientW": 900},
+            {"id": "s1.bullet.0", "role": "bullet", "x": 114, "y": 710,
+             "w": 900, "h": 36, "fontSize": 26, "scrollW": 900, "clientW": 900},
+        ]
+        hero = self.c.score_page("content-image", els, 0.0, layout_name="hero")
+        plain = self.c.score_page("content-image", els, 0.0, layout_name="even")
+        self.assertTrue(hero["valid"], hero["invalid_reason"])
+        self.assertFalse(plain["valid"])
+
+    def test_hero_not_rewarded_by_focal(self) -> None:
+        """满幅图的视觉占比 1.0 在 [0.35, 0.60] 区间外 → 视觉分 0（声明设计不自动加分）。"""
+        els, top = self._els(None, image=(1432, 460), bullets=1)   # 图底 760 ≤824
+        r = self.c.score_page("content-image", els, top, layout_name="hero")
+        self.assertTrue(r["valid"], r["invalid_reason"])
+        self.assertEqual(r["scores"]["focal"], 0.0)

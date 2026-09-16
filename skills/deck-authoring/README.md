@@ -26,6 +26,7 @@ python3 scripts/image_source.py --prompt "现场照片占位" -o sample-treated.
                                                                     # 3) 造占位图（几何色块拼贴）
 python3 scripts/render.py your.spec.json -o out.html                # 4) 出 HTML
 python3 scripts/render.py your.spec.json -o out.html --repair       #    （溢出时：降档→复检≤4轮）
+python3 scripts/render.py your.spec.json -o out.html --candidates   #    （未声明布局：候选并测出表）
 python3 scripts/measure.py out.html                                 # 5) 实测（真浏览器）
 python3 scripts/check.py your.spec.json out.html                    # 6) 校验
 python3 scripts/pdf.py out.html -o deck.pdf                         # 7) 矢量 PDF

@@ -155,7 +155,7 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
   换色板改 style.json；别把字段删了就交差。
 - **对比度不达标** → `ink.py styles/<你的风格>/style.json` 查色板；换色板别动阈值。
 - **`... 越出版面：下缘 ... 越出该页下边界 ...`** → 内容真的撑出这页了（实测）。
-  `measure.py` 点名越界元素；或 `render --repair` 跑修复梯（只降未声明档位）。
+  `measure.py` 点名越界元素；或 `render --repair`（修复梯）/`--candidates`（候选并测）。
 - **`... 越出版面：右缘 ...`**（多半在标题）→ 标题是 `nowrap` 的，不折行、直接裁；改短。
 - **`图片没加载`** → 相对路径挪目录就裂图；同目录交付或 base64（见 images.md）。
 - **字体回退提示** → 声明的族本机没有，后面栈顶上；不阻塞，交付前确认。

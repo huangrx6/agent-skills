@@ -15,4 +15,4 @@ import os as _os
 
 __path__ = [_os.path.dirname(_os.path.abspath(__file__))]
 
-from . import model, collision, repair  # noqa: E402,F401  （依赖上面的 __path__）
+from . import model, collision, repair, candidates  # noqa: E402,F401

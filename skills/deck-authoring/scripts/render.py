@@ -1453,6 +1453,97 @@ def _repair_loop(deck_spec: dict, style: dict, assets: dict | None,
     return 0 if report["fixed"] else 1
 
 
+def _candidates_main(deck_spec: dict, style: dict, assets, out_path: str,
+                     pick: bool) -> int:
+    """候选搜索：未声明布局的页，把结构候选各渲一遍、实测、打分。
+
+    只搜**未声明** ``layout`` 的页（声明过 = 钉死）；目标函数没有「最满优先」
+    （密度是区间满意度）；硬违规的候选作废。``--pick`` 才把最优候选写进
+    ``*.candidates.spec.json`` 并渲成产物 —— 不带它就只出表，决定权在作者。
+    """
+    import copy
+    import tempfile
+    cand_mod = _load_layout().candidates
+    slides = deck_spec["deck"]["slides"]
+    groups: dict[int, list] = {}
+    for i, s in enumerate(slides, 1):
+        cands = cand_mod.searchable(s, IMAGE_LAYOUTS, TWO_COL_LAYOUTS)
+        if cands:
+            groups[i] = cands
+    if not groups:
+        print("没有可搜索的页（layout 已声明，或页型无结构布局）")
+        return 0
+    results: dict[int, dict] = {i: {} for i in groups}
+    rounds = max(len(v) for v in groups.values())
+    for k in range(rounds):
+        trial = copy.deepcopy(deck_spec)
+        touched = False
+        for i, cands in groups.items():
+            if k < len(cands):
+                trial["deck"]["slides"][i - 1]["layout"] = cands[k]
+                touched = True
+        if not touched:
+            break
+        html = render_resolved(deck_mod.compile_spec(trial, style, assets=assets))
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as tf:
+            tf.write(html)
+            trial_path = tf.name
+        try:
+            measured = measure_mod.measure(trial_path)
+        finally:
+            os.unlink(trial_path)
+        rects = measured.get("slides") or []
+        for i, cands in groups.items():
+            if k >= len(cands):
+                continue
+            els = [e for e in measured.get("elements", []) if e.get("slide") == i]
+            top = rects[i - 1].get("y", 0) if i <= len(rects) else 0
+            results[i][cands[k]] = cand_mod.score_page(
+                slides[i - 1].get("type"), els, top, layout_name=cands[k])
+    chosen: dict[int, str] = {}
+    for i, table in results.items():
+        print(f"第 {i} 页（{slides[i - 1].get('type')}）:")
+        best_name, best = None, -1.0
+        for name in groups[i]:                     # 按候选顺序打印（缺省在前）
+            sc = table[name]
+            if not sc["valid"]:
+                why = "、".join(sc["invalid_reason"][:2])
+                print(f"  ✗ {name:12s} 作废（{why}）")
+                continue
+            mark = ""
+            if sc["total"] > best:
+                best, best_name = sc["total"], name
+            so = sc["scores"]
+            print(f"  · {name:12s} 总分 {sc['total']:.2f}"
+                  f"（占带 {sc['density']:.0%}"
+                  f"{'，密度分 ' + format(so['density'], '.2f') if 'density' in so else ''}"
+                  f"{'，可读 ' + format(so['readability'], '.2f')}"
+                  f"{'，视觉 ' + format(so['focal'], '.2f') if 'focal' in so else ''}"
+                  f"{'，平衡 ' + format(so['balance'], '.2f') if 'balance' in so else ''}）")
+            _ = mark
+        if best_name is not None:
+            chosen[i] = best_name
+            print(f"  → 最优：{best_name}（{best:.2f}）")
+        else:
+            print("  → 全部作废，保持缺省布局")
+    report = {"searched": {str(i): t for i, t in results.items()},
+              "chosen": {str(i): n for i, n in chosen.items()}}
+    deckio.write_json(out_path + ".candidates.json", report)
+    if pick and chosen:
+        picked = copy.deepcopy(deck_spec)
+        for i, name in chosen.items():
+            picked["deck"]["slides"][i - 1]["layout"] = name
+        deckio.write_json(out_path.replace(".html", ".candidates.spec.json"),
+                          picked)
+        deckio.write_text(out_path, render_resolved(
+            deck_mod.compile_spec(picked, style, assets=assets)))
+        where = "、".join(f"第 {i} 页 → {n}" for i, n in sorted(chosen.items()))
+        print(f"✓ 已选出并渲染：{where}（可采纳 *.candidates.spec.json）")
+    elif groups:
+        print("（未选：加 --pick 才落盘 —— 表在这里，决定权在作者）")
+    return 0
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="deck-spec.json → HTML（可选：导出 resolved）")
     ap.add_argument("spec")
@@ -1466,6 +1557,11 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--repair", action="store_true",
                     help="渲→实测→修复梯→再渲（≤4 轮；只动 spec 可表达字段，"
                          "作者声明过的不碰，产出 *.repaired.spec.json）")
+    ap.add_argument("--candidates", action="store_true",
+                    help="候选搜索：未声明布局的页把结构候选各渲一遍、实测打分"
+                         "（密度是区间满意度，不是最满优先；硬违规作废）")
+    ap.add_argument("--pick", action="store_true",
+                    help="配合 --candidates：把最优候选写进 *.candidates.spec.json 并渲出")
     args = ap.parse_args(argv[1:])
     deck_spec = deckio.read_json(args.spec)
     assets = load_assets(args.spec)      # assets/manifest.json（§12 管线入口）
@@ -1473,6 +1569,8 @@ def main(argv: list[str]) -> int:
     style = load_style(name)
     if args.repair:
         return _repair_loop(deck_spec, style, assets, args.out)
+    if args.candidates or args.pick:
+        return _candidates_main(deck_spec, style, assets, args.out, args.pick)
     resolved = deck_mod.compile_spec(deck_spec, style, assets=assets)
     page = render_resolved(resolved)
     deckio.write_text(args.out, page)
