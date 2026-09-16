@@ -512,7 +512,9 @@ def _field_values(slot: dict, brief: dict, lang: str) -> list[tuple[str, str]]:
             text += f"（这一页的说明文字是「{caption}」，它是**排出来的**，不是画出来的）"
         limits = ("不要：细线、细密网格或织物纹理、柔和渐变、低对比平光"
                   "（这四样塞进版式会糊成一团）；不要多个并列主体或重复主体；"
-                  "不要结构变形、过曝、裁切主体")
+                  "不要结构变形、过曝、裁切主体；"
+                  "**主体收在画面中心 80% 的区域里**（四周各留出 ≥10% 余量）—— "
+                  "版面会按槽位比例裁切或留边，贴到边上的主体一定会被切掉")
     else:
         composition = _composition_text(slot.get("variant") or "", zh=False)
         colour = (f"primary {primary}, secondary {secondary}, paper {paper}; "
@@ -533,7 +535,10 @@ def _field_values(slot: dict, brief: dict, lang: str) -> list[tuple[str, str]]:
         limits = ("Avoid: thin lines, fine mesh or woven texture, subtle gradients, "
                   "low-contrast flat light (all four mud up once in the slide); "
                   "multiple competing or duplicated subjects; structural distortion, "
-                  "blown highlights, a cropped-off subject")
+                  "blown highlights, a cropped-off subject; "
+                  "keep the subject inside the CENTRAL 80% of the frame (leave a "
+                  "margin of at least 10% on every side) \u2014 the layout crops or "
+                  "letterboxes to the slot, so anything touching the edge gets cut")
 
     return [
         ("主体", FILL["主体"][lang]),
@@ -739,6 +744,14 @@ def write_brief_md(brief: dict, out_path: str) -> str:
         "",
         "尺寸不对不是「将就一下」的事：**被放大渲染的图一定糊**，而交付前那条提示"
         "（`check.py` 的放大检查）就是为它准备的。",
+        "",
+        "**还要人眼看三条**（脚本查不出画面内容，只有你能看）：",
+        "",
+        "1. **主体在不在中心 80% 区域内** —— 版面按槽位裁切（照片）或留边（结构图），"
+        "贴边的主体一定被切；",
+        "2. **画面里有没有文字 / 数字** —— 有就重出（这一页的字由版面排）；",
+        "3. **结构图有没有被压扁** —— 结构图的比例写进 `visual.ratio`（如 `4:3`），"
+        "写了就按它留边，别硬塞进 3:2。",
     ]
     deckio.write_text(out_path, "\n".join(lines) + "\n")
     return out_path

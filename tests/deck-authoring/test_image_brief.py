@@ -69,6 +69,23 @@ class TestBrief(unittest.TestCase):
         image_source.write_brief_md(cls.brief, cls.md_path)
         cls.md = deckio.read_text(cls.md_path)
 
+    def test_prompt_asks_for_a_safe_area_around_the_subject(self) -> None:
+        """主体必须留余量 —— 否则裁切/留边一定把它切掉。
+
+        版面按**槽位**裁切（照片 `cover`）或留边（结构图 `contain`），谁也不知道
+        出图时主体贴没贴边；所以约束要写进提示词的【限制】栏（中英都要），
+        并且 brief 末尾再给三条**只能人眼看**的自检。
+        """
+        for slot in self.brief["slots"]:
+            zh = image_source.render_prompt(slot, self.brief, "zh")
+            en = image_source.render_prompt(slot, self.brief, "en")
+            self.assertIn("中心 80%", zh, slot.get("file"))
+            self.assertIn("10%", zh, slot.get("file"))
+            self.assertIn("CENTRAL 80%", en, slot.get("file"))
+            self.assertIn("10%", en, slot.get("file"))
+        for must in ("主体在不在中心 80%", "画面里有没有文字", "结构图有没有被压扁"):
+            self.assertIn(must, self.md, must)
+
     def test_one_entry_per_filename_not_per_page(self) -> None:
         """同一个文件名用在多页 → **合并成一条**。
 
