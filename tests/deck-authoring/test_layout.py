@@ -207,6 +207,14 @@ class TestChartContract(unittest.TestCase):
         self.assertEqual(g2["labels"][0]["style"]["fontSize"], tier["chartValue"])
         self.assertNotIn("radius", g2.get("style", {}),
                          "柱形圆角在 G2 5.2.10 的 spec 路径下被忽略，写了就是骗自己")
+        # 轴标题：不关就是数据集名（"label" / "value"）印在轴上 —— 实测截图里就是
+        self.assertFalse(g2["axis"]["x"]["title"])
+        self.assertFalse(g2["axis"]["y"]["title"])
+        # tooltip：交互产物会落进截图/录屏/PDF（实测截图里飘着"重大 / value / 3"）
+        self.assertFalse(g2["interaction"]["tooltip"])
+        # 柱宽：基准实测 187px / 横向覆盖 82.9%（四根几乎连成一片）——
+        # 用相对 band 的 padding（绝对像素在类目多时会把柱子挤成细线）
+        self.assertEqual(g2["scale"]["x"]["padding"], 0.45)
 
     def test_size_gate_ignores_captions_when_measuring_body(self):
         """字号体检的"正文"= role=bullet；图注再小也不是正文。"""

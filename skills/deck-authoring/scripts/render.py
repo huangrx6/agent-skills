@@ -31,6 +31,7 @@ import importlib.util
 import json
 import os
 import random
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -379,6 +380,12 @@ html,body{margin:0;background:var(--viewer)}
    自己的短横时就成了两个标记，而那个方块没有间距、直接贴住正文（实测截图）。 */
 .bullets{list-style:none;padding:0;margin:0}
 .tl li{flex:1;min-width:0;width:var(--tl-node,300px)}
+/* 图注 / 图表注：壳给一个站得住的缺省 —— 与图之间留一个间距 token，颜色压到
+   muted（注解不是正文）。皮肤要另说就覆盖这两条（皮肤 CSS 在壳之后，同级即胜）。 */
+.chartcap{margin-top:var(--sp-inner);color:var(--text);opacity:.62;
+  font:400 var(--s-caption,16px)/1.5 var(--body)}
+/* 行内强调（模型写的 `**x**`）：用 span 而不是 b —— 皮肤的 .tl b 会命中裸 b */
+.em{font-weight:700}
 .chartsrc{margin:calc(var(--sp-inner) * -0.5) 0 0;color:var(--text);opacity:.55;
   font:400 var(--s-caption,16px)/1.4 var(--body)}
 .chartwrap{margin-top:var(--sp-item);width:1432px;padding:var(--sp-item);
@@ -859,6 +866,24 @@ def chart_emphasis_set(slide: dict) -> set:
     return {str(v) for v in em.get("values", [])}
 
 
+# 柱宽：G2 的 band 默认把柱子撑到几乎相接。实测（PNG 量柱宽）：4 类目下柱子
+# 187px、横向覆盖 82.9% —— 四根几乎连成一片。`scale.x.padding` 是**相对 band** 的
+# 留白（实测 0.4 → 柱宽 116px / 覆盖 51.6%；`insetLeft/Right` 也能收窄，但它是绝对
+# 像素：类目一多（8 类）会把柱子挤成细线）。取 0.45 落在 45~52% 区间。
+_BAND_PAD = {"x": {"padding": 0.45}}
+
+
+# 行内强调：模型常把 Markdown 的 `**x**` 写进条目/标题（实测第 3 页条目原样显示了
+# `**6 因素** 硬尺标统一口径`）。解释成**加粗**（本意就是强调），用 `span.em`
+# 而不是 `<b>` —— 皮肤的 `.tl b`（时间线节点标签）会命中裸 `<b>`，把行内强调
+# 变成块级大字号。所有**可见文本**都走 rich()，不要再直接 html.escape。
+_MD_BOLD = re.compile(r"\*\*(.+?)\*\*")
+
+
+def rich(text) -> str:
+    return _MD_BOLD.sub(r'<span class="em">\1</span>', html.escape(str(text)))
+
+
 def _chart_norm_series(slide: dict) -> list[dict]:
     """统一成 [{name, data:[{label,value}]}]（单系列 data 与多系列 series 都收）。"""
     series = slide.get("series")
@@ -910,7 +935,13 @@ def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None,
         # 实测后果：canvas 退到 G2 默认 640×480，撑出 .g2 的 330px 容器、
         # 压住图注，而且只占满左侧不到一半宽度。
         "padding": "auto",
-        "axis": {"x": {**typo_axis, "grid": False}, "y": dict(typo_axis)},
+        # 轴**标题**一律关掉：不关就是数据集名（"label" / "value"）印在轴上 ——
+        # 最典型的图表 slop，人话标题由页面 message / 图注承担。
+        "axis": {"x": {**typo_axis, "grid": False, "title": False},
+                 "y": {**typo_axis, "title": False}},
+        # tooltip 关掉：交互产物会落进截图/录屏/PDF（实测截图里就飘着一个
+        # "重大 / value / 3" 浮层），也让同一份产物两次截图不一致。
+        "interaction": {"tooltip": False},
     }
     if kind in ("bar", "bar-horizontal"):
         rows = sorted(data, key=lambda d: -d.get("value", 0)) \
@@ -920,7 +951,7 @@ def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None,
             "type": "interval",
             "data": rows,
             "encode": {"x": "label", "y": "value", "color": "c"},
-            "scale": {"color": {"type": "identity"}},
+            "scale": {"color": {"type": "identity"}, **_BAND_PAD},
             "style": {"lineWidth": 0},
             "labels": [{"text": "value", "style": {**typo_label,
                                                    "fontWeight": 600,
@@ -976,7 +1007,7 @@ def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None,
             "encode": {"x": "label", "y": "value", "color": "series"},
             "transform": [{"type": "stackY"}] if kind == "bar-stacked" else [],
             "scale": {"color": {"range": chart_series_colors(primary, colors.get(
-                "background", "#FFFFFF"), max(1, len(series)))}},
+                "background", "#FFFFFF"), max(1, len(series)))}, **_BAND_PAD},
             "axis": {"x": {**typo_axis, "title": False, "grid": False},
                      "y": {**typo_axis, "title": False}},
         })
@@ -1188,7 +1219,7 @@ def render_resolved(resolved: dict) -> str:
                        f'style="--s-title:{tsize}px">{th}</div>')
             items = "".join(
                 f'<li {tag(f"s{i}.bullet.{bi}", i, "bullet", b, bsize)}>'
-                f'{html.escape(b)}</li>'
+                f'{rich(b)}</li>'
                 for bi, b in enumerate(slide.get("bullets", [])))
             out.append(f'<ul class="bullets" style="--s-bullet:{bsize}px">{items}</ul>')
         elif kind == "content-image":
@@ -1208,7 +1239,7 @@ def render_resolved(resolved: dict) -> str:
                            f'style="--s-title:{tsize}px">{th}</div>')
             items = "".join(
                 f'<li {tag(f"s{i}.bullet.{bi}", i, "bullet", b, bsize)}>'
-                f'{html.escape(b)}</li>'
+                f'{rich(b)}</li>'
                 for bi, b in enumerate(slide.get("bullets", [])))
             # 干净报错，不要甩一个 KeyError 栈：validate_spec.py 本该先拦住
             # （它现在有 REQUIRED_SLIDE_FIELDS），但 render 也可能被别的入口直接调。
@@ -1228,7 +1259,7 @@ def render_resolved(resolved: dict) -> str:
                 cap_attrs = tag(f"s{i}.caption", i, "caption", slide["caption"],
                                 tier["caption"])
                 cap = (f'<figcaption class="chartcap" {cap_attrs}>'
-                       f'{html.escape(slide["caption"])}</figcaption>')
+                       f'{rich(slide["caption"])}</figcaption>')
             # Family(content-image) × Variant：spec/compile 决定文图栅格分配，
             # 渲染只执行。默认 visual-right 必须**逐字节**等于旧输出（重构不改像素）。
             # （variant 已在 titleblock 之前判定 —— hero 不立独立标题块。）
@@ -1271,7 +1302,7 @@ def render_resolved(resolved: dict) -> str:
             for ci, col in enumerate(slide.get("columns", [])[:2]):
                 li = "".join(
                     f'<li {tag(f"s{i}.col{ci}.bullet.{bi}", i, "bullet", b, bsize)}>'
-                    f'{html.escape(b)}</li>'
+                    f'{rich(b)}</li>'
                     for bi, b in enumerate(col.get("bullets", [])))
                 band = "a" if ci == 0 else "b"
                 coltitle = col.get("title", "")
@@ -1279,7 +1310,7 @@ def render_resolved(resolved: dict) -> str:
                                tier["colTitle"])
                 cols.append(f'<div class="col"><div class="band {band}"></div>'
                             f'<h3 {h3_attrs} style="--s-colTitle:{tier["colTitle"]}px">'
-                            f'{html.escape(coltitle)}</h3>'
+                            f'{rich(coltitle)}</h3>'
                             f'<ul class="bullets small">{li}</ul></div>')
             # 非默认结构布局加 v-<layout> 类（宽度规则在骨架 CSS）；even 是缺省，
             # 不加类 —— 旧输出（flex 等分 6+6）一个字节都不动。自造布局名则加
@@ -1345,7 +1376,7 @@ def render_resolved(resolved: dict) -> str:
             if slide.get("caption"):
                 cap_attrs = tag(f"s{i}.caption", i, "caption", slide["caption"],
                                 tier["caption"])
-                out.append(f'<div class="chartcap" {cap_attrs}>{html.escape(slide["caption"])}</div>')
+                out.append(f'<div class="chartcap" {cap_attrs}>{rich(slide["caption"])}</div>')
         else:
             raise SystemExit(f"✗ 未知版式 type={kind!r}（支持 title / content-text / "
                              f"content-image / two-column / timeline / chart / end）")

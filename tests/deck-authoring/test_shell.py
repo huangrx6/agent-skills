@@ -267,5 +267,56 @@ class TestOrnamentNote(unittest.TestCase):
                          "① 是数字（No），不是装饰字符")
 
 
+
+class TestInlineText(unittest.TestCase):
+    """文本的两条硬约定：Markdown 星号要变成加粗；图注要有缺省样式。
+
+    实测踩过两件：第 3 页条目把 `**6 因素**` 原样显示（屏幕上就是星号）；
+    用户的皮肤没写 `.chartcap` 时，图注直接贴住图、而且用正文的黑 —— 两条都得由壳兜住。
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.render = _load("deck_render_inline", os.path.join(SCRIPTS, "render.py"))
+        with open(DEMO, encoding="utf-8") as fh:
+            cls.html = cls.render.render(json.load(fh))
+
+    def test_markdown_bold_becomes_em_span(self) -> None:
+        self.assertEqual(self.render.rich("**6 因素** 硬尺标统一口径"),
+                         '<span class="em">6 因素</span> 硬尺标统一口径')
+
+    def test_rich_still_escapes(self) -> None:
+        self.assertEqual(self.render.rich('<script>&"x"'),
+                         '&lt;script&gt;&amp;&quot;x&quot;')
+        self.assertNotIn("<script>", self.render.rich("<script>alert(1)</script>"))
+
+    def test_shell_gives_captions_a_default_gap_and_muted_color(self) -> None:
+        self.assertIn(".chartcap{margin-top:var(--sp-inner)", self.html,
+                      "图注的间距/颜色不能只靠皮肤 —— 皮肤没写就贴住图")
+        self.assertIn("opacity:.62", self.html)
+        self.assertIn(".em{font-weight:700}", self.html,
+                      "行内强调要有样式，否则 span 是隐形的")
+
+
+class TestMarkdownNote(unittest.TestCase):
+    """文本里出现 Markdown 标记 → 提示（格式归版式）。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.check = _load("deck_check_markdown", os.path.join(SCRIPTS, "check.py"))
+
+    def test_markdown_in_content_is_flagged(self) -> None:
+        deck = {"slides": [{"type": "content-text", "title": "t",
+                            "bullets": ["**6 因素** 硬尺标统一口径", "普通条目"]}]}
+        notes = self.check._markdown_notes(deck)
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("第 1 页", notes[0])
+
+    def test_plain_content_is_silent(self) -> None:
+        deck = {"slides": [{"type": "content-text", "title": "t",
+                            "bullets": ["6 因素 硬尺标统一口径"]}]}
+        self.assertEqual(self.check._markdown_notes(deck), [])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -922,6 +922,36 @@ def _ornament_notes(deck: dict) -> list[str]:
             f"文本里再写一个会变成两个标记而且贴住正文：删掉这个字符（要换标记就改皮肤）"]
 
 
+def _markdown_notes(deck: dict) -> list[str]:
+    """条目/标题里出现 Markdown 标记 → 说一声（提示）。
+
+    渲染器会把 `**x**` 解释成加粗（不然屏幕上就是星号：实测第 3 页显示成
+    `**6 因素** 硬尺标统一口径`）。但**格式是版式的事** —— 作者不该在内容里写标记，
+    该强调就换个更短的句子，或让版式承担。点出来是为了让它下次别再写。
+    """
+    hits: list[int] = []
+    for i, slide in enumerate(deck.get("slides", []), 1):
+        if not isinstance(slide, dict):
+            continue
+        texts = [slide.get("title") or "", slide.get("subtitle") or "",
+                 slide.get("caption") or ""]
+        texts += list(slide.get("bullets") or [])
+        for col in (slide.get("columns") or []):
+            if isinstance(col, dict):
+                texts += [col.get("title") or ""] + list(col.get("bullets") or [])
+        for node in (slide.get("nodes") or []):
+            if isinstance(node, dict):
+                texts += [node.get("label") or "", node.get("note") or ""]
+        if any("**" in t for t in texts if isinstance(t, str)):
+            hits.append(i)
+    if not hits:
+        return []
+    pages = "、".join(f"第 {n} 页" for n in hits[:6])
+    more = f"（共 {len(hits)} 页）" if len(hits) > 6 else ""
+    return [f"{pages}{more} 的文本里有 Markdown 标记（`**…**`）—— 已按**加粗**解释；"
+            f"格式归版式，内容里不用写标记（要强调就换更短的句子）"]
+
+
 def _visual_decision_notes(deck: dict) -> list[str]:
     """内容页没做视觉决定时开口 —— 点页号，并给可选的载体。
 
@@ -975,6 +1005,7 @@ def advisories(measured: dict, spec: dict | None = None,
         notes.extend(_check_type_size(measured, spec.get("deck", {}), tokens))
         notes.extend(_visual_decision_notes(spec.get("deck", {})))
         notes.extend(_ornament_notes(spec.get("deck", {})))
+        notes.extend(_markdown_notes(spec.get("deck", {})))
         # 信息层级（文本预算 / 焦点 / 密度）那三条曾由 hierarchy.py 提供，v4 随
         # 该模块一起退役：阈值取决于语境（封面就该空、看板就该满），做成阻塞会
         # 把第一份正常的 deck 挡住；而**装不装得下**这件事已由 measure 实测那两道
