@@ -42,10 +42,10 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
   python3 scripts/render.py spec.json --style $s -o $s.html && python3 scripts/shots.py $s.html --out-dir shots-$s --count 2; done
 ```
 
-**方向不是预设、也不只是色板**——它在字号档 / 字栈 / 动效 / 气质上互斥（三版只差色板
-= 三张同构皮肤，用户实测踩过的坑）。改 `style.json` 的 `type`/`fonts`/`motion` 与 `skin.css`
-的排法；字号按 style-architecture.md「字号怎么定」**用算术夹出来**（内页标题 40~56，不是
-封面尺度）；每版标：**风格名 + 温度 + 适合什么场合**，停下等选择。
+**方向从这份 deck 推（观众/场合/材料气质），不从风格史挑、不复用见过的风格名**——
+历史那张「八套对照表」实测就是菜单（三个方向永远是那几个名字），已删；换成四轴取点
+（骨架/字感/密度/色彩），任意两方向至少两轴不同且必含骨架轴（style-architecture.md
+「方向怎么来」）。每版标：**风格名 + 一句为什么这份内容配它 + 适合什么场合**，停下等选。
 
 ### 风格：自建，无内置
 
@@ -122,8 +122,8 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
 ## 动画：同一段画代码，三种时钟
 
 演示态的入场和录进 MP4 的帧由**同一个纯函数** `paint(si,t)` 画，「讲出来的」和
-「录出来的」不会跑偏。运动参数在**风格**里（`motion`，每套一个性格；夹具 swiss-grid
-= 短而齐；历史参数表见 animation.md）。
+「录出来的」不会跑偏。运动参数在**风格**里（`motion`，每套一个性格；性格 → 参数的
+推导见 animation.md）。
 
 两条硬约束：
 

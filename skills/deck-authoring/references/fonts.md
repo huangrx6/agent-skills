@@ -113,9 +113,11 @@ body / numeral 三档都给齐，所以"只用免费的"不会变成"有几套�
 
 完整映射表在 `fonts/mapping.json`（`--map` 可打成人类可读的样式），分两层：
 
-- **styles**：风格名 × display / body / numeral 三档该配哪款字（历史九套名保留作参考——minimal-baseline 已入表，自建同名即生效）
-  （比如 `terminal` 必须锁死等宽、`swiss-grid` 只能用**中性到没有性格**的字、
-  `paper-ink` 的 400 字重标题只有楷体/明朝体配得上）。
+- **styles**：**字感性格** × display / body / numeral 三档该配哪款字（v5 起不按风格名查 ——
+  风格名每份 deck 都不同，按名查的表实测变成菜单）。六个性格：bold-sans（响）/
+  editorial-serif（文）/ poster-heavy（海报）/ neutral-grotesk（中性）/
+  humanist-round（软）/ mono-engineering（工）。配字 = 从方向四轴里的「字感」轴
+  查这张表（`fonts.py --map`）。
 - **categories**：六类艺术字各适合什么场合（国潮 / 毛笔 / 潮流 / 卡通 / 电商 / 科技），
   以及忌讳（像素字字号必须落在整数倍、这一层最"吵"所以一页只用一款）。
 

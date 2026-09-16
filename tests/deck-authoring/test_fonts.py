@@ -114,11 +114,12 @@ class TestMapping(unittest.TestCase):
                                   encoding="utf-8").read())
         cls.names = [f["name"] for f in fonts.catalog()]
 
-    def test_every_style_is_covered(self) -> None:
-        styles = set(render.available_styles()) if hasattr(render, "available_styles") \
-            else set(fonts.deckio.list_dirs(os.path.join(FIXTURES_DIR, "styles")))
-        missing = styles - set(self.map["styles"])
-        self.assertEqual(missing, set(), f"这些风格没有字体映射：{sorted(missing)}")
+    def test_a_only_covers_every_personality(self) -> None:
+        """A 档子表必须覆盖全部字感性格 —— 缺一个，"没有 license"的用户就在那个
+        性格上无路可走。（v5：styles 层从风格名改成字感性格，按名查的表实测
+        变成了菜单。）"""
+        self.assertEqual(set(self.map["a_only"]["styles"]),
+                         set(self.map["styles"]))
 
     def test_every_category_is_covered(self) -> None:
         cats = {f["category"] for f in fonts.catalog()}
@@ -506,17 +507,17 @@ class TestStylesUseFreeArtFonts(unittest.TestCase):
         """**回归**：terminal 的整套立论是**等宽**，而迁移脚本一度把
         `霞鹜文楷`（比例字体！）塞到了 `Menlo` 前面 —— 列对齐会立刻散掉。
 
-        正确的前缀是**等宽变体** `LXGW WenKai Mono`。内置 terminal 风格已删
-        （styles/ 整目录移除），但映射表里保留着这套等宽字栈作为自建参考，
-        守护改在映射层继续。
+        正确的前缀是**等宽变体** `LXGW WenKai Mono`。内置风格已删、映射表也已从
+        风格名改成**字感性格**，这套等宽字栈现在挂在 `mono-engineering` 性格下，
+        守护跟着搬过去继续。
         """
-        row = self.map["styles"]["terminal"]["roles"]
+        row = self.map["styles"]["mono-engineering"]["roles"]
         for slot in ("display", "body"):
             # 映射行是 "A（注）/ B" 形的字符串栈，取第一项
             head = str(row[slot]).split("/")[0].strip()
-            self.assertIn("Mono", head, f"terminal.{slot} 打头的不是等宽字体：{row[slot]}")
+            self.assertIn("Mono", head, f"mono-engineering.{slot} 打头的不是等宽字体：{row[slot]}")
             if "霞鹜文楷" in head:
-                self.assertIn("等宽", head, "terminal 打头的中文是比例字体")
+                self.assertIn("等宽", head, "mono-engineering 打头的中文是比例字体")
 
 if __name__ == "__main__":
     unittest.main()

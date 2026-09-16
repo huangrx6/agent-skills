@@ -25,7 +25,7 @@ python3 scripts/ink.py styles/<你的风格>/style.json   # 逐色板验对比�
 两边开始漂）。所以分工是：
 
 - `colorSets` 存四个角色的 HEX（仓库既有形状，没改）——**primary / secondary / background / text**
-- `colorStructure` 存结构（随历史八套建立；现存在于夹具与自建风格里）。它是**作者声明的
+- `colorStructure` 存结构（作者声明；随自建风格建立）。它是**作者声明的
   设计意图**：`hue_structure` / `color_count` / `lightness_structure` /
   `saturation_structure` / `temperature` 这些字段按 OKLCH 判据自己写，脚本不再替你
   推算、也不再拿声明和实测对。
@@ -79,7 +79,7 @@ v3 起 OKLCH 就不再自动生成方向变体；**v4 起连测量 / 推导的�
 （原先按 OKLCH 生成 Safe / Creative / Experimental 三变体的那条路更早已退役，见下「三个方向」。）
 
 **中性色不参与色相判定**（彩度低于一个阈值就跳过）—— 挪中性色的色相只会让它变脏。
-阈值原先在 `palette.py`（`NEUTRAL_CHROMA = 0.03`，按实测标定：`pastel-geometry` 的副色
+阈值原先在 `palette.py`（`NEUTRAL_CHROMA = 0.03`，按实测标定：内置时期某套粉彩风格的副色
 `#8A8578` 彩度 0.020，目视就是暖灰，却卡在 0.02 上被算成"有色"、整套风格被误判成
 互补色）；该推导已随 palette.py 退役，这条当作**你手动判色相时**的经验沿用。
 
@@ -100,12 +100,12 @@ v3 起 OKLCH 就不再自动生成方向变体；**v4 起连测量 / 推导的�
 加分项同理（非常规冷暖、低饱和+高纯度强调、中性+非典型强调）。
 
 **这条不能一律阻塞**：规范第 18 条给过三档阈值（普通 PPT 0.45 / 设计型 0.65 /
-创意封面 0.75），而历史八套内置期有 5 套风格的某个色板正落在名单上 —— 一律阻塞，
+创意封面 0.75），而内置时期有 5 套风格的某个色板正落在名单上 —— 一律阻塞，
 仓库自己的风格先挂。所以现在的现实是：**名单只作自查**，配色选哪套由作者声明
 （`colorSet`）；带牙的画质门槛是**对比度**（`ink.py`）与产物实测（`check.py`）。
 
 > 拿 AI 主题的 deck 自查一遍就会看到：夹具两套的 `blue` 色板
-> （`swiss-grid/blue`、`minimal-baseline/blue`，主色都是 `#0033CC`）都同时命中
+> （两套不同风格各自的 `blue` 色板，主色都是 `#0033CC`）都同时命中
 > `tech_blue_purple_cyan`（主色落在 H 200~320、C ≥ 0.10）与
 > `corporate_blue_white`（蓝主色 + 白底）—— **想做 AI 主题的 deck，这几个色板
 > 不该默认选**。（这条以前由 `--novelty` 跑出来，现在照判据对着色值自己看。）
@@ -173,7 +173,7 @@ unusual gradient palette             premium low-saturation palette
 
 1. **渐变**。规范第 13 条那十种渐变类型（mesh / aurora / glow / conic…）都还没做 ——
    外壳里没有渐变。色板也没有 `gradient` 这条角色（它原先由 `palette.py::roles` 推导，
-   已随脚本退役）；历史八套的 `gradient_strategy` 都是 `none`。
+   已随脚本退役）；内置时期的八套风格 `gradient_strategy` 全是 `none`（没有一个做过渐变）。
 2. **玻璃拟态 / Glow / Mesh**。规范第 12 条的背景策略里有这些，当前只支持
    `solid` 与 `texture`（颗粒）。
 3. **强调色占比的实测**。规范第 11 条说 5%~20%。`measure.py` 已经记了每个元素的

@@ -653,33 +653,40 @@ def mapping() -> dict:
 
 
 def print_map(as_md: bool = False, a_only: bool = False) -> None:
-    """字体 ↔ 风格映射表。
+    """字体 ↔ **字感性格**映射表。
+
+    v5：不再按风格名查 —— 风格名每份 deck 都不同，而且按名查的那张表实测变成了
+    菜单（确认门②的方向永远是那几个历史名字）。现在按方向四轴里的「字感」轴查：
+    bold-sans / editorial-serif / poster-heavy / neutral-grotesk /
+    humanist-round / mono-engineering。
 
     `a_only=True` 时只打**严格 A** 那一套 —— 给"没有 license"的人用，
     里面每一款都能下载、安装、嵌进交付物。
     """
     mp = mapping()
     if a_only:
-        print("字体 ↔ 风格映射（**纯 A 档**：每一款都能免费商用、可嵌入交付物）\n")
-        for style, roles in mp["a_only"]["styles"].items():
-            label = mp["styles"].get(style, {}).get("label", style)
-            print(f"── {style}（{label}）")
+        print("字体 ↔ 字感性格映射（**纯 A 档**：每一款都能免费商用、可嵌入交付物）\n")
+        for pers, roles in mp["a_only"]["styles"].items():
+            row = mp["styles"].get(pers, {})
+            print(f"── {pers}（{row.get('label', pers)}）")
             for role, pick in roles.items():
                 print(f"     {role:14} {pick}")
         print()
         print(mp["a_only"]["why"])
         return
     if as_md:
-        print("# 字体 ↔ 风格映射\n")
-        for style, row in mp["styles"].items():
-            print(f"## {style}（{row['label']}）\n")
-            print(f"- 温度：{row['temperature']}")
+        print("# 字体 ↔ 字感性格映射\n")
+        for pers, row in mp["styles"].items():
+            print(f"## {pers}（{row['label']}）\n")
+            print(f"- 气质：{row['temperature']}")
+            print(f"- 适合：{row.get('from', '')}")
             for role, pick in row["roles"].items():
                 print(f"- **{role}**：{pick}")
             print()
         return
-    for style, row in mp["styles"].items():
-        print(f"── {style}（{row['label']} / {row['temperature']}）")
+    for pers, row in mp["styles"].items():
+        print(f"── {pers}（{row['label']} / {row['temperature']}）")
+        print(f"     适合          {row.get('from', '')}")
         for role, pick in row["roles"].items():
             print(f"     {role:14} {pick}")
     print()
@@ -687,7 +694,6 @@ def print_map(as_md: bool = False, a_only: bool = False) -> None:
     for row in mp["categories"].values():
         print(f"     {row['label']}")
         print(f"         {row['use']}")
-
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="字体库：清单 / 取字体 / 映射 / 内嵌")
