@@ -335,6 +335,71 @@ class TestRoleNotes(unittest.TestCase):
         self.assertEqual(check._role_notes(deck), [])
 
 
+class TestLocalPaths(unittest.TestCase):
+    """产物不许带本机绝对路径：图片**阻塞**（拷到别处就裂图），字体是提示。
+
+    分清两类是关键：`fonts.py` 有意用绝对路径（字体在 deck 项目之外），把它当�错
+    会让每份带字体的 deck 都报错；而图片的绝对路径**没有任何合法场景** —— 产物
+    就是要被拷来拷去的。
+    """
+
+    def test_absolute_image_path_blocks_with_the_fix(self) -> None:
+        problems, notes = check._check_local_paths('<img src="/Users/me/proj/x.png">')
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("/Users/me/proj/x.png", problems[0])
+        self.assertIn("相对路径", problems[0], "要给出修法，不是只说不行")
+        self.assertEqual(notes, [])
+
+    def test_file_url_blocks(self) -> None:
+        problems, _ = check._check_local_paths('<img src="file:///tmp/a.png">')
+        self.assertTrue(any("file://" in p for p in problems), problems)
+
+    def test_file_url_is_not_counted_twice(self) -> None:
+        """`file:///tmp/a.png` 只能算一处 —— 当成 file:// 又当成 /tmp/ 会虚报。"""
+        problems, _ = check._check_local_paths('<img src="file:///tmp/a.png">')
+        self.assertEqual(len(problems), 1, problems)
+
+    def test_font_url_is_a_note_and_names_embed(self) -> None:
+        page = "<style>@font-face{src:url('/Users/me/Library/Fonts/x.ttf')}</style>"
+        problems, notes = check._check_local_paths(page)
+        self.assertEqual(problems, [], "字体走绝对路径是设计，不能阻塞")
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("--embed", notes[0], "提示要说清怎么变成自包含单文件")
+
+    def test_clean_products_stay_silent(self) -> None:
+        for page in ('<img src="assets/x.png">',
+                     '<img src="data:image/png;base64,AAAA">',
+                     "<p>没有任何路径</p>"):
+            self.assertEqual(check._check_local_paths(page), ([], []), page)
+
+
+class TestReuseNotes(unittest.TestCase):
+    """同一张素材用在多页 —— 提示级（合理复用是决定，但得说出来）。"""
+
+    def test_same_asset_on_two_pages_is_flagged_once(self) -> None:
+        deck = {"slides": [{"image": "assets/a.png"}, {"image": "assets/a.png"},
+                           {"image": "assets/b.png"}]}
+        notes = check._reuse_notes(deck)
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("第1页、第2页", notes[0])
+        self.assertIn("a.png", notes[0])
+
+    def test_different_slot_ratios_are_called_out(self) -> None:
+        deck = {"slides": [
+            {"image": "a.png", "visual": {"kind": "evidence_image", "ratio": "3:2"}},
+            {"image": "a.png", "visual": {"kind": "evidence_image", "ratio": "1:1"}}]}
+        notes = check._reuse_notes(deck)
+        self.assertIn("比例不一样", notes[0])
+        self.assertIn("3:2", notes[0])
+        self.assertIn("1:1", notes[0])
+
+    def test_single_use_and_empty_deck_are_silent(self) -> None:
+        self.assertEqual(check._reuse_notes({"slides": [{"image": "a.png"},
+                                                       {"image": "b.png"}]}), [])
+        self.assertEqual(check._reuse_notes({}), [])
+        self.assertEqual(check._reuse_notes({"slides": [None, "不是字典"]}), [])
+
+
 class TestStyleRules(unittest.TestCase):
     """风格语法门（`check._check_style_rules`）：风格声明的语法 vs 实测。
 

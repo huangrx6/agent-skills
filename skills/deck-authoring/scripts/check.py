@@ -226,6 +226,62 @@ def _check_presenter_contract(page: str, deck: dict) -> list[str]:
     return out
 
 
+# 本机绝对路径：`/Users/…` / `/home/…` / `/tmp/…` / `C:\…`，以及 `file://`。
+# 分两类：图片的绝对路径**会裂**（换台机器/挪个目录就没了），字体的绝对路径是
+# **有意的**（字体在 deck 项目之外，见 fonts.py）—— 但单文件交付要 `--embed`。
+FILE_URL_RE = re.compile(r'file://[^\s"\')]+')
+ABS_PATH_RE = re.compile(
+    r'/(?:Users|home|private|tmp|var|opt|Volumes)/[^\s"\')]+'
+    r'|[A-Za-z]:\\\\[^\s"\')]+')
+
+
+def _check_local_paths(page: str) -> tuple[list[str], list[str]]:
+    """产物里不许出现本机绝对路径（图片阻塞 / 字体提示）。
+
+    一半是可移植性：`src="/Users/…/x.png"` 在**这台机器**上好好的，而交付物
+    是要被拷到别人机器、会议现场、归档目录里的 —— 换一处就是裂图，而且裂得
+    很晚（那时人已经走了）。相对路径没有这个问题：项目带走就行。
+
+    一半是隐私：绝对路径里往往带着用户名、项目名、客户名 —— 一份对外发的
+    产物不该附带一份本机目录树。
+
+    为什么字体单独算：字体住在 deck 项目之外是**设计**（见 `fonts.py`），
+    所以它是提示不是错；要把产物做成真正自包含单文件，用 `fonts.py --embed`。
+    """
+    problems: list[str] = []
+    notes: list[str] = []
+    # 先摘掉 file:// 整段再找裸路径 —— 否则 `file:///tmp/a.png` 会被算两遍
+    # （一次算 file://，一次算 /tmp/…），报出来的条数比实际多。
+    hard = FILE_URL_RE.findall(page)
+    stripped = FILE_URL_RE.sub(" ", page)
+    hits = ABS_PATH_RE.findall(stripped)
+    if not (hard or hits):
+        return problems, notes
+    font_urls, img_paths = [], []
+    for hit in hits:
+        at = stripped.find(hit)
+        if at > 0 and "url(" in stripped[max(0, at - 40):at]:
+            font_urls.append(hit)
+        else:
+            img_paths.append(hit)
+    if hard:
+        problems.append(
+            f"产物里有 file:// 路径（{len(hard)} 处，如 {hard[0]}）—— "
+            f"交付物不该指向本机文件系统：换成项目内相对路径（或图片内嵌）")
+    if img_paths:
+        example = sorted(img_paths)[0]
+        problems.append(
+            f"产物里有 {len(img_paths)} 处**本机绝对路径的素材**（如 {example}）—— "
+            f"在这台机器上看着正常，拷到别处/现场就是裂图；也是本机目录树泄漏。"
+            f"做法：把图放进 deck 项目（spec 同目录或 assets/），spec 里写相对路径")
+    if font_urls:
+        notes.append(
+            f"字体走的是**本机绝对路径**（{len(font_urls)} 处，如 {font_urls[0]}）—— "
+            f"字体住在 deck 项目之外，这是有意的；但拿它去别的机器会回退。"
+            f"要一份真正自包含的产物：`fonts.py --embed`（把字体 base64 进 HTML）")
+    return problems, notes
+
+
 def _check_layout(measured: dict) -> list[str]:
     """② 版面越界 / 容器裁切 —— 全部来自**真浏览器实测**，不是估算。
 
@@ -1203,6 +1259,8 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     page = deckio.read_text(html_path)      # 只读一次，校验与提示共用
     deck = spec["deck"]
     problems.extend(_check_presenter_contract(page, deck))
+    path_problems, _path_notes = _check_local_paths(page)
+    problems.extend(path_problems)
     colors = tokens["colorSets"][render_mod.resolve_color_set(tokens, deck)]
     paper = colors["background"]
     ink_text = ink.text_color(colors)
@@ -1306,6 +1364,45 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     return problems
 
 
+def _reuse_notes(deck: dict) -> list[str]:
+    """同一张素材被多页当主视觉（提示级）。
+
+    为什么开口：素材复用是"每页都真的决定过它要什么"的反面证据 —— 一页是现场图，
+    另一页也是现场图，多半是第二页没想。**合理的复用是决定**（贯穿动机、同一组系列
+    图），所以提示而不阻塞；但那一刻得说出来，而不是默认滑过去。
+
+    槽位比例不一样时一并说：同一张图进两个不同比例的槽位 = 会被裁成两种构图，
+    那就不是"复用"，是两种用法（要么接受裁切，要么换图）。
+    """
+    seen: dict[str, list[tuple[int, str]]] = {}
+    for i, s in enumerate(deck.get("slides") or [], 1):
+        if not isinstance(s, dict):
+            continue
+        img = s.get("image")
+        if not isinstance(img, str) or not img.strip():
+            continue
+        visual = s.get("visual")
+        ratio = ""
+        if isinstance(visual, dict) and isinstance(visual.get("ratio"), str):
+            ratio = visual["ratio"]
+        seen.setdefault(img.strip(), []).append((i, ratio))
+    out: list[str] = []
+    for img, where in seen.items():
+        if len(where) < 2:
+            continue
+        name = os.path.basename(img)
+        pages = "、".join(f"第{i}页" for i, _ in where)
+        ratios = sorted({r for _, r in where if r})
+        note = (f"{pages} 用了同一张素材（`{name}`）—— 同一张图承担多页的主视觉，"
+                f"通常说明后面那页没真的决定过它要什么。要复用的是「贯穿动机 / 系列图」"
+                f"就是决定，在 notes 里写一句为什么；否则换一页的图或版式")
+        if len(ratios) > 1:
+            note += (f"。另外这两页的槽位比例不一样（{' / '.join(ratios)}）—— "
+                     f"同一张图会被裁成两种构图，那是两种用法，不是复用")
+        out.append(note)
+    return out
+
+
 def _ornament_notes(deck: dict) -> list[str]:
     """条目**以装饰字符开头** → 说一声（提示）。
 
@@ -1400,7 +1497,7 @@ def _visual_decision_notes(deck: dict) -> list[str]:
 
 
 def advisories(measured: dict, spec: dict | None = None,
-               tokens: dict | None = None) -> list[str]:
+               tokens: dict | None = None, page: str | None = None) -> list[str]:
     """**不阻塞**的提示。
 
     与 `check()` 的分工照仓库既有做法（同 `check_pointers.py` 的 broken / suspect）：
@@ -1410,6 +1507,10 @@ def advisories(measured: dict, spec: dict | None = None,
     notes = _check_font_fallback(measured, tokens)
     notes.extend(_check_page_box(measured))
     notes.extend(_check_style_rules(measured, tokens))
+    if page is not None:
+        # 字体走本机绝对路径是**设计**（字体在项目之外）——所以它是提示不是错；
+        # 但单文件交付要 --embed。判据是产物文本，所以 page 必须传进来。
+        notes.extend(_check_local_paths(page)[1])
     notes.extend(_check_grid_alignment(measured))
     if spec is not None and tokens is not None:
         _, brand_notes = _check_brand(measured, spec.get("deck", {}), tokens)
@@ -1420,6 +1521,7 @@ def advisories(measured: dict, spec: dict | None = None,
         # 装得下就不报错，所以这里必须有人开口。
         notes.extend(_check_type_size(measured, spec.get("deck", {}), tokens))
         notes.extend(_visual_decision_notes(spec.get("deck", {})))
+        notes.extend(_reuse_notes(spec.get("deck", {})))
         notes.extend(_ornament_notes(spec.get("deck", {})))
         notes.extend(_markdown_notes(spec.get("deck", {})))
         # 信息层级（文本预算 / 焦点 / 密度）由作者自查：阈值取决于语境
@@ -1439,18 +1541,19 @@ def main(argv: list[str]) -> int:
     spec = deckio.read_json(args.spec)
     tokens = deckio.read_json(args.tokens) if args.tokens else None
     measured = measure_mod.measure(args.html)      # 只量一次，校验与提示共用
+    page = deckio.read_text(args.html)             # 产物文本（路径门/提示用）
     tokens = style_tokens(spec, tokens)
     problems = check(spec, args.html, tokens, measured=measured)
     if problems:
         print(f"✗ {len(problems)} 个问题：")
         for p in problems:
             print("  ·", p)
-        for n in advisories(measured, spec, tokens):
+        for n in advisories(measured, spec, tokens, page):
             print("  ·", n)
         return 1
     print("✓ 校验全过（对比度 / 版面越界与裁切 / 错位区间 / 装饰不压文字 / "
           "图表成比例 / 图表区无错位 / 图片加载 / 页面报错 / logo 不压文字）")
-    for n in advisories(measured, spec, tokens):
+    for n in advisories(measured, spec, tokens, page):
         print("  ·", n)
     return 0
 
