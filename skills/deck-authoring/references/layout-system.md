@@ -236,7 +236,7 @@ balance_score 计算**（§26）。
 
 symmetric/asymmetric/centered/editorial/radial/directional/layered；Style 可
 偏好 composition，但内容和 Page Type 优先。现状：每套风格的构图倾向写在
-style-architecture 的对照表里（swiss=栅格对称、botanical=编辑式非对称）。
+风格的气质声明里（网格骨架取对称，编辑式骨架取非对称）。
 
 ## 28. Content Fit 修复顺序【✅ 顺序成文】
 
