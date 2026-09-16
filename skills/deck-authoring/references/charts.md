@@ -1,11 +1,11 @@
-# 图表：DSL、意图树、muted+accent、结论先行
+# 图表：DSL、图形类型、muted+accent、结论先行
 
 ## 三层架构（谁负责什么）
 
 ```text
 AI 只写 DSL（chart / intent / message / data / series / emphasis / annotations）
         ↓
-chart.py：意图树 + 规则 + 确定性 SVG      ← Web / 预览 / PDF 都用它
+chart.py：图形类型（作者声明）+ 规则 + 确定性 SVG   ← Web / 预览 / PDF 都用它
         ↓
 pptx_native.py：按类型映射成原生图表       ← 可编辑的 PPT 层
 ```
@@ -27,8 +27,8 @@ DSL 的边界设计成**渲染器可替换**：`svg()` 的输入是纯数据 + �
 ```json
 {
   "type": "chart",
-  "chart": "bar",                      // 八类之一；不写 → intent 决定（多系列不写会报错）
-  "intent": "comparison",              // 想表达什么（见意图树）
+  "chart": "bar",                      // 八类之一；**必写**（v3：图形由作者显式声明）
+  "intent": "comparison",              // 想表达什么（可选语义标注，不再决定图形）
   "message": "DeepSeek 调用量领先第二名 40%",   // ← 结论，会当大标题
   "title": "模型调用量统计",              // ← 数据集名，降为小标签
   "data":  [{"label": "DeepSeek", "value": 86}, ...],
@@ -43,27 +43,31 @@ DSL 的边界设计成**渲染器可替换**：`svg()` 的输入是纯数据 + �
 
 ```bash
 python3 scripts/chart.py --demo all       # 八类各渲一个样例
-python3 scripts/chart.py --explain spec.json   # 每张图为什么用那个图形
+python3 scripts/chart.py --explain spec.json   # 打印每页声明的图形类型
 ```
 
-## 意图树（规范第 3/16 条）：图表不是"选样式"，是"判意图"
+## 图形类型（规范第 3/16 条）：**作者声明**，脚本不推断
 
-映射不是 1:1 死表 —— `resolve_type` 按数据形状分支（条数/标签是否像
-时间），每步带理由，`--explain` 与 compile 的 Decision Trace 同源：
+v3 起图形类型是**内容决策**：spec 必须写 `chart`，脚本不替你选图形。
 
-| 意图 | 图形 | | 意图 | 图形 |
-| --- | --- | --- | --- | --- |
-| trend 趋势 | line / area | | correlation 相关 | scatter |
-| ranking 排名 | bar-horizontal | | progress 进度 | bar-horizontal（温度计：位置即进度） |
-| comparison 比较 | bar | | deviation 偏差 | bar（第一版） |
-| composition 组成 | donut（≤5 条）/ 排序横条（>5） | | distribution 分布 | bar（离散桶）/ line（时间桶） |
+```text
+chart: "bar" | "bar-horizontal" | "line" | "area"
+     | "bar-stacked" | "donut" | "scatter" | "combo"   （八类，封闭）
+```
 
-没写 `chart` 也没写 `intent` → 缺省 bar（与历史一致）；**多系列直接报错**
-（bar 只画第一系列，猜错 = 静默丢数据）；标签像时间只在 `--explain` 里**建议**
-trend、不当缺省 —— 压测实测过"静默改观感"翻车。写了 intent 的映射见上表
-（`resolve_type` 按数据形状分支），理由进 `--explain` 与 Decision Trace。
+落地（`chart.py` 的 `declared_type()`）：**缺 `chart` → SystemExit**（缺哪一类
+由作者定，脚本猜不了）；**`chart` 不在八类里 → SystemExit**。`--explain` 打印
+每页声明的类型，并在该页没写 `message` 时点名提醒（规范第 5 条：标题应是结论）。
+两道图前门在 `validate_spec.py`：缺类型报 `MISSING_CHART_TYPE`、写错报
+`UNKNOWN_CHART_TYPE`（见 `validation.md`），本该在渲染之前就拦住。
 
-## 好看的三条硬规则
+历史备注：这里原有一条 `resolve_type()` / `infer_chart_type()` 的**意图推断**
+（按条数/标签是否像时间/系列数分支，没写就缺省 bar）—— 已按 v3 退役：
+推断等于替作者选图形。`intent`（八值：trend/ranking/comparison/composition/
+correlation/progress/deviation/distribution）现在是**可选语义标注**：写了对渲染
+**没有影响**，`validate_spec.py` 仍校验它属于这八值；不写也不影响图形。
+
+## 好看的三条硬规则（与图形类型无关，仍按声明渲染）
 
 1. **muted + 1 accent**（规范第 4 条）：给了 `emphasis` 就只有被强调的那根是
    Accent，其余降成 muted（主色向纸色褪 55%）。八根柱子八种颜色是业余的第一特征。

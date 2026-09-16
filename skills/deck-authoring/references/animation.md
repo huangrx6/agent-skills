@@ -150,7 +150,8 @@ P1 主视觉（完整入场）/ P2 标题（mask+落定）/ P3 支撑（fadeRise
 max_primary_motion_types = 2。本页两族：**遮罩/淡入族**（title mask、body fade）
 
 + **结构生长族**（rule growX、chart grow/draw、image wipe 同属"揭示"一族的
-方向变体）——同页不会出现 Fade+Slide+Scale+Rotate+Blur+Bounce+Glow+Glitch
+方向变体——这里的"方向"指效果方向，与 spec 的 `layout` 布局无关）——同页不会
+出现 Fade+Slide+Scale+Rotate+Blur+Bounce+Glow+Glitch
 同台（后四样本管线不存在，前几样按元素类型各归其位）。
 
 ## 18. 位移规则【✅】

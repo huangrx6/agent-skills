@@ -11,6 +11,9 @@
 
 > 校验和调参循环都在同一个文件里 —— 调参**完全由校验结果驱动**，
 > "哪项失败动哪个参数"是一张表的两半。
+>
+> v3 起还多了一层**输入层门**（`validate_spec.py`）与几条跨工件验收（风格的
+> `layouts` 词表）—— 它们不在 `check.py` 里，一并记在 §⑥。
 
 ## ① 对比度
 
@@ -110,11 +113,47 @@
 **判据 C（图表区无错位）**：图表容器（`<div class="chartwrap">`）
 内不许出现错位叠印元素。riso 只允许做容器与背景 —— 错位会毁掉柱与刻度的可读性。
 
+## ⑥ v3 新增门（输入层 + 布局词表）
+
+v3 把审美决策交给作者声明，脚本退到验收器：下面这几道门是"作者声明"那一侧的
+守门人 —— 声明缺了、写错、写了个已退役的值，都在这里当场拦。
+
+**输入层（`validate_spec.py`，渲染之前）：**
+
+- **colorSet 必填具名**：`deck.colorSet` 缺失或写 `"auto"` → `MISSING_COLOR_SET`；
+  名字不在该风格 token 的 `colorSets` 里 → `BAD_COLOR_SET`。v3 的配色方向不再由
+  语义（`mood`）推导，直接写色板名。（`render.resolve_color_set` 同样拦：缺失 /
+  `auto` 直接 SystemExit —— compile / render 两道入口都进不去。）
+- **图表类型必填且封闭**：chart 页缺 `chart` → `MISSING_CHART_TYPE`；不在八类
+  （bar/bar-horizontal/line/area/bar-stacked/donut/scatter/combo）→
+  `UNKNOWN_CHART_TYPE`（`chart.declared_type` 同样 SystemExit —— 见 `charts.md`）。
+- **layout 是自由值，但 `auto` 拦**：`layout` 必须是非空字符串（非字符串/空 →
+  `BAD_LAYOUT`）；写 `"auto"` → `BAD_LAYOUT`（实测选布局已退役）。自造布局名
+  合法 —— 渲染套缺省结构 + `data-layout` 钩子，由 skin.css 排。
+- **已删除的 `variant` 字段**：slide 级写 `variant` → `UNKNOWN_FIELD`，HINTS 里
+  指路 `layout`（字段已改名，不再是变体）。
+
+**跨工件（`check.py`，产物 + 词表）：**
+
+- **风格 `layouts` 词表验收**（`check._layout_vocab_problems`，**阻塞**）：风格在
+  `style.json` 声明 `layouts`（字符串数组）时，`spec.layout` 必须落在"词表 ∪ 结构
+  布局（`IMAGE_LAYOUTS` / `TWO_COL_LAYOUTS`）"里；不在 → 阻塞 problem（自造名写错
+  一个字母，skin 里那条规则就永远不生效 —— 最难查的静默）。风格没声明 `layouts`
+  → 不验（没有词表就没有拼写基准）。
+- **档位提示**（`check._tier_notes`，提示）：content-text 页条目 **> 5 且未声明
+  `bulletTier`** 时提示"缺省档下会偏挤，先拆页/收短，确实要小字就显式写
+  `bulletTier`"。v3 **没有按条数自动升降档** —— 档位是作者声明（`slide.bulletTier`
+  / 风格 `bulletDefault`）。
+- **布局轮换提示**（`check._layout_rotation_notes`）：同 type + 同 layout 连排
+  ≥2 页提示换布局（阈值与函数名见 `layout-system.md` §41）。
+
 ## 这一层不覆盖什么
 
-- **字段集**：那是**输入层**的事，由 `validate_spec.py` 管（见 `style-architecture.md`
-  的 schema 一节）。`check.py` 只验产物、不看字段集 —— 由它主动拦的字段只有
-  `color`（只接受 `"overprint"`）。
+- **字段集 / 必填声明**：那是**输入层**的事，由 `validate_spec.py` 管（见
+  `style-architecture.md` 的 schema 一节，以及本文件 §⑥ 列的新门）。`check.py`
+  仍不做字段集校验；它读 spec 只做三件跨工件的事：布局词表验收（**阻塞**）、
+  档位提示与布局轮换提示（**提示**）—— 由它主动拦的**字段**只有 `color`
+  （只接受 `"overprint"`）。
 - **② 是实测，不是估算**：但它量的是**当前这份产物**在当前字体下的样子。
   换了机器（字体不同）或换了浏览器版本，同一个 spec 量出来可能不同 —— 所以
   `measure.py` 会在字体回退时给提示。

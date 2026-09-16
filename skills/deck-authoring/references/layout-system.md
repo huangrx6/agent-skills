@@ -2,7 +2,7 @@
 
 适用：布局与页面结构层（PPT / HTML Deck / PDF / MP4 / GIF 共用）。核心目标：把
 Page Planner 输出的"页面意图"稳定转换为**可测量、可约束、可评分、可修复**的页面
-几何。本规则负责：布局、区域、网格、信息层级、留白、对齐、视觉平衡、版式变体、
+几何。本规则负责：布局、区域、网格、信息层级、留白、对齐、视觉平衡、版式布局、
 Content Fit、评分与修复。不负责：内容事实、品牌身份、最终颜色、图片 Prompt、
 图表语义选型、动画特效本身。每节标落地状态：【✅ 已实现】【约定=规则在、机制未接】。
 
@@ -24,11 +24,12 @@ x/y/dx/dy/rot/width/height 全判错）；最终几何由渲染层派生。
 
 ## 1. 总体架构【✅ 下半段已在】
 
-Slide Content → Page Planner → Layout Intent → Layout Family → Variant
-Candidates → Region Tree → Grid/Spacing/Constraints → **Layout Resolver** →
+Slide Content → Page Planner → Layout Intent → Layout Family → Layout（作者声明）
+→ Region Tree → Grid/Spacing/Constraints → **Layout Resolver** →
 Measurement → Hard Check → Layout Score → Repair → Resolved Slide → Renderer。
 本仓库：`plan.py`（前半）→ spec → `render.py`（resolve）→ `measure.py`（实测）
 → `check.py`（硬检查）→ `hierarchy.py`（软尺）；Score/Repair 引擎见 §37/§52。
+（v3：布局不是脚本从候选里实测选出的 —— 作者在 spec 写 `layout`，脚本只执行与验收。）
 
 ## 2. 职责边界【✅】
 
@@ -71,7 +72,7 @@ flex 硬扛——已改为算）。例外允许：full-bleed、editorial overlap
 页面先分 Region 再放 Component；基础 Region：HEADER/BODY/ASIDE/FOOTER/HERO/
 VISUAL/META，支持嵌套。落地形态：`grid.py` 的 `REGIONS` 常量 + HTML 结构本身
 （`.pad` = HEADER+BODY、`.footrow` = FOOTER、图/图表列 = VISUAL）；**没有独立
-的 region-tree JSON**——要"版式族×变体"（§15-18）时才需要它。
+的 region-tree JSON**——要"版式族 × 布局"（§15-18）时才需要它。
 
 ## 8. Auto Layout 参数【✅ 精神落地】
 
@@ -117,53 +118,65 @@ gap=57/73/101——改后 skin 的手写值收敛到令牌（残余 6~8 处手�
 
 Page Type=页面语义类型，Layout Family=空间组织方式（comparison 页型 → split
 族）。落地：`plan.py` 的 `PAGE_TYPES` 把页型查表映射到版式（comparison→chart、
-process→timeline…）；**family/variant 两级中间层未建**（§15-18；两族已带
-variant 字段，全量铺开在阶段 3）。
+process→timeline…）；**family/layout 两级中间层未建**（§15-18；两族已带
+layout 字段，全量铺开在阶段 3）。
 
 ## 15. Layout Family【✅ 第一片已落地（content-image）】
 
 规范至少支持 single/split/stack/grid/hero/editorial/overlay/timeline/diagram/
 chart/table/dashboard/full-bleed。现状：7 种 slide type（title/content-text/
 content-image/two-column/timeline/chart/end）+ 自建风格。**content-image 率先
-成为显式家族**：`variant` 字段进 spec（封闭值集）；two-column 已跟上（3 变体，
-§16）；其余 type 仍是单版式 ——
+成为显式家族**：`layout` 字段进 spec（v3：作者声明的自由字符串）；two-column
+已跟上（3 个结构布局，§16）；其余 type 仍是单版式 ——
 family 命名层全量铺开在路线图阶段 3。
 
-## 16. Layout Variant【✅ 已落地（content-image 4 变体 + two-column 3 变体）】
+## 16. Layout（布局）【✅ 结构布局已落地（content-image 4 + two-column 3）】
 
-每个 Family 多 Variant（split_40_60 / split_50_50 / split_left_visual / …；
-hero_center / hero_left / hero_full_bleed / …）。**content-image 已有显式变体**：
-`visual-right`（文 7 栅 + 图 5 栅，默认）/ `visual-left`（图先文后，镜像换节奏）/
-`even`（6+6 均分）/ `hero`（满幅 12 栅 + 底部实心标题条 —— 图就是主角：
-无条目 648px 占整页 64%，check 的全页图禁令对它 role-aware，因为标题/条目
-仍是真 DOM 文本，"信息烤进图里"的禁止不适用；hierarchy 的密度四档同样跳过
-hero —— 满图是特性，fit 对 hero 用 _hero_whitespace 另一把留白尺子）——
-键值双封闭（validate_spec），显式/auto 均进 Decision Trace（compile layout 段），
-fit 探针把四变体摆进同一份产物供评分（实测：图即陈述的页面 hero 0.45 胜
-分栏 0.40）。**two-column 已有显式变体**：`even`（6+6 均分，默认 —— flex 等分
-即 704px=span(6)，不加类，默认路径逐字节不变）/ `lean-left`（左 7 栅 825.33px
+每页一个布局：spec 写 `layout`（**自由字符串**），渲染器给**结构**，皮肤/风格
+负责细排。v3 的分工是"渲染器能力 + 作者自由"：
 
-+ 右 5 栅 582.67px，左栏承重 —— 对照页主张在左、细节在右）/ `lean-right`
-（左 5 右 7，镜像）—— 键值双封闭（validate_spec，值集与 content-image 分开），
-显式变体进 Decision Trace（compile layout 段自动留痕，无需改）；宽度全由网格
-算（825.33+582.67+24=1432 不变）。auto 不开放：two-column 没有 fit 实测候选，
-栅格分配是显式内容决策。其余 type（时间线）仍隐式 —— 等候选实测铺开。
+- **结构布局**是渲染器的能力清单（`render.IMAGE_LAYOUTS` /
+  `render.TWO_COL_LAYOUTS`，是**能力**不是封闭枚举禁令）：
+  - content-image：`visual-right`（文 7 栅 + 图 5 栅，缺省）/ `visual-left`
+    （图先文后，镜像换节奏）/ `even`（6+6 均分）/ `hero`（满幅 12 栅 + 底部实心
+    标题条 —— 图就是主角：无条目 648px 占整页 64%，check 的全页图禁令对它
+    role-aware，因为标题/条目仍是真 DOM 文本，"信息烤进图里"的禁止不适用；
+    hierarchy 的密度四档同样跳过 hero —— 满图是特性，fit 对 hero 用
+    `_hero_whitespace` 另一把留白尺子）。
+  - two-column：`even`（6+6 均分，缺省 —— flex 等分即 704px=span(6)，不加类，
+    默认路径逐字节不变）/ `lean-left`（左 7 栅 825.33px + 右 5 栅 582.67px，左栏
+    承重 —— 对照页主张在左、细节在右）/ `lean-right`（左 5 右 7，镜像）；宽度全
+    由网格算（825.33+582.67+24=1432 不变）。
+- **自造布局名**：spec 写任何其它字符串 → 渲染器套**缺省结构** + 加
+  `data-layout="<名>"`（content-image 缺省 visual-right、two-column 缺省 even），
+  排法由 skin.css 的属性选择器写。这是 v3 的核心口径：**布局语言是作者的自由，
+  脚本只提供结构与验收**，不枚举审美。
 
-## 17. Variant 选择依据【✅ 第一片已落地（content-image）】
+`layout` **显式声明**才进 Decision Trace（`compile` 的 layout 段）；自造名会在
+trace 里注明"缺省结构 + data-layout，排法由 skin.css 写"。不写 `layout` 时
+静默走该版式的结构缺省，不留痕。
+
+历史备注：这一段原叫"变体（Variant）"，值封闭且带 `auto` 实测选择；v3 退役：
+字段名改为 `layout`、`variant` 不再接受（写它 = `UNKNOWN_FIELD`，HINTS 指路
+layout）、`auto` 被 `validate_spec.py` 拦（`BAD_LAYOUT`）。其余 type（时间线）
+仍是隐式单版式。
+
+## 17. 布局选择依据【✅ 作者声明】
 
 不得随机选版式；必须考虑内容量/视觉角色/图比例/优先级/语义关系/风格/密度/
-平衡/前后页节奏。现状（content-image）：spec 写 `variant: "auto"` →
-`fit --recommend` 把四变体（含 hero）× 真图摆进同一份探针**实测**（CandidateScore，
-图的高宽比是真实输入）→ 落盘 JSON → `compile --fit-variants` 按分选最佳；
-平局偏默认，无数据回退默认并留痕。**显式 variant 永远赢**——实测数据
-不越权改内容决策。其余 type 仍页型查表（确定性，不随机）。
+平衡/前后页节奏。v3 的口径：**这些判断是作者的内容决策，写在 spec 的
+`layout` 里**。脚本不替作者选 —— 不推断、不随机、也不实测排名（实测选择已
+退役，见 §18/§57）。不写 `layout` 就走该版式的结构缺省（content-image 缺省
+visual-right、two-column 缺省 even，§16）；写自造名由 skin.css 排。
+其余 type 仍页型查表（确定性，不随机）。
 
-## 18. Variant Candidate Ranking【✅ 第一片已落地（content-image）】
+## 18. Layout Candidate Ranking【约定 —— 脚本不做】
 
-Page Planner 输出候选+分数，Resolver 实测后定版。现状（content-image 闭环）：
-`fit recommend`（纯函数）从实测选每页最佳 + 对手分数；`compile` 的
-auto 决策吃同一份数据、Decision Trace 带分数对比。全类型铺开待各家族
-有真变体（cards / editorial ……hero 已随 content-image 四变体落地）。
+规范设想 Page Planner 输出候选+分数、Resolver 实测后定版。v3 明确**退役这层
+自动排名**：选布局是内容决策，脚本排名会越权替作者做审美判断。现状：布局由
+作者在 spec 声明（§17），脚本只执行与验收（拼写由风格的 `layouts` 词表兜，
+见 `validation.md` 的 `_layout_vocab_problems`）。要做"候选并测"也只在**人环**
+里：先手写几版 spec、各自 `check`/`fit` 看一眼再定 —— 没有自动评分选版链。
 
 ## 19. Information Hierarchy【部分 ✅】
 
@@ -225,18 +238,23 @@ style-architecture 的对照表里（swiss=栅格对称、botanical=编辑式非
 ## 28. Content Fit 修复顺序【✅ 顺序成文】
 
 布局失败**禁止第一步缩字体**：1 修事实/必需内容 → 2 删无关装饰 → 3 更短
-Copy → 4 删低优先级 → 5 调 gap → 6 调 padding → 7 调区域比 → 8 换 Variant
+Copy → 4 删低优先级 → 5 调 gap → 6 调 padding → 7 调区域比 → 8 换 layout
 → 9 换组件档 → 10 缩非核心视觉 → 11 拆内容 → 12 拆页 → **13 最后才降字号
 tier**（权威表：`pipeline.md` §31 的 13 步修复顺序，这里是同一张）。
 落地：这条顺序
-写进 `hierarchy.py` 的报错文本（人唯一一定会读的那段字）；`bullet_tier()`
-的自动降档是**兜底**不是第一手段（退位到阶段 3，见附录路线图）。
+写进 `hierarchy.py` 的报错文本（人唯一一定会读的那段字）。v3 起**没有自动降档**：
+`bullet_tier()` 已删除，缩字号完全由作者显式声明（`slide.bulletTier` / 风格
+`bulletDefault`，§29）—— 脚本不再替内容悄悄缩小字。
 
-## 29. 字号降级【✅】
+## 29. 字号降级【✅ 作者声明】
 
 只允许 tier down（body.lg → body.md），禁止任意压缩（32→31→29→27）。
-落地：`bullet_tier()` 按条目数在 type 阶梯里**选档**，不是连续缩放；风格
-阶梯封闭（style.py 校验同级/倒挂）。
+落地：档位由**作者声明** —— 标题档 `slide.titleTier`（缺省映射在风格
+`titleTiers`，再缺省 `render.TITLE_TIER`）、条目档 `slide.bulletTier`（缺省
+风格 `bulletDefault`，再缺省 `"bullet"`）；`render.DEFAULT_BULLET_TIER="bullet"`，
+two-column 条目档固定 `bulletSmall`（结构事实）。**没有按条数自动升降档**
+（`bullet_tier()`/`BULLET_TIERS` 已删除）：内容多就拆页/收短或显式换小档，
+不让字自己变小（§28）。风格阶梯封闭（style.py 校验同级/倒挂）。
 
 ## 30. Component Constraints【约定】
 
@@ -255,7 +273,7 @@ aspect ratio（实测插槽比）/ minResolution（盒子 ×2）/ bleedAllowed /
 
 Chart Container 负责 chart box/title box/标注区/标签安全区；**Chart Engine
 不得突破 Container**（chartwrap 1100×330 钉死，SVG 就画这么大）；**Layout
-不决定 chart type**（chart.py 意图树查表）。
+不决定 chart type**（图形类型由 spec 显式声明，见 charts.md）。
 
 ## 33. Diagram Constraints【部分 ✅】
 
@@ -310,14 +328,14 @@ decor 类型与角位由风格 token 限定（版心已满的版式不放装饰�
 
 ## 40. Deck-level Rhythm【约定】
 
-不能只评单页：连续同 Variant 数、visual/text 节奏、full-bleed 频率、chart
+不能只评单页：连续同 layout 数、visual/text 节奏、full-bleed 频率、chart
 连续页数、纯文字连续页数。未实现（单页检查为主）；stress deck 提供测试面。
 
 ## 41. Repetition Rule【✅ 已落地（提示级）】
 
-同一 type+variant 连排 **n≥2** 即提示轮换（content-image / two-column；
-`check.py` 的 `_variant_rotation_notes`，check.py:377-402）——比规范原案的
-"≤2 页后提示"开口更早；附录、数据连续比较可例外（提示本就不阻塞）。
+同一 type+layout 连排 **n≥2** 即提示轮换（仅 content-image / two-column，
+`check.LAYOUT_TYPES`；`check.py` 的 `_layout_rotation_notes`，check.py:377-402）
+——比规范原案的"≤2 页后提示"开口更早；附录、数据连续比较可例外（提示本就不阻塞）。
 
 ## 42. Layout Novelty【约定】
 
@@ -366,7 +384,7 @@ visual（主视觉类型）与 density 提示；family/composition 字段未建�
 
 ## 50. Resolved Layout【✅ 架构差异见顶部注】
 
-只有 Resolved 层可含坐标：`{canvas, variant, regions:{x,y,w,h},
+只有 Resolved 层可含坐标：`{canvas, layout, regions:{x,y,w,h},
 components:{…}}`。本仓库的 Resolved 层 = 渲染后的 DOM + `measure.py` 的实测
 矩形（语义清单记意图、几何由测量层量回——两者对不上就是 bug）。无独立 JSON
 工件；要接 Layout Score（§37）时再物化它。
@@ -378,7 +396,7 @@ Slide DSL=语义层、Resolved Slide=几何层，**禁止混合**。落地：spe
 
 ## 52. Repair Engine【✅ 等价形】
 
-Repair 不重生成整页，输出 Patch（switch_copy_level / switch_variant…）。
+Repair 不重生成整页，输出 Patch（switch_copy_level / switch_layout…）。
 落地：`check.py`/`hierarchy.py` 的提示就是诊断（指名哪个元素、什么问题、按
 §28 顺序修）；Patch=人改 spec 的那几行，重跑门。无机器自动改写（人在环是
 刻意的：修复决策里"删什么内容"是价值判断）。
@@ -386,7 +404,7 @@ Repair 不重生成整页，输出 Patch（switch_copy_level / switch_variant…
 ## 53. Repair Priority【✅ 成文】
 
 R1 删无关装饰 → R2 短 Copy → R3 删低优先级 → R4 调 gap → R5 调 padding →
-R6 调区域比 → R7 换 variant → R8 换组件档 → R9 缩非核心视觉 → R10 拆内容
+R6 调区域比 → R7 换 layout → R8 换组件档 → R9 缩非核心视觉 → R10 拆内容
 → R11 拆页 → **R12 降字号 tier**——在统一表里这是**第 13 位**（第 1 位
 "修事实/必需内容"属内容层，见 `pipeline.md` §31）。与 §28 同一张表，写进
 hierarchy 报错。
@@ -411,13 +429,14 @@ DOM rect / image natural size。落地：`measure.py` 注入探针脚本、`--du
 取回（不走 CDP，见文件头注），拿真矩形；
 **字符宽度估算只能做预判**（fit 的粗筛），最终判断全靠实测。
 
-## 57. Candidate Testing【✅ 第一片已落地（content-image 四变体并测）】
+## 57. Candidate Testing【✅ 容量反馈；布局并测已退役】
 
-一次生成多个 Variant，同一浏览器批量测量后排名；选择 = hard pass + 最高分。
-落地：`fit.py` 的 `build_variant_probe` 把每页 content-image × **四变体**（含
-hero）摆进同一份探针产物，`fit --recommend` 渲一次量一次、按 CandidateScore
-逐页选最佳并落盘 JSON（fit.py:414 起，喂 `compile --fit-variants`）——
-与 §17/§18 同一条闭环。其余 type 待各家族有真变体（§15-18）。
+规范设想：一次生成多个 Variant，同一浏览器批量测量后排名。v3 把"并测布局"
+整条链退役 —— `build_variant_probe` / `recommend` / `--recommend` 已从 `fit.py`
+删除，`compile --fit-variants` 也不再存在。**fit 现在只做容量反馈**：把几种
+**版式**（content-text / two-column / content-image）摆进同一份探针产物渲一次
+量一次，报实测溢出与占比（`build_probe_deck` / `--from-spec` / `--slide` /
+`score_candidate` 七维，§58）—— 告诉作者"装不装得下"，不替作者选布局（§17/§18）。
 
 ## 58. Candidate Score【部分 ✅——仅 Rhythm 未接】
 
@@ -428,7 +447,7 @@ hierarchy.weights 与墨量重心的实测来。仅 **Rhythm .075 未接**（要
 
 ## 59. Deck-level Layout Planner【约定】
 
-页面不能完全独立选 layout；需读 previousVariant/nextIntent/sectionRole/
+页面不能完全独立选 layout；需读 previousLayout/nextIntent/sectionRole/
 pageImportance，避免连续同构页。未实现（配合 §40 一起做；§41 的轮换提示
 可作起点）。
 
@@ -437,7 +456,7 @@ pageImportance，避免连续同构页。未实现（配合 §40 一起做；§4
 Cover 允许 hero/大量留白/非对称/full-bleed/overlap/editorial 构图；必须保证
 标题清楚、Logo 安全、主视觉不压信息。落地：title 版式 + 品牌 logoOn=cover
 
-+ 装饰角块（不压字，阻塞检查守着）。
+- 装饰角块（不压字，阻塞检查守着）。
 
 ## 61. Statement Layout【✅】
 
@@ -574,14 +593,14 @@ Dashboard 版式。
 
 已记录（测试形态）：hard fail rate（每次跑套件）、overflow/overlap（check
 阻塞）、render 时间。未记录：average layout score（无分数引擎）、repair
-iterations、variant diversity、repetition rate、human rating。
+iterations、layout diversity、repetition rate、human rating。
 
 ## 85. 最终规则【✅ 逐条在文内】
 
 LLM 不写坐标（§0）；页型与族分离（§14）；Region 先于组件（§7）；网格/间距/
 几何单一来源（§79）；所有间距来自令牌（§9）；层级显式 priority 化（§19）；
-每页最多一个主要焦点（§21）；**留白是结构不是剩余空间**（§24）；变体必须有
-候选和实测（§17-18，第一片已落地）；Hard 失败不得导出（§35+deliver 中止）；Soft 用
+每页最多一个主要焦点（§21）；**留白是结构不是剩余空间**（§24）；布局由
+作者声明、脚本只验收（§17-18，v3）；Hard 失败不得导出（§35+deliver 中止）；Soft 用
 评分不宜全阻塞（§36）；Content Fit 不得第一步缩字号（§28）；Repair 必须
 patch 不重生成（§52）；坐标只在 Resolved 层（§50-51）；Chart/Diagram 内部
 归各自引擎（§32-33）；Style 管性格不管几何（§43）；Deck 级查节奏（§40 约定）；
@@ -590,7 +609,7 @@ patch 不重生成（§52）；坐标只在 Resolved 层（§50-51）；Chart/Di
 
 ## 86. 推荐运行流程【✅ 对应】
 
-Slide Content → Page Planner → Layout Intent →（Family/Variants 约定期）→
+Slide Content → Page Planner → Layout Intent →（Family/Layout 约定期）→
 Region/Grid+Tokens → Resolve（render）→ Browser Measurement（measure）→
 Hard Check（check）→（Score 约定期）→ Repair（人改 spec）→ Resolve Again
 → Resolved Slide（DOM）→ Renderer → Visual QA。九站总图见 `pipeline.md`。
@@ -598,25 +617,26 @@ Hard Check（check）→（Score 约定期）→ Repair（人改 spec）→ Reso
 ## 87. 一句话定义【✅】
 
 优秀的 AI PPT 布局系统，不是维护更多模板，而是把页面语义转换成有限的 Layout
-Family 与 Variant，再用 Grid、Region、Spacing、Priority、Constraint、
+Family 与 Layout，再用 Grid、Region、Spacing、Priority、Constraint、
 Measurement、Scoring 和 Repair 共同求出稳定、清晰且有设计感的最终几何。
 本仓库已兑现：Grid/Region 语义/Spacing/Priority 尺/Constraint（硬+软）/
-Measurement；Family×Variant 与 Scoring 已落地第一片（content-image/two-column
-与 CandidateScore），全量铺开在路线图上（见下）。
+Measurement；Family×Layout 已落地第一片（content-image 4 + two-column 3 结构
+布局），全量铺开在路线图上（见下）。v3 口径：审美决策交作者声明，脚本退到
+验收器（§17-18）。
 
 ---
 
 ## 附录 A：落地阶段记录（实测数字）
 
-+ **阶段 1**（✅）：文本预算 + 视觉焦点 + 密度三把尺（hierarchy.py，提示级）；
+- **阶段 1**（✅）：文本预算 + 视觉焦点 + 密度三把尺（hierarchy.py，提示级）；
   修复顺序写进报错文本。
-+ **阶段 2**（✅）：`grid.py` 唯一几何来源；12 列 84/24/97.33；间距 ramp +
+- **阶段 2**（✅）：`grid.py` 唯一几何来源；12 列 84/24/97.33；间距 ramp +
   语义档 + 关系规则；`--sp-*` 注入；时间线宽从网格算；锚点对齐检查（左缘
   7 任意值 → 全落列）；subtitle==bullet 同级碰撞修复 + style.py 校验。
-+ **阶段 3**（路线图）：版式族 × 变体表全量铺开（§15-18/§57-59；content-image/
-  two-column 两片与 CandidateScore 已先行落地）+ `bullet_tier`
-  退位（换变体/拆页优先，缩字号最后——现在它是兜底不是第一手段）。
-+ **阶段 4**（路线图）：Shape 8 参数（§44）+ Layout Score/Repair 引擎
+- **阶段 3**（路线图）：版式族 × 布局表全量铺开（§15-18/§57-59；content-image/
+  two-column 两片结构布局已先行落地）+ 档位已归作者声明（`bullet_tier` 退役：
+  换布局/拆页优先，缩字号由作者显式写，脚本不再自动兜底）。
+- **阶段 4**（路线图）：Shape 8 参数（§44）+ Layout Score/Repair 引擎
   （§37-38/§52-54）+ skin 残余手写间距清零。
 
 ## 附录 B：参考标准清单（要深入时看这些）

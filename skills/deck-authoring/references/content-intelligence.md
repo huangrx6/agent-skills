@@ -229,6 +229,9 @@ Page Planner 再映射（comparison → chart / two-column）。
 
 `{"visualRequirement": {"needed": true, "kind": "data|evidence_image|process|hierarchy|comparison|architecture|mood", "intent": "", "reason": "", "priority": "primary|supporting|decorative"}}`
 
+> `kind` 里的 `mood` 指**视觉氛围需求**这一种；曾用来推配色方向的 deck 级
+> `mood` 字段 v3 已退役 —— 配色改由 spec 显式写 `colorSet`（pipeline §11）。
+
 ## 32. 什么时候必须有视觉
 
 需要观众"看这个"就该产生：产品/UI 长什么样、改造前后、两方案差异、空间布局、
@@ -409,8 +412,9 @@ Color/比例/留白由 Image Pipeline 生成（`image_source.py --brief`）。
 
 ## 65. 与 Chart Engine 的接口
 
-Content 输出 data intent / message / metrics / comparison relation；Chart Engine
-决定类型、编码、标注、强调、动画（`chart.py` 意图树）。
+Content 输出 data intent / message / metrics / comparison relation；图形类型
+（`chart`，八类）由 spec 显式声明（v3 起不再由 intent 推断），Chart Engine
+负责编码、标注、强调、动画（`chart.py`）。
 
 ## 66. 与 Motion Engine 的接口
 

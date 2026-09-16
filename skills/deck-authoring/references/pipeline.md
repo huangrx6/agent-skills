@@ -18,10 +18,13 @@ PDF / PNG / MP4 / GIF。统一规定从原始材料到最终交付物的完整�
 
 ### 0.1 语义与执行分离【✅】
 
-AI 决定：内容语义、页面意图、风格意图、视觉需求、动画意图。
-程序决定：坐标、字号 tier、颜色值、字体文件、图片文件、图表几何、动画时间线、
-最终帧、导出格式。一句话：**AI 只做语义决策与受控选择，程序负责确定性执行。**
-落地：spec 只有语义字段（封闭集），几何/颜色/字体/帧全部由脚本派生。
+AI 决定：内容语义、页面意图、风格意图、视觉需求、动画意图，以及 v3 起**全部
+审美声明**（色板名 / 布局 / 档位 / 图形类型 —— 作者写、脚本只验收）。
+程序决定：坐标、字号档对应的取值、色值推导、字体文件、图片文件、图表几何、
+动画时间线、最终帧、导出格式。一句话：**AI 只做语义决策与受控选择，程序负责
+确定性执行。**
+落地：spec 只有语义字段（封闭集），几何/字体/帧全部由脚本派生；色值来自
+风格数据的 `colorSets`，spec 只写色板名（§11/§17）。
 
 ### 0.2 越靠近渲染，AI 自由度越低【✅】
 
@@ -51,8 +54,10 @@ Page Message；Motion Engine 改变信息层级；Brand 覆盖整个 Style；Con
 本仓库的站合并：①-⑤ = `plan.py --check`（三份 JSON 一次过检）；⑥ =
 `--to-spec`+`validate_spec`；⑦⑧ = `image_source --brief/--check`；⑨ =
 `compile.py`+`render.py`（**决策与绘制已分家**：compile 出 resolved.deck.json
-——主题/字号档/错位/logo/时间轴全在它定，每条决策带 trace；render_resolved
-只画不想；`render(spec)` 仍是 compile→draw 一步到位，字节级不变；variant:"auto" 的页吃 `fit --recommend` 实测数据（`--fit-variants` 喂入，无数据回退默认并留痕））；⑩⑫ = `check.py`
+——职责是**合并作者声明 + 解析资产 + 留痕**：色板名/档位/布局/图形类型都是
+spec 或风格数据声明的（compile 一概不推断），它把品牌并入、assetId 解析成
+路径、算错位与时间轴，并把每条决策记进 trace；render_resolved 只画不想；
+`render(spec)` 仍是 compile→draw 一步到位，字节级不变）；⑩⑫ = `check.py`
 （Layout QA 与 Visual QA 都在实测 DOM 上做，因为 resolved 层就是 DOM）；
 ⑬⑭ = `deliver.py` + 各导出的回读验证。
 
@@ -116,14 +121,21 @@ Validation（validate_spec）与 Semantic QA（plan.py）必须分开**，本仓
 
 ERROR=阻塞（退出≠0：数据冲突/悬空引用/缺素材/越界/重叠/导出打不开）；
 WARNING+SUGGESTION=提示流（过密/logo 缺 inverse/重复布局/低清图/0 图建议）；
-INFO（记录系统决策）= manifest 承担元素级事实，Resolver 决策日志未系统化
-【约定】。每门都有 errors/warnings（§52）。
+INFO（记录系统决策）= manifest 承担元素级事实 + `compile --trace` 的 Resolver
+决策（§26 第一版）；其余 Resolver（时间轴/图表）的决策日志未系统化【约定】。
+每门都有 errors/warnings（§52）。
 
 ## 11. Slide DSL【✅】
 
 语义层不是几何层。允许 pageType/layoutIntent/regions/components/priority/
 assetId/chartIntent/motionIntent/styleRef/brandRef；**禁止 x/y/w/h/dx/dy/
 rotation/任意字号/任意 hex** —— `validate_spec.py` 的封闭字段集 + COORD_FIELDS。
+
+v3 起两类声明**必写**（都是内容决策，脚本不再替作者选）：`colorSet`（具名 ——
+缺失或 `"auto"` = MISSING_COLOR_SET）与图表页的 `chart`（八类图形，缺失或
+未知 = 拦）。可选声明：`layout`（只 content-image / two-column 页可写；非空
+字符串，`"auto"` = BAD_LAYOUT；不写走缺省结构布局）、`titleTier` /
+`bulletTier`（不写取风格缺省）、`intent`（**只作语义标注**，不再决定图形）。
 
 ## 12. Asset Pipeline【✅ 简化形】
 
@@ -156,8 +168,9 @@ Brand=是谁，Style=怎么表达，Theme Resolver=怎么融合。禁止 Brand P
 
 ## 17. Theme Resolver【✅ 等价】
 
-输入 Brand Identity + Style 色彩语法（colorStructure）→ 合并出 Resolved 色板
-表；**Renderer 不得重新选颜色**（渲染分支只读 tokens）。
+输入 Brand Identity + Style 色板（`colorSets`，由 spec **显式具名** `colorSet`
+选定，v3 无 auto 派生/无按语义推方向）→ 合并出 Resolved 色板表；**Renderer
+不得重新选颜色**（渲染分支只读 tokens）。
 
 ## 18. Typography Resolver【✅ 等价】
 
@@ -167,9 +180,10 @@ approved→system 链）；**Renderer 不得临时换字体**。
 
 ## 19. Chart Resolver【✅】
 
-输入 Intent/Data/Message/Emphasis/Style/Theme → Resolved Chart Spec（本仓库
-= 手写确定性 SVG，DSL 边界可换引擎：AntV/ECharts/原生 PPT 图表——pptx_native
-已是第二种执行器）。**总链路不绑定具体技术实现** ✓。
+输入 图形类型（`chart`，spec 必写的八类之一，`declared_type` 不再推断）/
+Intent（可选语义标注）/Data/Message/Emphasis/Style/Theme → Resolved Chart
+Spec（本仓库 = 手写确定性 SVG，DSL 边界可换引擎：AntV/ECharts/原生 PPT
+图表——pptx_native 已是第二种执行器）。**总链路不绑定具体技术实现** ✓。
 
 ## 20. Diagram Resolver【部分 ✅】
 
@@ -185,8 +199,10 @@ Typography/Assets → Resolved Geometry（grid.py + render 分支 + CSS）。
 
 ## 22. Layout Candidate【约定】
 
-生成 2~4 合法 Variant → 批量测量 → Hard Check → Score → 选最佳。未实现
-（阶段 3；fit.py 多档试排是雏形）。
+生成 2~4 个合法版面候选（规范原词 Variant，本仓库 spec 侧统一叫 `layout`）
+→ 批量测量 → Hard Check → Score → 选最佳。未实现（阶段 3）；**v3 起脚本
+不选版式** —— `layout` 由作者声明（§11），`fit.py` 只剩容量试排：量的是
+"装不装得下"，不评审美、不给推荐。
 
 ## 23. Geometry Single Source of Truth【✅】
 
@@ -213,7 +229,9 @@ fallback decisions/warnings/geometry/theme/typography/assets/charts/motion。
 
 每个 Resolver 的关键决策可追踪（`{"decision":"split_40_60","reason":[…]}`
 式）。现状：决策理由写在代码注释与各规则文档（"为什么这样设计"人可查）；
-第一版已落：`compile --trace` 输出每条决策与理由（auto 派生/升降档/logo 选版）；消费者是人和 check 门禁（降档在门禁处再响一声）。
+第一版已落：`compile --trace` 输出每条决策与理由（品牌并入 / colorSet /
+assetId→路径 / **作者声明的**档位与布局 / logo 选版）；消费者是人和 check
+门禁（条目多且未声明 bulletTier 时在门禁处再响一声）。
 
 ## 27. Layout QA【✅】
 
@@ -243,9 +261,9 @@ QA 不是最后报错而是闭环：Resolve → Render → QA → Patch → Reso
 ## 31. Repair 顺序【✅ 两张表齐】
 
 统一顺序：1 修事实/必需内容 → 2 删无关装饰 → 3 短 Copy → 4 删低优先级 →
-5 调 gap → 6 调 padding → 7 调 region ratio → 8 换 Layout Variant → 9 换
-Component 档 → 10 调非核心视觉 → 11 拆内容 → 12 拆页 → **13 最后才降字号
-tier**。内容侧表在 content-intelligence §61/§13，布局侧 R1-R12 在
+5 调 gap → 6 调 padding → 7 调 region ratio → 8 换 `layout`（改 spec 声明的
+布局）→ 9 换 Component 档 → 10 调非核心视觉 → 11 拆内容 → 12 拆页 → **13
+最后才降字号 tier**。内容侧表在 content-intelligence §61/§13，布局侧 R1-R12 在
 layout-system §53——第 1 条（修事实）属于内容层，其余同构。
 
 ## 32. Repair Iteration【✅ 人在环版】
@@ -318,8 +336,9 @@ same input + same version + same seed = same resolved output（时间轴两次�
 
 Font：exact → approved（严格 A 级库）→ system safe；Image：契约缺失=阻塞
 （不静默换）+ 占位图给 brief 阶段；Chart：SVG 手写即主路径（无外部引擎可退）；
-Motion：高级 preset → 基础 fadeRise → 静态满态；Layout：变体未建前 =
-安全固定版式（fit 兜底）。websockets 缺失 → 说清代价降级，不静默变慢。
+Motion：高级 preset → 基础 fadeRise → 静态满态；Layout：spec 不写 `layout`
+就套该版式的缺省结构布局（写了自造名 = 缺省结构 + `data-layout`，排法由
+skin.css 写）。websockets 缺失 → 说清代价降级，不静默变慢。
 
 ## 44. Fallback 不能静默【✅】
 
@@ -374,12 +393,12 @@ Chart Type Registry=chart.py 类型表；Effect 面小无需 Registry（animatio
 | Storyline | 选择叙事 | 骨架表 / 配额 |
 | Page Plan | 页面意图 | 合法页型 / 复杂度 |
 | Slide DSL | 语义结构 | 封闭 Schema |
-| Color | 色彩意图 | OKLCH / 角色 / 对比度 |
-| Typography | 字体意图 | 字体文件 / tier / fit |
+| Color | 选色板（显式具名 colorSet） | OKLCH 数学 / 角色推导 / 对比度审计 |
+| Typography | 字体意图 / 档位声明（titleTier·bulletTier） | 字体文件 / 档值 / 档名拼错当场报 |
 | Image | 需求 / Prompt 填空 | 插槽实测 / 解析 / 验收 |
-| Chart | Intent / Message | 类型 / 编码 / SVG |
+| Chart | 图形类型（chart 八类）/ Intent / Message | 编码 / SVG / 类型与数据校验 |
 | Diagram | 关系意图 | 节点布局 / 连接 |
-| Layout | Intent | Geometry（grid） |
+| Layout | 布局声明（layout，自由字符串） | Geometry（grid）/ 词表验收 |
 | Motion | Intent / Creativity | Timeline / Frame |
 | Render | 无 | 100% |
 | Export | 无 | 100% |
@@ -405,7 +424,7 @@ Image-heavy/全部版式）+ chart-intents（Chart Resolver v2 展示：composit
 benchmark.py 逐 fixture 记录（全实测）：check_problems（check.py:542 的 check()
 只返回阻塞清单，没有 notes 指标）、script_errors、
 render_ms（机器相关仅参考）、字节可复现/编译确定性（§41）、逐页密度分布、
-focal/budget issues、unique_kinds/max_consecutive（variant diversity /
+focal/budget issues、unique_kinds/max_consecutive（版式/布局多样性 /
 repetition rate）。不采的（诚实留白）：repair iterations（Repair 引擎
 未建）、export 回读（测试套件盖着，慢不进常规基线）、human rating。
 
@@ -458,7 +477,7 @@ Repair 保证质量，Export QA 保证最终交付。本仓库的兑现度见各
 | 站 | 产物 | 跑什么 | **阻塞** | 提示 |
 | --- | --- | --- | --- | --- |
 | ①-③ 规划 | 三份 JSON | `plan.py --check` | 见 content-intelligence 落点表 | 推断当事实讲 / 空话无数字 / 同一句话两遍 |
-| ④ DSL | deck.spec.json | `--to-spec` + `validate_spec` | 封闭字段 / 页无 message / 图表无数据 / 图页无图 | 字体回退 / 没封面 |
+| ④ DSL | deck.spec.json | `--to-spec` + `validate_spec` | 封闭字段 / 页无 message / 图表缺类型或数据 / 图页无图 / colorSet 没具名 | 字体回退 / 没封面 |
 | ⑤⑥ 图像 | brief + 真图 | `image_source --brief/--check` | 缺图 / 宽度 / 比例 / 重复 | 零插槽建议 |
 | ⑦⑧ 渲染+QA | deck.html | `render.py` + `check.py` | 越界 / 重叠 / 溢出 / 对比度 / 全页图 | 密度 / 焦点 / 预算 / 对齐 / 0 图 |
 | ⑨ 交付 | 六格式 | `deliver.py` 等 | 规格/校验不过中止 · PDF 或原生 PPTX 导出失败 · PDF 像素差超容忍 | 接收方须知 |

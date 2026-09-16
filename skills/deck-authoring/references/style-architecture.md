@@ -10,7 +10,7 @@
 
 1. `<当前目录>/styles/` —— 风格跟着 deck 项目走（随项目交付、可移植）；
 2. skill 自己的 `styles/` —— 用户**显式托管**的全局风格；**工具链永不写入**
-   （写它 = 变相内置，用户明令禁止过；`style.py --new` 有守卫，见下文「方向预设」）；
+   （写它 = 变相内置，用户明令禁止过；`style.py --new` 有守卫，见下文「从脚手架起手」）；
 3. `dev-tools/style-fixture/` —— 开发夹具（minimal-baseline / swiss-grid），当参考拷改。
 
 缺省风格 `swiss-grid`（render.py:71 `DEFAULT_STYLE`）；`--style` 吃名字也吃路径。
@@ -50,7 +50,7 @@
     "minLarge":     3.0,                  // 大字（≥ largeTextPx）最小对比度
     "largeTextPx":  32
   },
-  "type": {                              // 字号级数（px）—— 15 档全必填（render.py:123）
+  "type": {                              // 字号级数（px）—— 15 档全必填（render.py:116）
     "cover": 128, "compact": 96, "small": 84, "end": 128,
     "subtitle": 36, "bulletLarge": 46, "bullet": 32, "bulletSmall": 26,
     "colTitle": 40, "nodeLabel": 28, "nodeNote": 22,
@@ -73,8 +73,8 @@
     // display / body 少一键渲染器直接 KeyError（render.py:765、787 读的就是这两键）
   },
   "viewerBackground": "#141414",         // 浏览器外底色（让纸色边能看见）
-  "motion": {                            // 动效时间轴 —— 7 键必填（style.py:68 REQUIRED_MOTION）
-    "easing":      "expoOut",                       // 只认 expoOut / overshoot（style.py:73）
+  "motion": {                            // 动效时间轴 —— 7 键必填（style.py:73 REQUIRED_MOTION）
+    "easing":      "expoOut",                       // 只认 expoOut / overshoot（style.py:78）
     "cssEase":     "cubic-bezier(0.16, 1, 0.3, 1)", // 注入 CSS；linear/ease 系 --check 拦
     "enterMs": 520, "staggerMs": 70,                // 入场时长 / 逐条错峰
     "titleHoldMs": 260,                             // 标题独占期
@@ -212,37 +212,56 @@ styles/<name>/
   render.py:283、297）。连带 `decor.types`（哪些版式放）与 `decor.zones`（放哪个角）
   都是**风格自报的**，不是写死在渲染器里的。
 
+#### token 里的三个可选**作者数据**键（v3）
+
+这三个键**脚本不推断**，是风格自报的数据（缺省 = 走内置缺省）：
+
+- **`titleTiers`**：`{版式: 档名}`，覆盖渲染器的缺省映射 `render.TITLE_TIER`
+  （`{title: cover, content-text: compact, end: end}`，render.py:105）。值域 =
+  `REQUIRED_TYPE_TIERS`（render.py:116 的档名集合）。合并顺序：缺省映射 →
+  风格 `titleTiers` → spec 逐页 `titleTier`（compile.py:134、140）。
+- **`bulletDefault`**：content-text / content-image 页的缺省条目档名，缺省值
+  `"bullet"`（`render.DEFAULT_BULLET_TIER`，render.py:129）；spec 逐页 `bulletTier`
+  覆盖它（compile.py:136、148）。two-column 仍固定 `bulletSmall`（结构事实，
+  不受此键影响）。
+- **`layouts`**：这套风格自报的**布局词表**（非空字符串数组）。渲染器认的结构布局
+  （`IMAGE_LAYOUTS`、`TWO_COL_LAYOUTS`，render.py:84、88）之外，作者自造的布局名
+  写法受它约束：`check.py::_layout_vocab_problems`（check.py:405）在风格声明了
+  `layouts` 时，把不在词表里、又不是结构布局的 `spec.layout` 判成**阻塞** problem
+  —— 自造名写错一个字母，skin 里那条规则就永远不生效，最难查的那种静默。
+
+`style.py --check`（`audit()`，style.py:174-190）会校验三者的形状与值域：
+`titleTiers` 的每个值、`bulletDefault` 都得是 `REQUIRED_TYPE_TIERS` 里的档名，
+`layouts` 必须是非空字符串数组 —— 形状/值域不对当场报，不等它静默走默认
+（静默最难查）。
+
 #### 换风格需要重审什么
 
 `check.py` 的门槛**全部从所选风格的 token 读**，不用改代码；但要确认新 token 里
 这几项填得合理：`type` 的级数（字号是否匹配观看距离）、`contrast` 门槛、
 `motion` 的时间轴（快慢节奏要配风格气质 —— 缓动只认 expoOut / overshoot，
-style.py:73；7 个时间键缺一个，style.py:68 的 REQUIRED_MOTION 会报）、
+style.py:78；7 个时间键缺一个，style.py:73 的 REQUIRED_MOTION 会报）、
 `misregistration`（要做错位才写区间 —— ③ 那条区间校验只在**写了**时生效；
 不做错位的风格直接不写这个键）。
 
-### C. 从方向预设起手（`style.py --new`）
+### C. 从脚手架起手（`style.py --new`）
 
-不想从零拷目录时，三个**方向预设**（`PRESETS`，style.py:80）先替你定好**结构性格** ——
-字号档 / 字栈 / 动效 / 气质互斥（拷夹具换色只会得到三张同构皮肤，用户实测踩过）：
-
-| 预设 | 气质 | 为什么 |
-| --- | --- | --- |
-| `editorial` | 安静 · 暖：衬线小字长留白 | 读的人拿在手里，字是内容不是海报 |
-| `poster` | 浓烈 · 暖：超粗黑巨字快节奏 | 三米外看，字本身是图形 |
-| `data` | 安静 · 冷：无衬线等宽数字高密度 | 一屏塞得下事实，眼睛不累 |
+不想从零拷目录时，`style.py --new` 先替你拷一份**契约完整**的脚手架 ——
+底座取夹具 tokens（字号档 / 字栈 / 动效 / 契约齐全），再拷一份夹具 `skin.css`：
 
 ```bash
-python3 scripts/style.py --new my-style --preset editorial          # 写 <当前目录>/styles/my-style/
-python3 scripts/style.py --new my-style --preset editorial --dir /项目/styles
+python3 scripts/style.py --new my-style            # 写 <当前目录>/styles/my-style/
+python3 scripts/style.py --new my-style --dir /项目/styles
 ```
 
-行为（`new_style()`，style.py:129）：
+行为（`new_style()`，style.py:81）：
 
-- 底座取夹具 tokens（契约完整性有保证），预设只覆盖结构性格键
-  （label / temperature / type / fonts / motion）；生成后立刻过契约体检，不过当场退出 1；
+- v3 **不再有方向预设**（`PRESETS` 已删除）—— 方向是模型读规则后按题目自己造的，
+  预设等于内置（用户明令禁止）。脚手架只保证"起手就过契约"，字号档 / 字栈 /
+  色板 / 气质都由作者按题目改；
 - **缺省写 `<当前目录>/styles/<name>/`**（风格跟 deck 项目走），`--dir` 可指到别处；
-- **守卫：拒绝写进 skill 自己的 `styles/`**（style.py:159）—— 那里是用户显式托管的
+- 生成后立刻过契约体检（`--new` 会调 `audit()`），不过当场退出 1；
+- **守卫：拒绝写进 skill 自己的 `styles/`**（style.py:107）—— 那里是用户显式托管的
   全局风格，工具链往里写 = 变相内置（用户明令禁止过，实测踩过两次）。
 
 ## spec 字段集（deck-spec.json）
@@ -251,16 +270,14 @@ python3 scripts/style.py --new my-style --preset editorial --dir /项目/styles
 {
   "deck": {
     "style":    "swiss-grid",         // 可选；缺省 swiss-grid。风格名（三根顺序查找）或路径
-    "colorSet": "vivid",              // 可选。写名 = 该风格 token.colorSets 的键；
-                                      // 省略或写 "auto" 也行 → 语义派生方向
-                                      // （mood → 风格语法，palette.auto_set，compile 留痕）
+    "colorSet": "vivid",              // **必填具名**（v3：auto/mood 派生已退役）——
+                                      // 写名 = 该风格 token.colorSets 的键；缺失或写
+                                      // "auto" → validate_spec 判 MISSING_COLOR_SET，
+                                      // render.resolve_color_set 再拦一道 SystemExit
     "seed":     11,                   // 建议显式写（缺省 1）；错位/颗粒按 (seed, 元素) 派生
     "title":    "封面文案",
     "brand":    "acme",               // 可选；品牌协议 —— 字体并入、色板同名键品牌赢
                                       // （compile.py:124）
-    "mood":     "calm",               // 可选；calm/neutral/bold/experimental —— auto 配色
-                                      // 方向的**第一优先输入**（palette.choose_direction；
-                                      // 枚举封闭，validate_spec.py:40-43）
     "note":     "...",                // 可选；deck 级备注（封闭字段集放行，工具链不消费）
     "slides": [
       {
@@ -270,19 +287,26 @@ python3 scripts/style.py --new my-style --preset editorial --dir /项目/styles
         "subtitle": "...",            // 仅 title 页
         "bullets":  ["..."],          // content-text / content-image
         "image":    "pic.png",        // 仅 content-image；相对路径或 assetId（见下节）
-        "variant":  "visual-right",   // 可选。content-image：visual-right（缺省）/
-                                      //   visual-left / even / hero / "auto"（fit 实测
-                                      //   喂入，没数据回退缺省）；
-                                      // two-column：even（缺省）/ lean-left / lean-right
-                                      //   （没有 auto —— 写了当拼错拦）
+        "layout":   "visual-right",   // 可选；非空字符串自由值（"auto" 判 BAD_LAYOUT）。
+                                      // 结构布局（渲染器能力）：content-image 的
+                                      //   visual-right（缺省）/ visual-left / even / hero；
+                                      //   two-column 的 even（缺省）/ lean-left / lean-right。
+                                      // 其它字符串 = 作者自造布局名 → 套缺省结构 +
+                                      //   data-layout="<名>"，排法由 skin.css 写；风格声明的
+                                      //   layouts 词表按词表验拼写（check 阻塞，见上文「token 里的三个可选作者数据键」）
+        "titleTier":  "compact",      // 可选；标题档名（风格 type 块里的键）—— 风格
+                                      //   titleTiers 定缺省映射，这里逐页覆盖（chart 除外）
+        "bulletTier": "bullet",       // 可选；条目档名（content-text / content-image /
+                                      //   two-column）—— 缺省取风格 bulletDefault
         "columns":  [{title, bullets}, ...],  // 仅 two-column；至多两栏
         "nodes":    [{label, note}, ...],     // 仅 timeline
-        "chart":    "bar",            // 仅 chart；显式图形（bar / bar-horizontal / line /
-                                      //   area / bar-stacked / donut / scatter / combo，
-                                      //   chart.py:94）
-        "intent":   "comparison",     // 仅 chart；trend / ranking / comparison /
-                                      //   correlation / deviation / distribution /
-                                      //   composition / progress —— 没写 chart 时按它推
+        "chart":    "bar",            // 仅 chart；**必填**的显式图形（bar / bar-horizontal /
+                                      //   line / area / bar-stacked / donut / scatter /
+                                      //   combo 八类，chart.py:92）；缺失 = MISSING_CHART_TYPE
+        "intent":   "comparison",     // 仅 chart；可选**语义标注**（不决定图形）——
+                                      //   trend / ranking / comparison / correlation /
+                                      //   deviation / distribution / composition /
+                                      //   progress，八值封闭，validate_spec 校验
         "message":  "结论一句话",      // 仅 chart；写了就当图表**大标题**（render.py:1118），
                                       // 原 title 降为数据集名
         "data":     [{label, value}, ...],    // 仅 chart（scatter 豁免 x/y）
@@ -301,6 +325,9 @@ python3 scripts/style.py --new my-style --preset editorial --dir /项目/styles
 **字段集是封闭的**：`validate_spec.py` 会把未知键直接判失败，并按类别给专门说明
 （坐标 / 字号 / 色值三类各有自己的话）。所以 `fontSize` / `x` / `y` 这类写法一开始
 就被挡下来 —— 不用等到产物那里才发现"它根本没生效"。
+
+v3 退役的两个字段现在都是未知键，写它们会被判 `UNKNOWN_FIELD`，提示里各有一条
+指路：`variant`（改叫 `layout`）、`mood`（配色不再由语义推导，直接写 `colorSet`）。
 
 `check.py` **不管**字段集（它验的是产物）；它唯一会主动拦的字段是 `color`：第 ① 条
 只接受 `"overprint"`，写成色值（如 `"#FF0000"`）会判失败。

@@ -1,4 +1,4 @@
-# 配色：结构、角色、novelty、三个方向
+# 配色：结构、角色、novelty、作者声明
 
 这一层实现的是"AI 视觉配色规范"。**先说清分工**，因为这份规范里大部分讲的是
 **生成过程**（怎么想），而代码能负责的只有**结构与校验**（怎么测）：
@@ -9,7 +9,7 @@
 | 13 个颜色角色 | **代码推导**（从色板四个角色推） | `palette.py::roles` |
 | 文字可读 / 背景与主体明度不能太近 | **阻塞** | `palette.py --audit`、`ink.py` |
 | 俗套组合（AI=蓝紫青、企业=蓝白…） | **按主题条件提示**，且**说清是哪一条** | `palette.py::novelty` |
-| Safe / Creative / Experimental 三方向 | **代码生成**（OKLCH 变体，确定性） | `palette.py::directions` |
+| 配色选择（用哪套 `colorSets`） | **作者声明**（spec 必填具名，脚本不推断） | `validate_spec.py` / `render.resolve_color_set` |
 | 外部配色站取灵感 / 搜索关键词 | **流程**（人/AI 做，见本文） | 见下 |
 | "好看的配色" | **判断**（测不出来，不做假检查） | — |
 
@@ -17,7 +17,6 @@
 python3 scripts/palette.py --audit                                  # 全部风格（用户+夹具）全审
 python3 scripts/palette.py --audit --topic "AI 大模型架构"            # 带上主题判俗套
 python3 scripts/palette.py --novelty swiss-grid blue --topic "AI…"   # 一个色板的 novelty 与依据
-python3 scripts/palette.py --directions swiss-grid blue              # 三个方向
 python3 scripts/palette.py --roles swiss-grid blue                   # 13 个角色的推导结果
 ```
 
@@ -41,26 +40,21 @@ python3 scripts/palette.py --roles swiss-grid blue                   # 13 个角
 是**风格级**比对：声明落在实测集合里就算过，而不是要求逐套板全等 —— 后者会把真实差异
 当错误报，而那种报告会让人开始忽略所有提示。
 
-### auto：主题按 deck 实际情况派生（总编排 §17 的落地）
+### 配色由作者显式声明（总编排 §17 的落地）
 
-规则说 "Style 出语法，Theme Resolver 按实际情况融合"。落地为两条路：
+规则说 "Style 出语法，Theme Resolver 按实际情况融合"。v3 只有一条路：**作者按 deck
+的实际情况选一套风格里手调好的 `colorSets`** —— 显式写 `deck.colorSet` 就是选它
+（最稳，也是 demo/stress 的用法）。
 
-1. **手调基准**：每套风格的 `colorSets` 是风格作者调好的家底 —— 显式指定
-   `deck.colorSet` 就是选它（最稳，也是 demo/stress 的用法）。
-2. **auto 派生**：省略 `colorSet` 或写 `"auto"` → `palette.auto_set` 对风格
-   第一套基准做 OKLCH 变体。**方向由语义决定**（`choose_direction`，§17
-   Theme Resolver 第一片）：spec 的 `mood`（calm/neutral/bold/experimental，
-   显式语义意图，第一优先级）→ 风格语法 `colorStructure.color_creativity`
-   （≥0.66 → creative，否则 safe）→ 都没有 → safe（手调基准原样）。
-   **seed 不参与方向决策** —— "换 deck 换配色看 seed"是没有理由的掷骰子
-   （已修掉的老根因）；变体是纯函数，同输入同结果（可回归）。只动
-   primary / secondary（纸色与文字不动），对比度结构原样保住；派生结果注入
-   `tokens.colorSets`，渲染与检查统一按名取（不留第二套取色路径）；
-   compile 的 theme trace 写明整条决策依据。
+历史那条 **auto 派生**（省略 `colorSet` 或写 `"auto"` → `palette.auto_set` 按 `mood` /
+风格语法选方向做 OKLCH 变体）已退役 —— 选色是审美决策，脚本退到验收器：现在
+`validate_spec.py` 把缺失或不具名的 `colorSet` 判 `MISSING_COLOR_SET`（名字不在
+`colorSets` 里判 `BAD_COLOR_SET`），`render.resolve_color_set` 再拦一道直接 SystemExit
+—— 不再有第二条取色路径，也不再读 `mood` / `color_creativity`。
 
-所以 colorSets 不是与规则冲突的"硬编码颜色"，而是**派生的基准与人类手调的
-对照组**；品牌色仍经由 `merge_color_sets` 同名覆盖进入（品牌协议 §5）。从语法
-凭空生成全新主题（不要基准）是未实现的约定 —— 没有感知模型撑着会出丑色。
+所以 colorSets 是**人类手调的家底**（不是与规则冲突的"硬编码颜色"）；品牌色仍经由
+`merge_color_sets` 同名覆盖进入（品牌协议 §5）。从语法凭空生成全新主题（不要基准）
+是未实现的约定 —— 没有感知模型撑着会出丑色。
 
 ## 为什么用 OKLCH 而不是 HSL
 
@@ -69,21 +63,21 @@ python3 scripts/palette.py --roles swiss-grid blue                   # 13 个角
 在感知里暗得多。拿 HSL 做变体会出现"提亮之后对比度反而掉了"，而这个流水线里
 对比度是**硬门槛**（文字必须过 4.5:1）。
 
-变体范围按规范第 19 条：
+规范第 19 条给的变体范围（**规范值**，v3 起不再由脚本自动执行）：
 
 | | 色相 | 彩度 | 明度 |
 | --- | --- | --- | --- |
 | 规范允许 | ±10°~30° | ±5%~20% | ±3%~12% |
-| 本实现（creative） | +18° | ×1.12 | +0.02 |
-| 本实现（experimental） | −28° | ×1.20 | −0.04 |
 
-**中性色不参与色相变化**（彩度低于 `NEUTRAL_CHROMA` 就跳过）—— 挪中性色的色相只会
-让它变脏。`NEUTRAL_CHROMA = 0.03` 是**按实测标定的**：`pastel-geometry` 的副色
-`#8A8578` 彩度 0.020，目视就是暖灰，可它正好卡在 0.02 上，于是被算成"有色"，那套风格
-被误判成互补色（实测发现）。
+v3 起 **OKLCH 只做测量 / 推导，不再自动生成方向变体**：`palette.py` 保留 `oklch()` /
+`to_hex()` / `contrast()` 这套数学，供 `hue_structure`（色相结构）、`roles`（13 角色
+推导）、`novelty`（俗套计分）与配色审计使用 —— 它们都要感知均匀的坐标才算得准。
+（原先按 OKLCH 生成 Safe / Creative / Experimental 三变体的那条路已退役，见下「三个方向」。）
 
-变化是**确定性的**（按角色取固定角度，不用随机）—— 随机会让同一份 spec 两次跑出
-不同的色，那就没法回归了。
+**中性色不参与色相判定**（彩度低于 `NEUTRAL_CHROMA` 就跳过）—— 挪中性色的色相只会
+让它变脏。`NEUTRAL_CHROMA = 0.03`（palette.py:143）是**按实测标定的**：`pastel-geometry`
+的副色 `#8A8578` 彩度 0.020，目视就是暖灰，可它正好卡在 0.02 上，于是被算成"有色"，
+那套风格被误判成互补色（实测发现）。
 
 ## 俗套表：说清是哪一条
 
@@ -114,22 +108,21 @@ python3 scripts/palette.py --roles swiss-grid blue                   # 13 个角
 > **这说明规范那两条不是空话，而是本仓库真实存在的情况** —— 想做 AI 主题的 deck，
 > 这几个色板不该默认选。
 
-## 三个方向
+## 三个方向：自动变体已退役（配色由作者声明）
 
-规范第 17 条：Safe / Creative / Experimental。本实现把它们做成**同一套色的三个 OKLCH
-变体**（而不是三套无关的色），因为规范要求"保留原 Palette 的视觉关系"：
+规范第 17 条：Safe / Creative / Experimental。**v3 起自动生成三方向变体的那条路已退役**
+—— `palette.py` 里 `directions` / `variant` / `choose_direction` / `auto_set` /
+`MOOD_DIRECTIONS` / `DIRECTIONS` 与 `--directions` CLI 全部删除：选色是审美决策，
+脚本退到验收器。
 
-- **Safe** —— 原样。稳定、克制、可用于正式汇报
-- **Creative** —— 色相挪 18°、彩度提 12%、明度微提。**不是默认**：按上节决策链，
-  mood 映射到 creative、或风格声明 `color_creativity` ≥ 0.66 才选它；无 mood 且未声明
-  落 Safe（手调基准原样）
-- **Experimental** —— 反方向挪 28°、彩度提 20%、明度降。制造冷暖反差，用在封面/视觉页
+替代做法是**作者显式声明**：`spec.deck.colorSet` 必填具名（缺失或写 `auto` 会被
+`validate_spec.py` 判 `MISSING_COLOR_SET`、被 `render.resolve_color_set` 直接
+SystemExit）。要"更 creative"就往风格的 `colorSets` 里加一套**手调**色板
+（同风格加色板的 seam 见 `references/style-architecture.md`），不是让脚本去挪色相。
 
 规范说"Creative 不满足可读性再回退 Safe" —— 可读性是**能测的**，但工具边界要说清：
-`--directions` 只打印三套变体与各自 novelty（palette.py:677-684），**输出里没有
-对比度判定**；要验对比度，把选中的变体写进 token 再跑 `ink.py <style.json>`
-（任一色板不达标退出码 1）。auto 派生路线不依赖这道回退 —— variant 只动
-primary / secondary，对比度结构原样保住（见上节）。
+v3 不再自动产出变体，也就没有那道自动回退。色板的对比度要验，跑
+`ink.py <style.json>`（任一色板不达标退出码 1）或 `palette.py --audit`。
 
 ## 检索关键词：搜 Style，不搜行业
 
@@ -159,7 +152,7 @@ unusual gradient palette             premium low-saturation palette
 | [WebGradients](https://webgradients.com/) | 颜色关系 + stop 分布 + 方向 | 不照搬；重点看 stop 的不均匀分布 |
 | [Happy Hues](https://www.happyhues.co/palettes/) | **角色如何分工** | 它的角色划分和规范第 20 条的 13 个角色可以对上 |
 | [Color Hunt](https://colorhunt.co/) | 提升新鲜感 | 按 Style + Mood 检索，不按行业 |
-| [Huemint](https://huemint.com/) | 高创造力候选 | 适合 Creative / Experimental 那一档 |
+| [Huemint](https://huemint.com/) | 高创造力候选 | 适合高创造力那一档（手工取色、再加进风格） |
 
 **取回来的色不得直接复制**：走第 19 条的变体流程（保留色相关系 → OKLCH 变体 →
 对比度检查 → 角色映射）。`palette.py --roles` 是最后一步的现成工具。

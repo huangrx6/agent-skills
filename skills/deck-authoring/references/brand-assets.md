@@ -24,7 +24,7 @@ Content（说什么）→ Style（怎么表达）→ Brand（是谁）→ Asset�
 | --- | --- | --- | --- |
 | Content | 标题、正文、数据、事实、页面目的 | 颜色、Logo、字体文件、图片路径 | spec / 三份规划 JSON |
 | Style | 构图、排版性格、色彩语法、图片/图形/动画语言 | 公司身份、官方 Logo、品牌锁定色 | deck 的 `styles/<name>/` |
-| Brand | Logo、品牌身份色、字体政策、署名、官方主题、视觉约束 | 页面坐标、布局变体、具体构图 | `brands/<name>/` |
+| Brand | Logo、品牌身份色、字体政策、署名、官方主题、视觉约束 | 页面坐标、布局（`layout`）、具体构图 | `brands/<name>/` |
 | Asset | 本 deck 真正用的图片/截图/插图文件 | 决定品牌规范、决定风格 | spec 同目录的图文件 |
 
 **核心原则**：Brand 定义"是谁"，Style 定义"怎么表达"，Content 定义"讲什么"，
@@ -107,8 +107,9 @@ Neutral → Ink Black → Brand Blue → Silver 这类）。品牌负责识别�
 ## 9. Approved Theme【约定】
 
 客户提供完整官方主题（light/dark 的 background/textPrimary）时优先于 Style
-自动配色，但只锁颜色应用，不锁构图/字号跨度/图形/图片/动画语言。未实现；
-近似做法：把官方色写成一套 `colorSets` 并入同名覆盖。
+自带配色（`colorSets`；spec 只选色板名，v3 无 auto 派生），但只锁颜色应用，
+不锁构图/字号跨度/图形/图片/动画语言。未实现；近似做法：把官方色写成一套
+`colorSets` 并入同名覆盖。
 
 ## 10. 品牌字体与 Style【✅ strict 落地；hybrid/style_allowed=约定】
 
