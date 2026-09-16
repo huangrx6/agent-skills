@@ -1632,6 +1632,51 @@ def _repair_loop(deck_spec: dict, style: dict, assets: dict | None,
     return 0 if report["fixed"] else 1
 
 
+def _contract_main(deck_spec: dict, style: dict, as_json: bool = False) -> int:
+    """把"这一页能装多少"打出来 —— **写内容前**先读预算。
+
+    为什么要有这一步：修复梯里"缩字号"排最后（第 13 位），而人一旦写多了，
+    最省事的动作就是压字号。把预算提前，写的时候就知道该收在多少字以内、
+    这一页最多几条 —— 比"渲完再发现装不下"便宜得多。
+
+    预算按 `grid` 跨度 + 风格 type 级数算（见 layout/contracts.py）；
+    `--json` 给程序读，默认给人读。
+    """
+    tiers = (style.get("tokens") or {}).get("type") or {}
+    rows = _load_layout().contracts.contract_for_slides(
+        deck_spec["deck"].get("slides") or [], tiers)
+    if as_json:
+        print(json.dumps(rows, ensure_ascii=False, indent=1))
+        return 0
+    if not rows:
+        print("spec 里没有可算的页（需要 type）")
+        return 0
+    print(f"风格 {style['name']} 的 type 级数下的**每页容量**（估算：按 CJK 全角、"
+          f"常见条目缩进；渲染后的实测才是硬门）")
+    for r in rows:
+        bits = [f"第 {r['page']} 页", r["pageType"],
+                f"layout={r.get('layout') or '缺省'}"]
+        if r.get("role"):
+            bits.append(f"role={r['role']}")
+        print("  " + " · ".join(bits))
+        if r.get("title"):
+            t = r["title"]
+            print(f"      标题 ≤ {t['maxChars']} 字/行 × {t.get('maxLines', 1)} 行")
+        for key, name in (("bullets", "条目"), ("columns", "栏"), ("nodes", "节点")):
+            spec = r.get(key)
+            if not spec:
+                continue
+            if key == "nodes":
+                print(f"      {name} ≤ {spec['maxItems']} 个"
+                      f"（标签 ≤ {spec.get('labelChars')} 字 / 说明 ≤ {spec.get('noteChars')} 字）")
+            elif key == "columns":
+                print(f"      {name}题 ≤ {spec.get('titleChars')} 字；"
+                      f"每栏 {name}目 ≤ {spec['maxItems']} 条 × {spec['maxChars']} 字")
+            else:
+                print(f"      {name} ≤ {spec['maxItems']} 条 × {spec['maxChars']} 字")
+    return 0
+
+
 def _cmp_panel_css() -> str:
     """对比页选择面板的样式（只在对比产物里注入）。"""
     return ("<style>\n"
@@ -1956,6 +2001,11 @@ def main(argv: list[str]) -> int:
                          "并写出对比页（同内容不同结构，页面上挑；复制选择得 picks JSON）")
     ap.add_argument("--pick", action="store_true",
                     help="配合 --candidates：不问作者，直接采用最优候选并渲染")
+    ap.add_argument("--contract", action="store_true",
+                    help="打出每页容量（标题/条目/栏目/节点的字数与条数预算）——"
+                         "写内容前先读，别写完再缩字号")
+    ap.add_argument("--json", action="store_true",
+                    help="配合 --contract：输出 JSON（给程序读）")
     ap.add_argument("--picks", default=None, metavar="PATH",
                     help="配合 --candidates：按对比页导出的 picks.json（{页码: 候选名}）"
                          "回写 spec 并渲染，产出 *.picked.spec.json")
@@ -1967,6 +2017,8 @@ def main(argv: list[str]) -> int:
     assets = load_assets(args.spec)      # assets/manifest.json（§12 管线入口）
     name = args.style or deck_spec["deck"].get("style")
     style = load_style(name)
+    if args.contract:
+        return _contract_main(deck_spec, style, args.json)
     if args.repair:
         return _repair_loop(deck_spec, style, assets, args.out)
     if args.candidates or args.pick or args.picks:

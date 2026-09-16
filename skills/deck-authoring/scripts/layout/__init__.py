@@ -16,4 +16,4 @@ import os as _os
 __path__ = [_os.path.dirname(_os.path.abspath(__file__))]
 
 from . import (model, collision, repair, candidates, fingerprint, allocation,
-               roles)  # noqa: E402,F401
+               roles, contracts)  # noqa: E402,F401

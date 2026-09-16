@@ -539,6 +539,66 @@ class TestCandidateCLI(unittest.TestCase):
             self.assertNotIn("layout", picked["deck"]["slides"][1])
 
 
+class TestContracts(unittest.TestCase):
+    """页面契约（layout/contracts.py）：写前预算 —— 这一页能装多少。
+
+    钉两件事：**结构真的影响预算**（宽栏能放更多字），以及**坏值不会把表变 NaN**
+    （NaN 参与比较全假，预算等于静默失效）。
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.pkg = _load_layout()
+        cls.c = cls.pkg.contracts
+        cls.TIERS = {"type": {"compact": 96.0, "bullet": 32.0, "colTitle": 40.0,
+                              "nodeLabel": 28.0, "nodeNote": 22.0,
+                              "cover": 128.0, "end": 128.0}}
+
+    def test_wider_text_region_holds_more_characters(self) -> None:
+        tiers = self.TIERS["type"]
+        wide = self.c.budgets("content-image", "visual-right", tiers)["bullets"]
+        narrow = self.c.budgets("content-image", "visual-wide", tiers)["bullets"]
+        self.assertGreater(wide["maxChars"], narrow["maxChars"],
+                           "7 栅文字栏必须比 4 栅能放更多字")
+
+    def test_hero_uses_its_own_title_size(self) -> None:
+        tiers = self.TIERS["type"]
+        hero = self.c.budgets("content-image", "hero", tiers)
+        normal = self.c.budgets("content-image", "visual-right", tiers)
+        self.assertGreater(hero["title"]["maxChars"], normal["title"]["maxChars"],
+                           "满幅页的标题住在底部条里，字号小一档 → 能放更多字")
+
+    def test_two_column_items_use_the_bullet_size_not_the_column_title(self) -> None:
+        col = self.c.budgets("two-column", "even", self.TIERS["type"])["columns"]
+        self.assertEqual(col["size"], 32.0, "栏内条目是条目字号，不是栏题字号")
+        self.assertGreater(col["titleChars"], 0)
+
+    def test_bad_tier_values_do_not_poison_the_table(self) -> None:
+        bad = {"bullet": float("nan"), "colTitle": True, "compact": "96"}
+        out = self.c.budgets("content-image", "even", bad)
+        # 任何一项变成 NaN 都会让后面的比较静默失效 —— 逐项确认是正常数
+        for key in ("title", "bullets"):
+            for field, value in out[key].items():
+                if isinstance(value, float):
+                    self.assertEqual(value, value, f"{key}.{field} 是 NaN")
+                    self.assertGreater(value, 0, f"{key}.{field}")
+        self.assertGreater(out["bullets"]["maxChars"], 0, out)
+        self.assertGreater(out["title"]["maxChars"], 0, out)
+
+    def test_unknown_page_type_is_not_guessed(self) -> None:
+        self.assertEqual(self.c.budgets(None, None, self.TIERS["type"]), {})
+        self.assertEqual(self.c.budgets("", None, self.TIERS["type"]), {})
+        # tiers 缺失（没有风格 token）走默认档，而不是变成空表或 NaN
+        fallback = self.c.budgets("content-text", None, None)
+        self.assertGreater(fallback["bullets"]["maxChars"], 0, fallback)
+
+    def test_per_slide_rows_skip_broken_entries(self) -> None:
+        rows = self.c.contract_for_slides(
+            [{"type": "content-text"}, None, {"title": "缺 type"}],
+            self.TIERS["type"])
+        self.assertEqual([r["page"] for r in rows], [1])
+
+
 class TestFingerprint(unittest.TestCase):
     """结构指纹（layout/fingerprint.py）：镜像不算新结构，跨度不同才算。
 

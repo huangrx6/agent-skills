@@ -687,6 +687,80 @@ def _layout_vocab_problems(deck: dict, tokens: dict, slides: list) -> list[str]:
     return out
 
 
+def _content_budget_notes(deck: dict, tokens: dict | None) -> list[str]:
+    """写前预算的**事后核对**：内容超出了这一页的容量（提示级）。
+
+    为什么要有它：修复梯里"缩字号"排在最后（第 13 位），而人在被"装不下"追着时
+    最容易先压字号。预算表把它提前 —— 这里只做一件事：**把数字和该先做的动作
+    说出来**（改文案 / 换更宽的结构），不提缩字号。
+
+    只提示不阻塞的原因：预算是**估算**（按 CJK 全角、按常见条目缩进），
+    真正的判据是渲染后的实测（越界 / 碰撞 / 死白）—— 那几道是硬门。
+    """
+    if not isinstance(tokens, dict):
+        return []
+    tiers = tokens.get("type") or {}
+    budget_mod = layout_mod.contracts
+    tol = 1.0 + budget_mod.TOLERANCE
+    out: list[str] = []
+    for i, s in enumerate(deck.get("slides") or [], 1):
+        if not isinstance(s, dict):
+            continue
+        page_type = s.get("type")
+        if not isinstance(page_type, str):
+            continue
+        layout = s.get("layout") if isinstance(s.get("layout"), str) else None
+        b = budget_mod.budgets(page_type, layout, tiers)
+        if not b:
+            continue
+        layout_name = layout or "缺省"
+        title = s.get("title")
+        tb = b.get("title")
+        if tb and isinstance(title, str) and tb.get("maxChars"):
+            room = tb["maxChars"] * tb.get("maxLines", 1)
+            if len(title) > room * tol:
+                out.append(
+                    f"第 {i} 页标题 {len(title)} 字，{layout_name} 结构下约能放 "
+                    f"{room} 字（{tb['maxChars']} 字/行 × {tb.get('maxLines', 1)} 行）"
+                    f" —— 先**改写标题**（短标题本来就是好标题）；要保留长句就换更宽的"
+                    f"结构或拆页，别先压字号")
+
+        def _check_items(items, key, where_label) -> None:
+            spec = b.get(key)
+            if not spec or not isinstance(items, list) or not items:
+                return
+            limit_n = spec.get("maxItems")
+            if isinstance(limit_n, int) and len(items) > limit_n:
+                out.append(
+                    f"第 {i} 页{where_label} {len(items)} 条，{layout_name} 结构下约能放 "
+                    f"{limit_n} 条 —— 收短/合并条目，或换更宽的结构（缩字号是修复顺序"
+                    f"第 13 位）")
+            limit_c = spec.get("maxChars")
+            if not isinstance(limit_c, int) or limit_c <= 0:
+                return
+            over = [x for x in items if isinstance(x, str)
+                    and len(x) > limit_c * tol]
+            if over:
+                worst = max(over, key=len)
+                out.append(
+                    f"第 {i} 页{where_label}有 {len(over)} 条超出这一栏的宽度"
+                    f"（约 {limit_c} 字/条，最长 {len(worst)} 字：「{worst[:18]}…」）"
+                    f" —— 改短文案，或换更宽的结构")
+
+        _check_items(s.get("bullets"), "bullets", "")
+        cols = s.get("columns")
+        if isinstance(cols, list):
+            for col in cols:
+                if isinstance(col, dict):
+                    _check_items(col.get("bullets"), "columns",
+                                 f"（栏「{col.get('title', '')}」）")
+        nodes = s.get("nodes")
+        if isinstance(nodes, list):
+            _check_items([n.get("label") for n in nodes
+                          if isinstance(n, dict) and n.get("label")], "nodes", "")
+    return out
+
+
 def _role_notes(deck: dict) -> list[str]:
     """页面角色（这一页在干什么）：**不合**与**重复**两条提示。
 
@@ -767,6 +841,7 @@ def _check_deck_shape(measured: dict, deck: dict,
     notes.extend(_tier_notes(deck))
     notes.extend(_layout_rotation_notes(deck))
     notes.extend(_role_notes(deck))
+    notes.extend(_content_budget_notes(deck, tokens))
     problems.extend(_layout_vocab_problems(deck, tokens or {},
                                            deck.get("slides", [])))
 

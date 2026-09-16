@@ -335,6 +335,46 @@ class TestRoleNotes(unittest.TestCase):
         self.assertEqual(check._role_notes(deck), [])
 
 
+class TestContentBudget(unittest.TestCase):
+    """写前预算的事后核对（`check._content_budget_notes`）。
+
+    它的价值全在**措辞**上：必须把"先改文案 / 换结构"说出来，且**不提缩字号**
+    （修复梯里缩字号排第 13 位，而人被装不下追着时最容易先压字号）。
+    """
+
+    TOKENS = {"type": {"compact": 96.0, "bullet": 32.0, "colTitle": 40.0,
+                       "nodeLabel": 28.0, "nodeNote": 22.0,
+                       "cover": 128.0, "end": 128.0}}
+
+    def test_too_many_items_reports_the_limit(self) -> None:
+        deck = {"slides": [{"type": "content-image", "layout": "visual-wide",
+                            "title": "标题",
+                            "bullets": ["短"] * 9}]}
+        notes = check._content_budget_notes(deck, self.TOKENS)
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("9 条", notes[0])
+        self.assertIn("8 条", notes[0])
+        self.assertNotIn("缩字号", notes[0].replace("缩字号是修复顺序第 13 位", ""))
+
+    def test_overlong_item_names_the_worst_one(self) -> None:
+        long = "这是一条明显超出这一栏宽度的条目内容"
+        deck = {"slides": [{"type": "content-image", "layout": "visual-wide",
+                            "title": "标题", "bullets": [long, "短"]}]}
+        notes = check._content_budget_notes(deck, self.TOKENS)
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("改短文案", notes[0])
+        self.assertIn(long[:10], notes[0])
+
+    def test_within_budget_is_silent(self) -> None:
+        deck = {"slides": [{"type": "content-text", "title": "短标题",
+                            "bullets": ["一", "二", "三"]}]}
+        self.assertEqual(check._content_budget_notes(deck, self.TOKENS), [])
+
+    def test_missing_tokens_is_silent(self) -> None:
+        deck = {"slides": [{"type": "content-text", "title": "x" * 200}]}
+        self.assertEqual(check._content_budget_notes(deck, None), [])
+
+
 class TestPageBox(unittest.TestCase):
     """页盒差 1px 就够：导出 PDF 每页溢出一张，而屏幕上一点看不出来。
 

@@ -330,6 +330,31 @@ score = 拟合损失×150 + 页内重复 + 跨页重复
 layout**、回到渲染缺省。坏键（非数字 / 页码越界）逐个报错，不当成静默跳过。
 语义契合、风格契合不打分 —— 决定权在作者，面板与 `*.candidates.json` 只把事实摆出来。
 
+### 写前预算（`render --contract`）
+
+```bash
+python3 scripts/render.py spec.json -o out.html --contract        # 人读
+python3 scripts/render.py spec.json -o out.html --contract --json  # 程序读
+```
+
+**先读预算再写字**。以前只有"写完 → 渲 → 量 → 发现装不下"这条回路，而修复梯里
+"缩字号"排在第 13 位 —— 于是"装不下"最常见的结果就是先压字号，而不是先改文案。
+预算把这个数字提前（`layout/contracts.py`）：
+
+| 给什么 | 怎么算 |
+| --- | --- |
+| 区域宽度 | `grid.span(n)`（跨度的唯一来源）—— 双栏按栏跨度、图页按文字栏跨度 |
+| 每行字数 | 按 CJK 全角估（1 字 ≈ 1 字号）；拉丁实际更宽裕 → **保守**估计 |
+| 可用高度 | 正文带 `CONTENT_BOTTOM − CONTENT_TOP`（692px） |
+| 条目缩进 | 默认 80px（常见皮肤悬挂缩进的量级，再保守一档） |
+
+例（swiss-grid 的档位）：content-image 的 7 栅文字栏 → 条目 **≤ 8 条 × 23 字**；
+`visual-wide`（4 栅）→ ≤ 8 条 × **11 字** —— 同一个内容换结构就装得下了，
+这正是"先换结构、别先压字号"的依据。
+
+**预算只是估算，不替代实测**：`check.py` 只在超出 `TOLERANCE`（15%）时开口，
+提示里第一句是"改文案 / 换更宽的结构"；渲染后的越界 / 碰撞 / 死白仍是**硬门**。
+
 ## 19. Information Hierarchy【部分 ✅】
 
 每个核心组件 priority 1..5（P1 主视觉/P2 标题结论/P3 关键证据数字/P4 支撑/
