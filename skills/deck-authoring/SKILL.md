@@ -87,6 +87,7 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
 5. **素材**：逐页决定这页靠什么立住，写进 spec 的 `visual` 四档 —— 纯文字 `{"kind":"none"}`
    （不必配图，但必须**决定过**）｜图表 `{"kind":"data"}`（chart 版式）｜结构图/流程图/拓扑/
    架构 `{"kind":"diagram"}`（**excalidraw.com** 或 **draw.io** 画好导出 PNG 放进 deck 项目）｜
+   **图不由脚本手画**（SVG / PIL / 画布都不行 —— 图里出现卡片、分栏、页标题，那它本来就该是一页 spec）｜
    两者的 `ratio` **必填**（如 `"3:2"` / `"1:1"`）—— 比例写下来才算定，槽位按它定高｜
    照片/插画/主视觉 `{"kind":"evidence_image"}`（`--brief` 出**提示词** → 你出图 → 放回目录 →
    `--check`）。`image` 只填文件名；**不用 SVG 手搓插图与流程图**（一眼假）—— SVG 只做风格的
