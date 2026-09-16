@@ -1387,6 +1387,72 @@ def render_resolved(resolved: dict) -> str:
     return "\n".join(out)
 
 
+measure_mod = _load_sibling("measure")   # 实测层（repair 循环里量产物）
+
+
+def _load_layout():
+    """加载 layout/ 包（模型 + 碰撞 + 修复梯）。机制同 _load_sibling。"""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "layout", "__init__.py")
+    pkg_spec = importlib.util.spec_from_file_location("_deck_render_layout", path)
+    if pkg_spec is None or pkg_spec.loader is None:
+        raise RuntimeError(f"加载不了 layout 包：{path}")
+    module = importlib.util.module_from_spec(pkg_spec)
+    sys.modules[pkg_spec.name] = module
+    pkg_spec.loader.exec_module(module)
+    return module
+
+
+def _repair_loop(deck_spec: dict, style: dict, assets: dict | None,
+                 out_path: str, max_iter: int = 4) -> int:
+    """渲 → 实测 → 修复梯 → 再渲（≤ max_iter 轮）。
+
+    每轮把当前产物写到 out_path（最后一轮即交付物）；补丁与诊断写
+    ``<out>.repair.json``，有补丁时另出 ``<out>.repaired.spec.json``
+    （可采纳 / 可拒绝 —— 修复只动 spec 可表达的字段）。
+    """
+    repair_mod = _load_layout().repair
+    patches: list = []
+    diagnostics: list = []
+    iterations = 0
+    for i in range(max_iter):
+        iterations = i + 1
+        resolved = deck_mod.compile_spec(deck_spec, style, assets=assets)
+        deckio.write_text(out_path, render_resolved(resolved))
+        measured = measure_mod.measure(out_path)
+        issues = repair_mod.signals(measured)
+        if not issues:
+            break
+        actions, diags = repair_mod.plan(deck_spec, resolved, issues)
+        # 同一页同一问题跨轮只记一次（声明类的诊断每轮都会重报，重复没有信息量）
+        seen = {(d["slide"], d["issue"], d["why"]) for d in diagnostics}
+        diagnostics.extend(
+            {**d, "iteration": iterations} for d in diags
+            if (d["slide"], d["issue"], d["why"]) not in seen)
+        if not actions:
+            break                       # 梯子走完（声明过 / 已到最小档）
+        repair_mod.apply(deck_spec, actions)
+        patches.extend({**a, "iteration": iterations} for a in actions)
+    report = {"iterations": iterations,
+              "fixed": not diagnostics and not repair_mod.signals(
+                  measure_mod.measure(out_path)),
+              "patches": patches, "diagnostics": diagnostics}
+    deckio.write_json(out_path + ".repair.json", report)
+    if patches:
+        deckio.write_json(out_path.replace(".html", ".repaired.spec.json"),
+                          deck_spec)
+    for p in patches:
+        print(f"  · 第 {p['slide']} 页 {p['field']}: {p['from']} → {p['to']}"
+              f"（{p['why']}）")
+    for d in diagnostics:
+        print(f"  ✗ 第 {d['slide']} 页 {d['issue']} 超出 {d['over']:.0f}px —— "
+              f"{d['why']}；建议：{d['suggest']}")
+    state = "✓ 修复完成" if report["fixed"] else "✗ 未能完全修复（见 repair.json）"
+    print(f"{state}（{iterations} 轮 / {len(patches)} 个补丁 / "
+          f"{len(diagnostics)} 条诊断）")
+    return 0 if report["fixed"] else 1
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="deck-spec.json → HTML（可选：导出 resolved）")
     ap.add_argument("spec")
@@ -1397,11 +1463,16 @@ def main(argv: list[str]) -> int:
                     help="额外导出 resolved.deck.json（渲染器的唯一输入，含决策 trace）")
     ap.add_argument("--trace", action="store_true",
                     help="打印决策 trace（每条：阶段 / 决定 / 理由）")
+    ap.add_argument("--repair", action="store_true",
+                    help="渲→实测→修复梯→再渲（≤4 轮；只动 spec 可表达字段，"
+                         "作者声明过的不碰，产出 *.repaired.spec.json）")
     args = ap.parse_args(argv[1:])
     deck_spec = deckio.read_json(args.spec)
     assets = load_assets(args.spec)      # assets/manifest.json（§12 管线入口）
     name = args.style or deck_spec["deck"].get("style")
     style = load_style(name)
+    if args.repair:
+        return _repair_loop(deck_spec, style, assets, args.out)
     resolved = deck_mod.compile_spec(deck_spec, style, assets=assets)
     page = render_resolved(resolved)
     deckio.write_text(args.out, page)

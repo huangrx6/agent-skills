@@ -163,6 +163,29 @@ gap=57/73/101——改后 skin 的手写值收敛到令牌（残余 6~8 处手�
 `margin-top`（块布局的相邻外距折叠取大者，写不写结果一样，写两处必漂移）。
 安全距离表的最低线（标题底 28 + 正文顶 20 = 48）由这 64 兜住。
 
+## 11e. Repair 修复梯【✅ render --repair】
+
+```bash
+python3 scripts/render.py spec.json -o out.html --repair
+```
+
+流程：渲 → 实测 → 硬问题 → 梯子 → 再渲（≤4 轮）。触发信号只有两种**硬**问题：
+竖向溢出（内容底超过正文带底）与标题横向写出列；提示级问题不进梯子。
+
+**主权规则**：
+
+- 只修改 spec **能表达**的字段（`bulletTier` / `titleTier`）—— 每步写进补丁
+  清单，另出 `*.repaired.spec.json`：可采纳、可拒绝、可复现。不改 CSS、
+  不改风格、不写运行期魔法变量。
+- **作者声明过的字段一律不碰**：显式写了 `bulletTier` / `titleTier` 的页只出
+  诊断（"声明过，不自动改"），决定权在作者。
+- **缩字号是最后手段且只降一档一轮**：`bulletLarge → bullet → bulletSmall`，
+  到最小档就停 —— 再装不下是内容问题（拆页 / 收短文案），不是字号问题。
+
+产物：`out.html`（最后一轮即交付物）、`out.html.repair.json`
+（iterations / fixed / patches / diagnostics）、`out.repaired.spec.json`（有补丁时）。
+退出码：全部修好 = 0；仍有问题 = 1（不能假装修好了）。
+
 ## 12. Alignment【✅ 提示级】
 
 对齐体检三条（提示级）：**左缘吸附**（锚点在列起点上）、**右缘在栅格缘**

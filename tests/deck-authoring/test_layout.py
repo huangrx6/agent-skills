@@ -9,6 +9,7 @@ figure 内部（visual×caption）、跨页 —— 这四类是视觉整体，�
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import sys
 import unittest
@@ -199,3 +200,127 @@ class TestEdgeGates(unittest.TestCase):
             {"id": "s1.subtitle", "role": "subtitle", "slide": 1,
              "x": 84, "y": 300, "w": 1400, "h": 33},
         ])), [])
+
+
+class TestRepairLadder(unittest.TestCase):
+    """修复梯（layout/repair.py）：信号 → 计划 → 应用。
+
+    一半在测「会修」：未声明的档位降一档、补丁可复现（写回 spec 字段）。
+    另一半在测「不许修」：作者声明过的字段只出诊断；已到最小档就停 ——
+    再装不下是内容问题，缩字号不是答案。
+    """
+
+    @staticmethod
+    def _layout_pkg():
+        return _load_layout()
+
+    def _signals(self, bottoms, tops=None):
+        """bottoms: {slide: 最后一行内容底（页内坐标）}。"""
+        tops = tops or {s: s * 936 for s in bottoms}
+        elements, slides = [], []
+        for s in sorted(set(list(bottoms) + list(tops))):
+            slides.append({"x": 0, "y": tops[s], "w": 1600, "h": 900})
+        for s, b in bottoms.items():
+            elements.append({"id": f"s{s}.bullet.0", "role": "bullet", "slide": s,
+                             "x": 84, "y": tops[s] + b - 40, "w": 1432, "h": 40})
+        return self._layout_pkg().repair.signals({"slides": slides,
+                                                  "elements": elements})
+
+    def test_v_overflow_detected(self) -> None:
+        issues = self._signals({1: 900})          # 带底 824
+        self.assertTrue(any(i["kind"] == "v_overflow" and i["slide"] == 1
+                            for i in issues))
+
+    def test_in_band_passes(self) -> None:
+        self.assertEqual(self._signals({1: 820}), [])
+
+    def test_foot_not_judged(self) -> None:
+        pkg = self._layout_pkg()
+        els = [{"id": "s1.foot", "role": "foot", "slide": 1,
+                "x": 84, "y": 936 + 830, "w": 300, "h": 18}]
+        self.assertEqual(pkg.repair.signals(
+            {"slides": [{"x": 0, "y": 936, "w": 1600, "h": 900}],
+             "elements": els}), [])
+
+    def test_plan_patches_undeclared_tier(self) -> None:
+        pkg = self._layout_pkg()
+        spec = {"deck": {"slides": [
+            {"type": "content-text", "title": "t", "bullets": ["a"] * 12}]}}
+        resolved = {"slides": [{"bTier": "bullet"}]}
+        actions, diags = pkg.repair.plan(spec, resolved, self._signals({1: 900}))
+        self.assertEqual(actions, [{"slide": 1, "field": "bulletTier",
+                                    "from": "bullet", "to": "bulletSmall",
+                                    "why": "内容底超出正文带 76px"}])
+        self.assertEqual(diags, [])
+
+    def test_plan_respects_declared_tier(self) -> None:
+        pkg = self._layout_pkg()
+        spec = {"deck": {"slides": [
+            {"type": "content-text", "title": "t", "bulletTier": "bulletLarge",
+             "bullets": ["a"] * 12}]}}
+        resolved = {"slides": [{"bTier": "bulletLarge"}]}
+        actions, diags = pkg.repair.plan(spec, resolved, self._signals({1: 900}))
+        self.assertEqual(actions, [])
+        self.assertEqual(len(diags), 1)
+        self.assertIn("不自动改", diags[0]["why"])
+
+    def test_plan_stops_at_smallest_tier(self) -> None:
+        pkg = self._layout_pkg()
+        spec = {"deck": {"slides": [
+            {"type": "content-text", "title": "t", "bullets": ["a"] * 20}]}}
+        resolved = {"slides": [{"bTier": "bulletSmall"}]}
+        actions, diags = pkg.repair.plan(spec, resolved, self._signals({1: 900}))
+        self.assertEqual(actions, [])
+        self.assertIn("内容问题", diags[0]["why"])
+
+    def test_apply_writes_back(self) -> None:
+        pkg = self._layout_pkg()
+        spec = {"deck": {"slides": [
+            {"type": "content-text", "title": "t", "bullets": ["a"]}]}}
+        pkg.repair.apply(spec, [{"slide": 1, "field": "bulletTier",
+                                 "from": "bullet", "to": "bulletSmall"}])
+        self.assertEqual(spec["deck"]["slides"][0]["bulletTier"], "bulletSmall")
+
+
+class TestRepairCLI(unittest.TestCase):
+    """`render --repair` 的端到端契约（真渲真量，钉住 CLI 行为）。"""
+
+    def test_repair_patches_undeclared_and_respects_declared(self) -> None:
+        import subprocess
+        import tempfile
+        scripts = os.path.join(SKILL, "scripts")
+        env = dict(os.environ)
+        with tempfile.TemporaryDirectory() as tmp:
+            spec = {"deck": {
+                "style": "swiss-grid", "colorSet": "blue", "seed": 3,
+                "title": "修复梯",
+                "slides": [
+                    {"type": "content-text", "title": "未声明档位",
+                     "bullets": [f"第 {i} 条内容，长度足够参与换行与占位" for i in range(1, 12)]},
+                    {"type": "content-text", "title": "声明过档位",
+                     "bulletTier": "bulletLarge",
+                     "bullets": [f"第 {i} 条内容，长度足够参与换行与占位" for i in range(1, 12)]},
+                ]}}
+            spec_path = os.path.join(tmp, "deck.spec.json")
+            with open(spec_path, "w", encoding="utf-8") as fh:
+                json.dump(spec, fh, ensure_ascii=False)
+            out = os.path.join(tmp, "out.html")
+            proc = subprocess.run(
+                ["python3", os.path.join(scripts, "render.py"),
+                 spec_path, "-o", out, "--repair"],
+                capture_output=True, text=True, timeout=300, env=env)
+            # 声明页修不了 → 退出码 1（这是契约：不能假装修好了）
+            self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+            report = json.load(open(out + ".repair.json", encoding="utf-8"))
+            fields = {(p["slide"], p["field"], p["to"]) for p in report["patches"]}
+            self.assertIn((1, "bulletTier", "bulletSmall"), fields)
+            self.assertNotIn((2, "bulletTier", "bulletSmall"), fields,
+                             "作者声明过的页不许被改")
+            self.assertTrue(any(d["slide"] == 2 for d in report["diagnostics"]))
+            repaired = json.load(
+                open(out.replace(".html", ".repaired.spec.json"), encoding="utf-8"))
+            self.assertEqual(repaired["deck"]["slides"][0]["bulletTier"],
+                             "bulletSmall")
+            # 声明页保持原样：repaired spec 里仍是作者声明的 bulletLarge
+            self.assertEqual(repaired["deck"]["slides"][1]["bulletTier"],
+                             "bulletLarge")
