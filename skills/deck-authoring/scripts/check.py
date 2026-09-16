@@ -76,9 +76,16 @@ SLIDE_W, SLIDE_H = 1600.0, 900.0
 # 一点都不像没做完（左轨 + 实线 + 巨号页码都在）。当初用户抱怨 swiss 第一版
 # “下半页 55% 是死的”，真正原因不是内容少，而是**没有构图锚点**；修法也是加锚点，
 # 不是加内容。所以：留白是不是问题，取决于风格有没有锚点，**像素密度算不出来**。
-# 密度这个量该在 fit.py 里看（那里是选版式的场景，旁边还带着“可以合页”的建议），
-# 不该在每次校验时拿一个不懂风格的阈值去喷人。
+# 密度这个量不该在每次校验时拿一个不懂风格的阈值去喷人。
+#
+# 但仍然要分两层开口（都是提示，不阻塞）：
+#   < DEAD_SPACE_NOTE —— 一页几乎什么都没排（通常是漏了条目）
+#   < SPARSE_NOTE     —— 下半页空着。这一条是**字号调正之后才看得见**的问题：
+#     大字（海报尺度）会把正文带填满，所以“字太大”一直同时意味着“内容不够”；
+#     字降下来后，同一页只剩 33~46% 就会现形。实测：把夹具字号从 96/46 降到
+#     48/24，第 2~5 页占带量落到 33~46%，下半页整块是死的。
 DEAD_SPACE_NOTE = 0.28
+SPARSE_NOTE = 0.5
 
 # **一张图覆盖整页** —— 禁止。
 #
@@ -601,6 +608,7 @@ def _check_deck_shape(measured: dict, deck: dict,
                 f"想加图的话这一页最容易加")
 
     # 逐页密度：只对“承载内容”的版式判 —— 封面/收尾页本来就该稀疏。
+    sparse: list[tuple[int, float]] = []
     for i, slide in enumerate(slides, 1):
         if slide.get("type") in ("title", "end"):
             continue
@@ -614,8 +622,18 @@ def _check_deck_shape(measured: dict, deck: dict,
             notes.append(
                 f"第 {i} 页几乎没有内容（只占正文带 {used:.0%}）—— 内容底 "
                 f"{bottom:.0f}px / 正文带底 {render_mod.CONTENT_BOTTOM:.0f}px。"
-                f"一页只有标题没条目通常是漏了；确实要留白就删掉这页"
-                f"（想看疏密去跑 fit.py）")
+                f"一页只有标题没条目通常是漏了；确实要留白就删掉这页")
+        elif used < SPARSE_NOTE:
+            sparse.append((i, used))
+    # 汇总成一条：一页一条会变成唠叨，唠叨会让人整体忽略提示
+    if sparse:
+        where = "、".join(f"第{i}页 {u:.0%}" for i, u in sparse[:5])
+        more = "" if len(sparse) <= 5 else f" 等 {len(sparse)} 页"
+        notes.append(
+            f"下半页空着：{where}{more}（占正文带不到 {SPARSE_NOTE:.0%}）—— "
+            f"这是把字号降下来之后才看得见的问题：大字在填满正文带，所以“字太大”"
+            f"常常同时意味着“内容不够”。补内容 / 换更饱满的版式（双栏、图、大数字）"
+            f"／确实要留白就接受，但别让它成为默认")
     return problems, notes
 
 
