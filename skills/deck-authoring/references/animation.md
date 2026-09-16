@@ -52,9 +52,8 @@ transform / connect / conclude / transition（如
   零依赖确定性管线不接 Aurora/Liquid Chrome/Particle Text 这类 WebGL/Shader 效果；
   要它们就换工具链，别在纯函数管线里塞】
 + **Semantic Motion**（数字 Count Up、柱图 Grow、折线 Path Draw、流程渐进）：
-  【✅ 段式线 growX、标题/正文/图的揭示已进 paint；**图表的数据动画
-  （柱生长 / 折线描画 / 点弹出）随 v4 的手写 SVG 渲染器一并关死** ——
-  图表页只有容器入场，见 §19/§31】
+  【✅ 段式线 growX、标题/正文/图的揭示已进 paint；**图表没有数据动画
+  （G2 `animation:false`）—— 图表页只有容器入场**，见 §19/§31】
 + **Ambient Motion**（低幅低速氛围）：【约定——背景纹理静态；grain 在帧模式/
   reduced-motion 下隐藏。"观众不该感觉背景在表演"由"背景根本不动"满足】
 + **Transition**（跨页）：【约定——当前是页内入场 + 切页；Shared Element/FLIP
@@ -72,7 +71,7 @@ export/limits/incompatible_with…）。本仓库的效果面很小且全部自�
 Typography Reveal / Ambient Background / Shader Material / Grid Digital / Particle /
 Reveal / Spatial Layout / Card Effects / Border Effects / Diagram Motion / Data Motion /
 Interactive Motion —— 本仓库只实现 Reveal（mask / wipe）与段式线 growX 等少数语义
-效果；**图表侧的 Data Motion（grow / draw）v4 已关死**（G2 `animation:false`）；
+效果；**图表侧没有 Data Motion（grow / draw）**（G2 `animation:false`）；
 交互类（Magnet / Cursor）只可能出现在 HTML，视频导出必禁。
 
 ## 7. Page Type 与 Motion Budget【✅ 换算落地】
@@ -85,7 +84,7 @@ Interactive Motion —— 本仓库只实现 Reveal（mask / wipe）与段式线
 ## 8. Page Type 推荐效果【✅ 等价落地】
 
 Cover/Statement → 标题 maskRevealY + 正文 fadeRise；Chart → **只有容器先行**
-（v4 图表动画关死，柱生长 / 折线描画已无）（**禁**大面积 glitch/粒子——本管线
+（图表只有容器入场，无柱生长/折线描画）（**禁**大面积 glitch/粒子——本管线
 没有这些，等于结构性满足）；
 Cards → Cluster/近同时揭示（stagger 50-130ms，禁 card1→4 大间隔依次飞入
 —— stagger 由风格 token 统一，不会写出大间隔）。
@@ -98,9 +97,8 @@ personality→easing 曲线，tempo→enter/stagger，continuity→titleHold。
 
 ## 10. Motion 参数怎么定：性格 → 参数（推导，不是查表）
 
-> 这里曾有一张「八套风格的 Motion 参数表」当自建参考值 —— 实测它变成了菜单
-> （确认门 ② 的三个方向翻来覆去总是那几个历史名字）。**任何参数对照表都会被当成
-> 选项清单**，删表留推导。下面的区间就是那张表各行的实际取值范围，知识没丢。
+**铁律：不提供参数对照表**（会被当成选项清单）。参数按场合 → 性格 → 区间推导；
+区间即各性格的实际取值范围。
 
 动效性格由**场合**决定（观众多远、要不要留反应时间、内容是读的还是扫的），
 参数由性格夹出来：
@@ -122,9 +120,8 @@ personality→easing 曲线，tempo→enter/stagger，continuity→titleHold。
 
 duration xs180/sm300/md520/lg800/xl1200、distance 4/6/12/24、stagger 35/70/120、
 ease enter=expoOut…**禁止每个元素随机写毫秒和位移**。落地：所有毫秒/位移来自
-`style.json` 的 `motion` 块（一套风格一份）；**图表侧原先的
-`chart.py::MOTION_TOKENS`（duration 300/600/1000、stagger 40/80/120）已随脚本
-退役** —— v4 图表动画关死，代码里没有第二个写毫秒的地方。本页位移：标题 26px、正文 16px、图表容器 10px、页码 0。
+`style.json` 的 `motion` 块（一套风格一份）；图表侧没有第二处写毫秒的地方
+（G2 `animation:false`）。本页位移：标题 26px、正文 16px、图表容器 10px、页码 0。
 
 ## 12. Motion Budget 规则【✅ 结构性满足】
 
@@ -136,8 +133,7 @@ token，天然在预算内；"降级"表现为换更小的 preset（§40）。
 
 0-0.25 Corporate / 0.25-0.5 Polished / 0.5-0.75 Creative / 0.75-1 Experimental；
 effective = creativity × page_type_factor（Cover×1.0 … Table×0.3）。本仓库把
-"创造力预算"固化为**风格人格差异**（每套自建一份参数；内置时期仅有一套风格
-一套允许——一套风格只用一个性格。
+"创造力预算"固化为**风格人格差异**（每套自建一份参数；一套风格只用一个性格）。
 
 ## 14. Motion Novelty【约定】
 
@@ -164,7 +160,7 @@ max_primary_motion_types = 2。本页两族：**遮罩/淡入族**（title mask�
 
 + **结构生长族**（rule growX、image wipe 同属"揭示"一族的
 方向变体——这里的"方向"指效果方向，与 spec 的 `layout` 布局无关；
-原 chart grow/draw 已随图表动画关死）——同页不会
+图表 grow/draw 不存在，G2 静态渲染）——同页不会
 出现 Fade+Slide+Scale+Rotate+Blur+Bounce+Glow+Glitch
 同台（后四样本管线不存在，前几样按元素类型各归其位）。
 
@@ -186,8 +182,8 @@ max_primary_motion_types = 2。本页两族：**遮罩/淡入族**（title mask�
 | 正文/副题 | fadeRise | 0→1 + 16px（**不是** 0.4→1：第 0 帧必须是干净空态，ghost 起点会破坏抽帧 QA） |
 | 页码/壳 | chrome | 只淡入不位移，跟标题走 |
 
-**图表内部的数据动画（`.bar` growY/growX、`.line` pathDraw、`.dot` pop）已随 v4 退役**：
-v4 起图表由 AntV G2 渲染（`animation:false`，见 `charts.md`），产物里没有
+**图表内部没有数据动画（`.bar` / `.line` / `.dot`）**：
+图表由 AntV G2 渲染（`animation:false`，见 `charts.md`），产物里没有
 `.bar` / `.line` / `.dot` 这些元素 —— `paint()` 里对应几行的选择器匹配不到任何
 东西，不产生效果。图表页只剩上面那一行**容器级**入场。
 
@@ -246,16 +242,15 @@ seed 已显式进 spec（错位/颗粒按 (seed,元素) 派生）。
 ## 29. Motion Graph【✅ 简化】
 
 after/before/with/sync/overlap —— 落地为编排表的 delay 数学：body 在 title
-之后（enter×0.55 + titleHold），页码与标题同拍。（原「图表数据在容器之后
-（+6%）」随 v4 图表动画关死而失效。）复杂依赖图未做（没有需要它的页面结构）。
+之后（enter×0.55 + titleHold），页码与标题同拍。复杂依赖图未做（没有需要它的页面结构）。
 
 ## 30. 基础 Preset Library【✅ 子集】
 
-规范第一版 15 个：fadeSoft fadeRise maskRevealX maskRevealY imageReveal
+规范列了 15 个：fadeSoft fadeRise maskRevealX maskRevealY imageReveal
 scaleFocus growX growY pathDraw countUp highlight crossFade sharedMove
 blurToClear accentSweep。**已实现规范 preset 4 个**：fadeRise、maskRevealY、
-imageReveal、growX；编外 **pop** 曾用于散点。**growY（柱）与 pathDraw
-（折线）已随 v4 图表动画关死而退役**；countUp/highlight/sharedMove 等记在路线图。高级 Shader 效果不进 preset（见 §5）。
+imageReveal、growX；编外 pop（散点）。**growY（柱）与 pathDraw（折线）不适用**（图表由 G2 静态渲染）；
+countUp/highlight/sharedMove 等记在路线图。高级 Shader 效果不进 preset（见 §5）。
 
 ## 31. Page Choreography【✅】
 

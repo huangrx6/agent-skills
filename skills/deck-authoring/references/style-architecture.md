@@ -13,7 +13,7 @@
 3. skill 自己的 `styles/` —— 用户**显式托管**的全局风格；**工具链永不写入**
    （写它 = 变相内置，用户明令禁止过）。
 
-**没有内置风格、没有默认风格**（`DEFAULT_STYLE` 已删）：`deck.style` 必填，缺了就
+**没有内置风格、没有默认风格**：`deck.style` 必填，缺了就
 `MISSING_STYLE` 并给指路报错。历史上还有过一根「可拷的参考实现」
 （`dev-tools/style-fixture/`）—— **v5 一并删了**：可拷贝的模板必然变成默认答案
 （用户实测：每份 deck 长得一样）。测试用的两份风格在测试夹具里（**不在本 skill 目录内**、
@@ -25,9 +25,8 @@
 
 ```jsonc
 {
-  // ── 必填顶层键 11 个（**形状契约**；`style.py --check` v4 已删，没有"当场指名报"了 ——
-  //    缺键会在渲染 / 校验时暴露：如 fonts.display|body 缺键渲染器 KeyError、
-  //    type 缺档 deck 编译 SystemExit）──
+  // ── 必填顶层键 11 个（**形状契约**；缺键在渲染 / 校验时当场暴露：
+  //    fonts.display|body 缺键渲染器 KeyError、type 缺档 deck 编译 SystemExit）──
   "version": 1,                          // schema 版本号；改了字段就 +1
   "label":       "风格显示名",               // `image_source.py --brief` 用；**从这份 deck 的内容长出来，
                                       // 不复用见过的风格名**（名字是锚：叫什么就会长成什么）
@@ -162,10 +161,8 @@
 
 ### 方向怎么来：从这份 deck 推，不从风格史挑
 
-> 历史教训：这里曾有一张「八套风格对照表」（名字 / 温度 / 构图锚点 / 适合场合），
-> 当作"自建参考"保留 —— 实测它变成了**菜单**：换什么题目，三个方向翻来覆去总是
-> 那两三个名字（瑞士栅格 / Riso 孔版…），每份 deck 长得一样。**任何样式清单都会被
-> 当成选项清单**，所以表删了，换成生成程序。
+**铁律：不设风格清单。** 任何样式清单（对照表 / 参数表 / 目录）都会被读者当成
+选项清单 —— 方向只能按下面的程序从内容生成。
 
 选风格看的是**画面**：每渲一页出来看（`render.py` + `shots.py`），不是对着文字想象。
 
@@ -224,9 +221,8 @@ styles/<name>/
   skin.css     视觉层：颜色、字体、纹理、装饰观感
 ```
 
-**加一种风格 = 写一个目录（style.json + skin.css），不碰任何 .py。** 历史上有过八套
-内置风格，就是这样加的（已全部移除；也不留任何可拷的参考实现 —— 模板必然变成默认
-答案），除了给 token 添了一个可选字段
+**加一种风格 = 写一个目录（style.json + skin.css），不碰任何 .py，不留可拷的参考实现
+（模板必然变成默认答案）。** 这条 seam 需要 token 添过一个可选字段
 （`colorSets.*.text`，见下）以外，渲染/校验/导出的代码一行未改。
 
 **为什么要做成目录而不是 CSS 分支**：分支意味着每加一种风格就多一个 if，
@@ -249,7 +245,7 @@ styles/<name>/
 
 字号不走变量硬写：token 的 `type` 级数整份注入为 `--t-*`，每种版式再用 `--s-title` /
 `--s-bullet` … 指向其中一档。**字号只有这一处来源** —— Python 侧写进语义清单的
-也是同一份（早先 Python 一张表、CSS 另一张表，实测写岔过：清单说 86、CSS 是 180）。
+也是同一份（字号两张表必然写岔）。
 
 #### token 里的两个可选字段
 
@@ -272,7 +268,7 @@ styles/<name>/
   render.py:279-280、285-286）。连带 `decor.types`（哪些版式放）与 `decor.zones`（放哪个角）
   都是**风格自报的**，不是写死在渲染器里的。
 
-#### token 里的三个可选**作者数据**键（v3）
+#### token 里的三个可选**作者数据**键
 
 这三个键**脚本不推断**，是风格自报的数据（缺省 = 走内置缺省）：
 
@@ -315,24 +311,20 @@ effect）：
 mkdir -p <deck项目>/styles/<名> && $EDITOR <deck项目>/styles/<名>/style.json
 ```
 
-（原 `style.py --new` 的脚手架生成器已随脚本 v4 退役 —— 它做的事就是"拷一份夹具"。
-**v5 起连夹具也删了**（两套参考实现连同内容样例一起移出 skill —— 它们现在只作为
-测试夹具存在，**不在本 skill 目录内**，读不到也不必读）：用户实测的病根正是它们 ——
-能拷就会拷，拷出来每份 deck 长得一样。
-所以在 **deck 项目的 `styles/`** 里现写：skill 自己的 `styles/` 是用户显式托管的
-全局风格，工具链与手工都不该往里写 = 变相内置（用户明令禁止过）。）
+（在 **deck 项目的 `styles/`** 里现写；skill 自己的 `styles/` 只放用户显式托管的
+全局风格，工具链与手工都不往里写 —— 写它 = 变相内置。）
 
 ## spec 字段集（deck-spec.json）
 
 ```jsonc
 {
   "deck": {
-    "style":    "my-style",          // **必填**（v5：`MISSING_STYLE`）——没有默认风格，
+    "style":    "my-style",          // **必填**（缺 = `MISSING_STYLE`）——没有默认风格，
                                       // 也不内置任何风格。风格名（两根顺序查找：
                                       // <cwd>/styles → skill 的 styles/，另有 DECK_STYLES
                                       // 环境变量可注入额外根）或**显式目录路径**（临时
                                       // 草稿直接渲：--style /tmp/dir-a）
-    "colorSet": "blue",               // **必填具名**（v3：auto/mood 派生已退役）——
+    "colorSet": "blue",               // **必填具名**（auto/mood 一律判失败）——
                                       // 写名 = 该风格 token.colorSets 的键；缺失或写
                                       // "auto" → validate_spec 判 MISSING_COLOR_SET，
                                       // render.resolve_color_set 再拦一道 SystemExit
@@ -398,7 +390,7 @@ v3 退役的两个字段现在都是未知键，写它们会被判 `UNKNOWN_FIEL
 
 图文页的 `image` 有两种写法：
 
-- **相对路径**（旧语义，全兼容）：spec 同目录没有 `assets/manifest.json` 时照旧用；
+- **相对路径**（相对 spec 所在目录）：没有 `assets/manifest.json` 时用这种；
 - **assetId**（语义引用）：放了 manifest 时，`image` 写清单里的 id。清单是**封闭
   schema v1**：`{"schemaVersion": 1, "assets": {id: {file, source, note}}}`
   （render.py:977-978），`file` 相对 `assets/` 目录。

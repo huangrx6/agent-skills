@@ -869,6 +869,10 @@ def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None) -> dic
     primary = colors.get("primary", "#0033CC")
     muted_c = chart_muted(primary, colors.get("background", "#FFFFFF"))
     text = colors.get("text", "#0A0A0A")
+    # 坐标轴配色：G2 主题的轴标签/轴名是**theme 自带的深色**，不跟 paper 走。
+    # 实测后果：深底反白风格里轴标签与轴名直接看不见（柱在、刻度没了）。
+    # 轴是图的一部分，颜色同样从 token 取 —— 这里只覆盖已实测生效的两项。
+    axis_ink = {"labelFill": text, "titleFill": text}
 
     def enc_color(d):
         return primary if (not emphasis or str(d.get("label")) in emphasis) else muted_c
@@ -876,8 +880,12 @@ def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None) -> dic
     kind = chart_declared_type(slide)
     spec: dict = {
         "animation": False,                      # 确定性：动画关死（§41/42）
-        "autoFit": False,
+        # autoFit **不写在这里**：它是 chart 实例选项，写在 spec 里会覆盖构造函数的
+        # autoFit:true（见文末实例化代码与 :952 的注释「autoFit 跟容器走」）——
+        # 实测后果：canvas 退到 G2 默认 640×480，撑出 .g2 的 330px 容器、
+        # 压住图注，而且只占满左侧不到一半宽度。
         "padding": "auto",
+        "axis": {"x": dict(axis_ink), "y": dict(axis_ink)},
     }
     if kind in ("bar", "bar-horizontal"):
         rows = sorted(data, key=lambda d: -d.get("value", 0)) \

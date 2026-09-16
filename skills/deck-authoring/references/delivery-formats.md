@@ -1,8 +1,7 @@
 # 交付格式的取舍
 
 一条流水线，五种交付物：`out.html` / `deck.pdf` / `pages/*.png` / `deck.pptx` /
-`deck-editable.pptx`。这条决策线是 #77 拍下来的，写在这里给后人读
-（PDF 与可编辑 PPTX 是后来补的，那两节的账已重算）。
+`deck-editable.pptx`（决策线见 #77）。
 
 ## HTML
 
@@ -69,8 +68,7 @@
 ### 贴图版 `pptx_native.py --png-dir`
 
 **是什么**：`python3 scripts/pptx_native.py --png-dir pages/ -o deck.pptx` ——
-16:9 pptx，每页**一张满版贴图**。（原 `make_pptx.py` v4 并入 `pptx_native.py` 的
-`--png-dir` 模式，独立脚本已退役。）
+16:9 pptx，每页**一张满版贴图**。
 
 **什么时候用**：带去现场演示（PPT 切页不会被打断、不用担心字号自适应）；
 给非技术受众 / 客户演示（"PPT"是他们的默认预期）。
@@ -113,10 +111,9 @@
 单件都有测试，**但"串起来"是另一回事** —— 这条最贵的三次教训都来自同一个动作：
 **把产物打开看**，而不是只看命令返回 0。
 
-**交付演练：手工跑**（推荐 —— 逐条跑、每步的退出码就是闸门。原 `deliver.py` 的
-"一条命令"编排 v4 已整文件退役，它把"打开看"做成一张对比图的便利也一并退役）：
+**交付演练：手工跑**（推荐 —— 逐条跑、每步的退出码就是闸门）：
 
-原 `deliver.py` 做的事（留作验收口径）：跑完整条链 → 对指定几页把
+演练的验收口径：跑完整条链 → 对指定几页把
 **HTML / 打印 PDF / 原生 PPTX** 三个版本各渲一张图拼成对比表 → 把每个版本与
 HTML **逐像素比**并报差异百分比 → 汇总每件产物的事实。校验不过就**中止**（把一份
 已知有问题的 deck 做成五种格式，只是把问题复制五份）。实测 6 页 / 2 页比对约
@@ -147,10 +144,8 @@ python3 $S/pptx_native.py  out.html -o deck-editable.pptx      # 7 原生版
 python3 $S/animate.py      out.html -o deck.mp4                # 8 视频
 ```
 
-> 原第 2 步 `plate.py in.jpg -o sample-treated.png`（出图后的制版后处理）v4 已
-> 退役：图片按原样使用，出图的色彩与构图约束改由 `image_source.py --brief` 的
-> 提示词与构图字段承担（见 `images.md`）；`deliver.py --allow-placeholder` 的
-> 空跑演练也随该脚本退役。
+> 没有制版后处理这一步：图片按原样使用，出图的色彩与构图约束由
+> `image_source.py --brief` 的提示词与构图字段承担（见 `images.md`）。
 
 ### 实测代价（21 页真实 deck，本机）
 

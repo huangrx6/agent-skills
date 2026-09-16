@@ -2,7 +2,7 @@
 
 这一层回答四个问题，**每层只回答一个**。说什么/为什么这样说的**规则**（Brief、
 Core Thesis、一页一 Takeaway、数字优先……）见 `content-intelligence.md`（内容智能 / 内容规划系统）；本篇是模块文档：
-schema、骨架表、检查与自查（**`plan.py` v4 已删**，规划层不再有校验 CLI）。
+schema、骨架表、检查与自查（规划层没有校验 CLI，自查）。
 
 ```text
 ① content.json   「我们知道什么」        事实 / 观点 / 数字 / 关系
@@ -26,9 +26,9 @@ schema、骨架表、检查与自查（**`plan.py` v4 已删**，规划层不再
 最容易踩的坑是让四层都自由生成自然语言 —— 那样产出的东西渲染器吃不下，
 校验也无处下手。
 
-> v4 说明：规划三层（内容理解 / Storyline / Page Planner）原先由 `plan.py` 做的那几项
-> 确定性校验已随脚本删除 —— 表中这几格的"程序确定性"现在退化为**自查**；
-> 只有 Slide DSL 的封闭字段集（`validate_spec.py`）与 Layout / 渲染仍是程序保证。
+> 规划三层（内容理解 / Storyline / Page Planner）没有程序校验 —— 这几格的
+> "程序确定性"是**自查**；Slide DSL 的封闭字段集（`validate_spec.py`）与
+> Layout / 渲染才是程序保证。
 
 ## 为什么从后往前建（已经走完了）
 
@@ -146,7 +146,7 @@ Agent，产出的东西渲染器吃不下，就全白写。
 | hero_visual / context_image | content-image | 图 |
 | evidence | content-text | 无（读的页，密一点可以） |
 
-**复杂度评分与拆页**（确定性公式；原来 `plan.py` 据此落门，**脚本 v4 已删，现在靠自查**）：
+**复杂度评分与拆页**（确定性公式，自查）：
 
 ```text
 复杂度 = 字符数/120 + 节点数×0.12 + 图表×0.25 + 图×0.15 + (层级-1)×0.10
@@ -159,9 +159,8 @@ Agent，产出的东西渲染器吃不下，就全白写。
 
 ## ③→④ 桥：从 pageplan 写 deck-spec
 
-原先这一步是 `plan.py --to-spec` 的**确定性映射**（把 pageplan 的 `metric_ref`
-解析成图表数据、`process` 带成 timeline 节点……）；**`plan.py` v4 已删，映射改由
-AI 自己写**。原来的几条硬约束仍然成立，但**不再有脚本替你把关**，得自己守：
+这一步是 **AI 自己写映射**（把 pageplan 的 `metric_ref` 解析成图表数据、
+`process` 带成 timeline 节点……）。几条硬约束得自己守：
 
 - 图表页必须有数据（`data`，或 `series`）—— 空数据的图表页是空的；
 - 图页必须有 `image`（这条 `validate_spec.py` 仍拦：`REQUIRED_SLIDE_FIELDS`）；
@@ -176,10 +175,10 @@ python3 scripts/check.py deck.spec.json out.html    # 产物实测门
 
 ## 还没做的（写清楚，别假装做了）
 
-1. **从原始文档抽取 content.json**（Word/PDF/网页 → 事实库）—— 现在这一步是
-   AI 照着 Schema 写（**`plan.py` v4 已删，连校验脚本都没有了**）。抽取管线
+1. **从原始文档抽取 content.json**（Word/PDF/网页 → 事实库）—— AI 照着
+   Schema 写（没有校验脚本）。抽取管线
    （格式解析、去重、指代消解）是单独的一块工程。
-2. **页型候选打分**（规范里的 candidates + score）—— 现在是 AI 直接定页型，
+2. **页型候选打分**（规范里的 candidates + score）—— AI 直接定页型，
    打分排序那层没做。
 3. **architecture 页型**（分层架构图）—— 页型表里**故意没有**它：渲染器没有
    架构图版式，映射过去就是死路。等图形版式落地再加。

@@ -79,8 +79,7 @@ DECK_FONT_DIR=/tmp/f python3 scripts/fonts.py --fetch   # 指定任意位置
 敏感得多 —— 没有 license 的时候，含糊等于不能用。
 
 所以 `--tier A` 与 `--list --license A` 用的是**严格相等**（`license == "A"`），
-不是 `startswith`。原先写成 `startswith` 的后果是 `A/B` 一路放过去，而那 4 款里有
-`阿里巴巴普惠体 3.0`、`猫啃珠圆体`、`庞门正道粗书体` 这种很容易被顺手用上的字。
+不是 `startswith`（`A/B` 必须挡住 —— 它意味着某个来源有署名 / 禁嵌入限制）。
 
 ```bash
 python3 scripts/fonts.py --fetch                 # 默认就是严格 A（要 B/C 得 --tier all）
@@ -113,8 +112,8 @@ body / numeral 三档都给齐，所以"只用免费的"不会变成"有几套�
 
 完整映射表在 `fonts/mapping.json`（`--map` 可打成人类可读的样式），分两层：
 
-- **styles**：**字感性格** × display / body / numeral 三档该配哪款字（v5 起不按风格名查 ——
-  风格名每份 deck 都不同，按名查的表实测变成菜单）。六个性格：bold-sans（响）/
+- **styles**：**字感性格** × display / body / numeral 三档该配哪款字（不按风格名查 ——
+  风格名每份 deck 都不同，按名查的表会变成菜单）。六个性格：bold-sans（响）/
   editorial-serif（文）/ poster-heavy（海报）/ neutral-grotesk（中性）/
   humanist-round（软）/ mono-engineering（工）。配字 = 从方向四轴里的「字感」轴
   查这张表（`fonts.py --map`）。

@@ -51,10 +51,9 @@ Hard Constraint > Semantic Requirement > Style Grammar > Creative Preference：
 `assets/product|screenshots|official`、`fonts/` 子目录按需自建）。品牌层可以
 不存在：`deck.brand` 不写就全走 Style + Color + Typography + Asset Rules。
 
-> ⚠️ **仓库里没有任何示例品牌**（v5 起）。曾经带过一个 `example`（ACME）——
-> 它被直接带进了真实交付（有人拿 demo 当模板，忘了删 `deck.brand`）。
-> 结论写进纪律：**示例资产必然被当成可用资产**，所以连示例一起删了（和
-> 风格夹具同一个理由）。品牌一律由用户提供：`brands/<name>/` 放 logo 文件 +
+> ⚠️ **仓库里没有任何示例品牌**。纪律：**示例资产必然被当成可用资产**
+> （示例 logo 会被直接带进真实交付），所以不留任何示例。
+> 品牌一律由用户提供：`brands/<name>/` 放 logo 文件 +
 > `brand.json`（封闭字段集见下）；`deck.brand` 不写就整层不生效 —— 这是合法状态。
 >
 > ⚠️ **logo 与品牌素材一律由用户提供**：不要生成、不要"先放个占位的"。
@@ -111,7 +110,7 @@ Neutral → Ink Black → Brand Blue → Silver 这类）。品牌负责识别�
 ## 9. Approved Theme【约定】
 
 客户提供完整官方主题（light/dark 的 background/textPrimary）时优先于 Style
-自带配色（`colorSets`；spec 只选色板名，v3 无 auto 派生），但只锁颜色应用，
+自带配色（`colorSets`；spec 只选色板名，无 auto 派生），但只锁颜色应用，
 不锁构图/字号跨度/图形/图片/动画语言。未实现；近似做法：把官方色写成一套
 `colorSets` 并入同名覆盖。
 
@@ -335,9 +334,9 @@ Renderer → Draw。**Renderer 只接受已解析的 asset 路径，禁止临时
 ## 45. 导出规则【✅】
 
 HTML/PDF：logo base64 内嵌（产物自包含，挪动不断链），SVG 最好。PPTX：
-python-pptx 不吃 SVG → **按实测盒子尺寸 ×2 栅格化**（Chrome 现场做；第一版
-拿标量当窗宽出过正方形截断的坑——既丢宽高比又被右边截掉，都不报错只是丑，
-现在传实测 w×h 再 ×2 截图）。栅格化保持宽高比、按实际盒子、≥2×，**不得
+python-pptx 不吃 SVG → **按实测盒子尺寸 ×2 栅格化**（Chrome 现场做；
+传实测 w×h 截图 —— 标量窗宽会截成方形、丢宽高比且不报错）。栅格化保持
+宽高比、按实际盒子、≥2×，**不得
 固定方形窗口**。栅格化不了明说跳过，不静默少一个 logo。
 
 ## 46. 品牌与图片的最终冲突判定【✅】

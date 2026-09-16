@@ -10,10 +10,9 @@ render.py：图形类型（作者声明）+ 规则 → AntV G2 spec   ← Web / 
 pptx_native.py：按类型映射成原生图表       ← 可编辑的 PPT 层
 ```
 
-**v4：Web 层改用 AntV G2 渲染**（`render.py::chart_g2_spec`，render.py:837）—— 原先是
-711 行的**手写 SVG 渲染器**（`chart.py`），用户实测的评语是"可丑的原生感"：手写几何
-只有极简骨架，成熟图形语法（编码 / 坐标轴 / 标注 / 堆叠）都得自己重做。G2 是声明式
-图形语法，**我们只出 spec（数据 → 编码），几何由 G2 算**。
+**Web 层用 AntV G2 渲染**（`render.py::chart_g2_spec`，render.py:837）：
+G2 是声明式图形语法，**我们只出 spec（数据 → 编码），几何由 G2 算**。
+（PPTX 层走 SVG 精修，见 delivery-formats.md。）
 
 换取成熟度付出的确定性代价，用三条守住：
 
@@ -32,14 +31,14 @@ DSL 的边界仍设计成**渲染器可替换**：`chart_g2_spec()` 的输入是
 ```json
 {
   "type": "chart",
-  "chart": "bar",                      // 八类之一；**必写**（v3：图形由作者显式声明）
+  "chart": "bar",                      // 八类之一；**必写**（图形由作者显式声明）
   "intent": "comparison",              // 想表达什么（可选语义标注，不再决定图形）
   "message": "DeepSeek 调用量领先第二名 40%",   // ← 结论，会当大标题
   "title": "模型调用量统计",              // ← 数据集名，降为小标签
   "data":  [{"label": "DeepSeek", "value": 86}, ...],
   "series": [{"name": "直连", "data": [...]}, ...],   // 多系列（line/stacked/combo）
   "emphasis": {"values": ["DeepSeek"]},               // 谁是重点
-  "annotations": [{"type": "reference", "value": 80, "text": "目标 80%"}],  // 字段仍在 schema，但 v4 不渲染（见下「标注」）
+  "annotations": [{"type": "reference", "value": 80, "text": "目标 80%"}],  // 字段在 schema 里但不渲染（见下「标注」）
   "unit": "%"
 }
 ```
@@ -55,7 +54,7 @@ python3 scripts/check.py your.spec.json out.html       # 图表门：G2 就绪 +
 
 ## 图形类型（规范第 3/16 条）：**作者声明**，脚本不推断
 
-v3 起图形类型是**内容决策**：spec 必须写 `chart`，脚本不替你选图形。
+图形类型是**内容决策**：spec 必须写 `chart`，脚本不替你选图形。
 
 ```text
 chart: "bar" | "bar-horizontal" | "line" | "area"
@@ -67,8 +66,7 @@ chart: "bar" | "bar-horizontal" | "line" | "area"
 两道图前门在 `validate_spec.py`：缺类型报 `MISSING_CHART_TYPE`、写错报
 `UNKNOWN_CHART_TYPE`（见 `validation.md`），本该在渲染之前就拦住。
 
-历史备注：这里原有一条 `resolve_type()` / `infer_chart_type()` 的**意图推断**
-（按条数/标签是否像时间/系列数分支，没写就缺省 bar）—— 已按 v3 退役：
+**没有意图推断**（不按条数/标签/系列数猜图形、不缺省 bar）：
 推断等于替作者选图形。`intent`（八值：trend/ranking/comparison/composition/
 correlation/progress/deviation/distribution）现在是**可选语义标注**：写了对渲染
 **没有影响**，`validate_spec.py` 仍校验它属于这八值；不写也不影响图形。
@@ -90,29 +88,24 @@ correlation/progress/deviation/distribution）现在是**可选语义标注**：
      环图整条轴关掉（`axis:false`）；
    - 环图例外地画**右侧颜色图例**（扇区名字必须能对上），其余图形不画图例。
 
-   坐标系的其它杂物（刻度数字 / 网格线）旧版手写 SVG 是彻底不画；G2 路径改由
-   各图的 `axis` 配置决定 —— 当前柱图未显式关轴，这块是待收的遗留（见文末
-   「第二阶段」）。
+   坐标系的其它杂物（刻度数字 / 网格线）由各图的 `axis` 配置决定 ——
+   柱图未显式关轴，是待收的遗留（见文末「第二阶段」）。
 
-## 标注（规范第 12 条）—— 已退役
+## 标注（规范第 12 条）—— 不渲染
 
-好图表与普通图表的差距多半不在图形，在标注 —— 这条规则仍然成立。但**承载它的
-渲染已随 `chart.py` 退役**：第一版那三种标注（`reference` 参考线 / `callout` 引线 /
-`peak` 峰值）是手写 SVG 实现的，G2 路径没有接。spec 的 `annotations` 字段**仍在封闭
-schema 里**（`validate_spec.py` 不拦），但 v4 渲染器**不消费它** —— 写了不报错，
-也不会有标注。
+好图表与普通图表的差距多半不在图形，在标注 —— 规则成立，但**当前渲染器不画
+标注**：`annotations` 字段在封闭 schema 里（`validate_spec.py` 不拦），渲染器
+**不消费它** —— 写了不报错，也不会有标注。
 
 现在图表上有的标注是 G2 自带的：**数值标签**（柱 / 折线末端，见上「好看的三条硬
 规则」第 3 条）与**环图的右侧颜色图例**。要恢复 reference / callout / peak，
 需要把 `annotations` 翻译成 G2 的 mark / annotation —— 记在文末「第二阶段」。
 
-## 图表动画（规范第 6~9 条）—— 已关死（v4）
+## 图表动画（规范第 6~9 条）—— 关死
 
-动画的"高级感"不在效果多，而在**克制且一致**。但 **v4 图表动画整体关死**：
-G2 spec 里 `"animation": false`（保确定性）—— 图表在产物里是**一次画完的静态图**，
-不再逐柱生长 / 逐线描画。原先 `chart.py` 那套 `MOTION_TOKENS`（`chart_enter` /
-`chart_stagger` / `highlight`…）与每类图形的进入语言（bar 的 growInY、line 的 pathIn、
-donut 的 sweep…）**随该脚本一起退役**。
+动画的"高级感"不在效果多，而在**克制且一致**。**图表动画整体关死**：G2 spec 里
+`"animation": false`（保确定性）—— 图表在产物里是**一次画完的静态图**，
+不逐柱生长、不逐线描画；图表页的动效只有容器入场（见 animation.md）。
 
 所以在 MP4/GIF 里，图表页只有**页面级**的进入动效：图表容器跟随页面进场淡入 +
 微升（见 `animation.md` 的角色表），容器里的图本身不动。规范定的预算
@@ -139,8 +132,8 @@ donut 的 sweep…）**随该脚本一起退役**。
 
 - Sankey / Treemap / Heatmap / Radar / Gauge / Waterfall / Funnel
 - 组合图的原生输出（目前 combo 在 PPT 层降级为柱）
-- 把 `annotations`（reference / callout / peak）翻译成 G2 的 mark / annotation ——
-  第一版手写 SVG 有，v4 还没接（见上「标注」）
+- 把 `annotations`（reference / callout / peak）翻译成 G2 的 mark / annotation
+  （见上「标注」）
 - 收起柱图未显式关掉的坐标轴刻度 / 网格线（`chart_g2_spec` 的 bar 分支目前只写
   了 `labels`，`axis` 走 G2 默认）
 - 每根柱子单独的 `data-m`（可以逐根 stagger）

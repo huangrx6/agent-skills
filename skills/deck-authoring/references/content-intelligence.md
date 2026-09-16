@@ -1,4 +1,4 @@
-# AI PPT 内容智能与规划系统（Content Intelligence · v3.0 Final）
+# AI PPT 内容智能与规划系统（Content Intelligence）
 
 > 命名升级：这一层不再叫单纯的"内容设计"——它是一套**内容智能 / 内容规划系统**
 > ：从原始材料到"每页唯一 Takeaway"的完整规划链（理解 → 论证 → 叙事 → 页规划）。
@@ -11,8 +11,8 @@
 
 > 字段口径：本文 JSON 示例是规范推荐形（camelCase）；本仓库 schema 用 snake_case
 > （`source_ref` / `source_type`），fact 的 `inferred` 即规范的 `derived` 语义，
-> claim 的 `type` 用 `original | derived`。执行标记：【拦】= 硬约束（**原由
-> `plan.py --check` 阻塞；该脚本 v4 已删，改为按本文自查**），【提示】= 开口不拦。
+> claim 的 `type` 用 `original | derived`。执行标记：【拦】= 硬约束（按本文自查），
+> 【提示】= 开口不拦。
 > schema 全表见 `planning.md`。
 
 ## 0. 核心原则
@@ -209,11 +209,10 @@ Decorative（只承担氛围）。Page Planner 优先保留 Primary。
 ## 28. 内容复杂度评分【≥0.70 未标 split=拦】
 
 complexity = textAmount + nodeCount + evidenceCount + hierarchyDepth +
-chartSeriesCount + visualRequirementCount。本仓库实现（原 `plan.py` 的 `complexity()`，
-v4 随脚本删除）是一条**确定性公式**：`字符/120 + 节点×0.12 + 图表×0.25 +
+chartSeriesCount + visualRequirementCount。本仓库用一条**确定性公式**自查：`字符/120 + 节点×0.12 + 图表×0.25 +
 图×0.15 + (层级-1)×0.10`，封顶 1.0 —— 没有 `complexityScore` / `risk` /
 `splitSuggested` 这类输出字段，现在也没有脚本替你算：**≥ 0.70 且没标拆页 = 硬约束**
-（自查；这条以前是 `plan.py --check` 的阻塞门）。标了拆页而内容很轻则会把一页拆散。
+（自查）。标了拆页而内容很轻则会把一页拆散。
 
 ## 29. 拆页策略
 
@@ -229,8 +228,8 @@ Page Planner 再映射（comparison → chart / two-column）。
 
 `{"visualRequirement": {"needed": true, "kind": "data|evidence_image|process|hierarchy|comparison|architecture|mood", "intent": "", "reason": "", "priority": "primary|supporting|decorative"}}`
 
-> `kind` 里的 `mood` 指**视觉氛围需求**这一种；曾用来推配色方向的 deck 级
-> `mood` 字段 v3 已退役 —— 配色改由 spec 显式写 `colorSet`（pipeline §11）。
+> `kind` 里的 `mood` 指**视觉氛围需求**这一种；配色不走这条 —— 由 spec 显式写
+> `colorSet`（pipeline §11）。
 
 ## 32. 什么时候必须有视觉
 
@@ -322,8 +321,7 @@ Story Graph 不允许逻辑断层：Problem → Implementation 缺 Solution → 
 
 ## 50. 空洞语言检测【变化词且全句无数字=提示】
 
-提升 / 优化 / 降低 / 提高 / 改善 / 赋能 / 助力 / 领先 / 先进（原 `plan.py` 的
-`VAGUE_CHANGE_WORDS` 九词；脚本已删，照词表自查）——
+提升 / 优化 / 降低 / 提高 / 改善 / 赋能 / 助力 / 领先 / 先进 ——
 单独出现就追问：提升什么？优化多少？为什么？有什么证据？
 
 ## 51. 数字优先
@@ -358,21 +356,19 @@ Story Graph 不允许逻辑断层：Problem → Implementation 缺 Solution → 
  "sources": ["doc01:p8", "doc02:p14"]}
 ```
 
-本仓库对应：pageplan 的页对象（message_ref + 页型 + data/nodes/columns）—— 原先由
-`plan.py --to-spec` 确定性映射成 deck-spec 的 slide；**该脚本 v4 已删，现在这一步
-由 AI 自己写**（写完跑 `validate_spec.py` + `check.py`）。
+本仓库对应：pageplan 的页对象（message_ref + 页型 + data/nodes/columns）——
+**由 AI 自己写成 deck-spec 的 slide**（写完跑 `validate_spec.py` + `check.py`）。
 
 ## 56. Presentation Plan（推荐）
 
-`{"brief", "coreThesis", "storyArchetype", "sections": [{"id", "title", "message", "slides": []}], "slides": []}` —— 本仓库拆成三份 JSON（content / storyline / pageplan），**由 AI 按本文自查**（原先 `plan.py --check` 分别校验；脚本已删）。
+`{"brief", "coreThesis", "storyArchetype", "sections": [{"id", "title", "message", "slides": []}], "slides": []}` —— 本仓库拆成三份 JSON（content / storyline / pageplan），**由 AI 按本文自查**。
 
 ## 57. Content QA（进 Page Planner 前必须完成）
 
 Thesis（存在且与 desiredAction 一致）/ Coverage（must_have 全覆盖）/ Evidence /
 Traceability / Unsupported Claim / Redundancy / Narrative Flow / One Takeaway /
-Audience Fit / Density Risk / Relevance。落地：**内容层没有自动门**（原先
-`plan.py --check` 覆盖其中的可判定项，脚本 v4 已删）—— 这一节靠人/AI 自查；
-产物层的硬门由 `check.py` 兜。
+Audience Fit / Density Risk / Relevance。落地：**内容层没有自动门** ——
+这一节靠人/AI 自查；产物层的硬门由 `check.py` 兜。
 
 ## 58. Content QA Score
 
@@ -398,8 +394,8 @@ Audience Fit / Density Risk / Relevance。落地：**内容层没有自动门**�
 ## 62. 与实测层的接口
 
 "装不装得下"由 `measure.py` 实测：Content Planner → Content Budget → Page Planner →
-Layout Resolver → **实测** → Repair。Content Engine 判断"值不值得说"。（原先这层是
-`fit.py` 的容量试排，v4 已删；现在**装不下**由 `check.py` 的越界 / 裁切两道门直接报。）
+Layout Resolver → **实测** → Repair。Content Engine 判断"值不值得说"。
+（**装不下**由 `check.py` 的越界 / 裁切两道门直接报。）
 
 ## 63. 与 Page Planner 的接口
 
@@ -415,7 +411,7 @@ Color/比例/留白由 Image Pipeline 生成（`image_source.py --brief`）。
 ## 65. 与 Chart Engine 的接口
 
 Content 输出 data intent / message / metrics / comparison relation；图形类型
-（`chart`，八类）由 spec 显式声明（v3 起不再由 intent 推断），Chart Engine
+（`chart`，八类）由 spec 显式声明（不由 intent 推断），Chart Engine
 负责编码、标注、强调（`render.py::chart_g2_spec`，AntV G2；图表动画 v4 关死）。
 
 ## 66. 与 Motion Engine 的接口

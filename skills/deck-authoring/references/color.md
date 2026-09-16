@@ -2,15 +2,14 @@
 
 这一层实现的是"AI 视觉配色规范"。**先说清分工**，因为这份规范里大部分讲的是
 **生成过程**（怎么想），而代码能负责的只有**结构与校验**（怎么测）。
-**v4：配色审计脚本 `palette.py` 已整体删除** —— 配色由作者声明，画质门槛改由
-`ink.py`（对比度）与 `check.py`（实测门）承担：
+**分工**：配色由作者声明；画质门槛由 `ink.py`（对比度）与 `check.py`（实测门）承担：
 
 | 规范里的内容 | 谁负责 | 在哪 |
 | --- | --- | --- |
 | 色相关系 / 颜色数量 / 明度 / 饱和度 / 冷暖 | **作者声明**（按 OKLCH 判据写，脚本不再算） | 风格 `style.json` 的 `colorStructure`（见下） |
-| 13 个颜色角色 | **已退役**（脚本不再推导；色板只保留四个角色） | 见下「Style 存结构，不存 HEX」 |
+| 13 个颜色角色 | **不存在**（色板只有四个角色） | 见下「Style 存结构，不存 HEX」 |
 | 文字可读 / 背景与主体明度不能太近 | **阻塞** | `ink.py`（对比度） |
-| 俗套组合（AI=蓝紫青、企业=蓝白…） | **作者自查**（脚本 novelty 已退役） | 见下「俗套表」 |
+| 俗套组合（AI=蓝紫青、企业=蓝白…） | **作者自查**（判据见下「俗套表」） | 见下「俗套表」 |
 | 配色选择（用哪套 `colorSets`） | **作者声明**（spec 必填具名，脚本不推断） | `validate_spec.py` / `render.resolve_color_set` |
 | 外部配色站取灵感 / 搜索关键词 | **流程**（人/AI 做，见本文） | 见下 |
 | "好看的配色" | **判断**（测不出来，不做假检查） | — |
@@ -30,26 +29,21 @@ python3 scripts/ink.py styles/<你的风格>/style.json   # 逐色板验对比�
   `saturation_structure` / `temperature` 这些字段按 OKLCH 判据自己写，脚本不再替你
   推算、也不再拿声明和实测对。
 
-**「其余九个角色由脚本推导」已随 `palette.py` 退役**（`surface` / `surface_alt` /
-`accent` / `highlight` / `text_primary|secondary|muted` / `border` / `chart_colors` /
-`gradient`）。现在色板只有上面四个角色：渲染器读 `primary` / `secondary` /
-`background` 与文字色（`ink.text_color()`），图表的 muted / 多系列深浅阶在渲染器里
-按「主色向纸色褪」现算（`render.py::chart_muted` / `chart_series_colors`），不再经过
-一层预推导的角色表。
+**色板只有上面四个角色**，不做 9 角色推导层（`surface` / `surface_alt` / `accent` /
+`highlight` / `text_primary|secondary|muted` / `border` / `chart_colors` /
+`gradient`）：渲染器读 `primary` / `secondary` / `background` 与文字色
+（`ink.text_color()`），图表的 muted / 多系列深浅阶在渲染器里按「主色向纸色褪」
+现算（`render.py::chart_muted` / `chart_series_colors`）。
 
-**原先的「声明 vs 实测对账」也已退役**：`palette.py::structure_of` 与 `--audit` 删除后，
-`colorStructure` 里的值不再有脚本消费 —— 它是一条**留给后人与风格作者的设计备注**，
-写岔了不会报错。真正带牙的门槛是**对比度**（`ink.py`）与产物实测（`check.py`），见下。
+**`colorStructure` 没有脚本消费** —— 它是留给风格作者的设计备注，写岔了不会报错。真正带牙的门槛是**对比度**（`ink.py`）与产物实测（`check.py`），见下。
 
 ### 配色由作者显式声明（总编排 §17 的落地）
 
-规则说 "Style 出语法，Theme Resolver 按实际情况融合"。v3 只有一条路：**作者按 deck
-的实际情况选一套风格里手调好的 `colorSets`** —— 显式写 `deck.colorSet` 就是选它
-（最稳，也是 demo/stress 的用法）。
+规则说 "Style 出语法，Theme Resolver 按实际情况融合"。落地只有一条路：**作者按 deck
+的实际情况选一套风格里手调好的 `colorSets`** —— 显式写 `deck.colorSet` 就是选它。
 
-历史那条 **auto 派生**（省略 `colorSet` 或写 `"auto"` → 按 `mood` / 风格语法选方向做
-OKLCH 变体；原实现 `palette.auto_set` 已随脚本删除）已退役 —— 选色是审美决策，
-脚本退到验收器：现在
+**没有 auto 派生**（省略 `colorSet` 或写 `"auto"` 一律被拦）—— 选色是审美决策，
+脚本只做验收：
 `validate_spec.py` 把缺失或不具名的 `colorSet` 判 `MISSING_COLOR_SET`（名字不在
 `colorSets` 里判 `BAD_COLOR_SET`），`render.resolve_color_set` 再拦一道直接 SystemExit
 —— 不再有第二条取色路径，也不再读 `mood` / `color_creativity`。
@@ -65,29 +59,25 @@ OKLCH 变体；原实现 `palette.auto_set` 已随脚本删除）已退役 —�
 在感知里暗得多。拿 HSL 做变体会出现"提亮之后对比度反而掉了"，而这个流水线里
 对比度是**硬门槛**（文字必须过 4.5:1）。
 
-规范第 19 条给的变体范围（**规范值**，v3 起不再由脚本自动执行）：
+规范第 19 条给的变体范围（**规范值，作者手动执行**）：
 
 | | 色相 | 彩度 | 明度 |
 | --- | --- | --- | --- |
 | 规范允许 | ±10°~30° | ±5%~20% | ±3%~12% |
 
-v3 起 OKLCH 就不再自动生成方向变体；**v4 起连测量 / 推导的代码也随 `palette.py` 删除**
-（`oklch()` / `to_hex()` / `contrast()` 那套数学，以及 `structure_of`（色相结构）、
-`roles`（13 角色推导）、`novelty`（俗套计分）全删）。所以 OKLCH 留在文档里的，是
-**你读着规则自己判色时的判据来源**：它感知均匀，比 HSL 更适合判明度与色相结构。
-唯一还带牙的颜色门是**对比度**，由 `ink.py` 用 sRGB 相对亮度算（`ink.contrast`）。
-（原先按 OKLCH 生成 Safe / Creative / Experimental 三变体的那条路更早已退役，见下「三个方向」。）
+**没有自动变体，也没有测量/推导代码** —— OKLCH 留在文档里，是**你读着规则
+自己判色时的判据来源**：它感知均匀，比 HSL 更适合判明度与色相结构。唯一带牙的
+颜色门是**对比度**，由 `ink.py` 用 sRGB 相对亮度算（`ink.contrast`）。
+（三个方向怎么产，见下「三个方向」。）
 
 **中性色不参与色相判定**（彩度低于一个阈值就跳过）—— 挪中性色的色相只会让它变脏。
-阈值原先在 `palette.py`（`NEUTRAL_CHROMA = 0.03`，按实测标定：内置时期某套粉彩风格的副色
-`#8A8578` 彩度 0.020，目视就是暖灰，却卡在 0.02 上被算成"有色"、整套风格被误判成
-互补色）；该推导已随 palette.py 退役，这条当作**你手动判色相时**的经验沿用。
+经验阈值 `NEUTRAL_CHROMA = 0.03`（实测标定：一个目视为暖灰的 `#8A8578` 彩度
+0.020，按 0.02 阈值会被算成"有色"、整套被误判成互补色）。
 
 ## 俗套表：说清是哪一条
 
 规范第 18 条。扣分项**必须能说出扣的是哪一条**，否则"俗不俗"只是个没有说服力的
-感觉。这张表原先是 `palette.py::novelty` 的计分依据；**该脚本已退役** —— 现在它是
-**作者选色时对着自查的清单**，不再有 `--novelty` 跑分。每条判据都带着"为什么俗"：
+感觉。这张表是**作者选色时对着自查的清单**，没有跑分工具；每条判据都带着"为什么俗"：
 
 | id | 判据 | 为什么 | 权重 |
 | --- | --- | --- | --- |
@@ -99,31 +89,26 @@ v3 起 OKLCH 就不再自动生成方向变体；**v4 起连测量 / 推导的�
 
 加分项同理（非常规冷暖、低饱和+高纯度强调、中性+非典型强调）。
 
-**这条不能一律阻塞**：规范第 18 条给过三档阈值（普通 PPT 0.45 / 设计型 0.65 /
-创意封面 0.75），而内置时期有 5 套风格的某个色板正落在名单上 —— 一律阻塞，
-仓库自己的风格先挂。所以现在的现实是：**名单只作自查**，配色选哪套由作者声明
+**这条不阻塞**（规范第 18 条的三档阈值 0.45/0.65/0.75 只作参考）：
+**名单只作自查**，配色选哪套由作者声明
 （`colorSet`）；带牙的画质门槛是**对比度**（`ink.py`）与产物实测（`check.py`）。
 
-> 拿 AI 主题的 deck 自查一遍就会看到：夹具两套的 `blue` 色板
-> （两套不同风格各自的 `blue` 色板，主色都是 `#0033CC`）都同时命中
-> `tech_blue_purple_cyan`（主色落在 H 200~320、C ≥ 0.10）与
-> `corporate_blue_white`（蓝主色 + 白底）—— **想做 AI 主题的 deck，这几个色板
-> 不该默认选**。（这条以前由 `--novelty` 跑出来，现在照判据对着色值自己看。）
+> 拿 AI 主题的 deck 自查一遍：`#0033CC` 这类蓝主色 + 白底的色板会同时命中
+> `tech_blue_purple_cyan`（H 200~320、C ≥ 0.10）与 `corporate_blue_white`
+> —— **想做 AI 主题的 deck，这类色板不该默认选**（照判据对着色值自己看）。
 
-## 三个方向：自动变体已退役（配色由作者声明）
+## 三个方向：配色由作者声明（无自动变体）
 
-规范第 17 条：Safe / Creative / Experimental。**v3 起自动生成三方向变体的那条路已退役**
-—— 原 `palette.py` 里 `directions` / `variant` / `choose_direction` / `auto_set` /
-`MOOD_DIRECTIONS` / `DIRECTIONS` 与 `--directions` CLI 已全部删除（整个脚本 v4 已删）：
-选色是审美决策，脚本退到验收器。
+规范第 17 条：Safe / Creative / Experimental。**方向变体由作者手动产**（换色相 /
+明度 / 饱和度各出一版再挑）：选色是审美决策，脚本只做验收。
 
 替代做法是**作者显式声明**：`spec.deck.colorSet` 必填具名（缺失或写 `auto` 会被
 `validate_spec.py` 判 `MISSING_COLOR_SET`、被 `render.resolve_color_set` 直接
 SystemExit）。要"更 creative"就往风格的 `colorSets` 里加一套**手调**色板
 （同风格加色板的 seam 见 `references/style-architecture.md`），不是让脚本去挪色相。
 
-规范说"Creative 不满足可读性再回退 Safe" —— 可读性是**能测的**，但工具边界要说清：
-v3 不再自动产出变体，也就没有那道自动回退。色板的对比度要验，跑
+规范说"Creative 不满足可读性再回退 Safe" —— 可读性是**能测的**，但没有自动回退
+这道工序：色板的对比度要验，跑
 `ink.py <style.json>`（任一色板不达标退出码 1）—— 这是现在唯一还带牙的配色门。
 
 ## 检索关键词：搜 Style，不搜行业
@@ -157,8 +142,8 @@ unusual gradient palette             premium low-saturation palette
 | [Huemint](https://huemint.com/) | 高创造力候选 | 适合高创造力那一档（手工取色、再加进风格） |
 
 **取回来的色不得直接复制**：走第 19 条的变体流程（保留色相关系 → OKLCH 变体 →
-对比度检查 → 角色映射）。**角色映射这一步原本有 `palette.py --roles` 代劳，已随脚本
-退役** —— 现在取回色后自己把角色填进 `colorSets` 的 `primary` / `secondary` /
+对比度检查 → 角色映射）。**角色映射作者自己做**：取回色后把角色填进
+`colorSets` 的 `primary` / `secondary` /
 `background` / `text`（只这四个角色），再用 `ink.py` 验对比度。
 
 ## 页面一致性
@@ -172,8 +157,7 @@ unusual gradient palette             premium low-saturation palette
 规范里有几条**本流水线还没有对应能力**，列在这里而不是含糊带过：
 
 1. **渐变**。规范第 13 条那十种渐变类型（mesh / aurora / glow / conic…）都还没做 ——
-   外壳里没有渐变。色板也没有 `gradient` 这条角色（它原先由 `palette.py::roles` 推导，
-   已随脚本退役）；内置时期的八套风格 `gradient_strategy` 全是 `none`（没有一个做过渐变）。
+   外壳里没有渐变。色板也没有 `gradient` 这条角色。
 2. **玻璃拟态 / Glow / Mesh**。规范第 12 条的背景策略里有这些，当前只支持
    `solid` 与 `texture`（颗粒）。
 3. **强调色占比的实测**。规范第 11 条说 5%~20%。`measure.py` 已经记了每个元素的

@@ -43,17 +43,17 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
 ```
 
 **方向从这份 deck 推（观众/场合/材料气质），不从风格史挑、不复用见过的风格名**——
-历史那张「八套对照表」实测就是菜单（三个方向永远是那几个名字），已删；换成四轴取点
+任何样式清单都会被当成选项清单，所以不设清单、只设四轴取点
 （骨架/字感/密度/色彩），任意两方向至少两轴不同且必含骨架轴（style-architecture.md
 「方向怎么来」）。每版标：**风格名 + 一句为什么这份内容配它 + 适合什么场合**，停下等选。
 
 ### 风格：自建，无内置
 
-**内置八套已整体移除**（styles/ 删除，按用户决定）——风格是每份 deck 的表达层。
+**风格是每份 deck 的表达层，工具链零内置**。
 自建：**deck 项目**的 `styles/<名>/` 放 `style.json + skin.css`（形状与逐键说明见
-`references/style-architecture.md`；字栈参考 `fonts/mapping.json`）。**没有可拷的参考实现**
-（夹具也删了：能拷就会拷，拷出来每份 deck 一样）；按契约现写。列风格 / 契约体检 / 联系表（`style.py` 全部子命令）已退役 —— 对比度归 `ink.py`，实测门归 `check.py`。
-每个风格可带多个 `colorSet`；**spec 的 `colorSet` 必填具名**（auto/mood 已退役 ——
+`references/style-architecture.md`；字栈参考 `fonts/mapping.json`）。**没有可拷的参考实现，也不携带示例资产**
+（能拷就会拷，拷出来每份 deck 一样）；按契约现写。对比度门禁归 `ink.py`，产物实测门归 `check.py`。
+每个风格可带多个 `colorSet`；**spec 的 `colorSet` 必填具名**（写 auto/mood 一律被拦 ——
 选色是审美决策，脚本只验对比度）。换风格/换色板只改 spec 两个字段，内容一字不动。
 
 ## 为什么不能让你写坐标或色值
@@ -71,7 +71,7 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
    `references/style-architecture.md`；写完跑 `validate_spec.py`）。
 2. **写 spec**（前置：大纲已过确认门 ①）：每页只有 `type` + 内容，见
    `references/style-architecture.md`；**写什么内容**见 `references/content-intelligence.md`
-   （一页一个观点 / 容量估算 / 观众距离）。拿不准就先渲出来跑 `check.py`（`fit.py` 试排已退役）。
+   （一页一个观点 / 容量估算 / 观众距离）。拿不准就先渲出来跑 `check.py`。
    `seed` 显式写（默认 1）：错位与颗粒按 (seed, 元素) 派生，否则没法回归。
    有品牌资产加一行 `deck.brand`（见 brand-assets.md：**品牌赢在“是谁”，风格赢在“怎么表达”**；
    品牌由用户提供 —— 仓库里没有示例品牌，示例资产会被直接当成可用资产用进交付）。
@@ -90,7 +90,7 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
    - 视频：`python3 scripts/animate.py out.html -o deck.mp4`（GIF：`-o deck.gif --width 960`；
      无需 ffmpeg）。运动设计与什么时候别用见 `references/animation.md`。
 5. **图页**：`image` 只填文件名；出图走 `--brief` 合同（提示词要到位 —— 出图后**没有**制版
-   后处理，图片按原样用，`plate.py` 已退役）；存产物同目录、`--check` 验，见 `references/images.md`。
+   后处理 —— 图片按原样用）；存产物同目录、`--check` 验，见 `references/images.md`。
 
 ## 版式
 
@@ -155,7 +155,7 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
   换色板改 style.json；别把字段删了就交差。
 - **对比度不达标** → `ink.py styles/<你的风格>/style.json` 查色板；换色板别动阈值。
 - **`... 越出版面：下缘 ... 越出该页下边界 ...`** → 内容真的撑出这页了（实测）。
-  `measure.py out.html` 会点名越界的是哪个元素，据此收字 / 拆页 / 换 `layout`（`fit.py` 已退役）。
+  `measure.py out.html` 会点名越界的是哪个元素，据此收字 / 拆页 / 换 `layout`。
 - **`... 越出版面：右缘 ...`**（多半在标题）→ 标题是 `nowrap` 的，不折行、直接裁；改短。
 - **`图片没加载`** → 相对路径挪目录就裂图；同目录交付或 base64（见 images.md）。
 - **字体回退提示** → 声明的族本机没有，后面栈顶上；不阻塞，交付前确认。

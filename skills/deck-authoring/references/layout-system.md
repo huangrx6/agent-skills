@@ -1,4 +1,4 @@
-# AI PPT 布局与视觉结构规则（v3.0 Final 全文落地）
+# AI PPT 布局与视觉结构规则（全文落地）
 
 适用：布局与页面结构层（PPT / HTML Deck / PDF / MP4 / GIF 共用）。核心目标：把
 Page Planner 输出的"页面意图"稳定转换为**可测量、可约束、可评分、可修复**的页面
@@ -27,14 +27,14 @@ x/y/dx/dy/rot/width/height 全判错）；最终几何由渲染层派生。
 Slide Content → Page Planner → Layout Intent → Layout Family → Layout（作者声明）
 → Region Tree → Grid/Spacing/Constraints → **Layout Resolver** →
 Measurement → Hard Check → Layout Score → Repair → Resolved Slide → Renderer。
-本仓库：规划（原 `plan.py`，v4 退役）→ spec → `render.py`（resolve）→ `measure.py`
-（实测）→ `check.py`（硬检查 + 软提示流）；Score/Repair 引擎见 §37/§52。
-（v3：布局不是脚本从候选里实测选出的 —— 作者在 spec 写 `layout`，脚本只执行与验收。）
+本仓库：spec → `render.py`（resolve）→ `measure.py`（实测）→ `check.py`
+（硬检查 + 软提示流）；Score/Repair 引擎见 §37/§52。
+布局不是脚本从候选里实测选出的 —— 作者在 spec 写 `layout`，脚本只执行与验收。
 
 ## 2. 职责边界【✅】
 
 Content Engine 决定"说什么"（content-intelligence.md）；Page Planner 决定页面
-类型/主要视觉/密度/谁最重要/语义关系（原 plan.py，v4 退役）；Layout Engine 决定
+类型/主要视觉/密度/谁最重要/语义关系（作者做）；Layout Engine 决定
 放哪里、占多大、间距多少、是否换版、是否拆页（render.py + grid.py）；**Renderer
 只按 Resolved 布局绘制，不重新布局**（渲染分支里没有第二套几何）。
 
@@ -57,8 +57,7 @@ bounds 检查**无角色豁免**（所有可见元素一视同仁，不存在"�
 
 12 Columns / margin 84 / gutter 24；列宽**动态计算**
 `(1600 − 2×84 − 11×24) / 12 = 97.33`（非整数是刻意的），只从 `grid.py` 取。
-禁止手写列宽——教训实测：check.py 曾手写 `CONTENT=(…,838)` 与 render 的 824
-漂了 14px，两个"唯一来源"已经漂了才发现；统一后不再漂。
+禁止手写列宽 —— 几何只有 `grid.py` 一个来源（第二份手写常量必然漂移）。
 
 ## 6. Grid Span【✅】
 
@@ -78,7 +77,7 @@ VISUAL/META，支持嵌套。落地形态：`grid.py` 的 `REGIONS` 常量 + HTM
 
 父 Region 负责 direction/padding/gap/align/justify；子组件不写坐标。落地 =
 CSS flex/grid：父容器 padding/gap 全走 `--sp-*` 令牌，子元素内容变化自动重排
-（父容器内容变化自动重排正是容量反馈依赖的机制；试排脚本 fit.py 已退役，§55）。
+（父容器内容变化自动重排正是容量反馈依赖的机制，§55）。
 
 ## 9. Spacing Tokens【✅】
 
@@ -117,23 +116,22 @@ gap=57/73/101——改后 skin 的手写值收敛到令牌（残余 6~8 处手�
 ## 14. Page Type 与 Layout Family 分离【 部分 ✅】
 
 Page Type=页面语义类型，Layout Family=空间组织方式（comparison 页型 → split
-族）。落地：页型→版式的查表原在 `plan.py` 的 `PAGE_TYPES`（comparison→chart、
-process→timeline…），v4 随脚本退役；现在由作者声明 `layout`（§17）。**family/
-layout 两级中间层未建**（§15-18；两族已带 layout 字段，全量铺开在阶段 3）。
+族）。落地：页型→版式的映射由作者声明 `layout`（§17）。**family/layout
+两级中间层未建**（§15-18；两族已带 layout 字段，全量铺开在阶段 3）。
 
 ## 15. Layout Family【✅ 第一片已落地（content-image）】
 
 规范至少支持 single/split/stack/grid/hero/editorial/overlay/timeline/diagram/
 chart/table/dashboard/full-bleed。现状：7 种 slide type（title/content-text/
 content-image/two-column/timeline/chart/end）+ 自建风格。**content-image 率先
-成为显式家族**：`layout` 字段进 spec（v3：作者声明的自由字符串）；two-column
+成为显式家族**：`layout` 字段进 spec（作者声明的自由字符串）；two-column
 已跟上（3 个结构布局，§16）；其余 type 仍是单版式 ——
 family 命名层全量铺开在路线图阶段 3。
 
 ## 16. Layout（布局）【✅ 结构布局已落地（content-image 4 + two-column 3）】
 
 每页一个布局：spec 写 `layout`（**自由字符串**），渲染器给**结构**，皮肤/风格
-负责细排。v3 的分工是"渲染器能力 + 作者自由"：
+负责细排。分工是"渲染器能力 + 作者自由"：
 
 - **结构布局**是渲染器的能力清单（`render.IMAGE_LAYOUTS` /
   `render.TWO_COL_LAYOUTS`，是**能力**不是封闭枚举禁令）：
@@ -148,7 +146,7 @@ family 命名层全量铺开在路线图阶段 3。
     由网格算（825.33+582.67+24=1432 不变）。
 - **自造布局名**：spec 写任何其它字符串 → 渲染器套**缺省结构** + 加
   `data-layout="<名>"`（content-image 缺省 visual-right、two-column 缺省 even），
-  排法由 skin.css 的属性选择器写。这是 v3 的核心口径：**布局语言是作者的自由，
+  排法由 skin.css 的属性选择器写。核心口径：**布局语言是作者的自由，
   脚本只提供结构与验收**，不枚举审美。
 
 `layout` **显式声明**才进 Decision Trace（`render.py --trace` 的 layout 段，由
@@ -156,24 +154,23 @@ family 命名层全量铺开在路线图阶段 3。
 trace 里注明"缺省结构 + data-layout，排法由 skin.css 写"。不写 `layout` 时
 静默走该版式的结构缺省，不留痕。
 
-历史备注：这一段原叫"变体（Variant）"，值封闭且带 `auto` 实测选择；v3 退役：
-字段名改为 `layout`、`variant` 不再接受（写它 = `UNKNOWN_FIELD`，HINTS 指路
-layout）、`auto` 被 `validate_spec.py` 拦（`BAD_LAYOUT`）。其余 type（时间线）
+版式字段叫 `layout`（**自由字符串**）：`variant` 不被接受（写它 = `UNKNOWN_FIELD`，
+HINTS 指路 layout）、`auto` 被 `validate_spec.py` 拦（`BAD_LAYOUT`）。其余 type（时间线）
 仍是隐式单版式。
 
 ## 17. 布局选择依据【✅ 作者声明】
 
 不得随机选版式；必须考虑内容量/视觉角色/图比例/优先级/语义关系/风格/密度/
-平衡/前后页节奏。v3 的口径：**这些判断是作者的内容决策，写在 spec 的
-`layout` 里**。脚本不替作者选 —— 不推断、不随机、也不实测排名（实测选择已
-退役，见 §18/§57）。不写 `layout` 就走该版式的结构缺省（content-image 缺省
+平衡/前后页节奏。口径：**这些判断是作者的内容决策，写在 spec 的
+`layout` 里**。脚本不替作者选 —— 不推断、不随机、也不实测排名（§18/§57）。
+不写 `layout` 就走该版式的结构缺省（content-image 缺省
 visual-right、two-column 缺省 even，§16）；写自造名由 skin.css 排。
 其余 type 仍页型查表（确定性，不随机）。
 
 ## 18. Layout Candidate Ranking【约定 —— 脚本不做】
 
-规范设想 Page Planner 输出候选+分数、Resolver 实测后定版。v3 明确**退役这层
-自动排名**：选布局是内容决策，脚本排名会越权替作者做审美判断。现状：布局由
+规范设想 Page Planner 输出候选+分数、Resolver 实测后定版。**没有这层自动排名**：
+选布局是内容决策，脚本排名会越权替作者做审美判断。布局由
 作者在 spec 声明（§17），脚本只执行与验收（拼写由风格的 `layouts` 词表兜，
 见 `validation.md` 的 `_layout_vocab_problems`）。要做"候选并测"也只在**人环**
 里：先手写几版 spec、各自 `check` 看一眼（越界/裁切实测给你容量答案，§55）
@@ -183,36 +180,35 @@ visual-right、two-column 缺省 even，§16）；写自造名由 skin.css 排�
 
 每个核心组件 priority 1..5（P1 主视觉/P2 标题结论/P3 关键证据数字/P4 支撑/
 P5 来源页脚）。落地：`grid.py` 有 PRIORITY 表；量化 P 判定的三把尺（文本预算/
-视觉焦点/密度）原在 `hierarchy.py`，v4 随脚本退役——P 判定改由作者声明与人审。
+视觉焦点/密度）由作者声明与人审。
 
 ## 20. Priority 影响【✅ 精神落地】
 
 Priority 影响字号 tier/字重/明度/面积/位置/留白/动画强度/突出度，**不能只靠
 "字号越大越重要"**。落地：风格 type 阶梯（cover/subtitle/bullet/colTitle 分
 级）+ 动画按角色分强度（title mask / body fadeRise / chrome 只淡）。同级碰撞
-与倒挂的体检原在 `style.py --check`（4 套风格曾 subtitle==bullet 同字号，两级
-之间没有层级——已修），v4 随脚本退役；风格阶梯的形状改由作者守（色板对比度
+与倒挂的体检由作者守（相邻档 ≥1.15 倍，见 style-architecture「字号怎么定」；
+色板对比度
 另有 `ink.py`，§29）。
 
 ## 21. Focal Point【✅】
 
 primary ≤1、secondary ≤2；多元素同等抢眼 → focal_conflict。判据（相对焦点
 间距 ≥25% 才算明确 + ≤3 个重元素）原由 `hierarchy.py` 的 `weights()` 量化，
-v4 随脚本退役——保留为规则，改由作者/人审视。实测 demo 与压测 deck 每页第一
+由作者/人审视。每页第一
 焦点领先第二名 90%+（标题永远最大字、图/图表永远最大面积——不是偶然，是阶梯
 的结构结果），人眼可复核。
 
 ## 22. Visual Weight【✅】
 
 visualWeight = 面积 × 对比 × 字重 × 饱和 × 孤立度 × 语义优先。简化质量
-（墨宽×高度/页面积×10）原由 `hierarchy.py` 算，v4 随脚本退役；主焦点应显著
+（墨宽×高度/页面积×10）由作者估；主焦点应显著
 领先（阈值 top1/top2 ≥ 1.25 → 我们用 25% 间距同义）保留为规则。
 
 ## 23. Density【✅】
 
 density = 占用核心面积 / 安全内容面积；参考带：Minimal 35-50 / Normal 45-65 /
-Information 55-75 / Dashboard 65-82。四带区提示原由 `hierarchy.py` 给，v4 随
-脚本退役；参考带保留为工程启发式（不是硬标准），由作者/人审。
+Information 55-75 / Dashboard 65-82。参考带是工程启发式（不是硬标准），由作者/人审。
 
 ## 24. 留白规则【✅】
 
@@ -230,7 +226,7 @@ balance_score 计算**（§26）。
 ## 26. Balance Score【约定】
 
 `1 − normalized_mass_difference`，mass = 面积 × visualWeight——软指标未实现；
-要做时 `hierarchy.py` 的 weights 已备好输入（v4 随脚本退役，重做须再建输入）。
+要做时须重建权重输入。
 
 ## 27. Composition【约定】
 
@@ -245,8 +241,8 @@ Copy → 4 删低优先级 → 5 调 gap → 6 调 padding → 7 调区域比 �
 → 9 换组件档 → 10 缩非核心视觉 → 11 拆内容 → 12 拆页 → **13 最后才降字号
 tier**（权威表：`pipeline.md` §31 的 13 步修复顺序，这里是同一张）。
 落地：这条顺序的权威文本在 `pipeline.md` §31（原写进 `hierarchy.py` 的报错
-文本，v4 随脚本退役）。v3 起**没有自动降档**：
-`bullet_tier()` 已删除，缩字号完全由作者显式声明（`slide.bulletTier` / 风格
+文本）。**没有自动降档**：
+缩字号完全由作者显式声明（`slide.bulletTier` / 风格
 `bulletDefault`，§29）—— 脚本不再替内容悄悄缩小字。
 
 ## 29. 字号降级【✅ 作者声明】
@@ -256,7 +252,7 @@ tier**（权威表：`pipeline.md` §31 的 13 步修复顺序，这里是同一
 `titleTiers`，再缺省 `render.TITLE_TIER`）、条目档 `slide.bulletTier`（缺省
 风格 `bulletDefault`，再缺省 `"bullet"`）；`render.DEFAULT_BULLET_TIER="bullet"`，
 two-column 条目档固定 `bulletSmall`（结构事实）。**没有按条数自动升降档**
-（`bullet_tier()`/`BULLET_TIERS` 已删除）：内容多就拆页/收短或显式换小档，
+）：内容多就拆页/收短或显式换小档，
 不让字自己变小（§28）。风格阶梯的形状（同级/倒挂）原由 `style.py` 校验，v4 随
 脚本退役——阶梯封闭这条规则保留，由作者守（色板对比度另有 `ink.py`）。
 
@@ -277,7 +273,7 @@ aspect ratio（实测插槽比）/ minResolution（盒子 ×2）/ bleedAllowed /
 
 Chart Container 负责 chart box/title box/标注区/标签安全区；**Chart Engine
 不得突破 Container**（chartwrap 占内容宽 1432，壳给 `.g2` 容器 330px 高；
-v4 起几何由 AntV G2 在容器内算，G2 的 autoFit 必须有这个高度才不抛错）；
+几何由 AntV G2 在容器内算，G2 的 autoFit 必须有这个高度才不抛错）；
 **Layout 不决定 chart type**（图形类型由 spec 显式声明，见 charts.md）。
 
 ## 33. Diagram Constraints【部分 ✅】
@@ -296,7 +292,7 @@ v4 起几何由 AntV G2 在容器内算，G2 的 autoFit 必须有这个高度�
 
 失败即阻塞：out of bounds（越界，实测）✓、text clipping（溢出/容器裁切）✓、
 对比度（叠印墨 vs 纸色——"unreadable min font"的对比度半边）✓、chart label
-clipping（v4 起 = G2 真渲染出来了 + 数据形状，见 `validation.md` 第 ⑤ 条）✓、
+clipping（= G2 真渲染出来了 + 数据形状，见 `validation.md` 第 ⑤ 条）✓、
 logo overlap（logo 压字）✓、decor overlap（墨块压文字栏）✓、unresolved asset
 （图没加载/脚本报错）✓、full-page image（图盖整页，hero role-aware）✓ ——
 `check.py` 阻塞 10 余条，原 `deliver.py` 在 check 失败时直接中止（"把已知有问题
@@ -436,22 +432,19 @@ image fit / chart fit；**不决定内容价值**（值不值得说是 content-i
 HTML 路径优先真浏览器测量：actual font metrics / wrapping / SVG bounds /
 DOM rect / image natural size。落地：`measure.py` 注入探针脚本、`--dump-dom`
 取回（不走 CDP，见文件头注），拿真矩形；
-**字符宽度估算只能做预判**（原 fit 的粗筛，v4 随脚本退役），最终判断全靠实测。
+**字符宽度估算只能做预判**，最终判断全靠实测。
 
-## 57. Candidate Testing【已退役（v4）】
+## 57. Candidate Testing【约定 —— 脚本不做】
 
-规范设想：一次生成多个 Variant，同一浏览器批量测量后排名。v3 先把"并测布局"
-整条链退役；v4 把 **`fit.py` 整文件也退役** —— 容量反馈曾由它做（把几种版式
-content-text / two-column / content-image 摆进同一份探针产物渲一次量一次，报
-实测溢出与占比）。现在"装不装得下"由 `measure.py` 实测（越界/裁切）在
-`check.py` 里定死（§55/§56），不替作者选布局（§17/§18）。
+规范设想：一次生成多个 Variant，同一浏览器批量测量后排名。**没有这条自动链**：
+选布局是作者的内容决策（§17/§18）。"装不装得下"由 `measure.py` 实测
+（越界/裁切）在 `check.py` 里定死（§55/§56）。要做"候选并测"只发生在**人环**：
+手写几版 spec、各自 `check` 看一眼再定。
 
-## 58. Candidate Score【已退役（v4）】
+## 58. Candidate Score【约定 —— 不做】
 
-原公式在 `fit.py` 的 `SCORE_WEIGHTS`（fit.py:77）：Fit .20 + 留白 .15 +
-语义 .10 + 层级 .15 + 焦点 .15 + 平衡 .10 + 风格 .075——层级/焦点/平衡从
-`hierarchy.weights` 与墨量重心的实测来。公式与 `fit.py` / `hierarchy.py` 一并
-v4 退役；仅作历史记录（要重做需先重建这两条输入）。
+不实现候选打分：分数替作者做审美判断（层级/焦点/平衡各占多少，本身就是
+风格立场）。要看好坏，渲出来看图。
 
 ## 59. Deck-level Layout Planner【约定】
 
@@ -469,9 +462,8 @@ Cover 允许 hero/大量留白/非对称/full-bleed/overlap/editorial 构图；�
 ## 61. Statement Layout【✅】
 
 目标只有一个：强化一个 Message；优先大标题/单数字/单焦点，避免多卡片多图表
-多层 bullet。落地：无 statement 页型（原 plan.py 页型表的映射随脚本退役）；
-要单句占页就用 `content-text` 写一条短句，密度由作者掌握（密度尺已随
-`hierarchy.py` 退役，§23）。
+多层 bullet。落地：无 statement 页型；要单句占页就用 `content-text` 写一条
+短句（声明 `bulletTier: bulletLarge`），密度由作者掌握（§23）。
 
 ## 62. Comparison Layout【✅】
 
@@ -531,8 +523,7 @@ restraint。落地：`check.py`（硬，阻塞 + 软项进其提示流）。原 
 ## 71. QA 输出【✅ 等价形】
 
 规范 `{valid, hardErrors, warnings, score, metrics}` ≈ 本仓库：退出码
-（0=valid）+ 阻塞报错清单 + 提示清单；metrics 分项原在 `hierarchy.py` 各尺里
-（v4 随脚本退役），汇总 score 未建（§37）。
+（0=valid）+ 阻塞报错清单 + 提示清单；metrics 分项与汇总 score 不做（§37）。
 
 ## 72. 与 Content Rules 的边界【✅】
 
@@ -644,13 +635,12 @@ Measurement；Family×Layout 已落地第一片（content-image 4 + two-column 3
 
 ## 附录 A：落地阶段记录（实测数字）
 
-- **阶段 1**（✅）：文本预算 + 视觉焦点 + 密度三把尺（hierarchy.py，提示级）；
-  修复顺序写进报错文本。（v4 备注：hierarchy.py 已整体退役，三把尺的规则文本
-  保留在 §19/§21-§23，修复顺序保留在 §28/§53 与 pipeline §31。）
+- **阶段 1**（✅ 规则保留）：文本预算 + 视觉焦点 + 密度三把尺（提示级，
+  作者自查）；规则文本在 §19/§21-§23，修复顺序在 §28/§53 与 pipeline §31。
 - **阶段 2**（✅）：`grid.py` 唯一几何来源；12 列 84/24/97.33；间距 ramp +
   语义档 + 关系规则；`--sp-*` 注入；时间线宽从网格算；锚点对齐检查（左缘
-  7 任意值 → 全落列）；subtitle==bullet 同级碰撞修复 + style.py 校验（v4 备注：
-  style.py 已整体退役，风格契约改由 ink.py 与 check.py 覆盖）。
+  7 任意值 → 全落列）；subtitle==bullet 同级碰撞修复。风格契约由
+  ink.py 与 check.py 覆盖。
 - **阶段 3**（路线图）：版式族 × 布局表全量铺开（§15-18/§57-59；content-image/
   two-column 两片结构布局已先行落地）+ 档位已归作者声明（`bullet_tier` 退役：
   换布局/拆页优先，缩字号由作者显式写，脚本不再自动兜底）。
