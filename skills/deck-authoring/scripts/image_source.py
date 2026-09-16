@@ -744,8 +744,13 @@ def write_brief_md(brief: dict, out_path: str) -> str:
     return out_path
 
 
-def check_images(spec_path: str, out_dir: str, style: str | None = None) -> tuple[int, list[str]]:
-    """验人交付的图：在不在、够不够大、比例对不对。
+def check_images(spec_path: str, out_dir: str, style: str | None = None,
+                 ) -> tuple[int, list[str], list[str]]:
+    """验人交付的图：在不在（阻塞）、够不够大（阻塞）、比例合不合（**只说明**）。
+
+    比例**不阻塞**：生图工具出成 1:1 / 4:3 / 2:1 是常态（提示词按不住比例，各家默认
+    都不同），而渲染层按**槽位**处理 —— 高度由槽位比例定，多出来的部分按 `visual.kind`
+    裁切（照片）或留边（结构图）。所以"比例不对"不是错，为比例重出图纯属浪费。
 
     为什么单独一步而不是并进 `check.py`：`check.py` 是在**渲染之后**看产物的
     （它只知道"有没有加载""有没有被放大"）；这一步是在**渲染之前**对着契约验 ——
@@ -762,6 +767,7 @@ def check_images(spec_path: str, out_dir: str, style: str | None = None) -> tupl
         raise SystemExit("✗ 这份 spec 里没有任何 image 槽位")
     want_w = 640 * BRIEF_SCALE
     problems: list[str] = []
+    notes: list[str] = []
     for name, page in sorted(wanted.items(), key=lambda kv: kv[1]):
         path = os.path.join(out_dir, name)
         if not os.path.isfile(path):
@@ -776,11 +782,12 @@ def check_images(spec_path: str, out_dir: str, style: str | None = None) -> tupl
         ratio_want = BRIEF_ASPECT[0] / BRIEF_ASPECT[1]
         ratio_got = w / h
         if abs(ratio_got - ratio_want) > 0.12:
-            problems.append(
-                f"第 {page} 页：`{name}` 比例是 {ratio_got:.2f}:1，契约是 "
-                f"{ratio_want:.2f}:1 —— 版面按宽度缩放，比例差太多会撑高或压扁"
-                f"（撑高会撞页脚）")
-    return (1 if problems else 0, problems)
+            notes.append(
+                f"第 {page} 页：`{name}` 是 {ratio_got:.2f}:1，槽位是 {ratio_want:.2f}:1"
+                f" —— **不用为比例重出图**：渲染按槽位比例定高度，照片按中心裁切"
+                f"（cover）、结构图留边不裁（contain，按 spec 的 visual.kind 选）。"
+                f"只要主体不贴边、画面里没有文字，裁切看不出来")
+    return (1 if problems else 0, problems, notes)
 
 def _parse_size(raw: str) -> tuple[int, int]:
     """`WxH` → (w, h)。格式不对要说清楚哪里不对，不甩生成器报错。"""
@@ -857,15 +864,19 @@ def main(argv: list[str]) -> int:
 
     if args.check:
         out_dir = args.dir or os.path.dirname(os.path.abspath(args.check))
-        code, problems = check_images(args.check, out_dir, args.style)
+        code, problems, notes = check_images(args.check, out_dir, args.style)
         if problems:
             print(f"✗ {len(problems)} 个问题：")
             for p in problems:
                 print("  ·", p)
+            for nt in notes:
+                print("  ·", nt)
             print(f"\n  契约见 {os.path.join(out_dir, 'image-brief.md')}"
                   f"（没有就先生成：image_source.py --brief <spec>）")
             return code
-        print("✓ 交付的图都符合契约（尺寸 / 比例 / 都在产物目录里）")
+        print("✓ 交付的图够用（都在产物目录里、尺寸够）")
+        for nt in notes:
+            print("  ·", nt)
         return 0
 
     if not args.prompt or not args.out:

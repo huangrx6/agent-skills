@@ -318,5 +318,43 @@ class TestMarkdownNote(unittest.TestCase):
         self.assertEqual(self.check._markdown_notes(deck), [])
 
 
+
+class TestImageSlotRatio(unittest.TestCase):
+    """**槽位定比例**，图片自身比例只管裁切/留边。
+
+    实测背景：生图工具出成 1:1 / 4:3 / 2:1 是常态（提示词按不住比例）。以前壳只写
+    `width:100%`，高度跟着图片走 —— 1:1 撑出页底（实测溢出 109px）、2:1 留空洞，
+    于是人被逼着重出图。现在高度由槽位比例定，多出来的按 `visual.kind` 处理。
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.render = _load("deck_render_ratio", os.path.join(SCRIPTS, "render.py"))
+        with open(TOKENS, encoding="utf-8") as fh:
+            cls.tokens = json.load(fh)
+
+    def _page(self, kind: str) -> str:
+        spec = {"deck": {"style": "swiss-grid", "colorSet": "blue", "seed": 1,
+                         "title": "t", "slides": [
+                             {"type": "content-image", "title": "图页",
+                              "image": "x.png", "bullets": ["一条"],
+                              "visual": {"kind": kind}}]}}
+        return self.render.render(spec)
+
+    def test_slot_owns_the_display_ratio(self) -> None:
+        html = self._page("evidence_image")
+        self.assertIn("aspect-ratio:3/2", html, "高度必须由槽位定，不由图片自身比例定")
+        self.assertIn("object-fit:cover", html, "照片：按中心裁切")
+
+    def test_diagram_is_letterboxed_not_cropped(self) -> None:
+        fig = re.search(r'<figure class="imgwrap"[^>]*>', self._page("diagram"))
+        assert fig is not None
+        self.assertIn('data-fit="contain"', fig.group(0),
+                      "结构图不能裁 —— 图里每一笔都是信息")
+        fig2 = re.search(r'<figure class="imgwrap"[^>]*>', self._page("evidence_image"))
+        assert fig2 is not None
+        self.assertNotIn("data-fit", fig2.group(0))
+
+
 if __name__ == "__main__":
     unittest.main()

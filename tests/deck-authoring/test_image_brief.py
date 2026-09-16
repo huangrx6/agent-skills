@@ -336,7 +336,7 @@ class TestCheck(unittest.TestCase):
         Image.new("RGB", (w, h), (180, 90, 60)).save(os.path.join(self.dir, self.name))
 
     def test_missing_image_is_reported(self) -> None:
-        code, problems = image_source.check_images(self.spec, self.dir)
+        code, problems, _notes = image_source.check_images(self.spec, self.dir)
         self.assertEqual(code, 1)
         self.assertTrue(any("还没出图" in p for p in problems), problems)
 
@@ -354,22 +354,29 @@ class TestCheck(unittest.TestCase):
 
     def test_too_small_image_is_reported_with_the_number(self) -> None:
         self._write(400, 267)                     # 比例对，但只有 400px 宽
-        code, problems = image_source.check_images(self.spec, self.dir)
+        code, problems, _notes = image_source.check_images(self.spec, self.dir)
         self.assertEqual(code, 1)
         self.assertTrue(any("400px 宽" in p for p in problems), problems)
         self.assertTrue(any("1280px" in p for p in problems), problems)
 
-    def test_wrong_aspect_is_reported(self) -> None:
-        self._write(1280, 1280)                   # 够大但是方的
-        code, problems = image_source.check_images(self.spec, self.dir)
-        self.assertEqual(code, 1)
-        self.assertTrue(any("比例" in p for p in problems), problems)
+    def test_wrong_aspect_is_a_note_not_a_blocker(self) -> None:
+        """够大但是方的（1:1）→ **不阻塞**：渲染按槽位处理（照片裁切 / 结构图留边）。
+
+        为什么改：为比例重出图是浪费 —— 生图工具按不住比例是常态（各家默认都不同），
+        而高度由**槽位**定（`.imgwrap img{aspect-ratio:3/2}`），1:1 不会撑出页底、
+        2:1 不会留空洞。真的该重出的只有两件：宽度不够、主要内容被裁到。
+        """
+        self._write(1280, 1280)
+        code, problems, notes = image_source.check_images(self.spec, self.dir)
+        self.assertEqual(code, 0, problems)
+        self.assertEqual(problems, [])
+        self.assertTrue(any("不用为比例重出图" in n for n in notes), notes)
 
     def test_a_good_image_passes(self) -> None:
         """反面对照：按契约出的图必须**一条都不报** ——
         否则上面那些"有牙"的用例可能只是"永远会报"。"""
         self._write(*self.brief_size())
-        code, problems = image_source.check_images(self.spec, self.dir)
+        code, problems, _notes = image_source.check_images(self.spec, self.dir)
         self.assertEqual(problems, [])
         self.assertEqual(code, 0)
 
@@ -380,7 +387,7 @@ class TestCheck(unittest.TestCase):
     def test_shared_filename_is_verified_once(self) -> None:
         """同一个文件用在多页时只验一次、只报一条 —— 三条一样的报错是噪音。"""
         self._write(320, 213)
-        _code, problems = image_source.check_images(self.spec, self.dir)
+        _code, problems, _notes = image_source.check_images(self.spec, self.dir)
         self.assertEqual(len(problems), 1, problems)
 
 

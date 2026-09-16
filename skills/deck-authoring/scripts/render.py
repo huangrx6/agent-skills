@@ -365,7 +365,15 @@ html,body{margin:0;background:var(--viewer)}
 .herofig .herobar .title{color:var(--paper);
   font-size:var(--s-colTitle,26px);line-height:1.3;white-space:normal}
 .hero-bullets{margin-top:var(--sp-item)}
-.imgwrap img{width:100%;display:block}
+/* 内容图：**展示比例由槽位定，不由图片自身比例定**。
+   生图工具出成 1:1 / 4:3 / 2:1 是常态（提示词按不住比例，各家默认都不同）——
+   以前这里只写 width，于是高度跟着图片比例走：1:1 撑出页底（实测溢出 109px）、
+   2:1 留出一个空洞。现在高度由槽位比例定，多出来的部分按内容类型处理：
+     · 照片 / 插画 / 截图 → cover（按中心裁切，主体居中几乎无损）
+     · 结构图 / 流程图     → contain（留边不裁 —— 图里每一笔都是信息）
+   皮肤的 .imgwrap 想改槽位比例就直接覆盖 aspect-ratio。 */
+.imgwrap img{width:100%;display:block;aspect-ratio:3/2;object-fit:cover}
+.imgwrap[data-fit="contain"] img{object-fit:contain}
 .cols{display:flex;gap:var(--sp-item)}
 .col{flex:1;min-width:0}
 /* two-column 变体：lean-left 左栏 7 栅（825.33px=span(7)），右栏由 flex:1 补齐
@@ -1265,7 +1273,11 @@ def render_resolved(resolved: dict) -> str:
             # （variant 已在 titleblock 之前判定 —— hero 不立独立标题块。）
             main_html = (f'<div class="main"><ul class="bullets" '
                          f'style="--s-bullet:{bsize}px">{items}</ul></div>')
-            img_html = (f'<figure class="imgwrap" {img_attrs}>'
+            # 结构图不裁：图里每一笔都是信息（照片则按中心裁切）
+            vkind = (slide.get("visual") or {}).get("kind") \
+                if isinstance(slide.get("visual"), dict) else None
+            fit_attr = ' data-fit="contain"' if vkind == "diagram" else ""
+            img_html = (f'<figure class="imgwrap" {img_attrs}{fit_attr}>'
                         f'<img src="{html.escape(src)}" alt="">{cap}</figure>')
             if layout == "visual-left":       # 图先文后
                 out.append(f'<div class="two v-left">{img_html}{main_html}</div>')
