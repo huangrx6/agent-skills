@@ -21,49 +21,49 @@ from __future__ import annotations
 
 # role → (中文名, 可承载的页型, 一句"什么时候用它")
 ROLES: dict[str, dict] = {
-    "cover": {"label": "封面", "types": ("title",),
+    "cover": {"label":  "封面", "visual": ('none',), "types": ("title",),
               "when": "第一页；标题 + 副题 + 一句定位"},
-    "transition": {"label": "章节分隔", "types": ("title",),
+    "transition": {"label":  "章节分隔", "visual": ('none',), "types": ("title",),
                    "when": "换章；只给章节名"},
-    "statement": {"label": "主张 / 金句", "types": ("content-text", "title"),
+    "statement": {"label":  "主张 / 金句", "visual": ('none',), "types": ("content-text", "title"),
                   "when": "一个判断，字少、字大"},
-    "breakdown": {"label": "目录 / 结构拆解", "types": ("content-text", "two-column"),
+    "breakdown": {"label":  "目录 / 结构拆解", "visual": ('none',), "types": ("content-text", "two-column"),
                   "when": "把后面要讲的东西列成几块"},
-    "evidence": {"label": "证据 / 细节", "types": ("content-text", "content-image"),
+    "evidence": {"label":  "证据 / 细节", "visual": ('none', 'evidence_image', 'diagram'), "types": ("content-text", "content-image"),
                  "when": "给人读的页；有截图/材料就配图"},
-    "metric": {"label": "核心数字", "types": ("chart", "content-text"),
+    "metric": {"label":  "核心数字", "visual": ('data', 'none'), "types": ("chart", "content-text"),
                "when": "数字是主角；能画图就画图"},
-    "trend": {"label": "走势 / 时间", "types": ("chart", "timeline"),
+    "trend": {"label":  "走势 / 时间", "visual": ('data', 'none'), "types": ("chart", "timeline"),
               "when": "随时间变化；折线或横向时间线"},
-    "composition": {"label": "构成 / 占比", "types": ("chart",),
+    "composition": {"label":  "构成 / 占比", "visual": ('data',), "types": ("chart",),
                     "when": "构成与份额"},
-    "comparison": {"label": "对比", "types": ("two-column", "chart", "content-image"),
+    "comparison": {"label":  "对比", "visual": ('none', 'data', 'evidence_image', 'diagram'), "types": ("two-column", "chart", "content-image"),
                    "when": "两边对照；两栏、对比图或文图"},
-    "process": {"label": "流程 / 路径", "types": ("timeline", "content-image"),
+    "process": {"label":  "流程 / 路径", "visual": ('none', 'evidence_image', 'diagram'), "types": ("timeline", "content-image"),
                 "when": "有几步、有先后"},
-    "capabilities": {"label": "能力并列", "types": ("two-column", "content-text"),
+    "capabilities": {"label":  "能力并列", "visual": ('none',), "types": ("two-column", "content-text"),
                      "when": "几项对等的能力/模块"},
-    "architecture": {"label": "分层架构", "types": ("content-image",),
+    "architecture": {"label":  "分层架构", "visual": ('evidence_image', 'diagram'), "types": ("content-image",),
                      "when": "层与层的关系；结构图（excalidraw / draw.io）"},
-    "flow": {"label": "流程 / 拓扑图", "types": ("content-image",),
+    "flow": {"label":  "流程 / 拓扑图", "visual": ('evidence_image', 'diagram'), "types": ("content-image",),
              "when": "节点与连线；结构图"},
-    "topology": {"label": "拓扑 / 关系", "types": ("content-image",),
+    "topology": {"label":  "拓扑 / 关系", "visual": ('evidence_image', 'diagram'), "types": ("content-image",),
                  "when": "多节点的连接关系；结构图"},
-    "hero_visual": {"label": "大图主角", "types": ("content-image",),
+    "hero_visual": {"label":  "大图主角", "visual": ('evidence_image', 'diagram'), "types": ("content-image",),
                     "when": "一张图承担这一页的主要信息"},
-    "context_image": {"label": "配图 / 场景", "types": ("content-image",),
+    "context_image": {"label":  "配图 / 场景", "visual": ('evidence_image', 'diagram'), "types": ("content-image",),
                       "when": "图说明背景，文字仍是主角"},
-    "risks": {"label": "风险 / 预判", "types": ("content-text", "two-column"),
+    "risks": {"label":  "风险 / 预判", "visual": ('none',), "types": ("content-text", "two-column"),
               "when": "可能出问题的地方"},
-    "actions": {"label": "行动 / 下一步", "types": ("content-text", "two-column"),
+    "actions": {"label":  "行动 / 下一步", "visual": ('none',), "types": ("content-text", "two-column"),
                 "when": "读完要干什么"},
-    "result": {"label": "结论 / 数字海报", "types": ("content-text", "chart"),
+    "result": {"label":  "结论 / 数字海报", "visual": ('none', 'data'), "types": ("content-text", "chart"),
                "when": "把结论收成一句或几个数"},
-    "observation": {"label": "观点 / 展望", "types": ("content-text", "two-column"),
+    "observation": {"label":  "观点 / 展望", "visual": ('none',), "types": ("content-text", "two-column"),
                     "when": "判断与看法"},
-    "team": {"label": "团队 / 关于", "types": ("content-image", "content-text"),
+    "team": {"label":  "团队 / 关于", "visual": ('evidence_image', 'diagram', 'none'), "types": ("content-image", "content-text"),
              "when": "谁在做"},
-    "closing": {"label": "收尾", "types": ("end",),
+    "closing": {"label":  "收尾", "visual": ('none',), "types": ("end",),
                 "when": "最后一页"},
 }
 
@@ -96,6 +96,22 @@ def mismatch_reason(page_type, role) -> str | None:
             f"这一页是 {page_type} —— 要么换页型，要么确认这是有意的例外")
 
 
+def markdown_table() -> str:
+    """planning.md 的那张角色表**由这里生成**（文档不再是第二份事实）。
+
+    表里有四列：角色 / 页型（结构）/ 主视觉档 / 什么时候用它。三列来自本模块，
+    所以它是生成物 —— `tests/deck-authoring/test_doc_contract.py` 逐字比对，
+    改了角色就必然改到文档那一段（或测试当场红）。
+    """
+    lines = ["| 角色（spec 的 `role`） | 页型（结构） | 主视觉档 | 什么时候用它 |",
+             "| --- | --- | --- | --- |"]
+    for role, spec in ROLES.items():
+        types = " / ".join(spec["types"])
+        tiers = " / ".join(f"`{t}`" for t in spec.get("visual", ()))
+        lines.append(f"| `{role}` | {types} | {tiers} | {spec['when']} |")
+    return "\n".join(lines)
+
+
 def vocabulary_table() -> list:
     """`[{role, label, types, when}]` —— 文档与 CLI 共用一份（不另拄一份表）。"""
     return [{"role": r, "label": s["label"], "types": list(s["types"]),
@@ -103,4 +119,4 @@ def vocabulary_table() -> list:
 
 
 __all__ = ["ROLES", "known", "label", "types_for", "roles_for",
-           "mismatch_reason", "vocabulary_table"]
+           "mismatch_reason", "vocabulary_table", "markdown_table"]
