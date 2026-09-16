@@ -235,9 +235,10 @@ after/before/with/sync/overlap —— 落地为编排表的 delay 数学：body 
 
 规范第一版 15 个：fadeSoft fadeRise maskRevealX maskRevealY imageReveal
 scaleFocus growX growY pathDraw countUp highlight crossFade sharedMove
-blurToClear accentSweep。**已实现 7 个**：fadeRise、maskRevealY、imageReveal、
-growX（线）、growY/growX（柱）、pathDraw；countUp/highlight/sharedMove 等
-记在路线图。高级 Shader 效果不进 preset（见 §5）。
+blurToClear accentSweep。**已实现规范 preset 6 个**：fadeRise、maskRevealY、
+imageReveal、growX（线）、growY/growX（柱）、pathDraw；编外 **pop**（点弹出）
+已实现、未入规范 15 名单（§4 Semantic Motion 已记）；countUp/highlight/
+sharedMove 等记在路线图。高级 Shader 效果不进 preset（见 §5）。
 
 ## 31. Page Choreography【✅】
 

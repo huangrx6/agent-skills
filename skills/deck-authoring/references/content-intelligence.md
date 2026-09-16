@@ -121,7 +121,7 @@ must_have（没它论证不成立）/ supporting（增强可信度）/ optional 
 
 预定义骨架（`plan.py --archetypes` 列全表）：problem_solution（问题→影响→方案→证明，
 适合方案/产品/销售）、scr（情境→冲突→解法，咨询/决策）、why_what_how（技术方案/
-战略）、current_gap_target（转型/平台升级）、goal_progress_result（汇报/复盘）、
+战略）、project_report（项目汇报，周报/月报/阶段汇报）、goal_progress_result（汇报/复盘）、
 overview_detail_evidence（评审/研究）、product_capability_value（产品/售前）、
 incident_review（事故复盘）、tech_proposal（架构评审）、past_present_future（发展史/
 路线）。
@@ -208,9 +208,12 @@ Decorative（只承担氛围）。Page Planner 优先保留 Primary。
 ## 28. 内容复杂度评分【≥0.70 未标 split=拦】
 
 complexity = textAmount + nodeCount + evidenceCount + hierarchyDepth +
-chartSeriesCount + visualRequirementCount。本仓库实现：
-`字符/120 + 节点×0.12 + 图表×0.25 + 图×0.15 + (层级-1)×0.10`，输出
-`{"complexityScore", "risk", "splitSuggested"}`。
+chartSeriesCount + visualRequirementCount。本仓库实现（plan.py:175-194）：
+`complexity()` 返回**裸 float 分数**（`字符/120 + 节点×0.12 + 图表×0.25 +
+图×0.15 + (层级-1)×0.10`，封顶 1.0），`should_split()` 返回（是否超阈值,
+分数）二元组 —— 没有 `complexityScore` / `risk` / `splitSuggested` 这类输出
+字段。`plan.py --check` 按它落门（plan.py:384-390）：≥0.70 未标 split =
+阻塞；标了 split 而分数不够 = 提示。
 
 ## 29. 拆页策略
 
@@ -316,7 +319,8 @@ Story Graph 不允许逻辑断层：Problem → Implementation 缺 Solution → 
 
 ## 50. 空洞语言检测【变化词且全句无数字=提示】
 
-赋能 / 助力 / 提升 / 优化 / 全面 / 高效 / 智能 / 协同 / 一体化 / 领先 / 先进 ——
+提升 / 优化 / 降低 / 提高 / 改善 / 赋能 / 助力 / 领先 / 先进（与 plan.py:211-212
+的 VAGUE_CHANGE_WORDS 九词同步）——
 单独出现就追问：提升什么？优化多少？为什么？有什么证据？
 
 ## 51. 数字优先

@@ -8,7 +8,8 @@ Content Fit、评分与修复。不负责：内容事实、品牌身份、最终
 
 > 架构口径：规范设想"Resolved Slide JSON"作为几何层工件；本仓库的对应物是
 > **渲染后的 DOM 本身**（浏览器就是 Layout Resolver：spec 无坐标 → render.py
-> 派生几何 → 真浏览器排 → `measure.py` 用 CDP 量回）。语义层（Slide DSL=spec，
+> 派生几何 → 真浏览器排 → `measure.py` 注入探针脚本、`--dump-dom` 把实测取回，
+> 不走 CDP）。语义层（Slide DSL=spec，
 > 字段封闭、`COORD_FIELDS` 直接判错）与几何层（DOM+实测）同样禁止混合——
 > 只是几何层不是一份 JSON，是活页面。
 
@@ -46,8 +47,10 @@ Design Unit。
 ## 4. Safe Area【✅】
 
 left/right = 84、top = 132（在 96~132 建议带内）、底部页脚独立带（52+24）。
-硬规则全落地：标题越界=阻塞；正文不得进页脚带；logo/页码有独立保护区（重叠
-即阻塞）；full-bleed 类图可越安全区但**核心文字不行**（bounds 检查只豁免图片）。
+硬规则落地实况：越界=阻塞（`check.py` 实测逐元素查，标题在内）；logo 压文字
+=阻塞。三条**承诺未全落地**，照实标注：正文进页脚带**无阻塞检查**、页码
+**无独立保护区**（重叠类阻塞目前只有 logo 压文字这一条）——这两条在路线图上；
+bounds 检查**无角色豁免**（所有可见元素一视同仁，不存在"只豁免图片"）。
 
 ## 5. Grid System【✅】
 
@@ -58,7 +61,7 @@ left/right = 84、top = 132（在 96~132 建议带内）、底部页脚独立带
 
 ## 6. Grid Span【✅】
 
-核心组件宽度取整列（ALLOWED_SPANS：2/3/4/5/6/7/8/9/12）：图文页 = 7+5 列、
+核心组件宽度取整列（`grid.py` 的 ALLOWED_SPANS：2/3/4/5/6/7/8/12）：图文页 = 7+5 列、
 两栏 = 6+6 列、时间线宽度按节点数从网格算（原写死 300px，6 节点超宽 538px 靠
 flex 硬扛——已改为算）。例外允许：full-bleed、editorial overlap、hero 构图、
 装饰元素；核心信息组件必须能解释其网格关系（对齐检查，§12）。
@@ -86,7 +89,8 @@ section 64（+hero 96）。注入产物为 CSS 变量 `--sp-*`；壳里的 gap �
 ## 10. 间距关系【✅】
 
 inner < item < group < section；**组距 ≥ 1.5 × 条目距**（Gestalt 接近性）、
-节距 ≥ 1.25 × 组距——成文进 `grid.py`，`--json` 自检。间距必须表达关系，
+节距 ≥ 1.33 × 组距（`grid.py` 的 SECTION_RATIO）——成文进 `grid.py`，
+`--json` 自检。间距必须表达关系，
 不是装饰。
 
 ## 11. Style 与 Spacing【✅】
@@ -98,7 +102,8 @@ gap=57/73/101——改后 skin 的手写值收敛到令牌（残余 6~8 处手�
 ## 12. Alignment【✅ 提示级】
 
 必须检查：标题/正文/卡片/图/图表/表格/题注的左缘与 baseline。落地：锚点元素
-（标题、栏题、图、图表）左缘必须吸附到列——提示级。实测改前左缘 7 个任意值
+（标题、subtitle（副标题）、图、图表——`check.py` 的 anchors 表，check.py:248）
+左缘必须吸附到列——提示级。实测改前左缘 7 个任意值
 （418/752/800/909/1086/1281/84），改后全部落列（84=边距、448=col4、812=col7、
 933=col8、1176=col10）。优先序：同 Region 左缘 > 网格列 > baseline > 光学对齐。
 
@@ -112,14 +117,16 @@ gap=57/73/101——改后 skin 的手写值收敛到令牌（残余 6~8 处手�
 
 Page Type=页面语义类型，Layout Family=空间组织方式（comparison 页型 → split
 族）。落地：`plan.py` 的 `PAGE_TYPES` 把页型查表映射到版式（comparison→chart、
-process→timeline…）；**family/variant 两级中间层未建**（§15-18 约定）。
+process→timeline…）；**family/variant 两级中间层未建**（§15-18；两族已带
+variant 字段，全量铺开在阶段 3）。
 
 ## 15. Layout Family【✅ 第一片已落地（content-image）】
 
 规范至少支持 single/split/stack/grid/hero/editorial/overlay/timeline/diagram/
 chart/table/dashboard/full-bleed。现状：7 种 slide type（title/content-text/
 content-image/two-column/timeline/chart/end）+ 自建风格。**content-image 率先
-成为显式家族**：`variant` 字段进 spec（封闭值集），其余 type 仍是单版式 ——
+成为显式家族**：`variant` 字段进 spec（封闭值集）；two-column 已跟上（3 变体，
+§16）；其余 type 仍是单版式 ——
 family 命名层全量铺开在路线图阶段 3。
 
 ## 16. Layout Variant【✅ 已落地（content-image 4 变体 + two-column 3 变体）】
@@ -146,7 +153,7 @@ fit 探针把四变体摆进同一份产物供评分（实测：图即陈述的�
 
 不得随机选版式；必须考虑内容量/视觉角色/图比例/优先级/语义关系/风格/密度/
 平衡/前后页节奏。现状（content-image）：spec 写 `variant: "auto"` →
-`fit --recommend` 把三变体 × 真图摆进同一份探针**实测**（CandidateScore，
+`fit --recommend` 把四变体（含 hero）× 真图摆进同一份探针**实测**（CandidateScore，
 图的高宽比是真实输入）→ 落盘 JSON → `compile --fit-variants` 按分选最佳；
 平局偏默认，无数据回退默认并留痕。**显式 variant 永远赢**——实测数据
 不越权改内容决策。其余 type 仍页型查表（确定性，不随机）。
@@ -156,7 +163,7 @@ fit 探针把四变体摆进同一份产物供评分（实测：图即陈述的�
 Page Planner 输出候选+分数，Resolver 实测后定版。现状（content-image 闭环）：
 `fit recommend`（纯函数）从实测选每页最佳 + 对手分数；`compile` 的
 auto 决策吃同一份数据、Decision Trace 带分数对比。全类型铺开待各家族
-有真变体（hero / cards / editorial …）。
+有真变体（cards / editorial ……hero 已随 content-image 四变体落地）。
 
 ## 19. Information Hierarchy【部分 ✅】
 
@@ -217,9 +224,11 @@ style-architecture 的对照表里（swiss=栅格对称、botanical=编辑式非
 
 ## 28. Content Fit 修复顺序【✅ 顺序成文】
 
-布局失败**禁止第一步缩字体**：1 删无关内容 → 2 更短 Copy → 3 删低优先级 →
-4 调 gap → 5 调 padding → 6 调区域比 → 7 换 Variant → 8 换组件档 → 9 缩
-非核心视觉 → 10 拆内容 → 11 拆页 → **12 最后才降字号 tier**。落地：这条顺序
+布局失败**禁止第一步缩字体**：1 修事实/必需内容 → 2 删无关装饰 → 3 更短
+Copy → 4 删低优先级 → 5 调 gap → 6 调 padding → 7 调区域比 → 8 换 Variant
+→ 9 换组件档 → 10 缩非核心视觉 → 11 拆内容 → 12 拆页 → **13 最后才降字号
+tier**（权威表：`pipeline.md` §31 的 13 步修复顺序，这里是同一张）。
+落地：这条顺序
 写进 `hierarchy.py` 的报错文本（人唯一一定会读的那段字）；`bullet_tier()`
 的自动降档是**兜底**不是第一手段（退位到阶段 3，见附录路线图）。
 
@@ -238,8 +247,9 @@ MetricCard 式声明表未建。
 ## 31. Image Constraints【✅】
 
 aspect ratio（实测插槽比）/ minResolution（盒子 ×2）/ bleedAllowed / 无放大
-（check 阻塞）都在图像契约与 check.py；**禁止非等比拉伸、无 focal 的盲裁、
-小图强放大**——放大检查阻塞，比例在 brief 阶段对齐。
+（check **提示**）都在图像契约与 check.py；**禁止非等比拉伸、无 focal 的盲裁、
+小图强放大**——放大检查是 notes 提示不是阻塞（check.py：渲染宽 > 原始宽 5%
+即提示"会糊"），比例在 brief 阶段对齐。
 
 ## 32. Chart Constraints【✅】
 
@@ -258,14 +268,20 @@ Chart Container 负责 chart box/title box/标注区/标签安全区；**Chart E
 表格过高优先拆表/分页/转附录而不是缩到不可读。现状：无 table 版式（表格数据
 走 chart 或截图）；规则留给将来。
 
-## 35. Hard Constraints【✅ 全对上】
+## 35. Hard Constraints【部分 ✅——四项在路线图】
 
-失败即阻塞：overlap（重叠）✓、out of bounds（越界）✓、text clipping（溢出）✓、
-unreadable min font（对比度+最小字号）✓、image excessive upscale（图放大）✓、
-chart label clipping（图表成比例）✓、logo overlap（logo 压字）✓、footer
-collision（页脚带）✓、impossible aspect（比例冲突）✓、unresolved required
-asset（缺图）✓ —— `check.py` 8+ 条，`deliver.py` 在 check 失败时直接中止
+失败即阻塞：out of bounds（越界，实测）✓、text clipping（溢出/容器裁切）✓、
+对比度（叠印墨 vs 纸色——"unreadable min font"的对比度半边）✓、chart label
+clipping（柱高成比例）✓、logo overlap（logo 压字）✓、decor overlap（墨块压
+文字栏）✓、unresolved asset（图没加载/脚本报错）✓、full-page image（图盖
+整页，hero role-aware）✓ —— `check.py` 阻塞 10 余条，`deliver.py` 在 check
+失败时直接中止
 （"把已知有问题的 deck 做成五种格式只是把问题复制五份"）。
+
+四项**承诺未落地**（路线图，先别当已有的牙）：unreadable min font 的**最小字号**
+半边、overlap（**文字互压**——重叠类阻塞目前只有 logo 压文字一条）、footer
+collision（**正文进页脚带**）、impossible aspect（**比例冲突**）。另：image
+excessive upscale（图放大）是 **notes 提示**不是阻塞（渲染宽 > 原始宽 5% 即提示）。
 
 ## 36. Soft Constraints【✅】
 
@@ -297,9 +313,11 @@ decor 类型与角位由风格 token 限定（版心已满的版式不放装饰�
 不能只评单页：连续同 Variant 数、visual/text 节奏、full-bleed 频率、chart
 连续页数、纯文字连续页数。未实现（单页检查为主）；stress deck 提供测试面。
 
-## 41. Repetition Rule【约定】
+## 41. Repetition Rule【✅ 已落地（提示级）】
 
-同一 layoutVariant 连续 ≤2 页，超过提示（附录、数据连续比较可例外）。未实现。
+同一 type+variant 连排 **n≥2** 即提示轮换（content-image / two-column；
+`check.py` 的 `_variant_rotation_notes`，check.py:377-402）——比规范原案的
+"≤2 页后提示"开口更早；附录、数据连续比较可例外（提示本就不阻塞）。
 
 ## 42. Layout Novelty【约定】
 
@@ -369,7 +387,9 @@ Repair 不重生成整页，输出 Patch（switch_copy_level / switch_variant…
 
 R1 删无关装饰 → R2 短 Copy → R3 删低优先级 → R4 调 gap → R5 调 padding →
 R6 调区域比 → R7 换 variant → R8 换组件档 → R9 缩非核心视觉 → R10 拆内容
-→ R11 拆页 → **R12 降字号 tier**。与 §28 同一张表，写进 hierarchy 报错。
+→ R11 拆页 → **R12 降字号 tier**——在统一表里这是**第 13 位**（第 1 位
+"修事实/必需内容"属内容层，见 `pipeline.md` §31）。与 §28 同一张表，写进
+hierarchy 报错。
 
 ## 54. Repair Loop【✅ 人在环版】
 
@@ -387,22 +407,30 @@ image fit / chart fit；**不决定内容价值**（值不值得说是 content-i
 ## 56. Browser Measurement【✅】
 
 HTML 路径优先真浏览器测量：actual font metrics / wrapping / SVG bounds /
-DOM rect / image natural size。落地：`measure.py` 走 CDP 拿真矩形；
+DOM rect / image natural size。落地：`measure.py` 注入探针脚本、`--dump-dom`
+取回（不走 CDP，见文件头注），拿真矩形；
 **字符宽度估算只能做预判**（fit 的粗筛），最终判断全靠实测。
 
-## 57. Candidate Testing【约定】
+## 57. Candidate Testing【✅ 第一片已落地（content-image 四变体并测）】
 
 一次生成多个 Variant，同一浏览器批量测量后排名；选择 = hard pass + 最高分。
-雏形：fit.py 多档位试排；多 variant 并测未实现（等 §16 变体表）。
+落地：`fit.py` 的 `build_variant_probe` 把每页 content-image × **四变体**（含
+hero）摆进同一份探针产物，`fit --recommend` 渲一次量一次、按 CandidateScore
+逐页选最佳并落盘 JSON（fit.py:414 起，喂 `compile --fit-variants`）——
+与 §17/§18 同一条闭环。其余 type 待各家族有真变体（§15-18）。
 
-## 58. Candidate Score【约定】
+## 58. Candidate Score【部分 ✅——仅 Rhythm 未接】
 
-Fit×0.35 + Layout×0.35 + StyleMatch×0.15 + RhythmMatch×0.15。未实现。
+实装公式（`fit.py` 的 `SCORE_WEIGHTS`，fit.py:77）：Fit .20 + 留白 .15 +
+语义 .10 + 层级 .15 + 焦点 .15 + 平衡 .10 + 风格 .075——层级/焦点/平衡从
+hierarchy.weights 与墨量重心的实测来。仅 **Rhythm .075 未接**（要跨页序列，
+配合 §40）。
 
 ## 59. Deck-level Layout Planner【约定】
 
 页面不能完全独立选 layout；需读 previousVariant/nextIntent/sectionRole/
-pageImportance，避免连续同构页。未实现（配合 §40-41 一起做）。
+pageImportance，避免连续同构页。未实现（配合 §40 一起做；§41 的轮换提示
+可作起点）。
 
 ## 60. Cover Layout【✅】
 
@@ -453,10 +481,12 @@ hero 40-75% / evidence 30-55 / supporting 20-40 / decoration <20（不是硬
 主要用于 Cover/Section/Image Story/Mood/特殊过渡页；**正文页默认不用**。
 落地：无 full-bleed 版式；装饰角块是唯一的出血元素且受角位限定。
 
-## 69. Overlap【✅ 限定】
+## 69. Overlap【部分 ✅】
 
 只在 editorial/hero/creative/共享元素构图用；必须文字可读、层级清楚、不遮
-核心信息。落地：装饰块可越安全区但压字=阻塞；文字元素之间重叠=阻塞。
+核心信息。落地：装饰块可越安全区但压字=阻塞（墨块×文字栏）；**文字元素之间
+重叠=阻塞还未实现**——重叠类阻塞目前只有 logo 压文字这一条（`check.py` 的
+`_check_brand`），通用互压检查在路线图上。
 
 ## 70. Layout QA【✅】
 
@@ -551,7 +581,7 @@ iterations、variant diversity、repetition rate、human rating。
 LLM 不写坐标（§0）；页型与族分离（§14）；Region 先于组件（§7）；网格/间距/
 几何单一来源（§79）；所有间距来自令牌（§9）；层级显式 priority 化（§19）；
 每页最多一个主要焦点（§21）；**留白是结构不是剩余空间**（§24）；变体必须有
-候选和实测（§17-18 约定）；Hard 失败不得导出（§35+deliver 中止）；Soft 用
+候选和实测（§17-18，第一片已落地）；Hard 失败不得导出（§35+deliver 中止）；Soft 用
 评分不宜全阻塞（§36）；Content Fit 不得第一步缩字号（§28）；Repair 必须
 patch 不重生成（§52）；坐标只在 Resolved 层（§50-51）；Chart/Diagram 内部
 归各自引擎（§32-33）；Style 管性格不管几何（§43）；Deck 级查节奏（§40 约定）；
@@ -571,7 +601,8 @@ Hard Check（check）→（Score 约定期）→ Repair（人改 spec）→ Reso
 Family 与 Variant，再用 Grid、Region、Spacing、Priority、Constraint、
 Measurement、Scoring 和 Repair 共同求出稳定、清晰且有设计感的最终几何。
 本仓库已兑现：Grid/Region 语义/Spacing/Priority 尺/Constraint（硬+软）/
-Measurement；Family×Variant 与 Scoring 在路线图上（见下）。
+Measurement；Family×Variant 与 Scoring 已落地第一片（content-image/two-column
+与 CandidateScore），全量铺开在路线图上（见下）。
 
 ---
 
@@ -582,7 +613,8 @@ Measurement；Family×Variant 与 Scoring 在路线图上（见下）。
 + **阶段 2**（✅）：`grid.py` 唯一几何来源；12 列 84/24/97.33；间距 ramp +
   语义档 + 关系规则；`--sp-*` 注入；时间线宽从网格算；锚点对齐检查（左缘
   7 任意值 → 全落列）；subtitle==bullet 同级碰撞修复 + style.py 校验。
-+ **阶段 3**（路线图）：版式族 × 变体表（§15-18/§57-59）+ `bullet_tier`
++ **阶段 3**（路线图）：版式族 × 变体表全量铺开（§15-18/§57-59；content-image/
+  two-column 两片与 CandidateScore 已先行落地）+ `bullet_tier`
   退位（换变体/拆页优先，缩字号最后——现在它是兜底不是第一手段）。
 + **阶段 4**（路线图）：Shape 8 参数（§44）+ Layout Score/Repair 引擎
   （§37-38/§52-54）+ skin 残余手写间距清零。

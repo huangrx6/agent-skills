@@ -64,7 +64,7 @@ DECK_FONT_DIR=/tmp/f python3 scripts/fonts.py --fetch   # 指定任意位置
 | --- | --- | --- |
 | 得意黑 Smiley Sans | `atelier-anchor/smiley-sans` | OFL-1.1 |
 | 霞鹜文楷 / 霞鹜文楷 TC | `lxgw/LxgwWenKai` / `lxgw/LxgwWenKaiTC` | OFL-1.1 |
-| 清松手写体 1–9 | `jasonhandwriting/JasonHandwriting` | OFL |
+| 清松手写体 1（`--fetch` 自动只取第 1 款；2–9 同仓库手工拿） | `jasonhandwriting/JasonHandwriting` | OFL |
 | Fusion Pixel Font | `TakWolf/fusion-pixel-font` | MIT |
 
 其余 120 款按 `--list --urls` 给的来源页手工拿，放进 `fonts/ttf/` 即可 —— 文件名里
@@ -96,13 +96,13 @@ body / numeral 三档都给齐，所以"只用免费的"不会变成"有几套�
 > 打包给别人），要带上它的版权声明与 License 文本。只是拿它排版、或者把用到的字形
 > 子集嵌进 PDF，不受这条影响 —— 那是通行做法。
 
-清单 126 款里严格 A 是 **86 款**；`A/B` 有 4 处落在默认映射上，`B` 有 2 处
+清单 126 款里严格 A 是 **64 款**（另有 A/B 22 款）；`A/B` 有 4 处落在默认映射上，`B` 有 2 处
 （`京华老宋体`、`HarmonyOS Sans`）—— 这些在纯 A 方案里都换掉了。
 
 ## 授权：清单标了 A/B/C，但不是"标了就没事"
 
-- **A**（86 款）：OFL / 开源或官方明确广泛免费商用 —— 可以下载、安装、进交付物。
-- **B**（28 款）：免费商用但有**署名 / 地区 / 禁商标 / 禁嵌入**等限制 —— 用之前读条款。
+- **A**（64 款，另有 A/B 22 款）：OFL / 开源或官方明确广泛免费商用 —— 可以下载、安装、进交付物。
+- **B**（24 款 + 4 款带附加条件的 B 变体）：免费商用但有**署名 / 地区 / 禁商标 / 禁嵌入**等限制 —— 用之前读条款。
 - **C**（12 款）：只是"被免费字体平台收录为商免"，授权未经一手确认。
 
 **免费字体的授权会调整**，而把字体嵌进交付物（尤其 PDF / PPTX）属于"再分发"，
@@ -113,7 +113,7 @@ body / numeral 三档都给齐，所以"只用免费的"不会变成"有几套�
 
 完整映射表在 `fonts/mapping.json`（`--map` 可打成人类可读的样式），分两层：
 
-- **styles**：风格名 × display / body / numeral 三档该配哪款字（历史八套名保留作参考，自建同名即生效）
+- **styles**：风格名 × display / body / numeral 三档该配哪款字（历史九套名保留作参考——minimal-baseline 已入表，自建同名即生效）
   （比如 `terminal` 必须锁死等宽、`swiss-grid` 只能用**中性到没有性格**的字、
   `paper-ink` 的 400 字重标题只有楷体/明朝体配得上）。
 - **categories**：六类艺术字各适合什么场合（国潮 / 毛笔 / 潮流 / 卡通 / 电商 / 科技），

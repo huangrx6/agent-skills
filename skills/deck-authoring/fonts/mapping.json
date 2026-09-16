@@ -1,7 +1,7 @@
 {
  "version": 1,
  "note": "字体 ↔ 风格映射表。两问：这套风格该配哪款字（styles），以及某类艺术字该用在什么场合（categories）。**每一款字体都必须在 fonts/catalog.json 里**（有测试把关）—— 映射到查不到的字体等于给了一条走不通的路。",
- "how_to_read": "roles 里的 display/body/numeral 对应版面上的三档字：标题档、正文档、数字档（有的风格还有 opening 开场页档）。写 `A / B` 表示 A 优先、装不到就退到 B。",
+ "how_to_read": "roles 里的 display/body/numeral 对应版面上的三档字：标题档、正文档、数字档。写 `A / B` 表示 A 优先、装不到就退到 B。",
  "licensed_note": "带 ⓑ 的是清单里授权的 B 级（有署名/地区/禁嵌入等限制）——**要嵌进交付物之前先读条款**；A 级可以直接用。",
  "styles": {
   "keynote-dark": {

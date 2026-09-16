@@ -94,9 +94,9 @@ original / derived(inferred) / generated 三分；**generated 不得伪装为事
 
 ## 7. Storyline【✅】
 
-让观众按什么顺序相信；从有限 Archetype 选（七个规范骨架 ⊂ 本仓库十个，
-多出 overview_detail/product/incident/tech_proposal/project_report）；可组合
-最多两种主骨架。乱序=阻塞。
+让观众按什么顺序相信；从有限 Archetype 选（五个规范骨架 ⊂ 本仓库十个，
+多出 overview_detail/product/incident/tech_proposal/project_report；全表见
+plan.py:81 ARCHETYPES）；可组合最多两种主骨架。乱序=阻塞。
 
 ## 8. Page Planning【✅】
 
@@ -402,7 +402,8 @@ Image-heavy/全部版式）+ chart-intents（Chart Resolver v2 展示：composit
 
 ## 54. Benchmark 指标【✅ 已落地（数值化）】
 
-benchmark.py 逐 fixture 记录（全实测）：check_problems/notes、script_errors、
+benchmark.py 逐 fixture 记录（全实测）：check_problems（check.py:542 的 check()
+只返回阻塞清单，没有 notes 指标）、script_errors、
 render_ms（机器相关仅参考）、字节可复现/编译确定性（§41）、逐页密度分布、
 focal/budget issues、unique_kinds/max_consecutive（variant diversity /
 repetition rate）。不采的（诚实留白）：repair iterations（Repair 引擎
@@ -460,7 +461,11 @@ Repair 保证质量，Export QA 保证最终交付。本仓库的兑现度见各
 | ④ DSL | deck.spec.json | `--to-spec` + `validate_spec` | 封闭字段 / 页无 message / 图表无数据 / 图页无图 | 字体回退 / 没封面 |
 | ⑤⑥ 图像 | brief + 真图 | `image_source --brief/--check` | 缺图 / 宽度 / 比例 / 重复 | 零插槽建议 |
 | ⑦⑧ 渲染+QA | deck.html | `render.py` + `check.py` | 越界 / 重叠 / 溢出 / 对比度 / 全页图 | 密度 / 焦点 / 预算 / 对齐 / 0 图 |
-| ⑨ 交付 | 六格式 | `deliver.py` 等 | check 失败中止 / 嵌入超限 | 接收方须知 |
+| ⑨ 交付 | 六格式 | `deliver.py` 等 | 规格/校验不过中止 · PDF 或原生 PPTX 导出失败 · PDF 像素差超容忍 | 接收方须知 |
+
+> ⑨ 没有"嵌入超限"这道门：唯一嵌入上限在 `fonts.py embed()` 单独内联时
+> （fonts.py:474-493），交付链不调它；失败条件即 deliver.py 的 failures 计入点
+> （:307 规格、:315 校验、:324 PDF 导出、:340 原生导出、:373 像素差超容忍）。
 
 ```bash
 S=skills/deck-authoring/scripts

@@ -95,18 +95,22 @@ python3 scripts/palette.py --roles swiss-grid blue                   # 13 个角
 | `tech_blue_purple_cyan` | 主题像 AI/科技 **且** 主色落在 H 200~320 且 C ≥ 0.10 | 训练数据里最高频的一套（规范第 23 条点名） | −0.30 |
 | `corporate_blue_white` | 蓝主色（H 230~275）+ 白底 | 企业模板的默认解 | −0.18 |
 | `premium_black_gold` | 深底 + 金色强调（H 60~100） | 高端感的默认解 | −0.15 |
-| `even_saturation` | 两个高饱和色相且饱和度接近 | 没有主次 | −0.12 |
+| `even_saturation` | 主副两色饱和度都 ≥ 0.10 且相差 < 0.03，两色相隔 > 120° | 没有主次 | −0.12 |
 | `low_lightness_contrast` | 背景与主体明度差 < 0.25 且底是浅的 | 重点浮不出来 | −0.15 |
 
 加分项同理（非常规冷暖、低饱和+高纯度强调、中性+非典型强调）。
 
 **实测：历史八套内置期，5 套的某个色板正落在名单上**（现为自建风格按同一判据提示） —— 所以这条**不能一律阻塞**，
 否则仓库自己的风格先挂。它只做两件事：按**主题条件**指出"这套色 + 这个主题正好落在
-最俗的组合上"，以及在你显式要求时（`--min-novelty`）当闸门。阈值按规范第 18 条：
-普通 PPT 0.45 / 设计型 0.65 / 创意封面 0.75。
+最俗的组合上"，以及在你显式要求时（`--min-novelty`）当闸门。规范第 18 条给过三档
+阈值（普通 PPT 0.45 / 设计型 0.65 / 创意封面 0.75），但代码里那份对应表
+（`NOVELTY_MIN`，palette.py:312）**没接线，是死常量**；实际生效的闸门是风格自报的
+`colorStructure.novelty_target`（palette.py:628；夹具 swiss-grid 0.5）加上显式
+`--min-novelty`。
 
-> 拿 `--topic "AI 大模型架构"` 审一遍就会看到 `swiss-grid/blue` 同时命中
-> `tech_blue_purple_cyan` 与 `corporate_blue_white`，`keynote-dark/blue` 命中前者。
+> 拿 `--topic "AI 大模型架构"` 审一遍就会看到：夹具两套的 `blue` 色板
+> （`swiss-grid/blue`、`minimal-baseline/blue`）都同时命中
+> `tech_blue_purple_cyan` 与 `corporate_blue_white`（实测 novelty 0.14）。
 > **这说明规范那两条不是空话，而是本仓库真实存在的情况** —— 想做 AI 主题的 deck，
 > 这几个色板不该默认选。
 
@@ -116,11 +120,16 @@ python3 scripts/palette.py --roles swiss-grid blue                   # 13 个角
 变体**（而不是三套无关的色），因为规范要求"保留原 Palette 的视觉关系"：
 
 - **Safe** —— 原样。稳定、克制、可用于正式汇报
-- **Creative** —— 色相挪 18°、彩度提 12%、明度微提。**默认优先选它**
+- **Creative** —— 色相挪 18°、彩度提 12%、明度微提。**不是默认**：按上节决策链，
+  mood 映射到 creative、或风格声明 `color_creativity` ≥ 0.66 才选它；无 mood 且未声明
+  落 Safe（手调基准原样）
 - **Experimental** —— 反方向挪 28°、彩度提 20%、明度降。制造冷暖反差，用在封面/视觉页
 
-规范说"Creative 不满足可读性再回退 Safe" —— 可读性是**能测的**，所以这个回退是
-可执行的：跑 `--directions` 看哪一套过 `ink.py` 的对比门槛。
+规范说"Creative 不满足可读性再回退 Safe" —— 可读性是**能测的**，但工具边界要说清：
+`--directions` 只打印三套变体与各自 novelty（palette.py:677-684），**输出里没有
+对比度判定**；要验对比度，把选中的变体写进 token 再跑 `ink.py <style.json>`
+（任一色板不达标退出码 1）。auto 派生路线不依赖这道回退 —— variant 只动
+primary / secondary，对比度结构原样保住（见上节）。
 
 ## 检索关键词：搜 Style，不搜行业
 
@@ -171,5 +180,6 @@ unusual gradient palette             premium low-saturation palette
 2. **玻璃拟态 / Glow / Mesh**。规范第 12 条的背景策略里有这些，当前只支持
    `solid` 与 `texture`（颗粒）。
 3. **强调色占比的实测**。规范第 11 条说 5%~20%。`measure.py` 已经记了每个元素的
-   `measuredColor`，所以**算得出来**（按元素盒面积统计），但还没接进 `check.py`。
+   `color`（measure.py:164；`measuredColor` 只是 pptx 导出侧的改名，
+   pptx_native.py:409），所以**算得出来**（按元素盒面积统计），但还没接进 `check.py`。
 4. **外部配色源的自动检索**。`palette.py` 不联网 —— 取灵感这一步是流程（见上）。
