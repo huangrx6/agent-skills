@@ -67,6 +67,10 @@
 
 ### 贴图版 `pptx_native.py --png-dir`
 
+**先问 HTML**：它是**唯一带演示态**的形态（`?present` 一页一屏、`←/→`、`F`）且自包含
+单文件；其余四种（PDF / PNG / PPTX / 视频）都从它派生。报交付清单时**不要漏掉它** ——
+实测漏过一次，用户拿到的是"没有可演示版本"的三件套。
+
 **可编辑 PPTX 的两种入口（同一构建核）**：`pptx_native.py out.html`（当场实测）
 与 `pptx_native.py --resolved resolved.deck.json`（吃 `render --resolved` 的完整
 契约：语义 + 实测几何 + 颜色变量一次成型）—— 几何只在渲染时定一次，

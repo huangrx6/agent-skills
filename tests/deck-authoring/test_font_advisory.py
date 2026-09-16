@@ -130,5 +130,51 @@ class TestFontAdvisory(unittest.TestCase):
             self.assertNotIn(note, problems, "字体提示漏进了阻塞的 problems")
 
 
+
+class TestSystemUiFontNote(unittest.TestCase):
+    """两条结论要分得清：**谁顶上了**（回退）与**顶上的是不是默认**（没设计）。
+
+    用合成的 measured 字典（不跑浏览器）：判据的形状由 `measure.py` 的像素指纹给，
+    这里钉的是"什么情况说什么话"。
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.check = _load("_deck_test_font_check", os.path.join(SCRIPTS, "check.py"))
+
+    def _notes(self, fonts: dict, stacks: list) -> list:
+        return self.check._check_font_fallback({"fonts": fonts, "stacks": stacks})
+
+    def test_system_ui_first_family_is_flagged_as_no_design(self) -> None:
+        notes = self._notes({"Hiragino Sans GB": {"available": True}},
+                            [["Hiragino Sans GB", "sans-serif"]])
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("系统 UI 默认族", notes[0])
+
+    def test_personality_family_is_silent(self) -> None:
+        notes = self._notes({"得意黑 Smiley Sans": {"available": True}},
+                            [["得意黑 Smiley Sans", "sans-serif"]])
+        self.assertEqual(notes, [], "有性格的族不该被念")
+
+    def test_all_default_rendering_says_font_has_no_effect(self) -> None:
+        notes = self._notes({"MiSans": {"available": False, "defaultLike": True},
+                             "PingFang SC": {"available": False, "defaultLike": True}},
+                            [["MiSans", "PingFang SC", "sans-serif"]])
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("字体等于没生效", notes[0])
+
+    def test_fallback_says_who_won(self) -> None:
+        notes = self._notes({"MiSans": {"available": False},
+                             "Source Han Sans SC": {"available": True}},
+                            [["MiSans", "Source Han Sans SC", "sans-serif"]])
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("实际用的是 'Source Han Sans SC'", notes[0])
+
+    def test_generic_family_is_a_target_not_a_font(self) -> None:
+        notes = self._notes({"sans-serif": {"available": True, "generic": True}},
+                            [["sans-serif"]])
+        self.assertEqual(notes, [], "通用族是回退目标，不是字体，不该报")
+
+
 if __name__ == "__main__":
     unittest.main()

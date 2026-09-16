@@ -374,6 +374,10 @@ html,body{margin:0;background:var(--viewer)}
 .cols.v-lean-left .col:first-child{flex:none;width:825.33px}
 .cols.v-lean-right .col:last-child{flex:none;width:825.33px}
 .tl{display:flex;gap:var(--sp-item);list-style:none;padding:0;margin:0}
+/* 条目列表：壳只管**结构**（无默认圆点、无浏览器缩进）——标记是装饰，归皮肤
+   （`.bullets li::before`）。壳不再发标记：以前每条前面有一个方块元素，皮肤再画
+   自己的短横时就成了两个标记，而那个方块没有间距、直接贴住正文（实测截图）。 */
+.bullets{list-style:none;padding:0;margin:0}
 .tl li{flex:1;min-width:0;width:var(--tl-node,300px)}
 .chartsrc{margin:calc(var(--sp-inner) * -0.5) 0 0;color:var(--text);opacity:.55;
   font:400 var(--s-caption,16px)/1.4 var(--body)}
@@ -1184,7 +1188,7 @@ def render_resolved(resolved: dict) -> str:
                        f'style="--s-title:{tsize}px">{th}</div>')
             items = "".join(
                 f'<li {tag(f"s{i}.bullet.{bi}", i, "bullet", b, bsize)}>'
-                f'<i>■</i>{html.escape(b)}</li>'
+                f'{html.escape(b)}</li>'
                 for bi, b in enumerate(slide.get("bullets", [])))
             out.append(f'<ul class="bullets" style="--s-bullet:{bsize}px">{items}</ul>')
         elif kind == "content-image":
@@ -1204,7 +1208,7 @@ def render_resolved(resolved: dict) -> str:
                            f'style="--s-title:{tsize}px">{th}</div>')
             items = "".join(
                 f'<li {tag(f"s{i}.bullet.{bi}", i, "bullet", b, bsize)}>'
-                f'<i>■</i>{html.escape(b)}</li>'
+                f'{html.escape(b)}</li>'
                 for bi, b in enumerate(slide.get("bullets", [])))
             # 干净报错，不要甩一个 KeyError 栈：validate_spec.py 本该先拦住
             # （它现在有 REQUIRED_SLIDE_FIELDS），但 render 也可能被别的入口直接调。
@@ -1267,7 +1271,7 @@ def render_resolved(resolved: dict) -> str:
             for ci, col in enumerate(slide.get("columns", [])[:2]):
                 li = "".join(
                     f'<li {tag(f"s{i}.col{ci}.bullet.{bi}", i, "bullet", b, bsize)}>'
-                    f'<i>■</i>{html.escape(b)}</li>'
+                    f'{html.escape(b)}</li>'
                     for bi, b in enumerate(col.get("bullets", [])))
                 band = "a" if ci == 0 else "b"
                 coltitle = col.get("title", "")

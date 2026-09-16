@@ -120,12 +120,29 @@ PROBE_JS = r"""
     if (GENERIC[fam.toLowerCase()]) {
       return { available: true, generic: true, width: null };
     }
-    // 启发式：拿一个一定不存在的族当基准，宽度不同 = 声明的族真的生效了
-    var c = document.createElement('canvas').getContext('2d');
-    var probe = '汉字宽度测试 Abcdefgh 0123456789 ilWm';
-    c.font = '40px "' + fam + '"';              var a = c.measureText(probe).width;
-    c.font = '40px "__no_such_font_xyz__"';     var b = c.measureText(probe).width;
-    return { available: Math.abs(a - b) > 0.5, width: Math.round(a * 100) / 100 };
+    // **像素指纹**：同一字串在"声明的族"与"一定不存在的族"下各画一次，逐像素比。
+    // 为什么不是宽度（原来就是这么写的）：CJK 字形全是 1em 等宽 —— 换字体宽度不变，
+    // 实测 11 个族（含不存在的族）宽度全等，宽度法对中文**永远判不出**，只会误报。
+    // 像素比的是字形形状与覆盖，对 CJK 有效；alpha 通道做指纹。
+    var sample = '汉字永宇国术图 AaWM7';
+    var cv = document.createElement('canvas');
+    cv.width = 300; cv.height = 56;
+    var ctx2 = cv.getContext('2d');
+    function fingerprint(f) {
+      ctx2.clearRect(0, 0, cv.width, cv.height);
+      ctx2.font = '32px "' + f + '", __no_such_font_xyz__';
+      ctx2.fillStyle = '#000';
+      ctx2.textBaseline = 'top';
+      ctx2.fillText(sample, 2, 6);
+      var d = ctx2.getImageData(0, 0, cv.width, cv.height).data;
+      var h = 5381;
+      for (var i = 0; i < d.length; i += 4) { h = ((h * 33) ^ d[i + 3]) >>> 0; }
+      return h;
+    }
+    var missing = fingerprint('__no_such_font_xyz__');
+    var mine = fingerprint(fam);
+    // 与默认渲染一致 = 这个族没带来任何字形差异（不存在，或它就是本机默认族）。
+    return { available: mine !== missing, defaultLike: mine === missing, width: null };
   }
 
   function collect() {

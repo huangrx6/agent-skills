@@ -470,30 +470,49 @@ def _check_type_size(measured: dict, deck: dict, tokens: dict | None) -> list[st
     return notes
 
 
+# 本机**系统 UI 默认族**：它们不是设计选择，而是"没设字体时你会看到的那个字形"。
+# 出现在风格字体栈首位 = 字体不承担设计（实测用户反馈："字体一直没有生效"）。
+# 不含等宽族：mono 是 fonts/mapping.json 里的一种**性格**，不是默认回退目标。
+SYSTEM_UI_FAMILIES = {
+    "helvetica", "helvetica neue", "arial", "pingfang sc", "hiragino sans gb",
+    "-apple-system", "blinkmacsystemfont", "system-ui", "segoe ui", "roboto",
+    "sans-serif", "serif", "noto sans", "liberation sans", "dejavu sans",
+}
+
+
 def _check_font_fallback(measured: dict) -> list[str]:
-    """字体回退**提示**（不判失败）—— 而且要说清楚**谁顶上了**。"
+    """字体两条**提示**（都不阻塞）—— 说清"谁顶上了"，以及"顶上的是不是默认"。
 
-    启发式：拿一个一定不存在的族当基准比宽度，宽度一样 = 那个族没生效。
-    通用族（serif / monospace）排除 —— 它们不是字体而是**回退目标**，不排会误报“缺失”。
-    即便如此仍可能误报（衬线撞衬线），所以只提示。
+    判据来自探针的**像素指纹**（`measure.py`：同字串在"声明的族"与"不存在的族"下各画
+    一次、逐像素比）。为什么不用宽度：CJK 字形全是 1em 等宽 —— 宽度法对中文永远判不出
+    （实测 11 个族连不存在的族宽度都相等），只会误报。
 
-    只跟**有文字的元素**的栈算（探针已经滤掉无文字的，见 `measure.py`）。
-    早先按全部元素统计，结果报了 `<figure>` 的 'PingFang SC' —— 那是 Chrome 给 CJK 的
-     UA 默认值，而那个元素不渲染任何字形（实测踩过）。
+    两条分开，因为修法不同：
+    - 首选没生效 → 回退链顶上：**排版会随机器变**（换台机器就换字形）；
+    - 首选生效但**是本机系统 UI 族** → 字形就是本机默认，**视觉上等于没设字体** ——
+      要的是"换个族 / 自带字体文件"，不是"修回退"。
     """
     fonts = measured.get("fonts", {})
     out: list[str] = []
     for stack in measured.get("stacks", []):
         first = stack[0] if stack else None
-        if not first or fonts.get(first, {}).get("available"):
-            continue                       # 首选能用，没有回退
-        winner = next((f for f in stack if fonts.get(f, {}).get("available")), None)
-        tail = (f"，实际用的是 {winner!r}" if winner
-                else "，栈里没有一个可用 —— 会落到系统默认")
-        out.append(f"字体回退（启发式提示）：声明的 {first!r} 在本机不可用{tail}"
-                   f" —— 排版会随机器变，交付前确认一下")
+        if not first:
+            continue
+        info = fonts.get(first, {})
+        if info.get("generic"):
+            continue                       # 通用族是回退目标，不是"字体"
+        if not info.get("available"):
+            winner = next((f for f in stack if fonts.get(f, {}).get("available")), None)
+            tail = (f"，实际用的是 {winner!r}" if winner
+                    else "，栈里没有一个能带来不同字形 —— **字体等于没生效**"
+                         "（全是本机默认渲染）")
+            out.append(f"字体回退（提示）：声明的 {first!r} 在本机没有生效{tail}"
+                       f" —— 排版会随机器变；本机可用的族见 references/fonts.md")
+        elif first.strip().lower() in SYSTEM_UI_FAMILIES:
+            out.append(f"字体（提示）：{first!r} 是本机**系统 UI 默认族** —— 字形就是没设"
+                       f"字体时的样子，排版不承担设计。要性格就从 references/fonts.md 的"
+                       f"性格映射里挑一个本机可用的族，或自带字体文件走 @font-face")
     return out
-
 
 def _check_brand(measured: dict, deck: dict, tokens: dict) -> tuple[list[str], list[str]]:
     """品牌资产：**logo 压文字（阻塞）** + 两条提示。
@@ -873,6 +892,36 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     return problems
 
 
+def _ornament_notes(deck: dict) -> list[str]:
+    """条目**以装饰字符开头** → 说一声（提示）。
+
+    为什么必须开口：标记由皮肤画（``.bullets li::before``），壳不发标记。作者在条目
+    文本里再写一个 ``▦ ■ ● ▶`` 就是**两个标记**，而且那个字符没有间距、直接贴住正文
+    （实测截图：蓝短横 + 黑方块贴字）。判据只看**首字符的 Unicode 类别**，不猜语义：
+    So（符号/emoji）/ Sm（数学）/ Sk（修饰）开头即报；①②③ 是 No（数字），不报。
+    """
+    import unicodedata
+    hits: dict[str, list[int]] = {}
+    for i, slide in enumerate(deck.get("slides", []), 1):
+        if not isinstance(slide, dict):
+            continue
+        bullets: list[str] = list(slide.get("bullets") or [])
+        for col in (slide.get("columns") or []):
+            if isinstance(col, dict):
+                bullets += list(col.get("bullets") or [])
+        for b in bullets:
+            if not isinstance(b, str) or not b:
+                continue
+            if unicodedata.category(b[0]) in ("So", "Sm", "Sk"):
+                hits.setdefault(b[0], []).append(i)
+    if not hits:
+        return []
+    items = "、".join(f"{ch!r}（第 {'/'.join(str(n) for n in sorted(set(p))[:4])} 页）"
+                     for ch, p in list(hits.items())[:3])
+    return [f"条目以装饰字符开头：{items} —— 条目标记由皮肤的 `.bullets li::before` 画，"
+            f"文本里再写一个会变成两个标记而且贴住正文：删掉这个字符（要换标记就改皮肤）"]
+
+
 def _visual_decision_notes(deck: dict) -> list[str]:
     """内容页没做视觉决定时开口 —— 点页号，并给可选的载体。
 
@@ -925,6 +974,7 @@ def advisories(measured: dict, spec: dict | None = None,
         # 装得下就不报错，所以以前没有任何一条会开口。
         notes.extend(_check_type_size(measured, spec.get("deck", {}), tokens))
         notes.extend(_visual_decision_notes(spec.get("deck", {})))
+        notes.extend(_ornament_notes(spec.get("deck", {})))
         # 信息层级（文本预算 / 焦点 / 密度）那三条曾由 hierarchy.py 提供，v4 随
         # 该模块一起退役：阈值取决于语境（封面就该空、看板就该满），做成阻塞会
         # 把第一份正常的 deck 挡住；而**装不装得下**这件事已由 measure 实测那两道

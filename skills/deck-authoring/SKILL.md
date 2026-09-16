@@ -78,8 +78,8 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
    - 渲染：`python3 scripts/render.py your.spec.json -o out.html`（中间产物就加 `--resolved resolved.deck.json --trace`）
    - 实测+判定：`python3 scripts/check.py your.spec.json out.html`（真浏览器量完再判，全过退 0；
      只想单独量就 `measure.py out.html`）
-4. **可选交付**：
-   - 演示：直接把 `out.html` 给人（`out.html?present` 一页一屏、`←/→` 翻页、`F` 全屏）
+4. **交付**（**HTML 不能漏** —— 它是唯一带演示态的形态、自包含单文件，也是其余格式的源头）：
+   - HTML：直接把 `out.html` 给人（`?present` 一页一屏、`←/→` 翻页、`F` 全屏）
    - PDF：`python3 scripts/pdf.py out.html -o deck.pdf`（矢量、能打印；脚本会验页数与页尺寸）
    - PNG 截图：`python3 scripts/shots.py out.html --out-dir pages/ --count N`
    - PPTX：观感 100% 用 `pptx_native.py --png-dir pages/ -o deck.pptx`；**对方要改字**用 `pptx_native.py out.html -o deck.pptx`（原生 shapes，字是真字）

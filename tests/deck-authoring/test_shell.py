@@ -219,5 +219,53 @@ class TestShell(unittest.TestCase):
                 self.assertAlmostEqual(r["kP"], min(r["vw"] / 1600, r["vh"] / 900), places=6)
 
 
+
+class TestBulletMarkerOwnership(unittest.TestCase):
+    """条目标记**归皮肤**：壳只做结构 reset，不发标记。
+
+    壳原来在每条前发一个 `<i>■</i>`：皮肤再画自己的标记（`.bullets li::before`
+    短横）时就成了**两个标记**，而且那个方块没有间距、直接贴住正文（实测截图：
+    蓝短横 + 黑方块贴字）。装饰归风格是这条流水线的基本分工，所以壳不再发标记。
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.render = _load("deck_render_marker", os.path.join(SCRIPTS, "render.py"))
+        with open(DEMO, encoding="utf-8") as fh:
+            cls.html = cls.render.render(json.load(fh))
+
+    def test_shell_emits_no_bullet_marker(self) -> None:
+        self.assertNotIn("<i>■</i>", self.html,
+                         "壳不该发条目标记 —— 那是皮肤的 ::before")
+        for chunk in ("<li ",):
+            self.assertIn(chunk, self.html, "条目本身还要在")
+
+    def test_bullets_keep_a_structural_reset(self) -> None:
+        self.assertIn(".bullets{list-style:none", self.html,
+                      "壳要给条目列表一条结构 reset（无默认圆点、无浏览器缩进）")
+
+
+class TestOrnamentNote(unittest.TestCase):
+    """条目以装饰字符开头 → 提示（两个标记 + 贴字）。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.check = _load("deck_check_ornament", os.path.join(SCRIPTS, "check.py"))
+
+    def test_ornament_leading_bullets_are_flagged(self) -> None:
+        deck = {"slides": [{"type": "content-text", "title": "t",
+                            "bullets": ["▦ backend/services：编排层", "普通条目"]}]}
+        notes = self.check._ornament_notes(deck)
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("▦", notes[0])
+        self.assertIn("第 1 页", notes[0])
+
+    def test_numerals_and_plain_text_are_silent(self) -> None:
+        deck = {"slides": [{"type": "content-text", "title": "t",
+                            "bullets": ["① 量化评级", "② 归档", "普通条目"]}]}
+        self.assertEqual(self.check._ornament_notes(deck), [],
+                         "① 是数字（No），不是装饰字符")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -95,10 +95,6 @@
  letter-spacing: 0.02em;
 }
 
-.bullets i {
- display: none;
-}
-
 .bullets.small {
  font-size: var(--s-bulletSmall, 26px);
  line-height: 1.6;
