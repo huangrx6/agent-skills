@@ -1,0 +1,27 @@
+{
+  "type": "architecture",
+  "title": "Web 应用运行时架构",
+  "nodes": [
+    { "id": "users", "label": "用户", "kind": "client" },
+    { "id": "cdn", "label": "CDN", "kind": "service", "pin": "left" },
+    { "id": "lb", "label": "负载均衡", "kind": "service" },
+    { "id": "api", "label": "API 服务", "kind": "service", "emphasis": "primary" },
+    { "id": "pg", "label": "PostgreSQL", "kind": "data" },
+    { "id": "redis", "label": "Redis 缓存", "kind": "async" },
+    { "id": "queue", "label": "任务队列", "kind": "async" },
+    { "id": "worker", "label": "Worker", "kind": "service" }
+  ],
+  "edges": [
+    { "from": "users", "to": "cdn", "label": "HTTPS" },
+    { "from": "cdn", "to": "lb" },
+    { "from": "lb", "to": "api" },
+    { "from": "api", "to": "pg", "kind": "data", "label": "读写" },
+    { "from": "api", "to": "redis", "kind": "data", "label": "读缓存" },
+    { "from": "api", "to": "queue", "kind": "async", "label": "投递任务" },
+    { "from": "queue", "to": "worker", "kind": "async" }
+  ],
+  "cards": [
+    { "title": "请求路径", "items": ["用户流量经 CDN 与负载均衡进入 API", "读请求优先走 Redis 缓存"] },
+    { "title": "异步路径", "items": ["API 把耗时任务投递到队列", "Worker 从队列消费执行"] }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "type": "dependency",
+  "title": "模块依赖",
+  "nodes": [
+    { "id": "web", "label": "web", "kind": "plain" },
+    { "id": "api", "label": "api", "kind": "plain" },
+    { "id": "core", "label": "core", "kind": "plain" },
+    { "id": "db", "label": "db", "kind": "plain" },
+    { "id": "worker", "label": "worker", "kind": "plain" }
+  ],
+  "edges": [
+    { "from": "web", "to": "api" },
+    { "from": "api", "to": "core" },
+    { "from": "api", "to": "db" },
+    { "from": "core", "to": "db" },
+    { "from": "worker", "to": "core" }
+  ]
+}

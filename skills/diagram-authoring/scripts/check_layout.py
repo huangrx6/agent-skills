@@ -35,7 +35,7 @@ import json
 import math
 import os
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 
@@ -100,6 +100,28 @@ STEPPABLE = frozenset({"gap", "edge", "crossing", "through", "overlap", "slant"}
 # 刚刚好压在实测带之上：宁可当保安，不当噪声源。
 BEND_MAX = 4
 
+# ── 质量两档（模仿 archify 的 quality_profile）─────────────────────
+#
+# standard（默认）= 现有行为：软项报告不阻塞。
+# showcase = 交付档：把「结构上不该出现」的软项升级为阻塞 —— 调参循环
+# 仍然先跑（升级发生在**调参结束之后**的拷贝上，不干扰重试），
+# 试尽了还有残留就不交付，而不是带着“报告全绿但图上有交叉”出图。
+#
+# 哪些软项升级：交叉/重合/斜段/折点/几何相交/穿节点。**不升级** readability
+# 与 icon —— 前者是“图太大”的告知，后者是选型问题，卡住它们不会让图变好。
+QUALITY_LEVELS = ("standard", "showcase")
+SHOWCASE_HARD = frozenset({"crossing", "overlap", "slant", "bend",
+                           "intersect", "through"})
+
+# ── 桌面可读性下限（模仿 archify 的 desktop-readability）──────────
+#
+# 图按宽度缩到一块典型阅读屏里时，最小的字投影后还有多大？
+# 参考 width 960 = 一块笔记本主区；低于 6px 的字在那个尺度上已不可读。
+# 这一条**只告知不阻塞也不调参**：能修它的是内容（拆图/折行/降层级），
+# 间距参数对它毫无作用 —— 加大间距反而让画布更宽、投影更小。
+READER_REFERENCE_WIDTH = 960.0
+MIN_PROJECTED_TEXT_PX = 6.0
+
 # 「相交属于形状本身」的两种图型：径向（兄弟节点绕着父节点排）与力导向（没有层可依）。
 # 只有这两种的几何相交是**形状**；其余图型出现相交，就是**路由该绕的没绕开**。
 CROSSING_INHERENT_TYPES = frozenset({"mindmap", "network"})
@@ -123,6 +145,8 @@ CHECK_LABEL = {
     # 两项都是“路由在结构上不该出现的东西” —— 由 TestEveryCheckHasALabel 钉住。
     "bend": "折点过多",
     "intersect": "连线相交",
+    # 「图缩到阅读屏后字还有多大」—— 只告知，不阻塞、不调参（见 check_readability）。
+    "readability": "桌面可读性",
 }
 # 报告里用的中文说法。**参数名不许出现在报告里** —— 一旦报告写"建议调大某某"，
 # 参数选择权就又回到模型手上了（validation.md 第二节）。
@@ -143,6 +167,9 @@ class Issue:
     # 把建议随 issue 一起带上，而不是事后从 `check` 反推 —— 反推一定会漏掉
     # “同一类 check 里有两种性质不同的失败”这种情况（文字溢出就是）。
     advice: str | None = None
+    # 机器可读回执（`--json`）用的量化证据：量到的值 / 阈值。**给人看的报告不用它**，
+    # 免得两套措辞互相漂移；JSON 消费方（emit / 基准）拿它做机械判断。
+    evidence: dict = field(default_factory=dict)
 
     def line(self) -> str:
         mark = "✗" if self.blocking else "·"
@@ -181,6 +208,24 @@ class Outcome:
         """
         return not self.blocking and not (self.tunable_hits() & STEPPABLE)
 
+    def promote(self, quality: str = "standard") -> "Outcome":
+        """showcase 档把结构类软项升级为阻塞。**返回拷贝，不动原值。**
+
+        升级必须发生在调参循环**之外**（`layout_with_retry` 全程用原值判断
+        收敛）：软项是可调的，先让调参跑完；试尽了还有残留，交付门才把它挡下。
+        直接在循环里升级会让“可调”变“阻塞”，`converged()` 永远为假，
+        循环白转四轮还出不了图 —— 那不是 showcase，是把仪表盘焊死在警报位。
+        """
+        if quality not in QUALITY_LEVELS:
+            raise ValueError(f"quality 只允许 {QUALITY_LEVELS}，收到 {quality!r}")
+        if quality != "showcase":
+            return self
+        return Outcome(issues=[
+            replace(i, blocking=True)
+            if (not i.blocking and i.check in SHOWCASE_HARD) else i
+            for i in self.issues
+        ])
+
 
 @dataclass
 class Attempt:
@@ -212,7 +257,8 @@ def check_gaps(result: ResultT) -> list[Issue]:
             if gap < GAP_MIN:
                 out.append(Issue("gap", True, f"{ia} ↔ {ib}",
                                  f"间隙 {gap:.0f}px，下限 {GAP_MIN:.0f}px",
-                                 advice="元素挨得过近：拆节点，或把相关节点归入同一主题分开画。"))
+                                 advice="元素挨得过近：拆节点，或把相关节点归入同一主题分开画。",
+                                 evidence={"gapPx": round(gap, 1), "minPx": GAP_MIN}))
     return out
 
 
@@ -228,7 +274,8 @@ def check_edge_lengths(result: ResultT) -> list[Issue]:
         if shortest < EDGE_MIN:
             out.append(Issue("edge", True, f"{e['from']} → {e['to']}",
                              f"最短一段 {shortest:.0f}px，下限 {EDGE_MIN:.0f}px",
-                             advice="连线过短：拆节点或减少层级。"))
+                             advice="连线过短：拆节点或减少层级。",
+                             evidence={"shortestPx": round(shortest, 1), "minPx": EDGE_MIN}))
     return out
 
 
@@ -273,7 +320,9 @@ def check_text_fit(spec: dict, result: ResultT,
         elif tm.too_long_for_largest(node.get("label", "")):
             # 真正的"内容"问题只有这一种：标签长到最大档也放不下，只能换写法。
             out.append(Issue("text", True, nid, "标签超过了最大断行档位，无法成图",
-                             advice="标签太长：换更短的说法，或把内容拆成两个节点。"))
+                             advice="标签太长：换更短的说法，或把内容拆成两个节点。",
+                             evidence={"units": tm.weighted_units(node.get("label", "")),
+                                        "maxUnits": tm.LARGEST_CLASS[1]}))
     return out
 
 
@@ -642,6 +691,40 @@ def check_regions(spec: dict, result: ResultT, boxes: dict[str, BoxT]) -> list[I
     return out
 
 
+# ── #13 桌面可读性（只告知）────────────────────────────
+def check_readability(spec: dict, result: ResultT) -> list[Issue]:
+    """图按宽度缩进一块典型阅读屏后，最小的字还有多大。
+
+    模仿 archify 的 `desktop-readability`：它用 `projected = font × min(1, 960/viewBoxWidth)`
+    保证交付产物在真实浏览器里不小于 6px。我们这里的对应物是“整张图缩到适合屏宽时”，
+    最小的字（次要说明那档，12px）投影后是否还看得见。
+
+    为什么只告知、不阻塞也不调参：能修它的是**内容**（拆图 / 折行 / 降层级），
+    间距参数对它只有反作用 —— 加大间距让画布更宽，投影更小。把它塞进调参循环
+    只会让循环白转。
+    """
+    placed = list(result.real_nodes().values())
+    if not placed:
+        return []
+    left = min(p.x for p in placed)
+    right = max(p.x + p.width for p in placed)
+    canvas_w = right - left
+    if canvas_w <= READER_REFERENCE_WIDTH:
+        return []                       # 不缩就不会小
+    projected = tm.FONT_DETAIL * READER_REFERENCE_WIDTH / canvas_w
+    if projected >= MIN_PROJECTED_TEXT_PX:
+        return []
+    return [Issue(
+        "readability", False, "整张图",
+        f"图宽 {canvas_w:.0f}px，缩进 {READER_REFERENCE_WIDTH:.0f}px 阅读屏后"
+        f"最小的字只剩 {projected:.1f}px（下限 {MIN_PROJECTED_TEXT_PX:.0f}px）",
+        advice="图太宽了：拆成两张图、给长链折行，或降低层级 —— 加大间距只会更宽。",
+        evidence={"canvasWidthPx": round(canvas_w, 1),
+                   "referenceWidthPx": READER_REFERENCE_WIDTH,
+                   "projectedPx": round(projected, 2),
+                   "minPx": MIN_PROJECTED_TEXT_PX})]
+
+
 def check(spec: dict, result: ResultT,
           boxes: dict[str, BoxT]) -> Outcome:
     return Outcome(issues=[
@@ -657,6 +740,7 @@ def check(spec: dict, result: ResultT,
         *check_geometric_crossings(spec, result),
         *check_regions(spec, result, boxes),
         *check_region_labels(spec, result, boxes),
+        *check_readability(spec, result),
     ])
 
 
@@ -775,6 +859,56 @@ def layout_with_retry(spec: dict, boxes: dict[str, BoxT],
 
 
 # ── 报告 ────────────────────────────────────────────────────
+# ── 机器可读回执（模仿 archify 的修复回执）──────────────────
+def build_receipt(spec: dict, result: ResultT, attempts: list[Attempt],
+                  outcome: Outcome, quality: str = "standard") -> dict:
+    """archify 风格的结构化诊断：code / severity / subject / evidence / suggestedFixes。
+
+    给**机器消费方**（emit 的交付门、基准的 verify、上游 agent 的修复循环）用；
+    人看的报告仍然是 `format_report` 那三段。两套输出**同一份 Outcome**，不会各说各话。
+
+    与 archify 的两点刻意差异：
+      1. **suggestedFixes 里不出现参数名** —— 那是本 skill 的硬规则（报告措辞由
+         `_assert_no_param_names` 钉着），回执里同样遵守：建议全部是内容层的。
+      2. **不给具体坐标建议** —— archify 可以给（坐标是模型写的，脚本算一个更好的
+         还回去）；我们的坐标是脚本推导的，模型不该拿坐标，也就不该收坐标。
+         修复建议里能给的是“量到了什么 / 阈值是多少”，不是“挪到哪”。
+    """
+    if quality not in QUALITY_LEVELS:
+        raise ValueError(f"quality 只允许 {QUALITY_LEVELS}，收到 {quality!r}")
+    hit = {i.check for i in outcome.issues}
+    diagnostics = []
+    for i in outcome.issues:
+        diagnostics.append({
+            "code": f"layout/{i.check}",
+            "severity": "error" if i.blocking else "warning",
+            "message": f"{i.where} —— {i.detail}",
+            "subject": {"check": i.check, "where": i.where},
+            "evidence": dict(i.evidence),
+            "suggestedFixes": [i.advice] if i.advice else [],
+        })
+    placed = list(result.real_nodes().values())
+    metrics = {
+        "nodes": len(placed),
+        "edges": len(result.edges),
+        "crossings": result.crossings,
+        "tuningRounds": len(attempts) - 1 if attempts else 0,
+    }
+    if placed:
+        metrics["canvasWidthPx"] = round(
+            max(p.x + p.width for p in placed) - min(p.x for p in placed), 1)
+    return {
+        "ok": not outcome.blocking,
+        "quality": quality,
+        "checks": [
+            {"name": name, "ok": name not in hit}
+            for name in CHECK_LABEL
+        ],
+        "metrics": metrics,
+        "diagnostics": diagnostics,
+    }
+
+
 def _assert_no_param_names(text: str) -> None:
     """报告里不许出现参数名。写成断言，而不是靠下次记得 ——
     一条措辞规则如果没人检查，就会在第一次图省事时消失。"""
@@ -835,7 +969,9 @@ def format_report(spec: dict, attempts: list[Attempt], outcome: Outcome) -> str:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="十二项校验 + 自动调参（报告里不出现参数名）")
     ap.add_argument("spec", help="*.diagram.json")
-    ap.add_argument("--json", action="store_true", help="附带机器可读结果")
+    ap.add_argument("--quality", choices=QUALITY_LEVELS, default="standard",
+                    help="standard=软项只报告；showcase=交付档，结构类软项升级为阻塞")
+    ap.add_argument("--json", action="store_true", help="附带机器可读回执（结构化诊断）")
     args = ap.parse_args(argv)
 
     try:
@@ -852,15 +988,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"布局失败：{exc}", file=sys.stderr)
         return 1
 
-    print(format_report(spec, attempts, outcome))
+    # showcase 升级发生在调参**之后**（见 Outcome.promote 的说明）。
+    final = outcome.promote(args.quality)
+    print(format_report(spec, attempts, final))
     if args.json:
-        print(json.dumps({
-            "rounds": len(attempts),
-            "crossings": result.crossings,
-            "blocking": len(outcome.blocking),
-            "soft": len(outcome.soft),
-        }, ensure_ascii=False, indent=2))
-    return 0 if not outcome.blocking else 1
+        print(json.dumps(build_receipt(spec, result, attempts, final, args.quality),
+                         ensure_ascii=False, indent=2))
+    return 0 if not final.blocking else 1
 
 
 if __name__ == "__main__":

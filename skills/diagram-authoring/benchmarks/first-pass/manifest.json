@@ -1,0 +1,385 @@
+{
+  "schema_version": 1,
+  "description": "first-pass 可用性基准：普通模型第一次生成的规格，能不能不经人工修补就用。三门：语义正确 / 确定性校验（showcase）/ 人审。",
+  "cases": [
+    {
+      "id": "web-runtime-architecture",
+      "type": "architecture",
+      "prompt": "画一张 Web 应用的运行时架构图：用户经过 CDN 和负载均衡到达 API 服务，API 读写 PostgreSQL、用 Redis 做缓存，异步任务走队列由 Worker 消费。",
+      "required_nodes": [
+        {
+          "aliases": [
+            "用户",
+            "user",
+            "client",
+            "浏览器",
+            "browser"
+          ],
+          "kind": "client"
+        },
+        {
+          "aliases": [
+            "cdn"
+          ],
+          "kind": "service"
+        },
+        {
+          "aliases": [
+            "负载均衡",
+            "load balancer",
+            "lb"
+          ],
+          "kind": "service"
+        },
+        {
+          "aliases": [
+            "api",
+            "api 服务",
+            "api server",
+            "应用"
+          ],
+          "kind": "service"
+        },
+        {
+          "aliases": [
+            "postgresql",
+            "postgres",
+            "主库",
+            "数据库",
+            "database"
+          ],
+          "kind": "data"
+        },
+        {
+          "aliases": [
+            "redis",
+            "缓存",
+            "cache"
+          ],
+          "kind": "async"
+        },
+        {
+          "aliases": [
+            "队列",
+            "queue",
+            "sqs"
+          ],
+          "kind": "async"
+        },
+        {
+          "aliases": [
+            "worker",
+            "消费者",
+            "worker/消费者"
+          ],
+          "kind": "service"
+        }
+      ],
+      "required_edges": [
+        {
+          "from": "用户",
+          "to": "cdn"
+        },
+        {
+          "from": "cdn",
+          "to": "负载均衡"
+        },
+        {
+          "from": "负载均衡",
+          "to": "api"
+        },
+        {
+          "from": "api",
+          "to": "postgresql"
+        },
+        {
+          "from": "api",
+          "to": "redis"
+        },
+        {
+          "from": "api",
+          "to": "队列"
+        },
+        {
+          "from": "队列",
+          "to": "worker"
+        }
+      ]
+    },
+    {
+      "id": "release-flow",
+      "type": "flow",
+      "prompt": "画一个发布流程：提交代码后先跑测试，测试通过等审批，审批通过就部署，部署失败则回滚，回滚后重新提交。",
+      "required_nodes": [
+        {
+          "aliases": [
+            "提交",
+            "commit",
+            "提交代码"
+          ],
+          "kind": "plain"
+        },
+        {
+          "aliases": [
+            "测试",
+            "test",
+            "跑测试"
+          ],
+          "kind": "plain"
+        },
+        {
+          "aliases": [
+            "审批",
+            "approval",
+            "等审批"
+          ],
+          "kind": "plain"
+        },
+        {
+          "aliases": [
+            "部署",
+            "deploy",
+            "deployment"
+          ],
+          "kind": "plain"
+        },
+        {
+          "aliases": [
+            "回滚",
+            "rollback"
+          ],
+          "kind": "plain"
+        }
+      ],
+      "required_edges": [
+        {
+          "from": "提交",
+          "to": "测试"
+        },
+        {
+          "from": "测试",
+          "to": "审批"
+        },
+        {
+          "from": "审批",
+          "to": "部署"
+        },
+        {
+          "from": "部署",
+          "to": "回滚"
+        },
+        {
+          "from": "回滚",
+          "to": "提交"
+        }
+      ]
+    },
+    {
+      "id": "module-dependency",
+      "type": "dependency",
+      "prompt": "画模块依赖图：web 依赖 api，api 依赖 core 和 db，core 依赖 db，worker 依赖 core。",
+      "required_nodes": [
+        {
+          "aliases": [
+            "web"
+          ],
+          "kind": "plain"
+        },
+        {
+          "aliases": [
+            "api"
+          ],
+          "kind": "plain"
+        },
+        {
+          "aliases": [
+            "core"
+          ],
+          "kind": "plain"
+        },
+        {
+          "aliases": [
+            "db",
+            "数据库"
+          ],
+          "kind": "plain"
+        },
+        {
+          "aliases": [
+            "worker"
+          ],
+          "kind": "plain"
+        }
+      ],
+      "required_edges": [
+        {
+          "from": "web",
+          "to": "api"
+        },
+        {
+          "from": "api",
+          "to": "core"
+        },
+        {
+          "from": "api",
+          "to": "db"
+        },
+        {
+          "from": "core",
+          "to": "db"
+        },
+        {
+          "from": "worker",
+          "to": "core"
+        }
+      ]
+    },
+    {
+      "id": "order-state",
+      "type": "state",
+      "prompt": "画订单状态机：待支付 → 已支付 → 已发货 → 已完成；支付超时回到待支付前是已取消；已发货可以部分退款到已退款。",
+      "required_nodes": [
+        {
+          "aliases": [
+            "待支付",
+            "pending",
+            "等待支付"
+          ],
+          "kind": "plain"
+        },
+        {
+          "aliases": [
+            "已支付",
+            "paid"
+          ],
+          "kind": "plain"
+        },
+        {
+          "aliases": [
+            "已发货",
+            "shipped"
+          ],
+          "kind": "plain"
+        },
+        {
+          "aliases": [
+            "已完成",
+            "done",
+            "completed"
+          ],
+          "kind": "plain"
+        },
+        {
+          "aliases": [
+            "已取消",
+            "cancelled",
+            "canceled"
+          ],
+          "kind": "plain"
+        },
+        {
+          "aliases": [
+            "已退款",
+            "refunded"
+          ],
+          "kind": "plain"
+        }
+      ],
+      "required_edges": [
+        {
+          "from": "待支付",
+          "to": "已支付"
+        },
+        {
+          "from": "已支付",
+          "to": "已发货"
+        },
+        {
+          "from": "已发货",
+          "to": "已完成"
+        },
+        {
+          "from": "待支付",
+          "to": "已取消"
+        },
+        {
+          "from": "已发货",
+          "to": "已退款"
+        }
+      ]
+    },
+    {
+      "id": "service-network",
+      "type": "network",
+      "prompt": "画服务网状图：网关连着订单、库存、支付三个服务，它们都读写同一个事件总线，订单和库存之间还有直连。",
+      "required_nodes": [
+        {
+          "aliases": [
+            "网关",
+            "gateway"
+          ],
+          "kind": "service"
+        },
+        {
+          "aliases": [
+            "订单",
+            "order",
+            "订单服务"
+          ],
+          "kind": "service"
+        },
+        {
+          "aliases": [
+            "库存",
+            "inventory",
+            "库存服务"
+          ],
+          "kind": "service"
+        },
+        {
+          "aliases": [
+            "支付",
+            "payment",
+            "支付服务"
+          ],
+          "kind": "service"
+        },
+        {
+          "aliases": [
+            "事件总线",
+            "bus",
+            "event bus",
+            "消息总线"
+          ],
+          "kind": "async"
+        }
+      ],
+      "required_edges": [
+        {
+          "from": "网关",
+          "to": "订单"
+        },
+        {
+          "from": "网关",
+          "to": "库存"
+        },
+        {
+          "from": "网关",
+          "to": "支付"
+        },
+        {
+          "from": "订单",
+          "to": "事件总线"
+        },
+        {
+          "from": "库存",
+          "to": "事件总线"
+        },
+        {
+          "from": "订单",
+          "to": "库存"
+        }
+      ]
+    }
+  ]
+}

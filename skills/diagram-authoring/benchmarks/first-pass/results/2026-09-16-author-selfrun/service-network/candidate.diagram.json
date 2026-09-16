@@ -1,0 +1,20 @@
+{
+  "type": "network",
+  "title": "服务互连拓扑",
+  "nodes": [
+    { "id": "gateway", "label": "网关", "kind": "service", "emphasis": "primary" },
+    { "id": "order", "label": "订单服务", "kind": "service" },
+    { "id": "inventory", "label": "库存服务", "kind": "service" },
+    { "id": "payment", "label": "支付服务", "kind": "service" },
+    { "id": "bus", "label": "事件总线", "kind": "async" }
+  ],
+  "edges": [
+    { "from": "gateway", "to": "order", "label": "HTTP" },
+    { "from": "gateway", "to": "inventory", "label": "HTTP" },
+    { "from": "gateway", "to": "payment", "label": "HTTP" },
+    { "from": "order", "to": "bus", "kind": "async", "label": "发布事件" },
+    { "from": "inventory", "to": "bus", "kind": "async", "label": "发布事件" },
+    { "from": "payment", "to": "bus", "kind": "async", "label": "发布事件" },
+    { "from": "order", "to": "inventory", "kind": "sync", "label": "查库存" }
+  ]
+}

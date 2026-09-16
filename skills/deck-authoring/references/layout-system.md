@@ -261,16 +261,44 @@ visual-right、two-column 缺省 even，§16）；写自造名由 skin.css 排�
 
 ## 18. Layout Candidate Ranking【✅ --candidates（声明页钉死）】
 
+页级**候选**：每页给出 **3 个结构不同**的候选 + 1 个"当前/缺省"，整份 deck 联合
+择优，并输出一页**对比页**供作者挑。
+
 ```bash
-python3 scripts/render.py spec.json -o out.html --candidates        # 只出表
-python3 scripts/render.py spec.json -o out.html --candidates --pick  # 选优落盘
+# 一、出候选：实测打分 + 联合择优 + 对比页（同内容不同结构）
+python3 scripts/render.py spec.json -o out.html --candidates
+#    → out.compare.html（N 组 × 最多 4 页 + 选择面板）
+#    → out.candidates.json（逐候选分数 / 选定 / 惩罚项 / 诊断）
+
+# 二、在 out.compare.html 上挑，点「复制选择」得到 {"3":"hero"} 存成 picks.json
+
+# 三、回写并渲染正式产物（产出 out.picked.spec.json）
+python3 scripts/render.py spec.json -o out.html --candidates --picks picks.json
+
+# 或：不问作者，直接采用联合择优的结果
+python3 scripts/render.py spec.json -o out.html --candidates --pick
 ```
 
-**边界**：只搜**未声明** `layout` 的页（content-image 4 候选 / two-column 3 候选，
-来自渲染器能力清单）；声明过 = 钉死不搜。每轮给全部可搜页套同一候选序号、
-整渲实测（页与页独立测）。
+**边界**：只搜**未声明** `layout` 的页（content-image 5 个名字 / two-column 5 个
+名字，来自渲染器能力清单）；声明过 = 钉死不搜。
 
-**打分（可测维度，实测驱动）**：
+**结构指纹**（`layout/fingerprint.py`）：`composition = family + 排序后的区域跨度集`。
+镜像折叠成同一个构图 —— `visual-right` 与 `visual-left` 是**同一个结构**，不得占两个
+候选位（摆三个近亲候选等于没给选择）。当前真构图表：
+
+| 页型 | 结构（composition） | 名字 |
+| --- | --- | --- |
+| content-image | `split\|5,7` | visual-right / visual-left |
+| content-image | `split\|6,6` | even |
+| content-image | `split\|4,8` | visual-wide |
+| content-image | `hero\|12,12` | hero |
+| two-column | `columns\|6,6` | even |
+| two-column | `columns\|5,7` | lean-left / lean-right |
+| two-column | `columns\|4,8` | lean-hard-left / lean-hard-right |
+
+类名 = layout 名（皮肤按名字就能选到）；`visual-left` 额外保留历史短名 `v-left`。
+
+**打分（单页，实测驱动）**：
 
 | 维度 | 权重 | 判据 |
 | --- | --- | --- |
@@ -280,8 +308,27 @@ python3 scripts/render.py spec.json -o out.html --candidates --pick  # 选优落
 | 平衡 | 0.20 | 视觉质量中心偏离版心的距离（图按面积折半计质量） |
 
 **作废**：竖向溢出 / 标题写出列 / 安全盒碰撞，任一命中即无效（不进排序）。
-语义契合、风格契合、deck 节奏**不打分** —— 表摆出来（`*.candidates.json`），
-决定权在作者；`--pick` 才把最优写进 `*.candidates.spec.json` 并渲染。
+
+**deck 级联合择优**（`layout/allocation.py`）：逐页各挑各的最优会得到"每页都还行、
+整份却一个版式用五遍" —— 重复是 deck 级的病，就得用 deck 级的目标函数治：
+
+```text
+score = 拟合损失×150 + 页内重复 + 跨页重复
+```
+
+| 项 | 权重 | 治什么 |
+| --- | --- | --- |
+| 拟合损失 | ×150 | 别为了多样性牺牲"装得下"；带 `FIT_BAND`=0.16（**接近最优即可**，否则永远锁死在逐页最优上） |
+| 页内同 family / 同构图 | ×300 / ×450 | 三条候选不能是近亲 |
+| 与上一页 family 重叠 | ×90 | 相邻页换构图最容易被眼睛记住 |
+| 全局重复 layout / 组合 / family | ×600 / ×1400 / ×14 | 按 n(n-1)/2 增长：用得越多惩罚越陡 |
+
+平局用 `hash_seed(seed\|页码\|组合)` 决 —— **同 seed 同输入必得同结果**（`--seed`
+或 spec 的 `deck.seed`）。诊断带次数（"版式 'even' 用了 5 次"）。
+
+**回写**：`--picks` 接受 `{页码: 候选名}`；值写 `null` / `""` / `"缺省"` = **撤掉
+layout**、回到渲染缺省。坏键（非数字 / 页码越界）逐个报错，不当成静默跳过。
+语义契合、风格契合不打分 —— 决定权在作者，面板与 `*.candidates.json` 只把事实摆出来。
 
 ## 19. Information Hierarchy【部分 ✅】
 

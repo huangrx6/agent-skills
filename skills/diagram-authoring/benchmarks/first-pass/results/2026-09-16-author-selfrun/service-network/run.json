@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "agent": "pi (author self-run)",
+  "model": "当前会话模型",
+  "attempt": 1,
+  "bias_note": "作者本人自跑:作者同时是 skill 与 manifest 的作者,语义门存在对齐偏置;结果只作 harness 冒烟与首轮基线,不作为独立模型证据",
+  "visual_review": { "status": "skipped", "reviewer": "", "defects": [], "note": "本会话无图像查看能力,按三档声明如实记 skipped" }
+}

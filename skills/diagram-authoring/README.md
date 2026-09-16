@@ -43,8 +43,15 @@ cd skills/diagram-authoring
 # 2. 校验规格（字段集封闭：未知字段、含坐标、未知 kind 都会判失败）
 python3 scripts/validate_spec.py my.diagram.json
 
-# 3. 出图：这一条串起整条流水线（校验 → 分层布局 → 十二项校验 → 失败自己调参重跑 → 写文件）
+# 3. 出图：这一条串起整条流水线（校验 → 分层布局 → 十三项校验 → 失败自己调参重跑 → 原子写入）
 python3 scripts/emit_excalidraw.py my.diagram.json
+
+# 3+. 交付给别人看时用 showcase 档：结构类软项升级为阻塞，有残留就不出图；
+#     成功后打印三档回执（确定性校验 / 自研预览 / 感知审查，互不冒充）+ SHA-256
+python3 scripts/emit_excalidraw.py my.diagram.json --quality showcase
+
+# 3-. 图型拿不准？信号词打分推荐（同分不硬选）
+python3 scripts/guide.py "审批通过后部署，失败则回滚"
 
 # 3'. 换后端：同一份规格，只换一条命令（要交付 / 要标准图元时用）
 python3 scripts/emit_drawio.py my.diagram.json
@@ -106,17 +113,18 @@ $ python3 scripts/emit_drawio.py tests/fixtures/specs/01-architecture.json -o /t
 
 ```text
 diagram-authoring/
-├── SKILL.md                # 给 Agent 的规则（不写坐标等硬规则、图类型策略表）
+├── SKILL.md                # 给 Agent 的规则（不写坐标等硬规则、图类型策略表、修复纪律）
 ├── README.md               # 本文件
 ├── references/
-│   ├── diagram-spec.md     # 内容层契约：允许写什么、刻意不存在的字段、kind 封闭枚举、groups、style、detail
-│   ├── validation.md       # 十二项校验的阈值与级别、自动调参循环、报告该说什么
-│   ├── visual-design.md    # 审美总原则 + 可校验 / 不可校验的分界 + 9 条实测问题清单
-│   ├── icons.md            # 图标素材库：怎么查、怎么选、为什么它是外部尺寸来源
+│   ├── diagram-spec.md     # 内容层契约：允许写什么、刻意不存在的字段、kind 封闭枚举、groups、style、detail、cards
+│   ├── validation.md       # 十三项校验的阈值与级别、质量两档（standard/showcase）、JSON 回执、自动调参循环、报告该说什么
+│   ├── visual-design.md    # 审美总原则 + 可校验 / 不可校验的分界 + 18 条实测问题清单
+│   ├── icons.md            # 图标（内置 sigil + 素材库）：怎么查、怎么选、为什么它是外部尺寸来源
 │   ├── excalidraw-backend.md  # 默认后端：plain JSON 的理由、官网接着改、它自己重排文字这个限制
 │   └── drawio-backend.md   # 另一个后端：不压缩 XML、形状映射表、与 Excalidraw 有意不同的地方、导出步骤
-├── scripts/                # 13 个：校验 / 布局 / 两个后端出图 / 结构自检 / 文字测量 / 色板 / 素材 / 方向预览 / **配色预览** / 官网打开
+├── scripts/                # 校验 / 布局 / 两个后端出图 / 结构自检 / 文字测量 / 色板 / 素材 / 内置 sigil / 方向与配色预览 / 官网打开 / 场景路由 guide
 ├── dev-tools/preview.py    # 出 PNG 供目视复核（需 PIL，非运行时）
+├── benchmarks/first-pass/  # first-pass 可用性基准：manifest + 三门验证器 + 协议（模仿 archify ordinary-model-floor）
 └── evals/
     └── evals.json          # 6 条行为评估（不写坐标 / 类型判断 / 风格先问 / 报告改内容）
 ```

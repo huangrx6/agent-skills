@@ -1,0 +1,18 @@
+{
+  "type": "flow",
+  "title": "发布流程",
+  "nodes": [
+    { "id": "commit", "label": "提交代码", "kind": "plain" },
+    { "id": "test", "label": "跑测试", "kind": "plain" },
+    { "id": "approval", "label": "审批", "kind": "plain" },
+    { "id": "deploy", "label": "部署", "kind": "plain", "emphasis": "primary" },
+    { "id": "rollback", "label": "回滚", "kind": "plain", "emphasis": "critical" }
+  ],
+  "edges": [
+    { "from": "commit", "to": "test" },
+    { "from": "test", "to": "approval", "label": "通过" },
+    { "from": "approval", "to": "deploy", "label": "批准" },
+    { "from": "deploy", "to": "rollback", "kind": "async", "label": "失败" },
+    { "from": "rollback", "to": "commit", "kind": "async", "label": "修复后重新提交" }
+  ]
+}

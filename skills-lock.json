@@ -1,13 +1,13 @@
 {
   "skills": {
     "deck-authoring": {
-      "computedHash": "3101d203d397f55ac60dda42f913d8e124c5f871d80ff59c9773f6f96d83bab2",
+      "computedHash": "56dfc5e4274af2ff4ad0e898c54e4d525171a98f723e16b02843fde36ed5529e",
       "skillPath": "skills/deck-authoring/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
     "diagram-authoring": {
-      "computedHash": "2f59e66cba32480dc6cf600bbeb8400ebc4e5f2f217f12083d52ef4ab5de63e4",
+      "computedHash": "8e41911729d7b3fcc283968e14e3c057cb3ee5c2ab8711f7c3452551a36d03fa",
       "skillPath": "skills/diagram-authoring/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"

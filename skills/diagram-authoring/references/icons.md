@@ -1,8 +1,25 @@
 # 图标：让图更丰富，而且**不用手拖**
 
-素材库（`.excalidrawlib`）里存的就是**原始元素**。所以"用图标"这件事完全可以由脚本做：
-把选中的那一项复制进我们生成的场景 —— 不需要网络、不需要在 Excalidraw 里手拖，
-结果是可复现的（同一个库、同一个名字 → 同一张图）。
+图标有两个来源，**内置 sigil 优先**：
+
+| 来源 | 什么时候用 | 依赖 |
+| --- | --- | --- |
+| **内置 sigil**（`scripts/sigils.py`） | 常见语义角标：用户/括号/圆柱/队列/盾牌/云/外部/方块 | **零依赖** —— 不碰素材库 |
+| 素材库（`.excalidrawlib`） | 品牌logo、更丰富的图形 | 本机路径可配，不入仓库 |
+
+内置 sigil 是模仿 archify 的 semantic sigil：每个语义一个小小的 16px 图形，
+由脚本自绘、随当前画布墨色上色。宽度进尺寸链的方式与素材库图标**完全一致**
+（同一个 `intrinsic_size` / `fit_scale` / `place` 管道），所以下面关于尺寸链的
+讨论对两者同样成立。两源同名时永远取内置 —— 静默挑另一个等于"我写了 A 出来的是 B"。
+
+```bash
+python3 scripts/sigils.py                # 内置目录：user / api / database / queue / shield / cloud / external / plain + 别名
+python3 scripts/sigils.py --name database
+```
+
+内置名的好处：**不配素材库也能用**，而且不存在"自带文字缩成噪点"的问题
+（sigil 本来就只有图形）。注意：内置 sigil 目前只在 Excalidraw 后端渲染；
+drawio 后端遇到任何 icon 仍然报错（见下）。
 
 ## 你（agent）该怎么做
 

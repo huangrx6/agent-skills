@@ -33,6 +33,7 @@ import os
 import random
 import re
 import sys
+import copy
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -98,11 +99,12 @@ def style_roots() -> tuple[str, ...]:
 #     脚本只提供结构与验收）。
 # 历史备注：这里原叫"变体"（值封闭 + 自动实测选择）。v3 起自动选择退役，
 # 名字改为布局；spec 字段 `layout`，`variant` 不再接受。
-IMAGE_LAYOUTS = ("visual-right", "visual-left", "even", "hero")
+IMAGE_LAYOUTS = ("visual-right", "visual-left", "even", "visual-wide", "hero")
 
 # two-column 的结构布局（同上：渲染器能力，非审美枚举）：
 #   even = 6+6 均分（缺省） / lean-left = 左 7 栅右 5 栅 / lean-right = 镜像
-TWO_COL_LAYOUTS = ("even", "lean-left", "lean-right")
+TWO_COL_LAYOUTS = ("even", "lean-left", "lean-right",
+                   "lean-hard-left", "lean-hard-right")
 
 # ── 版面几何：壳里那些数字的**唯一出处** ─────────────────────────────
 # `SHELL_CSS` 里的 `.pad{padding:132px 84px}` 与 `.footrow{bottom:52px}` 是这几个值；
@@ -408,6 +410,15 @@ html,body{margin:0;background:var(--viewer)}
    v-left 只换 DOM 顺序（宽度不动），类名留给 skin 做侧别微调的钩子。 */
 .two.v-even .main{width:704px}
 .two.v-even .imgwrap{width:704px}
+/* 4+8：图拉到 8 栅（946.67px=span(8)）、正文压到 4 栅（461.33px=span(4)）。
+   为什么要它：6+6 / 7+5 / 满幅只给得出三个**真构图**，给了三个候选也只有一个组合。
+   版式候选要有得挑，结构词表先得够大（461.33+946.67+24=1432 不变）。
+   max-height 必须有：槽宽 946 时 3:2 的图高 631px，正文带只剩 524 —— 会直接
+   竖向溢出（实测：这个候选一开始全页作废）。aspect-ratio 遇 max-height 会
+   等比缩（不裁不变形），图比槽窄一截，但构图仍然真的不同。 */
+.two.v-visual-wide .main{width:461.33px}
+.two.v-visual-wide .imgwrap{width:946.67px}
+.two.v-visual-wide .imgwrap img{max-height:470px}
 /* hero：图是这一页的主角 —— 满幅 12 栅 + 底部**实心**标题条。
    条用 --text 底 / --paper 字的反转色对：对比度与正文是同一个 token 保证
    （≥4.5 自动成立）。刻意不做半透明渐变 scrim —— 渐变透明端的文字对比度
@@ -437,6 +448,11 @@ html,body{margin:0;background:var(--viewer)}
    默认路径逐字节不变（test_compile 的黄金对照钉着）。 */
 .cols.v-lean-left .col:first-child{flex:none;width:825.33px}
 .cols.v-lean-right .col:last-child{flex:none;width:825.33px}
+/* 4+8 / 8+4：强弱更分明的一对栏（461.33px=span(4) / 946.67px=span(8)）。
+   侧别靠 :first-child / :last-child —— flex 会自己分配剩下的宽度，
+   所以与 7+5 同属于一个度量集（跨度集合），不是新的家族。 */
+.cols.v-lean-hard-left .col:first-child{flex:none;width:461.33px}
+.cols.v-lean-hard-right .col:last-child{flex:none;width:461.33px}
 .tl{display:flex;gap:var(--sp-item);list-style:none;padding:0;margin:0}
 /* 条目列表：壳只管**结构**（无默认圆点、无浏览器缩进）——标记是装饰，归皮肤
    （`.bullets li::before`）。壳不再发标记：以前每条前面有一个方块元素，皮肤再画
@@ -1339,9 +1355,13 @@ def render_resolved(resolved: dict) -> str:
             img_html = (f'<figure class="imgwrap" {img_attrs}{fit_attr}>'
                         f'<img src="{html.escape(src)}" alt="">{cap}</figure>')
             if layout == "visual-left":       # 图先文后
-                out.append(f'<div class="two v-left">{img_html}{main_html}</div>')
+                # 类名 = layout 名（皮肤按名字就能选到，不用猜）；`v-left` 是历史短名，
+                # 保留不撤 —— 已经写在皮肤里的选择器不能因为改名默默失效。
+                out.append(f'<div class="two v-visual-left v-left">{img_html}{main_html}</div>')
             elif layout == "even":            # 6+6 均分
                 out.append(f'<div class="two v-even">{main_html}{img_html}</div>')
+            elif layout == "visual-wide":     # 4+8：图当主角、正文收窄
+                out.append(f'<div class="two v-visual-wide">{main_html}{img_html}</div>')
             elif layout == "hero":            # 图为主角：满幅 + 实心标题条
                 # 无条目 648px（占整页 64% —— check 对 hero 放行，标题仍是
                 # 真 DOM 文本）；带条目压到 520px 给正文留位。caption/条目
@@ -1612,29 +1632,172 @@ def _repair_loop(deck_spec: dict, style: dict, assets: dict | None,
     return 0 if report["fixed"] else 1
 
 
-def _candidates_main(deck_spec: dict, style: dict, assets, out_path: str,
-                     pick: bool) -> int:
-    """候选搜索：未声明布局的页，把结构候选各渲一遍、实测、打分。
+def _cmp_panel_css() -> str:
+    """对比页选择面板的样式（只在对比产物里注入）。"""
+    return ("<style>\n"
+            ".cmp{position:fixed;left:20px;bottom:20px;z-index:50;"
+            "font:400 15px/1.5 var(--body);background:var(--paper);color:var(--text);"
+            "border:1px solid color-mix(in srgb,var(--text) 30%,transparent);"
+            "padding:14px 16px;max-width:min(620px,86vw)}\n"
+            ".cmp button{font:inherit;padding:4px 10px;cursor:pointer;"
+            "background:transparent;color:inherit;margin-left:6px;"
+            "border:1px solid color-mix(in srgb,var(--text) 35%,transparent)}\n"
+            ".cmp button[aria-pressed=\"true\"]{background:var(--text);color:var(--paper)}\n"
+            ".cmp .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;"
+            "margin-top:8px}\n"
+            ".cmp .row button{margin-left:0}\n"
+            ".cmp textarea{width:100%;height:56px;margin-top:8px;display:none;"
+            "font:12px/1.4 monospace;box-sizing:border-box}\n"
+            ".cmp.min .body{display:none}\n"
+            "</style>\n")
 
-    只搜**未声明** ``layout`` 的页（声明过 = 钉死）；目标函数没有「最满优先」
-    （密度是区间满意度）；硬违规的候选作废。``--pick`` 才把最优候选写进
-    ``*.candidates.spec.json`` 并渲成产物 —— 不带它就只出表，决定权在作者。
+
+def _cmp_panel_html(plan: list, seed) -> str:
+    """对比页的选择面板。
+
+    **为什么要有它**：候选表摆出来只能给会看表的人；"版式该长什么样"这个决定
+    应该能在页面上点出来。静态文件、零服务器：选择存内存 + localStorage，
+    "复制选择"吐出一段 JSON，交给 `--picks` 回写 spec。
+
+    `plan`：`[{"page": 3, "variants": ["even", null]}]`（`null` = 缺省/当前）。
     """
-    import copy
-    import tempfile
+    return (_cmp_panel_css()
+            + '<div class="cmp" id="cmp"><div><b>候选选择</b>'
+              '<button id="cmp-toggle">收起</button></div>'
+              '<div class="body"><div class="row">'
+              '<button id="cmp-prev">上一组</button>'
+              '<span id="cmp-pos"></span>'
+              '<button id="cmp-next">下一组</button>'
+              '<button id="cmp-copy">复制选择</button>'
+              '<button id="cmp-reset">全部用缺省</button></div>'
+              '<div class="row" id="cmp-vars"></div>'
+              '<textarea id="cmp-out" readonly spellcheck="false"></textarea>'
+              '<div class="row" id="cmp-hint" style="opacity:.62"></div></div></div>\n'
+            + "<script>\n" + _cmp_panel_js(plan, seed) + "\n</script>\n")
+
+
+def _cmp_panel_js(plan: list, seed) -> str:
+    """面板行为：按 DOM 顺序把页分回组；选择存 localStorage；导出 JSON。"""
+    return ("(function(){\n"
+            f"  var PLAN={json.dumps(plan, ensure_ascii=False)};\n"
+            f"  var KEY='deck-cmp-{html.escape(str(seed))}';\n"
+            "  var slides=[].slice.call(document.querySelectorAll('section.slide'));\n"
+            "  var groups=[],k=0;\n"
+            "  PLAN.forEach(function(p){groups.push({page:p.page,"
+            "variants:p.variants.map(function(v){return {name:v,index:k++};})});});\n"
+            "  if(!groups.length) return;\n"
+            "  var pick={};\n"
+            "  try{ pick=JSON.parse(localStorage.getItem(KEY)||'{}')||{}; }"
+            "catch(err){ pick={}; }\n"
+            "  var at=0;\n"
+            "  function label(v){ return v===null ? '缺省（当前渲染）' : v; }\n"
+            "  function save(){ try{ localStorage.setItem(KEY,JSON.stringify(pick)); }"
+            "catch(err){} }\n"
+            "  function go(i){\n"
+            "    at=Math.max(0,Math.min(groups.length-1,i));\n"
+            "    var g=groups[at];\n"
+            "    document.getElementById('cmp-pos').textContent=\n"
+            "      '第 '+g.page+' 页 · 第 '+(at+1)+'/'+groups.length+' 组';\n"
+            "    var box=document.getElementById('cmp-vars'); box.innerHTML='';\n"
+            "    g.variants.forEach(function(v,vi){\n"
+            "      var b=document.createElement('button');\n"
+            "      b.textContent=(vi+1)+'. '+label(v.name);\n"
+            "      b.setAttribute('aria-pressed',"
+            " String(pick[g.page]===v.name || (v.name===null && !(g.page in pick))));\n"
+            "      b.onclick=function(){ pick[g.page]=v.name; save(); go(at);\n"
+            "        slides[v.index].scrollIntoView({block:'center'}); };\n"
+            "      box.appendChild(b);\n"
+            "    });\n"
+            "  }\n"
+            "  document.getElementById('cmp-prev').onclick=function(){ go(at-1); };\n"
+            "  document.getElementById('cmp-next').onclick=function(){ go(at+1); };\n"
+            "  document.getElementById('cmp-reset').onclick=function(){\n"
+            "    pick={}; save(); go(at); };\n"
+            "  document.getElementById('cmp-toggle').onclick=function(){\n"
+            "    var p=document.getElementById('cmp'); p.classList.toggle('min');\n"
+            "    this.textContent=p.classList.contains('min')?'展开':'收起'; };\n"
+            "  document.getElementById('cmp-copy').onclick=function(){\n"
+            "    var out=document.getElementById('cmp-out');\n"
+            "    out.style.display='block'; out.value=JSON.stringify(pick); out.select();\n"
+            "    try{ document.execCommand('copy'); }catch(err){}\n"
+            "    document.getElementById('cmp-hint').textContent=\n"
+            "      '已选 '+Object.keys(pick).length+' 页 —— 存成 picks.json 后： '\n"
+            "      + 'render.py <spec> --candidates --picks picks.json'; };\n"
+            "  go(0);\n"
+            "})();")
+
+
+def _default_layout(page_type: str) -> str | None:
+    """不声明 layout 时渲染器用的缺省结构名（用于对比页标出"当前"）。"""
+    return {"content-image": "visual-right", "two-column": "even"}.get(page_type)
+
+
+def _apply_picks(deck_spec: dict, picks: dict) -> tuple[dict, list[str], list[str]]:
+    """把 `{页码: 候选名}` 写回 spec。
+
+    候选名可以是 `null` / `""` / `"缺省"` —— 表示**撤掉 layout**、回到渲染缺省。
+    坏的键（不是数字、页码越界）不静默吞：写进 `problems` 让调用方开口。
+    """
+    picked = copy.deepcopy(deck_spec)
+    slides = picked.get("deck", {}).get("slides") or []
+    applied: list[str] = []
+    problems: list[str] = []
+    for key, name in (picks or {}).items():
+        try:
+            idx = int(key)
+        except (TypeError, ValueError):
+            problems.append(f"picks 的键 {key!r} 不是页码")
+            continue
+        if idx < 1 or idx > len(slides):
+            problems.append(f"picks 里的第 {idx} 页不存在（共 {len(slides)} 页）")
+            continue
+        if name in (None, "", "缺省"):
+            slides[idx - 1].pop("layout", None)
+            applied.append(f"第 {idx} 页 → 缺省")
+            continue
+        if not isinstance(name, str):
+            problems.append(f"第 {idx} 页的候选名 {name!r} 不是字符串")
+            continue
+        slides[idx - 1]["layout"] = name
+        applied.append(f"第 {idx} 页 → {name}")
+    return picked, applied, problems
+
+
+def _candidates_main(deck_spec: dict, style: dict, assets, out_path: str,
+                     pick: bool, seed=None, picks_path: str | None = None,
+                     compare_path: str | None = None) -> int:
+    """页级候选：每页 3 个**结构不同**的候选 + 1 个"当前/缺省"，整份 deck 联合择优。
+
+    与旧版的区别（旧版逐页各挑各的最优）：
+
+    - 候选先按**结构指纹**去重（镜像折叠成同一个构图）—— 三个候选不能是同一个
+      构图的三件衣服；
+    - 选择由 `layout/allocation.py` **整份 deck 一起**做（重复惩罚 + 拟合带 +
+      seed 决定平局）：逐页最优会得到"每页都还行、整份一个版式用五遍"；
+    - 产物是**对比页**（N 组 × 最多 4 页，同内容不同结构）+ 选择面板：
+      决定权在作者，面板把选择吐成 JSON，`--picks` 回写 spec。
+
+    `--pick`（自动采用最优）保留兼容：不带 `--picks` 时仍可用。
+    """
+    fp_mod = _load_layout().fingerprint
+    alloc_mod = _load_layout().allocation
     cand_mod = _load_layout().candidates
     slides = deck_spec["deck"]["slides"]
+    seed = seed if seed is not None else deck_spec["deck"].get("seed", 1)
+
     groups: dict[int, list] = {}
     for i, s in enumerate(slides, 1):
-        cands = cand_mod.searchable(s, IMAGE_LAYOUTS, TWO_COL_LAYOUTS)
-        if cands:
-            groups[i] = cands
+        vocab = cand_mod.searchable(s, IMAGE_LAYOUTS, TWO_COL_LAYOUTS)
+        if vocab:
+            groups[i] = fp_mod.distinct(s.get("type"), vocab)
     if not groups:
         print("没有可搜索的页（layout 已声明，或页型无结构布局）")
         return 0
+
+    # 每个候选各渲一遍、实测、打分。同一轮里所有页试同一个候选序号 —— 一次
+    # 渲染量完所有页，比"每页每候选渲染一次"少一个数量级的启动开销。
     results: dict[int, dict] = {i: {} for i in groups}
-    rounds = max(len(v) for v in groups.values())
-    for k in range(rounds):
+    for k in range(max(len(v) for v in groups.values())):
         trial = copy.deepcopy(deck_spec)
         touched = False
         for i, cands in groups.items():
@@ -1659,47 +1822,119 @@ def _candidates_main(deck_spec: dict, style: dict, assets, out_path: str,
             top = rects[i - 1].get("y", 0) if i <= len(rects) else 0
             results[i][cands[k]] = cand_mod.score_page(
                 slides[i - 1].get("type"), els, top, layout_name=cands[k])
-    chosen: dict[int, str] = {}
-    for i, table in results.items():
+
+    # 联合择优：候选的"拟合分"就是实测总分（密度是其中的区间满意度，
+    # 不是最满优先）；重复与跨页节奏由 allocation 的惩罚项管。
+    pages = []
+    for i, cands in groups.items():
+        page_type = slides[i - 1].get("type")
+        pages.append({"key": i, "pageType": page_type,
+                      "candidates": [
+                          {"layout": n, "fit": results[i][n]["total"],
+                           "fingerprint": fp_mod.fingerprint(page_type, n)}
+                          for n in cands if results[i][n]["valid"]]})
+    plan = alloc_mod.allocate(pages, seed=seed)
+    chosen = plan["assignments"]
+
+    for i, cands in groups.items():
         print(f"第 {i} 页（{slides[i - 1].get('type')}）:")
-        best_name, best = None, -1.0
-        for name in groups[i]:                     # 按候选顺序打印（缺省在前）
-            sc = table[name]
+        keep = set(chosen.get(i) or [])
+        for name in cands:
+            sc = results[i][name]
             if not sc["valid"]:
                 why = "、".join(sc["invalid_reason"][:2])
-                print(f"  ✗ {name:12s} 作废（{why}）")
+                print(f"  ✗ {name:13s} 作废（{why}）")
                 continue
-            mark = ""
-            if sc["total"] > best:
-                best, best_name = sc["total"], name
             so = sc["scores"]
-            print(f"  · {name:12s} 总分 {sc['total']:.2f}"
+            mark = "★" if name in keep else " "
+            print(f"  {mark} {name:13s} 总分 {sc['total']:.2f}"
                   f"（占带 {sc['density']:.0%}"
                   f"{'，密度分 ' + format(so['density'], '.2f') if 'density' in so else ''}"
                   f"{'，可读 ' + format(so['readability'], '.2f')}"
                   f"{'，视觉 ' + format(so['focal'], '.2f') if 'focal' in so else ''}"
                   f"{'，平衡 ' + format(so['balance'], '.2f') if 'balance' in so else ''}）")
-            _ = mark
-        if best_name is not None:
-            chosen[i] = best_name
-            print(f"  → 最优：{best_name}（{best:.2f}）")
-        else:
-            print("  → 全部作废，保持缺省布局")
-    report = {"searched": {str(i): t for i, t in results.items()},
-              "chosen": {str(i): n for i, n in chosen.items()}}
-    deckio.write_json(out_path + ".candidates.json", report)
-    if pick and chosen:
-        picked = copy.deepcopy(deck_spec)
-        for i, name in chosen.items():
-            picked["deck"]["slides"][i - 1]["layout"] = name
-        deckio.write_json(out_path.replace(".html", ".candidates.spec.json"),
-                          picked)
+    for note in plan["diagnostics"]:
+        print(f"  ⚠️ {note}")
+
+    report = {"seed": seed, "searched": {str(i): t for i, t in results.items()},
+              "assignments": {str(i): n for i, n in chosen.items()},
+              "penalties": plan["penalties"], "score": plan["score"],
+              "diagnostics": plan["diagnostics"]}
+    deckio.write_json(os.path.splitext(out_path)[0] + ".candidates.json",
+                      report)
+
+    # ── 对比页：同内容、不同结构 ─────────────────────────────────────
+    compare_path = compare_path or (os.path.splitext(out_path)[0] + ".compare.html")
+    compare_spec = copy.deepcopy(deck_spec)
+    panel_plan: list = []
+    cursor = 0
+    for i, s in enumerate(compare_spec["deck"]["slides"], 1):
+        cands = chosen.get(i) or []
+        if not cands:
+            continue
+        current = s.get("layout")
+        variants: list = list(cands)
+        if current is None:
+            default = _default_layout(s.get("type"))
+            if default not in variants:
+                variants.append(None)          # 缺省（撤掉 layout 的那种渲法）
+        elif current not in variants:
+            variants.append(current)
+        # 展开成连续多页：同内容、只换 layout
+        expanded = []
+        for name in variants:
+            page = copy.deepcopy(s)
+            if name is None:
+                page.pop("layout", None)
+            else:
+                page["layout"] = name
+            expanded.append(page)
+        compare_spec["deck"]["slides"][cursor:cursor + 1] = expanded
+        cursor += len(expanded)
+        panel_plan.append({"page": i, "variants": variants})
+    # 页码引用会失效（页数变了）—— 对比产物是**给人挑的**，不是交付物，
+    # 所以只把原始页号写在面板里，产物内部不再依赖页码。
+    compare_html = render_resolved(
+        deck_mod.compile_spec(compare_spec, style, assets=assets))
+    compare_html = compare_html.replace(
+        "</body>", _cmp_panel_html(panel_plan, seed) + "</body>")
+    deckio.write_text(compare_path, compare_html)
+    print(f"✓ 对比页已写出 {compare_path}（{len(panel_plan)} 组 · "
+          f"每组最多 {max(len(p['variants']) for p in panel_plan)} 页）"
+          f"—— 在页面上挑，点「复制选择」得到 picks JSON")
+
+    # ── 回写 ──────────────────────────────────────────────────────────
+    if picks_path:
+        picks = deckio.read_json(picks_path)
+        picked, applied, problems = _apply_picks(deck_spec, picks)
+        for p in problems:
+            print(f"✗ {p}")
+        if not applied:
+            print("✗ picks 里没有可应用的选择")
+            return 1
+        picked_path = os.path.splitext(out_path)[0] + ".picked.spec.json"
+        deckio.write_json(picked_path, picked)
         deckio.write_text(out_path, render_resolved(
             deck_mod.compile_spec(picked, style, assets=assets)))
+        print(f"✓ 已按选择渲染 {out_path}（{'、'.join(applied)}）")
+        print(f"  采纳后的 spec：{picked_path}")
+        return 0
+    if pick:
+        if not chosen:
+            print("✗ 没有可用候选，未改动")
+            return 1
+        picked_spec = copy.deepcopy(deck_spec)
+        for i, name in chosen.items():
+            picked_spec["deck"]["slides"][i - 1]["layout"] = name
+        deckio.write_json(os.path.splitext(out_path)[0] + ".candidates.spec.json",
+                          picked_spec)
+        deckio.write_text(out_path, render_resolved(
+            deck_mod.compile_spec(picked_spec, style, assets=assets)))
         where = "、".join(f"第 {i} 页 → {n}" for i, n in sorted(chosen.items()))
-        print(f"✓ 已选出并渲染：{where}（可采纳 *.candidates.spec.json）")
-    elif groups:
-        print("（未选：加 --pick 才落盘 —— 表在这里，决定权在作者）")
+        print(f"✓ 已自动采用最优并渲染：{where}")
+        return 0
+    print(f"（未回写：在对比页上挑好，点「复制选择」存成 picks.json，再跑 "
+          f"--candidates --picks picks.json；或加 --pick 直接采用最优）")
     return 0
 
 
@@ -1717,10 +1952,16 @@ def main(argv: list[str]) -> int:
                     help="渲→实测→修复梯→再渲（≤4 轮；只动 spec 可表达字段，"
                          "作者声明过的不碰，产出 *.repaired.spec.json）")
     ap.add_argument("--candidates", action="store_true",
-                    help="候选搜索：未声明布局的页把结构候选各渲一遍、实测打分"
-                         "（密度是区间满意度，不是最满优先；硬违规作废）")
+                    help="页级候选：每页 3 个结构不同的候选 + 缺省，整份 deck 联合择优，"
+                         "并写出对比页（同内容不同结构，页面上挑；复制选择得 picks JSON）")
     ap.add_argument("--pick", action="store_true",
-                    help="配合 --candidates：把最优候选写进 *.candidates.spec.json 并渲出")
+                    help="配合 --candidates：不问作者，直接采用最优候选并渲染")
+    ap.add_argument("--picks", default=None, metavar="PATH",
+                    help="配合 --candidates：按对比页导出的 picks.json（{页码: 候选名}）"
+                         "回写 spec 并渲染，产出 *.picked.spec.json")
+    ap.add_argument("--seed", default=None,
+                    help="候选择优的随机种子（缺省读 spec 的 deck.seed）——"
+                         "同 seed 同输入必得同结果")
     args = ap.parse_args(argv[1:])
     deck_spec = deckio.read_json(args.spec)
     assets = load_assets(args.spec)      # assets/manifest.json（§12 管线入口）
@@ -1728,8 +1969,9 @@ def main(argv: list[str]) -> int:
     style = load_style(name)
     if args.repair:
         return _repair_loop(deck_spec, style, assets, args.out)
-    if args.candidates or args.pick:
-        return _candidates_main(deck_spec, style, assets, args.out, args.pick)
+    if args.candidates or args.pick or args.picks:
+        return _candidates_main(deck_spec, style, assets, args.out, args.pick,
+                               seed=args.seed, picks_path=args.picks)
     resolved = deck_mod.compile_spec(deck_spec, style, assets=assets)
     page = render_resolved(resolved)
     deckio.write_text(args.out, page)

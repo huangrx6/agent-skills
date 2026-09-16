@@ -397,6 +397,62 @@ class TestColumnHooks(unittest.TestCase):
         self.assertIn("--s-bullet:", m.group(0))
 
 
+class TestStructureVariants(unittest.TestCase):
+    """结构变体真的渲得出来（词表里的名字 ↔ CSS 里的类名 ↔ DOM 上的类，三处必须对上）。
+
+    实测踩过：候选搜索里一个词表名字，如果渲染器没实现对应 CSS，
+    三个"结构不同"的候选会渲成同一个样子 —— 比不给候选更差（给了假选择）。
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.render = _load("deck_render_variants", os.path.join(SCRIPTS, "render.py"))
+
+    def _render(self, slide: dict) -> str:
+        spec = {"deck": {"style": "swiss-grid", "colorSet": "blue", "seed": 1,
+                         "title": "t", "slides": [
+                             {"title": "页", "bullets": ["一条", "两条"],
+                              "image": "x.png",
+                              "visual": {"kind": "evidence_image"}, **slide}]}}
+        return self.render.render(spec)
+
+    def test_visual_wide_gets_its_own_grid(self) -> None:
+        html = self._render({"type": "content-image", "layout": "visual-wide"})
+        self.assertIn('class="two v-visual-wide"', html)
+        self.assertIn(".two.v-visual-wide .main{width:461.33px}", html)
+        self.assertIn(".two.v-visual-wide .imgwrap{width:946.67px}", html)
+
+    def test_hard_lean_columns_get_their_own_grid(self) -> None:
+        html = self._render({"type": "two-column", "layout": "lean-hard-left",
+                             "columns": [{"title": "左", "bullets": ["a"]},
+                                         {"title": "右", "bullets": ["b"]}]})
+        self.assertIn('class="cols v-lean-hard-left"', html)
+        self.assertIn(".cols.v-lean-hard-left .col:first-child", html)
+
+    def test_every_vocab_name_has_a_renderer_branch(self) -> None:
+        """词表里的每个名字都要能在产物里出现**同名**类名（否则就是承诺了却没实现）。
+
+        类名 = layout 名是契约：皮肤作者按名字就能选到，不用猜。历史上 visual-left
+        渲的是 `v-left`，那种"名字对不上"最难查（皮肤里那条规则永远不生效）。
+        """
+        for name in self.render.IMAGE_LAYOUTS:
+            html = self._render({"type": "content-image", "layout": name})
+            marker = ("herofig" if name == "hero"
+                      else 'class="two' + ("" if name == "visual-right" else f" v-{name}"))
+            self.assertIn(marker, html, f"content-image 的 {name} 没有渲出来")
+        for name in self.render.TWO_COL_LAYOUTS:
+            html = self._render({"type": "two-column", "layout": name,
+                                 "columns": [{"title": "左", "bullets": ["a"]},
+                                             {"title": "右", "bullets": ["b"]}]})
+            marker = ('class="cols"' if name == "even" else f'class="cols v-{name}"')
+            self.assertIn(marker, html, f"two-column 的 {name} 没有渲出来")
+
+    def test_legacy_visual_left_class_is_kept(self) -> None:
+        """历史短名 `v-left` 不能因为改名默默失效（已在皮肤里的选择器还要能用）。"""
+        html = self._render({"type": "content-image", "layout": "visual-left"})
+        self.assertIn('class="two v-visual-left v-left"', html)
+
+
 class TestStyleLocationNote(unittest.TestCase):
     """风格的位置要开口说：**风格随 deck 项目交付**。
 

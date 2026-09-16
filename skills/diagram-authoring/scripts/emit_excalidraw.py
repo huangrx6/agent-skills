@@ -82,6 +82,7 @@ palette = _load_sibling("palette")
 tm = _load_sibling("text_metrics")
 shapes = _load_sibling("shapes")
 icons = _load_sibling("icons")
+sigils = _load_sibling("sigils")
 
 
 def _stable_int(key: str, salt: str = "") -> int:
@@ -403,6 +404,10 @@ def region_elements(region: dict, style: dict | None = None,
         text = "\n".join(lines)
         label_id = _eid("region-label", region["id"])
         label_x, dirty = _region_label_x(region, width, polylines)
+        # 底色与边标签同步**常开**（同一个办法，两处一致）：标题是要读的字，
+        # 不论搜到的位置干不干净都垫一枚画布色小牌。`dirty` 仍然返回，
+        # 作为“标题带里没有干净位置”的机器可读标记。
+        _ = dirty
         elements.append({
             **_base(label_id, "text", label_x - width / 2.0,
                    region["label_y"], width, height,
@@ -418,13 +423,8 @@ def region_elements(region: dict, style: dict | None = None,
             "lineHeight": tm.LINE_HEIGHT,
             "baseline": round(size * BASELINE_RATIO, 2),
         })
-        if dirty:
-            # 标题宽过区域的时候，标题带里**根本不存在**干净位置（实测：420px 的标题
-            # 在 468px 的区域里，竖线又在正中）。这时给标题铺一个画布色底 ——
-            # 线到字跟前断开，字照样读得清。这和边标签的 needs_backdrop 是同一个办法，
-            # 复用而不是另发明一套。
-            elements[-1]["backgroundColor"] = palette.CANVAS["background"]
-            elements[-1]["roundness"] = {"type": 3}
+        elements[-1]["backgroundColor"] = palette.CANVAS["background"]
+        elements[-1]["roundness"] = {"type": 3}
     return elements
 
 
@@ -726,12 +726,12 @@ def edge_label_element(edge: dict, index: int, obstacles: list | None = None,
     el_id = _eid("elabel", f"{edge['from']}-{edge['to']}", index)
     el = _base(el_id, "text", x, y, width, height,
                palette.CANVAS["text"], "transparent", extra={"roundness": None})
-    if needs_backdrop:
-        # 一个干净位置都找不到时，给文字铺一个**底色**（Excalidraw 的文字元素本来
-        # 就有 backgroundColor，铺在字后面就是一枚小牌子）。这样“标签被线穿过看不清”
-        # 在结构上不可能发生 —— 比继续挪、挪到一个一样脏的地方强。
-        el["backgroundColor"] = palette.CANVAS["background"]
-        el["roundness"] = {"type": 3}
+    # **底色常开**（模仿 archify 的 label mask）：每个标签都垫一枚画布色小牌。
+    # 以前只在“搜不到干净位置”时才铺，但“线从字旁边掠过”在密集图上同样难读；
+    # 常开后线到字跟前断开，任何位置都读得清。`needs_backdrop` 保留在返回值里，
+    # 只是“这个位置被穿过”的机器可读标记（测试与预览用它）。
+    el["backgroundColor"] = palette.CANVAS["background"]
+    el["roundness"] = {"type": 3}
     el.update({
         "text": label,
         "fontSize": tm.FONT_DETAIL,
@@ -836,6 +836,70 @@ def title_element(title: str | None) -> dict | None:
     }
 
 
+# ── 结论卡片（模仿 archify 的 cards：支撑性细节放卡片，不堆进图里）────
+# 几何与折行住在 `layout.card_rows`（两个后端同一份推导，常量也在那边）；
+# 这里只负责把排好的卡落成 Excalidraw 元素。
+
+
+def card_elements(laid: list[dict], level: str = "tint") -> list[dict]:
+    """卡片 = 便签风矩形（虚线框 + 极轻填充）+ 标题 + 条目。
+
+    与区域同一条规矩：挂 `groupIds`（装饰不是节点）；文字**不绑容器**
+    （卡片不是可拖址的节点，自由文字的位置我们自己算得准）。
+    """
+    if level not in palette.LEVELS:
+        level = "tint"
+    if not laid:
+        return []
+    elements: list[dict] = []
+    for card in laid:
+        gid = f"card-{card['index']}"
+        stroke = palette.frame_stroke(level)
+        fill = palette.LEVELS[level]["fill"]
+        elements.append(_base(_eid("card", gid), "rectangle",
+                              card["x"], card["y"], card["width"], card["height"],
+                              stroke, fill, stroke_style="dashed",
+                              stroke_width=1.0,
+                              roundness={"type": 3},
+                              extra={"groupIds": [gid]}))
+        tx = card["x"] + L.CARD_PAD_X
+        ty = card["y"] + L.CARD_PAD_Y
+        if card["title_lines"]:
+            text = "\n".join(card["title_lines"])
+            w = max(tm.weighted_units(l) for l in card["title_lines"]) * tm.FONT_NODE
+            h = len(card["title_lines"]) * tm.FONT_NODE * tm.LINE_HEIGHT
+            elements.append({
+                **_base(_eid("card-title", gid), "text", tx, ty, round(w, 2),
+                        round(h, 2), palette.LEVELS[level]["stroke"],
+                        "transparent", extra={"groupIds": [gid], "roundness": None}),
+                "text": text, "originalText": text,
+                "fontSize": tm.FONT_NODE,
+                "fontFamily": palette.CANVAS["font_family"],
+                "textAlign": "left", "verticalAlign": "top",
+                "containerId": None, "lineHeight": tm.LINE_HEIGHT,
+                "baseline": round(tm.FONT_NODE * BASELINE_RATIO, 2),
+                "strokeWidth": 1,
+            })
+            ty += h + L.CARD_PAD_Y
+        if card["item_lines"]:
+            text = "\n".join(card["item_lines"])
+            w = max(tm.weighted_units(l) for l in card["item_lines"]) * tm.FONT_DETAIL
+            h = len(card["item_lines"]) * tm.FONT_DETAIL * tm.LINE_HEIGHT
+            elements.append({
+                **_base(_eid("card-items", gid), "text", tx, ty, round(w, 2),
+                        round(h, 2), palette.CANVAS["text"],
+                        "transparent", extra={"groupIds": [gid], "roundness": None}),
+                "text": text, "originalText": text,
+                "fontSize": tm.FONT_DETAIL,
+                "fontFamily": palette.CANVAS["font_family"],
+                "textAlign": "left", "verticalAlign": "top",
+                "containerId": None, "lineHeight": tm.LINE_HEIGHT,
+                "baseline": round(tm.FONT_DETAIL * BASELINE_RATIO, 2),
+                "strokeWidth": 1,
+            })
+    return elements
+
+
 def build_scene(spec: dict, result, boxes: dict,
                 icon_lookup=None, icon_height=None) -> dict:
     elements: list[dict] = []
@@ -923,6 +987,10 @@ def build_scene(spec: dict, result, boxes: dict,
                                    label["x"] + label["width"] + pad,
                                    label["y"] + label["height"] + pad))
 
+    # 结论卡片（可选）：排在内容下方 —— 先于标题落位，标题居中时把卡片也算进去。
+    left, top, right, bottom = scene_bounds(elements) if elements else (0, 0, 0, 0)
+    elements += card_elements(L.card_rows(spec, left, right, bottom))
+
     # 图标题最后加：它要按已排好的内容来居中，而它自己**不参与**布局。
     # 放的位置是“内容顶边往上 TITLE_GAP”，所以不需要把别的元素往下挪 ——
     # 标题落到 y 为负的地方没关系：下面会把视图滚到内容左上角（见 OPEN_MARGIN_*）。
@@ -986,7 +1054,7 @@ class SpecError(ValueError):
 
 def load_icons(spec: dict, library_path: str | None = None,
                icon_height: float | None = None, full: bool = False):
-    """把规格里用到的图标从素材库取出来。**一个都不要就完全不碰文件。**
+    """把规格里用到的图标取出来。**一个都不要就完全不碰文件。**
 
     返回 `(lookup, sizes)`：
       - `lookup(name)` → 那一项的元素数组
@@ -994,24 +1062,37 @@ def load_icons(spec: dict, library_path: str | None = None,
 
     名字不存在时**判失败不 fallback** —— 静默换一个图标，看图的人根本不知道
     原本想要的是什么（与 `kind` / `shape` / `emphasis` 同一条规矩）。
+
+    名字分两个来源，**内置 sigil 优先**（见 `sigils.py`）：
+      1. `sigils.NAMES` 里的内置名 —— 由脚本自绘，不需要任何外部文件；
+      2. 其余名字 —— 照旧走 `.excalidrawlib` 素材库。
+    两源同名时永远取内置：静默挑另一个等于"我写了 A 出来的是 B"。
+    全部图标都是内置名时，素材库路径**完全不接触** —— "出图零依赖"不受影响。
     """
     wanted = {n["icon"] for n in spec.get("nodes", []) if n.get("icon")}
     if not wanted:
         return None, {}, {}
 
-    path, source = icons.library_path(library_path)
-    if not path:
-        raise icons.LibraryError(
-            f"规格里有节点指定了图标，但没找到素材库（{source}）。"
-            f"用 --library 指定，或写一行路径到 ~/.config/excalidraw-library-path")
-    library = icons.load(path)
-
     lookup = {}
     for name in sorted(wanted):
-        elements = icons.resolve(library, name)      # 找不到会抛错并列出可用名字
-        # 默认只留图形：节点自己已经有标签，素材自带的文字是冗余的，
-        # 而且缩到节点尺寸后只有几个像素（见 icons.glyph_only）。
-        lookup[name] = list(elements) if full else icons.glyph_only(elements)
+        if sigils.is_builtin(name):
+            # 颜色用当前画布墨色 —— 调用时机在主题切定之后（emit 的顺序保证）。
+            lookup[name] = sigils.glyph(name, palette.CANVAS.get("text", "#1f2937"))
+
+    library_names = wanted - set(lookup)
+    if library_names:
+        path, source = icons.library_path(library_path)
+        if not path:
+            raise icons.LibraryError(
+                f"规格里有节点指定了图标 {sorted(library_names)}，其中没有内置 sigil，"
+                f"需要素材库但没找到（{source}）。用 --library 指定，或写一行路径到 "
+                f"~/.config/excalidraw-library-path，或改用内置名（scripts/sigils.py 可列）")
+        library = icons.load(path)
+        for name in sorted(library_names):
+            elements = icons.resolve(library, name)      # 找不到会抛错并列出可用名字
+            # 默认只留图形：节点自己已经有标签，素材自带的文字是冗余的，
+            # 而且缩到节点尺寸后只有几个像素（见 icons.glyph_only）。
+            lookup[name] = list(elements) if full else icons.glyph_only(elements)
 
     # 每个节点算自己的图标高度 —— 用户要的"适配每一个元素"。
     sizes = {}
@@ -1108,12 +1189,17 @@ def icon_contrast_issues(spec: dict, lookup: dict) -> list:
 
 
 def emit(spec: dict, *, params=None, library: str | None = None,
-         icon_height: float | None = None, icon_full: bool = False
+         icon_height: float | None = None, icon_full: bool = False,
+         quality: str = "standard"
          ) -> tuple[dict, Any, Any, list]:
     """跑完整条流水线并返回场景。**校验有阻塞项就不出图。**
 
     顺序刻意是 validate → layout → check → emit：出图是最后一步，
     前一步不过就不该走到这里。跳过校验直接出图，等于把“不重叠/不溢出”的保证丢掉。
+
+    `quality`：standard（默认）= 现有行为；showcase = 交付档 ——
+    调参循环照常先跑，试尽后结构类软项（交叉/重合/斜段/折点/相交/穿节点）
+    升级为阻塞，有残留就不出图（见 `check_layout.Outcome.promote`）。
     """
     validator = _load_sibling("validate_spec")
     report = validator.validate(spec)
@@ -1136,6 +1222,8 @@ def emit(spec: dict, *, params=None, library: str | None = None,
     extra = icon_readability_issues(spec, lookup or {}, icon_height)
     if extra:
         outcome = _check_layout().Outcome(issues=[*outcome.issues, *extra])
+    # showcase 升级在调参之后：调参循环全程用原始 outcome 判断收敛（见 promote 的说明）。
+    outcome = outcome.promote(quality)
     if outcome.blocking:
         return {}, result, outcome, attempts
     icon_lookup = (lambda name: lookup.get(name)) if lookup else None
@@ -1148,6 +1236,46 @@ def _check_layout():
     return _load_sibling("check_layout")
 
 
+def _atomic_write(path: str, payload: str) -> None:
+    """先写同目录临时文件，再原子换入（模仿 archify 的 deliver 提交）。
+
+    为什么不直接写目标：写到一半被打断（磁盘满 / 进程被杀）会留下**半个文件**，
+    而它看起来和正常产物一样 —— 同目录临时文件 + `os.replace` 保证目标路径上
+    要么是旧版、要么是完整新版，永远不会是半张图。
+    """
+    tmp = os.path.join(os.path.dirname(os.path.abspath(path)),
+                       f".{os.path.basename(path)}.tmp-{os.getpid()}")
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
+
+def _delivery_receipt(out_path: str, spec_path: str, spec_bytes: bytes,
+                      artifact: str, receipt: dict) -> None:
+    """三档声明 + SHA-256 双回执（模仿 archify 的交付声明）。三档互不冒充：
+
+    1. 确定性校验 —— 本脚本机器可证；
+    2. 自研预览渲染 —— 未验证，须 dev-tools/preview.py 或 excalidraw.com 核对；
+    3. 感知审查 —— pending，**只能人眼看真实渲染**；校验全绿 ≠ 图讲清楚了。
+    """
+    digest = lambda b: hashlib.sha256(b).hexdigest()
+    checks = receipt.get("checks", [])
+    passed = sum(1 for c in checks if c.get("ok"))
+    print("── 交付回执 ──")
+    print(f"确定性校验: 通过（{passed}/{len(checks)} 项，档位 {receipt.get('quality', 'standard')}）")
+    print("自研预览渲染: 未验证（需 dev-tools/preview.py 或在 Excalidraw 里打开核对）")
+    print("感知审查: pending（校验全绿 ≠ 图讲清楚了；须人眼看真实渲染）")
+    print(f"规格 sha256: {digest(spec_bytes)[:16]}…  "
+          f"产物 sha256: {digest(artifact.encode('utf-8'))[:16]}…")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="规格 → .excalidraw（plain JSON）")
     ap.add_argument("spec", help="*.diagram.json")
@@ -1158,11 +1286,15 @@ def main(argv: list[str] | None = None) -> int:
                     help="强制图标高度（默认按每个节点自身高度算，见 references/icons.md）")
     ap.add_argument("--icon-full", action="store_true",
                     help="保留素材自带的文字（默认只取图形：节点自己已经有标签了）")
+    ap.add_argument("--quality", choices=("standard", "showcase"), default="standard",
+                    help="showcase=交付档：结构类软项升级为阻塞，有残留就不出图")
+    ap.add_argument("--json", action="store_true", help="附带机器可读回执（结构化诊断）")
     args = ap.parse_args(argv)
 
     try:
         with open(args.spec, encoding="utf-8") as fh:
-            spec = json.load(fh)
+            spec_bytes = fh.read().encode("utf-8")
+        spec = json.loads(spec_bytes)
     except (OSError, json.JSONDecodeError) as exc:
         print(f"读不到规格：{exc}", file=sys.stderr)
         return 2
@@ -1170,7 +1302,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         scene, result, outcome, attempts = emit(spec, library=args.library,
                                                 icon_height=args.icon_height,
-                                                icon_full=args.icon_full)
+                                                icon_full=args.icon_full,
+                                                quality=args.quality)
     except SpecError as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -1187,6 +1320,10 @@ def main(argv: list[str] | None = None) -> int:
     if not scene:
         print("校验有阻塞项，不出图：", file=sys.stderr)
         print(_check_layout().format_report(spec, attempts, outcome), file=sys.stderr)
+        if args.json:
+            receipt = _check_layout().build_receipt(spec, result, attempts,
+                                                    outcome, args.quality)
+            print(json.dumps(receipt, ensure_ascii=False, indent=2), file=sys.stderr)
         return 1
 
     payload = json.dumps(scene, ensure_ascii=False, indent=2)
@@ -1196,14 +1333,18 @@ def main(argv: list[str] | None = None) -> int:
 
     out = args.out or os.path.splitext(args.spec)[0] + ".excalidraw"
     try:
-        with open(out, "w", encoding="utf-8") as fh:
-            fh.write(payload + "\n")
+        _atomic_write(out, payload + "\n")
     except OSError as exc:
         print(f"写不了 {out}：{exc}", file=sys.stderr)
         return 2
     n_nodes = len(result.real_nodes())
     print(f"✓ {out}  （{n_nodes} 个节点 / {len(result.edges)} 条边 / "
           f"{len(scene['elements'])} 个元素 / 交叉 {result.crossings}）")
+    receipt = _check_layout().build_receipt(spec, result, attempts,
+                                            outcome, args.quality)
+    _delivery_receipt(out, args.spec, spec_bytes, payload, receipt)
+    if args.json:
+        print(json.dumps(receipt, ensure_ascii=False, indent=2))
     return 0
 
 

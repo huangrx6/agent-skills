@@ -1,0 +1,19 @@
+{
+  "type": "state",
+  "title": "订单状态机",
+  "nodes": [
+    { "id": "pending", "label": "待支付", "kind": "plain" },
+    { "id": "paid", "label": "已支付", "kind": "plain" },
+    { "id": "shipped", "label": "已发货", "kind": "plain" },
+    { "id": "done", "label": "已完成", "kind": "plain" },
+    { "id": "cancelled", "label": "已取消", "kind": "plain", "emphasis": "critical" },
+    { "id": "refunded", "label": "已退款", "kind": "plain", "emphasis": "critical" }
+  ],
+  "edges": [
+    { "from": "pending", "to": "paid", "label": "支付成功" },
+    { "from": "paid", "to": "shipped", "label": "发货" },
+    { "from": "shipped", "to": "done", "label": "签收" },
+    { "from": "pending", "to": "cancelled", "label": "支付超时" },
+    { "from": "shipped", "to": "refunded", "label": "部分退款" }
+  ]
+}

@@ -3283,6 +3283,17 @@ class NodeBox:
 # —— 同一件几何量只能有一处定义（这个仓库已经吃过两次「两处各留一份、然后漂掉」的亏）。
 TITLE_GAP = 28.0
 
+# ── 结论卡片（cards）的几何常量 ─────────────────────────────
+#
+# 卡片是图下方的锗点（模仿 archify 的 cards）：支撑性细节放卡片，不堆进图里。
+# 与标题同一条规矩：**不参与布局**，内容算完之后才落位；两个后端共用这几个数，
+# 同一件几何量只留这一处。断行用的 `wrap` 在 text_metrics，两个后端各自调。
+CARD_GAP_BELOW = 48.0        # 内容底边到第一行卡片顶边
+CARD_GAP_BETWEEN = 24.0       # 同行卡片之间的空隙
+CARD_PAD_X = 12.0             # 卡片内边距（左右）
+CARD_PAD_Y = 10.0             # 卡片内边距（上下；标题与条目之间也用它）
+CARD_WRAP_UNITS = 24.0        # 条目断行宽度（单位数，与 L 档一致）
+
 REGION_PAD = 26.0        # 区域边框到成员节点的距离
 # 区域标题的字号：比节点标题（16）大一步 —— 参考图里它就是整块区域的名字。
 REGION_LABEL_SIZE = 20.0
@@ -3299,6 +3310,69 @@ REGION_HEAD = 40.0
 # 「标签超过最大断行档位就判失败」是同一类内容级问题。
 REGION_TITLE_MAX_LINES = 2
 REGION_MIN_GAP = 18.0    # 两个区域贴在一起时至少留这么多
+
+
+def card_rows(spec: dict, content_left: float, content_right: float,
+              content_bottom: float) -> list[dict]:
+    """把 `cards` 排成内容下方的若干行，返回每张卡的折行与几何（绝对坐标）。
+
+    两个后端共用这一份推导（同一件几何量只留一处）：
+      - 断行宽度 = `CARD_WRAP_UNITS` 单位（标题按字号比折算，条目用原始单位）；
+      - 行宽以**内容宽**为上限；单张卡超限时独占一行 —— 卡片内容比排版优先；
+      - 行内居中于内容宽，新行的 y 在上一行最高那张卡之下。
+
+    卡片**不参与布局**（与标题同一条规矩）：它在内容算完之后才落位，
+    不会反过来把任何节点推开。
+    """
+    cards = spec.get("cards") or []
+    if not cards:
+        return []
+    usable = max(240.0, content_right - content_left)
+    wrap_units_items = CARD_WRAP_UNITS
+    wrap_units_title = CARD_WRAP_UNITS * _tm.FONT_DETAIL / _tm.FONT_NODE
+
+    entries: list[dict] = []
+    for index, card in enumerate(cards):
+        title_lines, _ = _tm.wrap(str(card.get("title", "")), wrap_units_title)
+        item_lines: list[str] = []
+        for item in card.get("items", []):
+            got, _ = _tm.wrap(f"• {item}", wrap_units_items)
+            item_lines.extend(got)
+        title_w = max([_tm.weighted_units(l) for l in title_lines] or [0.0]) * _tm.FONT_NODE
+        items_w = max([_tm.weighted_units(l) for l in item_lines] or [0.0]) * _tm.FONT_DETAIL
+        width = round(max(title_w, items_w) + 2 * CARD_PAD_X, 2)
+        title_h = len(title_lines) * _tm.FONT_NODE * _tm.LINE_HEIGHT
+        items_h = len(item_lines) * _tm.FONT_DETAIL * _tm.LINE_HEIGHT
+        height = round(title_h + (CARD_PAD_Y if item_lines else 0.0)
+                       + items_h + 2 * CARD_PAD_Y, 2)
+        entries.append({"index": index, "title_lines": title_lines,
+                        "item_lines": item_lines,
+                        "width": width, "height": height})
+
+    rows: list[list[dict]] = []
+    current: list[dict] = []
+    current_w = 0.0
+    for entry in entries:
+        if current and current_w + CARD_GAP_BETWEEN + entry["width"] > usable:
+            rows.append(current)
+            current, current_w = [], 0.0
+        current.append(entry)
+        current_w = (current_w + CARD_GAP_BETWEEN + entry["width"]
+                     if len(current) > 1 else entry["width"])
+    if current:
+        rows.append(current)
+
+    y = content_bottom + CARD_GAP_BELOW
+    for row in rows:
+        total = sum(c["width"] for c in row) + CARD_GAP_BETWEEN * (len(row) - 1)
+        x = (usable - total) / 2.0 if total < usable else 0.0
+        row_height = max(c["height"] for c in row)
+        for card in row:
+            card["x"] = round(content_left + x, 2)
+            card["y"] = round(y, 2)
+            x += card["width"] + CARD_GAP_BETWEEN
+        y += row_height + CARD_GAP_BETWEEN
+    return entries
 
 
 def region_label_lines(label: str, width: float) -> tuple[list[str], float]:

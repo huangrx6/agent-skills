@@ -33,11 +33,12 @@ import sys
 # 封闭字段集。加字段要同时改这里和 references/diagram-spec.md —— 这正是设计意图：
 # 让"顺手加一个"变得有摩擦。
 TOP_FIELDS = {"type", "title", "direction", "detail", "groups", "nodes", "edges",
-              "visual", "mood", "style"}
+              "visual", "mood", "style", "cards"}
 GROUP_FIELDS = {"id", "label", "level", "style", "description"}
 NODE_FIELDS = {"id", "label", "kind", "shape", "emphasis", "icon", "group",
                "detail", "rank", "pin"}
 EDGE_FIELDS = {"id", "from", "to", "label", "kind"}
+CARD_FIELDS = {"title", "items"}
 DIRECTIONS = {"LR", "TB"}
 DETAIL_LEVELS = {"executive", "standard", "diagnostic"}
 PINS = {"left", "right", "top", "bottom"}
@@ -270,6 +271,30 @@ def validate(spec: dict) -> Issues:
         pin = n.get("pin")
         if pin is not None and pin not in PINS:
             issues.error("BAD_PIN", f"{where}.pin", f"pin 只允许 {sorted(PINS)}")
+
+    # cards：结论卡片（模仿 archify 的 cards —— 支撑性细节放卡片，不堆进图里）。
+    # 与 group 同一条规矩：**写了却没内容就报错**，不让它静默不生效。
+    cards = spec.get("cards", [])
+    if cards is not None and not isinstance(cards, list):
+        issues.error("BAD_CARDS", "$.cards", "cards 必须是数组")
+        cards = []
+    for ci, card in enumerate(cards or []):
+        where = f"$.cards[{ci}]"
+        if not isinstance(card, dict):
+            issues.error("BAD_CARD", where, "card 必须是对象")
+            continue
+        _check_fields(card, CARD_FIELDS, where, issues)
+        if not str(card.get("title", "")).strip():
+            issues.error("MISSING_CARD_TITLE", where, "card 缺少非空 title")
+        items = card.get("items")
+        if not isinstance(items, list) or not items:
+            issues.error("MISSING_CARD_ITEMS", where,
+                         "card 需要至少一条 item（空卡片在图上什么都不表达）")
+        else:
+            for ii, item in enumerate(items):
+                if not isinstance(item, str) or not item.strip():
+                    issues.error("BAD_CARD_ITEM", f"{where}.items[{ii}]",
+                                 "item 必须是非空字符串")
 
     # edges
     for ei, e in enumerate(spec.get("edges", []) or []):

@@ -38,6 +38,17 @@ layout = _load_layout()
 model, collision = layout.model, layout.collision
 
 
+def _load_render():
+    spec = importlib.util.spec_from_file_location(
+        "_deck_test_layout_render", os.path.join(SKILL, "scripts", "render.py"))
+    if spec is None or spec.loader is None:
+        raise RuntimeError("加载不了 render.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["_deck_test_layout_render"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 class TestModel(unittest.TestCase):
     def test_expand_rect(self) -> None:
         safe = model.expand_rect(
@@ -427,6 +438,257 @@ class TestRepairCLI(unittest.TestCase):
             # 声明页保持原样：repaired spec 里仍是作者声明的 bulletLarge
             self.assertEqual(repaired["deck"]["slides"][1]["bulletTier"],
                              "bulletLarge")
+
+
+class TestApplyPicks(unittest.TestCase):
+    """`--picks` 的回写：候选名写进 spec，null/“缺省”撤掉 layout，坏键不静默吞。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.render = _load_render()
+
+    def _spec(self) -> dict:
+        return {"deck": {"slides": [
+            {"type": "content-image", "layout": "hero"},
+            {"type": "two-column"},
+            {"type": "content-text"}]}}
+
+    def test_names_are_written_and_default_removes_layout(self) -> None:
+        picked, applied, problems = self.render._apply_picks(
+            self._spec(), {"1": "even", "2": "缺省", "3": None})
+        self.assertEqual(problems, [])
+        self.assertEqual(len(applied), 3)
+        self.assertEqual(picked["deck"]["slides"][0]["layout"], "even")
+        self.assertNotIn("layout", picked["deck"]["slides"][1])
+        self.assertNotIn("layout", picked["deck"]["slides"][2])
+        # 原 spec 不被就地改（回写是复制，不是污染输入）
+        self.assertEqual(self._spec()["deck"]["slides"][0]["layout"], "hero")
+
+    def test_bad_keys_and_values_are_reported(self) -> None:
+        _picked, applied, problems = self.render._apply_picks(
+            self._spec(), {"9": "even", "abc": "even", "1": 7})
+        self.assertEqual(applied, [])
+        self.assertEqual(len(problems), 3, problems)
+
+
+class TestCandidateCLI(unittest.TestCase):
+    """`--candidates` 的端到端契约：对比页 + 报告 + `--picks` 回写。
+
+    钉的是“决定权在作者”这件事：产物里必须有一页对比页（同内容不同结构）
+    和一份能被回写的 picks 通路 —— 而不是脚本自己悄悄选完了。
+    """
+
+    def test_compare_page_and_picks_writeback(self) -> None:
+        import subprocess
+        import tempfile
+        scripts = os.path.join(SKILL, "scripts")
+        with tempfile.TemporaryDirectory() as tmp:
+            spec = {"deck": {
+                "style": "swiss-grid", "colorSet": "blue", "seed": 11,
+                "title": "候选",
+                "slides": [
+                    {"type": "content-image", "title": "图页",
+                     "bullets": ["一", "二", "三"], "image": "x.png",
+                     "visual": {"kind": "evidence_image"}},
+                    {"type": "two-column", "title": "双栏",
+                     "columns": [{"title": "左", "bullets": ["a", "b"]},
+                                 {"title": "右", "bullets": ["c", "d"]}]},
+                ]}}
+            spec_path = os.path.join(tmp, "deck.spec.json")
+            with open(spec_path, "w", encoding="utf-8") as fh:
+                json.dump(spec, fh, ensure_ascii=False)
+            out = os.path.join(tmp, "out.html")
+            env = dict(os.environ)
+            proc = subprocess.run(
+                ["python3", os.path.join(scripts, "render.py"), spec_path,
+                 "-o", out, "--candidates"],
+                capture_output=True, text=True, timeout=600, env=env)
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+            compare = os.path.join(tmp, "out.compare.html")
+            self.assertTrue(os.path.exists(compare), proc.stdout)
+            with open(compare, encoding="utf-8") as fh:
+                html = fh.read()
+            self.assertIn('id="cmp"', html, "对比页必须带选择面板")
+            self.assertIn("var PLAN=", html)
+            # 同一页的几种结构都要在对比页里出现：visual-right 是**默认路径**
+            # （不发类名，逐字节不变），其它变体发 v-<名>。
+            self.assertIn('class="two"', html)
+            self.assertIn('class="two v-even"', html, "同一页的不同结构要都在对比页里")
+            self.assertIn('class="two v-visual-wide"', html)
+
+            report_path = os.path.join(tmp, "out.candidates.json")
+            with open(report_path, encoding="utf-8") as fh:
+                report = json.load(fh)
+            self.assertEqual(set(report["assignments"]), {"1", "2"})
+            self.assertTrue(report["assignments"]["2"],
+                            "每页都必须给出候选（否则对比页是空的）")
+
+            picks_path = os.path.join(tmp, "picks.json")
+            with open(picks_path, "w", encoding="utf-8") as fh:
+                json.dump({"1": "even", "2": None}, fh)
+            proc2 = subprocess.run(
+                ["python3", os.path.join(scripts, "render.py"), spec_path,
+                 "-o", out, "--candidates", "--picks", picks_path],
+                capture_output=True, text=True, timeout=600, env=env)
+            self.assertEqual(proc2.returncode, 0, proc2.stdout + proc2.stderr)
+            with open(os.path.join(tmp, "out.picked.spec.json"),
+                      encoding="utf-8") as fh:
+                picked = json.load(fh)
+            self.assertEqual(picked["deck"]["slides"][0]["layout"], "even")
+            self.assertNotIn("layout", picked["deck"]["slides"][1])
+
+
+class TestFingerprint(unittest.TestCase):
+    """结构指纹（layout/fingerprint.py）：镜像不算新结构，跨度不同才算。
+
+    为什么这条要单独测：页级要给 3 个候选，一旦把镜像（图左/图右）当成不同结构，
+    三个候选就会摆出"同一个构图换三件衣服"—— 作者看着有得选，其实没得选。
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.c = _load_layout().fingerprint
+
+    def test_mirrors_collapse_to_one_composition(self) -> None:
+        self.assertEqual(self.c.composition("content-image", "visual-right"),
+                         self.c.composition("content-image", "visual-left"))
+        self.assertEqual(self.c.composition("two-column", "lean-left"),
+                         self.c.composition("two-column", "lean-right"))
+
+    def test_different_spans_or_family_are_different_structures(self) -> None:
+        comps = {self.c.composition("content-image", n)
+                 for n in ("visual-right", "even", "hero")}
+        self.assertEqual(len(comps), 3, comps)
+
+    def test_distinct_keeps_one_per_composition(self) -> None:
+        self.assertEqual(
+            self.c.distinct("content-image",
+                            ["visual-right", "visual-left", "even", "visual-wide",
+                             "hero"]),
+            ["visual-right", "even", "visual-wide", "hero"])
+        self.assertEqual(
+            self.c.distinct("two-column",
+                            ["even", "lean-left", "lean-right",
+                             "lean-hard-left", "lean-hard-right"]),
+            ["even", "lean-left", "lean-hard-left"])
+
+    def test_vocabulary_is_wide_enough_for_candidate_search(self) -> None:
+        """结构词表至少要有 3 个真构图 —— 否则"给三个候选"是句空话。
+
+        实测踩过：content-image 只有 6+6 / 7+5 / 满幅三个构图，
+        于是三个候选只能取全部 —— 联合择优根本没有自由度可选。
+        """
+        for page_type in ("content-image", "two-column"):
+            comps = {self.c.composition(page_type, n)
+                     for n in self.c.STRUCTURES[page_type]}
+            self.assertGreaterEqual(len(comps), 3, f"{page_type} 真构图不足：{comps}")
+
+    def test_unknown_names_are_kept_not_swallowed(self) -> None:
+        """不认识的名字不静默吞掉：宁可多给一个候选，也别把真支持的东西藏了。"""
+        self.assertIsNone(self.c.composition("content-image", "brand-new"))
+        self.assertEqual(self.c.distinct("content-image", ["brand-new"]),
+                         ["brand-new"])
+        self.assertIsNone(self.c.fingerprint("content-text", "anything"))
+
+    def test_mirror_lookup(self) -> None:
+        self.assertEqual(self.c.mirror_of("content-image", "visual-right"),
+                         "visual-left")
+        self.assertIsNone(self.c.mirror_of("content-image", "hero"))
+
+    def test_region_spans_are_exposed_for_budgets(self) -> None:
+        keys = self.c.region_budget_key("content-image", "visual-right")
+        self.assertEqual({k: v["span"] for k, v in keys.items()},
+                         {"main": 7, "image": 5})
+
+    def test_table_covers_exactly_the_renderer_vocabulary(self) -> None:
+        """结构表 ↔ 渲染器能力清单不得漂移（两份词表写岔 = 静默不受支持）。"""
+        render = _load_render()
+        for page_type, vocab in (("content-image", render.IMAGE_LAYOUTS),
+                                 ("two-column", render.TWO_COL_LAYOUTS)):
+            self.assertEqual(set(self.c.STRUCTURES[page_type]), set(vocab),
+                             f"{page_type} 的结构表与渲染器能力清单对不上")
+
+
+class TestAllocation(unittest.TestCase):
+    """deck 级**联合**择优（layout/allocation.py）。
+
+    测的是一件事：逐页各挑各的最优会得到"每页都还行、整份却一个版式用五遍"，
+    联合择优必须在多页之间把候选散开，而且**同 seed 必得同结果**。
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.pkg = _load_layout()
+        cls.a, cls.fp = cls.pkg.allocation, cls.pkg.fingerprint
+
+    def _page(self, key, fits: dict, page_type="content-image"):
+        return {"key": key, "pageType": page_type,
+                "candidates": [{"layout": n, "fit": f,
+                                "fingerprint": self.fp.fingerprint(page_type, n)}
+                               for n, f in fits.items()]}
+
+    def test_same_seed_same_result(self) -> None:
+        pages = [self._page(i, {"visual-right": 0.8, "even": 0.79, "hero": 0.78})
+                 for i in range(1, 7)]
+        first = self.a.allocate(pages, seed="deck-a")["assignments"]
+        second = self.a.allocate(pages, seed="deck-a")["assignments"]
+        third = self.a.allocate(pages, seed="deck-b")["assignments"]
+        self.assertEqual(first, second, "同 seed 同输入必须同结果")
+        self.assertEqual(set(first), set(third), "两个 seed 都该给出全部页")
+
+    def test_repetition_is_spread_across_pages(self) -> None:
+        """同分页多于一页时，选出来的三条候选不该每页都是同一组。"""
+        fits = {"visual-right": 0.80, "even": 0.80, "visual-wide": 0.80,
+                "hero": 0.80, "visual-left": 0.80}      # 5 个名字 → 4 个真构图
+        pages = [self._page(i, fits) for i in range(1, 7)]
+        out = self.a.allocate(pages, seed="deck-spread")
+        combos = {tuple(sorted(v)) for v in out["assignments"].values()}
+        self.assertGreaterEqual(len(combos), 3, f"候选组合没散开：{combos}")
+        # visual-left 与 visual-right 同构图（镜像）→ 同一页不会同时出现
+        for key, names in out["assignments"].items():
+            comps = [self.fp.composition("content-image", n) for n in names]
+            self.assertEqual(len(comps), len(set(comps)), f"第 {key} 页给了同构图候选")
+
+    def test_far_worse_candidate_is_dropped(self) -> None:
+        """一个明显更差的候选不该占位置（拟合带内才留）。"""
+        out = self.a.allocate(
+            [self._page(1, {"visual-right": 0.90, "even": 0.85, "hero": 0.80,
+                            "visual-left": 0.20})], seed="deck-band")
+        self.assertEqual(out["assignments"][1],
+                         ["visual-right", "even", "hero"])
+
+    def test_insufficient_candidates_are_reported_not_faked(self) -> None:
+        """two-column 只有 3 个真构图（lean 两向是镜像）——给 3 个，不凑数。"""
+        out = self.a.allocate(
+            [self._page(1, {"even": 0.8, "lean-left": 0.75, "lean-right": 0.70},
+                        page_type="two-column")], seed="deck-two")
+        self.assertEqual(len(out["assignments"][1]), 2,
+                         "默认给三条；只有两个真构图时才给两条")
+        self.assertTrue(any("只有 2 个结构不同" in d for d in out["diagnostics"]),
+                        out["diagnostics"])
+
+    def test_pages_without_candidates_stay_out(self) -> None:
+        out = self.a.allocate([{"key": 3, "pageType": "content-text",
+                                "candidates": []}], seed="deck-empty")
+        self.assertEqual(out["assignments"], {})
+        self.assertTrue(any("没有可用候选" in d for d in out["diagnostics"]))
+
+    def test_bad_fit_values_do_not_poison_the_page(self) -> None:
+        """NaN / bool / 字符串不是分数：混进 max() 会把基准变成 NaN（静默挑错）。"""
+        page = {"key": 1, "pageType": "content-image", "candidates": [
+            {"layout": "even", "fit": float("nan")},
+            {"layout": "hero", "fit": True},
+            {"layout": "visual-right", "fit": "0.9"},
+            {"layout": "visual-left", "fit": 0.7,
+             "fingerprint": self.fp.fingerprint("content-image", "visual-left")},
+        ]}
+        out = self.a.allocate([page], seed="deck-nan")
+        self.assertEqual(out["assignments"][1], ["visual-left"])
+
+    def test_repeat_counts_only_reports_actual_repeats(self) -> None:
+        self.assertEqual(self.a.repeat_counts(["a", "a", "b"]), {"a": 2})
+        self.assertEqual(self.a.repeat_counts([]), {})
 
 
 class TestCandidates(unittest.TestCase):

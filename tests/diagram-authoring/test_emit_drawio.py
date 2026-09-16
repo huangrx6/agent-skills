@@ -642,6 +642,10 @@ class TestCli(unittest.TestCase):
             blocking = [_Issue()]
             issues = [_Issue()]
 
+            def promote(self, quality: str = "standard"):
+                # 跳随真实 Outcome 的接口：emit 现在会在调参后调 promote(quality)。
+                return self
+
         real = D._load_sibling("check_layout")
         original = real.layout_with_retry
 

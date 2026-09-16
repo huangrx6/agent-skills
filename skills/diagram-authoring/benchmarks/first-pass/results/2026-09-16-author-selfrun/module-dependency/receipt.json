@@ -1,0 +1,78 @@
+{
+  "case_id": "module-dependency",
+  "first_pass_usable": false,
+  "gates": {
+    "semantic": "pass",
+    "validation": "pass",
+    "visual_review": "skipped"
+  },
+  "problems": [
+    "人审未执行（skipped）—— skipped 永远不能算 usable"
+  ],
+  "validation_receipt": {
+    "ok": true,
+    "quality": "showcase",
+    "checks": [
+      {
+        "name": "gap",
+        "ok": true
+      },
+      {
+        "name": "edge",
+        "ok": true
+      },
+      {
+        "name": "text",
+        "ok": true
+      },
+      {
+        "name": "palette",
+        "ok": true
+      },
+      {
+        "name": "crossing",
+        "ok": true
+      },
+      {
+        "name": "through",
+        "ok": true
+      },
+      {
+        "name": "region",
+        "ok": true
+      },
+      {
+        "name": "overlap",
+        "ok": true
+      },
+      {
+        "name": "slant",
+        "ok": true
+      },
+      {
+        "name": "region_label",
+        "ok": true
+      },
+      {
+        "name": "bend",
+        "ok": true
+      },
+      {
+        "name": "intersect",
+        "ok": true
+      },
+      {
+        "name": "readability",
+        "ok": true
+      }
+    ],
+    "metrics": {
+      "nodes": 5,
+      "edges": 5,
+      "crossings": 0,
+      "tuningRounds": 0,
+      "canvasWidthPx": 511.0
+    },
+    "diagnostics": []
+  }
+}

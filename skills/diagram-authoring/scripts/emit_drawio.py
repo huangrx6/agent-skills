@@ -491,6 +491,32 @@ def title_cell(title: str, rect: tuple[float, float, float, float],
                                 rect[2], rect[3]))
 
 
+def card_cells(laid: list[dict], knobs: dict) -> list[str]:
+    """结论卡片 → drawio 单元格（圆角虚线框，标题加粗 + 条目列表）。
+
+    几何（行/列/尺寸）来自 `layout.card_rows` —— 与 Excalidraw 后端**同一份推导**，
+    这边只做序列化。标题用 `&lt;b&gt;` 加粗：`html=1` 下与 `&lt;br&gt;` 同一套机制。
+    """
+    cells: list[str] = []
+    for card in laid:
+        lines = [f"&lt;b&gt;{escape_xml(l)}&lt;/b&gt;" for l in card["title_lines"]]
+        lines += [escape_xml(l) for l in card["item_lines"]]
+        style = ";".join([
+            "rounded=1", "arcSize=8", "dashed=1", "html=1",
+            "align=left", "verticalAlign=top",
+            f"spacingLeft={round(L.CARD_PAD_X)}", f"spacingTop={round(L.CARD_PAD_Y / 2)}",
+            f"fillColor={palette.LEVELS['tint']['fill']}",
+            f"strokeColor={palette.frame_stroke('tint')}",
+            "strokeWidth=1",
+            f"fontSize={round(tm.FONT_DETAIL * (knobs.get('font_scale') or 1.0))}",
+            f"fontFamily={knobs['font_family']}",
+        ])
+        cells.append(_cell(f"card-{card['index']}", "&lt;br&gt;".join(lines), style,
+                           _rect_geometry(card["x"], card["y"],
+                                          card["width"], card["height"])))
+    return cells
+
+
 def build_page(spec: dict, result: Any, boxes: dict,
                detail_level: str | None = None) -> str:
     """一页 = 一个 `<diagram>` 块（含它自己的 mxGraphModel）。
@@ -502,8 +528,12 @@ def build_page(spec: dict, result: Any, boxes: dict,
     level = detail_level if detail_level is not None else spec.get("detail", L.DEFAULT_DETAIL)
     regions = L.region_boxes(spec, result.placed, boxes)
     title = spec.get("title")
-    rect = title_rect(title, content_bounds(result, regions))
-    frame = Frame(result, regions, [rect] if rect else [])
+    bounds = content_bounds(result, regions)
+    rect = title_rect(title, bounds)
+    cards = L.card_rows(spec, bounds[0], bounds[2], bounds[3])
+    card_rects = [(c["x"], c["y"], c["width"], c["height"]) for c in cards]
+    frame = Frame(result, regions,
+                  [r for r in ([rect] if rect else []) + card_rects if r])
 
     by_id = {node["id"]: node for node in spec.get("nodes", [])}
     body: list[str] = []
@@ -516,6 +546,7 @@ def build_page(spec: dict, result: Any, boxes: dict,
         body.append(node_cell(by_id[node_id], placed, boxes[node_id], level, frame))
     for index, edge in enumerate(result.edges):
         body.append(edge_cell(edge, index, result.placed, level, frame))
+    body += card_cells(cards, palette.knobs())
     if rect and title:
         # 标题最后加：和 Excalidraw 侧一样画在最上层（它是 chrome，不是内容）
         body.append(title_cell(title, rect, frame))
@@ -563,11 +594,15 @@ def build_model(spec: dict, result: Any, boxes: dict,
 
 
 def emit_page(spec: dict, *, params: dict | None = None, scheme: str | None = None,
-              seeds: dict[str, str] | None = None) -> tuple[str, Any, Any, list]:
+              seeds: dict[str, str] | None = None,
+              quality: str = "standard") -> tuple[str, Any, Any, list]:
     """跑完整条流水线并返回 XML。**校验有阻塞项就不出图。**
 
     顺序与 Excalidraw 后端**逐条一致**（validate → layout → check → 落笔）：
     出图是最后一步，前一步不过就不该走到这里。
+
+    `quality`：showcase 档在调参试尽后把结构类软项升级为阻塞
+    （见 `check_layout.Outcome.promote`），与 Excalidraw 后端同一条语义。
     """
     validator = _load_sibling("validate_spec")
     report = validator.validate(spec)
@@ -585,23 +620,43 @@ def emit_page(spec: dict, *, params: dict | None = None, scheme: str | None = No
     if icons_used:
         raise SpecError(
             f"drawio 后端还不支持图标（用到的节点：{'、'.join(icons_used[:5])}）。"
-            "图标要映射到 drawio 的 image/custom shape，属于 P2；"
+            "内置 sigil 与素材库图标目前只在 Excalidraw 后端可用；"
             "先用 Excalidraw 后端出这张图，或者把 icon 去掉。")
 
     boxes = L.boxes_from_spec(spec)
     result, outcome, attempts = _load_sibling("check_layout").layout_with_retry(
         spec, boxes, params)
+    # showcase 升级在调参之后（与 Excalidraw 后端同一条语义）。
+    outcome = outcome.promote(quality)
     if outcome.blocking:
         return "", result, outcome, attempts
     return build_page(spec, result, boxes), result, outcome, attempts
 
 
 def emit(spec: dict, *, params: dict | None = None, scheme: str | None = None,
-         seeds: dict[str, str] | None = None) -> tuple[str, Any, Any, list]:
+         seeds: dict[str, str] | None = None,
+         quality: str = "standard") -> tuple[str, Any, Any, list]:
     """单份规格 → 整个 `.drawio` 文件（一页）。多份请用 `build_file` 拼。"""
     page, result, outcome, attempts = emit_page(spec, params=params, scheme=scheme,
-                                                seeds=seeds)
+                                                seeds=seeds, quality=quality)
     return (build_file([page]) if page else ""), result, outcome, attempts
+
+
+def _atomic_write(path: str, payload: str) -> None:
+    """先写同目录临时文件，再原子换入 —— 目标路径上要么是旧版、要么是完整新版。
+    与 Excalidraw 后端同一个办法（模仿 archify 的 deliver 提交）。"""
+    tmp = os.path.join(os.path.dirname(os.path.abspath(path)),
+                       f".{os.path.basename(path)}.tmp-{os.getpid()}")
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -616,6 +671,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--seed", action="append", metavar="键=#RRGGBB",
                     help="在选定方案之上改种子色，可重复：canvas / ink / accent / critical。"
                          "例如 --seed accent=#0B5FFF")
+    ap.add_argument("--quality", choices=("standard", "showcase"), default="standard",
+                    help="showcase=交付档：结构类软项升级为阻塞，有残留就不出图")
     ap.add_argument("--stdout", action="store_true", help="打到标准输出，不写文件")
     args = ap.parse_args(argv)
 
@@ -643,7 +700,8 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         try:
             page, _result, outcome, attempts = emit_page(spec, scheme=args.scheme,
-                                                         seeds=seeds)
+                                                         seeds=seeds,
+                                                         quality=args.quality)
         except (SpecError, KeyError) as exc:
             print(f"{path}：{exc}", file=sys.stderr)
             return 1
@@ -673,15 +731,29 @@ def main(argv: list[str] | None = None) -> int:
 
     out = args.out or (os.path.splitext(args.spec[0])[0] + ".drawio")
     try:
-        with open(out, "w", encoding="utf-8") as fh:
-            fh.write(xml)
+        _atomic_write(out, xml)
     except OSError as exc:
         print(f"写不了 {out}：{exc}", file=sys.stderr)
         return 1
     nodes = node_total
     page_note = f"{len(pages)} 页 / " if len(pages) > 1 else ""
     print(f"✓ 已写出 {out}（{page_note}{nodes} 个节点 / {edge_total} 条边 / "
-          f"{len(xml.splitlines())} 行 XML，配色 {args.scheme or palette.DEFAULT_SCHEME}）")
+          f"{len(xml.splitlines())} 行 XML，配色 {args.scheme or palette.DEFAULT_SCHEME}，"
+          f"档位 {args.quality}）")
+    # 三档声明（与 Excalidraw 后端同一条语义）：确定性校验 / 自研预览 / 感知审查。
+    import hashlib
+    print("── 交付回执 ──")
+    print(f"确定性校验: 通过（档位 {args.quality}）")
+    print("自研预览渲染: 未验证（需 check_drawio 结构自检已过；目视请在 draw.io 里打开核对）")
+    print("感知审查: pending（须人眼看真实渲染）")
+    spec_bytes = b""
+    try:
+        spec_bytes = b"".join(open(p, "rb").read() for p in args.spec)
+    except OSError:
+        pass          # 规格文件已被移动/删除：回执里就不给哈希，不影响交付本身
+    if spec_bytes:
+        print(f"规格 sha256: {hashlib.sha256(spec_bytes).hexdigest()[:16]}…  "
+              f"产物 sha256: {hashlib.sha256(xml.encode('utf-8')).hexdigest()[:16]}…")
     return 0
 
 
