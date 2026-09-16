@@ -139,3 +139,63 @@ class TestCollision(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestEdgeGates(unittest.TestCase):
+    """右缘栅格 + 同级左缘一致（提示级，挂在网格对齐那组）。"""
+
+    @staticmethod
+    def _measured(els):
+        return {"elements": els}
+
+    @staticmethod
+    def _notes(measured):
+        check_spec = importlib.util.spec_from_file_location(
+            "_deck_test_check_align", os.path.join(SKILL, "scripts", "check.py"))
+        if check_spec is None or check_spec.loader is None:
+            raise RuntimeError("加载不了 check.py")
+        check = importlib.util.module_from_spec(check_spec)
+        sys.modules["_deck_test_check_align"] = check
+        check_spec.loader.exec_module(check)
+        return check._check_grid_alignment(measured)
+
+    def test_chart_box_wider_than_grid_fires_right_edge_note(self) -> None:
+        """图表盒 1480 宽（右缘 1564）—— 左缘吸得完美也必须被看见。"""
+        notes = self._notes(self._measured([
+            {"id": "s1.chart", "role": "chart", "slide": 1,
+             "x": 84, "y": 300, "w": 1480, "h": 378},
+        ]))
+        self.assertTrue(any("右缘不在栅格缘" in n for n in notes), notes)
+
+    def test_chart_right_on_content_edge_passes(self) -> None:
+        self.assertEqual(self._notes(self._measured([
+            {"id": "s1.chart", "role": "chart", "slide": 1,
+             "x": 84, "y": 300, "w": 1432, "h": 378},
+        ])), [])
+
+    def test_image_right_at_span_end_passes(self) -> None:
+        """span5 的图（582.67 宽）右缘 = 列起点减一档 gutter —— 合法。"""
+        self.assertEqual(self._notes(self._measured([
+            {"id": "s1.image", "role": "image", "slide": 1,
+             "x": 84, "y": 300, "w": 582.67, "h": 400},
+        ])), [])
+
+    def test_title_subtitle_left_mismatch_fires(self) -> None:
+        """2px 漂移（标题块内缩 30、副标题用了 32 的档）—— 肉眼成品上才看得见。"""
+        notes = self._notes(self._measured([
+            {"id": "s1.title", "role": "title", "slide": 1,
+             "x": 114, "y": 195, "w": 282, "h": 81},
+            {"id": "s1.subtitle", "role": "subtitle", "slide": 1,
+             "x": 116, "y": 300, "w": 1400, "h": 33},
+        ]))
+        self.assertTrue(any("左缘不一致" in n and "2px" in n for n in notes), notes)
+
+    def test_aligned_pair_passes(self) -> None:
+        # 取列起点 84：既过「同级左缘一致」，也过「左缘吸附」（x=114 会命中
+        # 另一条门 —— 那条对 114 报警是对的，风格故意内缩要走它的豁免口径）
+        self.assertEqual(self._notes(self._measured([
+            {"id": "s1.title", "role": "title", "slide": 1,
+             "x": 84, "y": 195, "w": 282, "h": 81},
+            {"id": "s1.subtitle", "role": "subtitle", "slide": 1,
+             "x": 84, "y": 300, "w": 1400, "h": 33},
+        ])), [])

@@ -377,7 +377,11 @@ html,body{margin:0;background:var(--viewer)}
 .tl li{flex:1;min-width:0;width:var(--tl-node,300px)}
 .chartsrc{margin:calc(var(--sp-inner) * -0.5) 0 0;color:var(--text);opacity:.55;
   font:400 var(--s-caption,16px)/1.4 var(--body)}
-.chartwrap{margin-top:var(--sp-item);width:1432px;padding:var(--sp-item);position:relative}
+.chartwrap{margin-top:var(--sp-item);width:1432px;padding:var(--sp-item);
+  position:relative;box-sizing:border-box}
+/* box-sizing:border-box 必须有：1432 是**含内边距**的栅格宽。content-box 下
+   总宽 = 1432+48 = 1480，右缘冲出内容界 48px —— 皮肤一留横向 padding 就现形
+   （不留的皮肤恰好把它掩盖了）。 */
 /* 图表容器高度**由壳给死**（330px）—— v4 起图表是 G2（默认 canvas 渲染器），
    而 G2 的 autoFit 从容器取尺寸：容器没有高度就会在渲染时抛错（实测）。
    高度钉在 .g2 上而不是 .chartwrap svg 上：canvas/svg 都由 G2 自己塞进去。

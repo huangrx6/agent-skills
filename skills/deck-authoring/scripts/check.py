@@ -282,12 +282,74 @@ def _check_grid_alignment(measured: dict) -> list[str]:
             continue
         if grid_mod.snap(x) is None:
             off.append((slide_no, x, str(el.get("role"))))
+    notes = []
+    if off:
+        head = "、".join(f"第{s}页 {r}（x={x:.0f}）" for s, x, r in off[:4])
+        notes.append(f"有 {len(off)} 个锚点元素的左缘没吸附到网格列：{head}")
+    notes.extend(_right_edge_notes(measured, starts))
+    notes.extend(_pair_alignment_notes(measured))
+    return notes
+
+
+def _right_edge_notes(measured: dict, starts: list) -> list:
+    """**视觉容器的右缘也必须落在栅格缘**（提示级）。
+
+    只查带内边距的视觉容器（chart / image）：它们是「盒」，右缘冲出内容界
+    或悬在半列上，左缘检查看不见（实测：图表盒 1480 宽、右缘 1564，
+    冲出内容界 48px，左缘 84 却吸得完美 —— 左缘门全程沉默）。
+
+    合法右缘 = 内容右界（1516）或某列起点减一档 gutter（span 的右端）。
+    """
+    content_right = round(grid_mod.PAD_X + grid_mod.CONTENT_W, 1)
+    ends = {content_right} | {round(s - grid_mod.GUTTER, 1) for s in starts[1:]}
+    off = []
+    for el in measured.get("elements", []):
+        if el.get("role") not in ("chart", "image"):
+            continue
+        x, w, slide_no = el.get("x"), el.get("w"), el.get("slide")
+        if not all(isinstance(v, (int, float)) for v in (x, w, slide_no)):
+            continue
+        right = round(x + w, 1)
+        if not any(abs(right - e) <= 0.5 for e in ends):
+            off.append((slide_no, right, str(el.get("role"))))
     if not off:
         return []
-    head = "、".join(f"第{s}页 {r}（x={x:.0f}）" for s, x, r in off[:4])
-    return [f"有 {len(off)} 个锚点元素的左缘没吸附到网格列：{head}"
-            f" —— 列起点是 {starts[:6]}…（见 grid.py）。网格对齐是「整齐」的地基；"
-            f"若是风格有意的偏移（悬挂缩进/出血），可以忽略这条"]
+    head = "、".join(f"第{s}页 {r}（右缘={r2:.0f}，内容右界 {content_right:.0f}）"
+                     for s, r2, r in off[:4])
+    return [f"有 {len(off)} 个视觉容器的右缘不在栅格缘上：{head} —— "
+            f"宽度数学错了（常见：width 含不含 padding 的 box-sizing 问题），不是设计"]
+
+
+def _pair_alignment_notes(measured: dict) -> list:
+    """**同一锚点块内的行要对齐**（提示级）：标题与副标题的左缘差 >1px。
+
+    实测见过 2px 漂移（标题块内缩 6+24=30，副标题用了 32 的档）——
+    单看每行都「差不多」，并排就露馅；这类错肉眼在成品上才看得见，
+    门里量一下就知道。
+    """
+    # 按 **id 段**配对，不按 role：栏题（s4.col0.title）与时间线节点标签
+    # （s5.node1.label）的 role 也是 subtitle，但它们不是标题块的副标题 ——
+    # 按角色配对会把两栏的栏距（728px）报成"写岔了"。
+    xs: dict[int, dict] = {}
+    for el in measured.get("elements", []):
+        eid = str(el.get("id", ""))
+        seg = eid.split(".", 1)[1] if "." in eid else ""
+        role = "subtitle" if seg == "subtitle" else (
+            "title" if seg == "title" else None)
+        if role is None:
+            continue
+        slide_no, x = el.get("slide"), el.get("x")
+        if not isinstance(slide_no, int) or not isinstance(x, (int, float)):
+            continue
+        xs.setdefault(slide_no, {})[role] = x
+    off = [(s, abs(p["title"] - p["subtitle"]))
+           for s, p in xs.items() if "title" in p and "subtitle" in p
+           and abs(p["title"] - p["subtitle"]) > 1]
+    if not off:
+        return []
+    head = "、".join(f"第{s}页差 {d:.0f}px" for s, d in off[:4])
+    return [f"标题与副标题的左缘不一致：{head} —— 同一个锚点块的两行要共一条"
+            f"左缘线（皮肤里两处内缩值写岔了）"]
 
 
 def _check_measured_health(measured: dict) -> list[str]:
