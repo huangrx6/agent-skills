@@ -1350,20 +1350,35 @@ def render_resolved(resolved: dict) -> str:
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(description="deck-spec.json → HTML")
+    ap = argparse.ArgumentParser(description="deck-spec.json → HTML（可选：导出 resolved）")
     ap.add_argument("spec")
     ap.add_argument("-o", "--out", required=True)
     ap.add_argument("--style", default=None,
                     help=f"风格目录名（缺省读 spec 的 deck.style，再缺省 {DEFAULT_STYLE}）")
+    ap.add_argument("--resolved", default=None, metavar="PATH",
+                    help="额外导出 resolved.deck.json（渲染器的唯一输入，含决策 trace）")
+    ap.add_argument("--trace", action="store_true",
+                    help="打印决策 trace（每条：阶段 / 决定 / 理由）")
     args = ap.parse_args(argv[1:])
     deck_spec = deckio.read_json(args.spec)
     assets = load_assets(args.spec)      # assets/manifest.json（§12 管线入口）
     name = args.style or deck_spec["deck"].get("style", DEFAULT_STYLE)
     style = load_style(name)
-    page = render(deck_spec, style, assets=assets)
+    resolved = deck_mod.compile_spec(deck_spec, style, assets=assets)
+    page = render_resolved(resolved)
     deckio.write_text(args.out, page)
     print(f"✓ 已写出 {args.out}（风格 {style['name']} / {len(page)} 字节 / "
           f"{len(deck_spec['deck']['slides'])} 页）")
+    if args.resolved:
+        deckio.write_json(args.resolved, resolved)
+        print(f"✓ 已写出 {args.resolved}（{len(resolved['trace'])} 条 trace · "
+              f"colorSet={resolved['colorSet']}）")
+    if args.trace:
+        for t in resolved["trace"]:
+            slide = f" 第 {t['slide']} 页" if t.get("slide") else ""
+            print(f"  [{t['stage']}]{slide} {t['decision']}")
+            for r in t.get("reason", []):
+                print(f"      · {r}")
     return 0
 
 
