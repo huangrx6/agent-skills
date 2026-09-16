@@ -183,29 +183,44 @@ def style_folder(name: str) -> str | None:
 
 
 def style_location_note(folder: str | None, spec_path: str) -> str | None:
-    """风格目录在临时目录里 / 在 deck 项目之外 → 说一声（不阻塞）。
+    """风格目录 / spec 的位置有问题 → 说一声（不阻塞）。
 
     为什么必须开口：风格是 deck 的**表达层，随项目交付**。放在 /tmp 里，重启或被
     清理就没了 —— 实测发生过：一份 17 页 deck 的风格目录被清掉，spec 里的
-    `deck.style` 成了死链，整套版式再也复现不出来。修复动作只有一个：
-    把 `styles/<名>/` 挪进 deck 项目，spec 改指它。
+    `deck.style` 成了死链，整套版式再也复现不出来。
+
+    四情形分开说，因为**要挪的东西不同**（早期版本一律劝"把风格挪到 spec 旁边"，
+    spec 自己就在 /tmp 时这句是反的）：
+      · 两个都在临时目录 → 整个 deck 项目都要挪；
+      · 只有风格在临时目录 → 挪风格；
+      · 只有 spec 在临时目录 → 挪 spec（风格在项目里也一样交付不了）；
+      · 风格在 deck 项目之外 → 挪风格进去。
     """
     if not folder or not os.path.isabs(folder):
         return None
     spec_dir = os.path.dirname(os.path.abspath(spec_path))
-    real = os.path.realpath(folder).rstrip(os.sep) + os.sep
     temp_root = os.path.realpath(tempfile.gettempdir()).rstrip(os.sep) + os.sep
-    if real.startswith(temp_root) or real.startswith("/private/tmp/"):
-        spec_real = os.path.realpath(spec_dir).rstrip(os.sep) + os.sep
-        if spec_real.startswith(temp_root) or spec_real.startswith("/private/tmp/"):
-            return (f"⚠️ **整个 deck 项目都在临时目录里**：spec={spec_dir} / 风格={folder}\n"
-                    f"   重启或被清理就全没了（实测发生过：风格目录被清掉，spec 里的 "
-                    f"deck.style 成了死链）—— 把 spec + styles/ + assets/ 一起挪进"
-                    f"**项目目录**（随项目交付）")
+
+    def is_temp(path: str) -> bool:
+        real = os.path.realpath(path).rstrip(os.sep) + os.sep
+        return real.startswith(temp_root) or real.startswith("/private/tmp/")
+
+    in_spec = os.path.realpath(folder).rstrip(os.sep).startswith(
+        os.path.realpath(spec_dir).rstrip(os.sep) + os.sep)
+    style_temp, spec_temp = is_temp(folder), is_temp(spec_dir)
+    if style_temp and spec_temp:
+        return (f"⚠️ **整个 deck 项目都在临时目录里**：spec={spec_dir} / 风格={folder}\n"
+                f"   重启或被清理就全没了（实测发生过：风格被清掉，spec 的 deck.style "
+                f"成了死链）—— 把 spec + styles/ + assets/ 一起挪进**项目目录**")
+    if style_temp:
         return (f"⚠️ 风格在临时目录里：{folder}\n"
                 f"   风格随 deck 项目交付 —— 挪进 {spec_dir}/styles/<名>/，"
                 f"再把 spec 的 deck.style 改成那个名字；临时目录重启即失")
-    if not real.startswith(os.path.realpath(spec_dir).rstrip(os.sep) + os.sep):
+    if spec_temp:
+        return (f"⚠️ **spec 在临时目录里**：{spec_dir}\n"
+                f"   风格在项目里也没用 —— deck 项目（spec + styles/ + assets/）该建在"
+                f"**项目目录**：交付 / 换台机器要能一起带走")
+    if not in_spec:
         return (f"⚠️ 风格在 deck 项目之外：{folder}\n"
                 f"   交付 / 换台机器就找不到它 —— 建议挪进 {spec_dir}/styles/<名>/")
     return None

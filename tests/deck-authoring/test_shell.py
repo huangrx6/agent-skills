@@ -375,6 +375,13 @@ class TestStyleLocationNote(unittest.TestCase):
         self.assertIn("临时目录", note or "")
         self.assertIn("项目目录", note or "")
 
+    def test_spec_in_temp_but_style_in_project_names_the_spec(self) -> None:
+        """要挪的东西不同，说法就不同：spec 在 /tmp 时不能劝"把风格挪到 spec 旁边"。"""
+        D = os.path.dirname(SCRIPTS)          # 非临时目录
+        note = self.render.style_location_note(
+            os.path.join(D, "styles"), "/tmp/some/deck.spec.json")
+        self.assertIn("spec 在临时目录", note or "")
+
     def test_style_outside_the_deck_project_is_flagged(self) -> None:
         # 两边都得在**非临时目录**里，才能测到"项目之外"那一条：
         # 夹具目录当 deck 项目，skill 目录当"项目之外"的风格根。

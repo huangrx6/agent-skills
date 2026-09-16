@@ -376,6 +376,21 @@ class TestCheck(unittest.TestCase):
         self.assertTrue(any("400px 宽" in p for p in problems), problems)
         self.assertTrue(any("1280px" in p for p in problems), problems)
 
+    def test_svg_slots_are_read_from_viewbox(self) -> None:
+        """SVG 是矢量：尺寸读 viewBox，且不做"放大=糊"那条。
+
+        实测踩过：用户的 4 张结构图是 SVG，`Image.open` 直接抛 —— 检查器整个崩掉。
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            svg = os.path.join(tmp, "diagram.svg")
+            with open(svg, "w", encoding="utf-8") as fh:
+                fh.write('<svg xmlns="http://www.w3.org/2000/svg" '
+                         'viewBox="0 0 1280 800"></svg>')
+            self.assertEqual(image_source.image_size(svg), (1280, 800))
+            # 缺文件不能把检查器带走（deckio.read_text 读不到时抛 SystemExit）
+            self.assertIsNone(image_source.image_size(os.path.join(tmp, "nope.svg")))
+            self.assertIsNone(image_source.image_size(os.path.join(tmp, "not-a.svg")))
+
     def test_wrong_aspect_is_a_note_not_a_blocker(self) -> None:
         """够大但是方的（1:1）→ **不阻塞**：渲染按槽位处理（照片裁切 / 结构图留边）。
 

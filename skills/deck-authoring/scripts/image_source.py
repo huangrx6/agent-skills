@@ -18,6 +18,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import tempfile
 import random
 import shlex
@@ -757,6 +758,43 @@ def write_brief_md(brief: dict, out_path: str) -> str:
     return out_path
 
 
+def image_size(path: str) -> tuple[int, int] | None:
+    """像素尺寸。SVG 读 viewBox / width-height —— PIL 打不开矢量图（实测会抛）。
+
+    SVG 是**矢量**：没有"分辨率"这回事。版面按宽度缩放，所以宽度取 viewBox 的宽，
+    `--check` 那条"够不够大"对矢量图不适用（放多大都不糊），由调用方跳过。
+    """
+    if not os.path.isfile(path):
+        # 缺文件由调用方报（"还没出图"），检查器自己不能因为读不到就退出进程 ——
+        # `deckio.read_text` 读不到时抛 SystemExit（它的约定），在这里必须拦住。
+        return None
+    if path.lower().endswith(".svg"):
+        try:
+            raw = deckio.read_text(path)
+        except (OSError, UnicodeDecodeError):
+            return None
+        box = re.search(r'viewBox\s*=\s*"([-\d.\s,]+)"', raw)
+        if box:
+            parts = [x for x in re.split(r"[\s,]+", box.group(1).strip()) if x]
+            if len(parts) == 4:
+                try:
+                    return (round(float(parts[2])), round(float(parts[3])))
+                except ValueError:
+                    return None
+        wh = re.search(r'width\s*=\s*"(\d+)"[^>]*height\s*=\s*"(\d+)"', raw)
+        if wh:
+            try:
+                return (int(wh.group(1)), int(wh.group(2)))
+            except ValueError:
+                return None
+        return None
+    try:
+        with Image.open(path) as im:
+            return tuple(im.size)          # type: ignore[return-value]
+    except (OSError, ValueError):
+        return None
+
+
 def check_images(spec_path: str, out_dir: str, style: str | None = None,
                  ) -> tuple[int, list[str], list[str]]:
     """验人交付的图：在不在（阻塞）、够不够大（阻塞）、比例合不合（**只说明**）。
@@ -799,9 +837,16 @@ def check_images(spec_path: str, out_dir: str, style: str | None = None,
         if not os.path.isfile(path):
             problems.append(f"第 {page} 页：`{name}` 不在 {out_dir} —— 还没出图")
             continue
-        with Image.open(path) as im:
-            w, h = im.size
-        if w < want_w:
+        size = image_size(path)
+        if size is None:
+            notes.append(f"第 {page} 页：`{name}` 读不出尺寸（不是常见图片格式？）"
+                         f" —— 尺寸与比例都没法验")
+            continue
+        w, h = size
+        if path.lower().endswith(".svg"):
+            notes.append(f"第 {page} 页：`{name}` 是**矢量图**（SVG）—— 不做放大检查"
+                         f"（放多大都不糊）；比例按 viewBox {w}×{h} 算")
+        elif w < want_w:
             problems.append(
                 f"第 {page} 页：`{name}` 只有 {w}px 宽，契约要 {want_w}px —— "
                 f"放进版面会被放大渲染（会糊）")
