@@ -555,5 +555,45 @@ class TestRoleStaysOutOfTheImage(unittest.TestCase):
         self.assertIn("点缀", self.md)
         self.assertIn("盖住整页是不允许的", self.md)
 
+
+class TestContractLocation(unittest.TestCase):
+    """合同（提示词 + requests）的落点：**永远跟着 spec（deck 项目）走**。
+
+    实测踩过：一份 17 页 deck 的提示词合同被 `--dir` 搬进了 /tmp —— 用户拿不到
+    那份要他拿去出图的东西。`--dir` 的本意只是"图片在哪"：占位图仍按它落
+    （渲染按图片目录解析 `image`），但合同留在 spec 同目录。
+    """
+
+    def test_brief_and_requests_stay_with_spec_while_images_follow_dir(self) -> None:
+        import contextlib
+        import io
+        import shutil
+
+        with tempfile.TemporaryDirectory() as spec_dir, \
+                tempfile.TemporaryDirectory() as img_dir:
+            spec = os.path.join(spec_dir, "deck.spec.json")
+            shutil.copyfile(STRESS, spec)
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = image_source.main(
+                    ["image_source.py", "--brief", spec, "--dir", img_dir])
+            self.assertEqual(rc, 0, buf.getvalue())
+            self.assertTrue(os.path.isfile(os.path.join(spec_dir, "image-brief.md")),
+                            "提示词合同必须落在 spec 同目录（deck 项目）")
+            self.assertFalse(os.path.exists(os.path.join(img_dir, "image-brief.md")))
+            self.assertTrue(os.path.isdir(os.path.join(spec_dir, "assets", "requests")),
+                            "机读 requests 与合同同根")
+            self.assertTrue(any(f.endswith(".png") for f in os.listdir(img_dir)),
+                            "占位图按 --dir 落（图片在哪由它说）")
+            self.assertIn("临时目录", buf.getvalue(),
+                          "deck 建在临时目录里要开口说一声")
+
+    def test_temp_dir_note_only_fires_for_temp_dirs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIn("临时目录", image_source._temp_dir_note(tmp) or "")
+        project = os.path.dirname(os.path.abspath(STRESS))
+        self.assertIsNone(image_source._temp_dir_note(project))
+
+
 if __name__ == "__main__":
     unittest.main()

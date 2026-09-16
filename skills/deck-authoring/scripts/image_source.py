@@ -18,6 +18,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import tempfile
 import random
 import shlex
 import subprocess
@@ -312,9 +313,14 @@ def _aspect_box(w: int, h: int) -> str:
     return f"{w}:{h}（≈{w / h:.2f}:1）"
 
 
-def build_brief(spec_path: str, out_dir: str, style: str | None = None) -> dict:
+def build_brief(spec_path: str, out_dir: str, style: str | None = None,
+                contract_dir: str | None = None) -> dict:
     """产出提示词契约（人读的 markdown + 机读的 JSON 一起给；后者写进
-    out_dir/assets/requests/，md 由 main() 调 write_brief_md 写）。"""
+    contract_dir/assets/requests/，md 由 main() 调 write_brief_md 写）。
+
+    `out_dir` = **图片在哪**（占位图落这儿）；`contract_dir` = **合同在哪**
+    （缺省同 out_dir）。分开是因为 `--dir` 的本意只是前者 —— 实测踩过：一份
+    17 页 deck 的提示词合同被 `--dir` 一起搬进 /tmp，用户拿不到那份要他执行的东西。"""
     info, style_name = _slot_geometry(spec_path, style, out_dir)
     if not info:
         # 不直接失败：先说清"你这份 spec 一张图都没有"，再指出哪几页可能该有 ——
@@ -367,9 +373,10 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None) -> dict:
         "reference": reference, "target_px": [w, h], "aspect": _aspect_box(*BRIEF_ASPECT),
         "slots": slots, "colors": info["colors"],
     }
-    # 机读的那一半落盘（人读的 md 由 main() 调 write_brief_md 写）。out_dir 缺省
-    # 就是 spec 同目录（main 里的缺省），与 manifest（render.load_assets）同根。
-    _write_asset_requests(brief, measured_px, os.path.join(out_dir, "assets", "requests"))
+    # 机读的那一半落盘（人读的 md 由 main() 调 write_brief_md 写）。缺省与图片同目录；
+    # `--dir` 指到别处时仍跟着 spec 走 —— 合同与 manifest（render.load_assets）同根。
+    _write_asset_requests(brief, measured_px,
+                          os.path.join(contract_dir or out_dir, "assets", "requests"))
     return brief
 
 
@@ -784,6 +791,22 @@ def _parse_size(raw: str) -> tuple[int, int]:
             round(deckio.as_number(parts[1], f"--size 的高（{raw!r}）")))
 
 
+def _temp_dir_note(path: str) -> str | None:
+    """deck 建在临时目录里 → 说一声（不阻塞）。
+
+    为什么必须开口：提示词合同是**要交给用户去执行**的东西（他拿它去出图），
+    落在 /tmp 里重启就没了。实测踩过：一份 17 页 deck 的 spec / 风格 / 提示词
+    全在 /tmp/dir-*，用户手上只有一段对话，那份合同等于没产出。
+    """
+    real = os.path.realpath(path).rstrip(os.sep) + os.sep
+    temp_root = os.path.realpath(tempfile.gettempdir()).rstrip(os.sep) + os.sep
+    if real.startswith(temp_root) or real.startswith("/private/tmp/"):
+        return (f"⚠️ deck 项目在临时目录里：{path}\n"
+                f"   spec / 风格 / 素材 / 提示词合同都该在**项目目录**（随项目交付）——\n"
+                f"   临时目录重启即失，用户也就拿不到这份要他执行的提示词。")
+    return None
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(
         description="图片来源三条路：**写契约给人出图（--brief）** / 调生图命令 / 几何色块拼贴")
@@ -796,7 +819,8 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--prompt", default=None, help="（占位路径）出图用的提示词")
     ap.add_argument("-o", "--out", default=None, help="输出文件（--brief 缺省写 spec 同目录）")
     ap.add_argument("--dir", default=None,
-                    help="图片所在的目录（缺省：spec 所在目录）")
+                    help="**图片**所在的目录（缺省：spec 所在目录）—— 只管图片："
+                         "提示词合同与 requests 始终写在 spec 同目录")
     ap.add_argument("--style", default=None, help="风格（缺省读 spec 的 deck.style）")
     ap.add_argument("--tokens", default=None,
                     help="风格 tokens 路径（缺省按 spec 的 deck.style 解析）")
@@ -810,15 +834,21 @@ def main(argv: list[str]) -> int:
     args = ap.parse_args(argv[1:])
 
     if args.brief:
-        out_dir = args.dir or os.path.dirname(os.path.abspath(args.brief))
-        brief = build_brief(args.brief, out_dir, args.style)
-        target = args.out or os.path.join(out_dir, "image-brief.md")
+        # 合同（md + requests）落 **spec 所在目录**；`--dir` 只管图片在哪（实测踩过：
+        # 提示词被 --dir 搬进 /tmp，用户拿不到）。
+        spec_dir = os.path.dirname(os.path.abspath(args.brief))
+        out_dir = args.dir or spec_dir
+        brief = build_brief(args.brief, out_dir, args.style, contract_dir=spec_dir)
+        target = args.out or os.path.join(spec_dir, "image-brief.md")
         write_brief_md(brief, target)
         print(f"✓ 图片提示词契约 → {target}")
         print(f"  {len(brief['slots'])} 个槽位 · 统一规格 "
               f"{brief['target_px'][0]}×{brief['target_px'][1]}px · {brief['aspect']}")
-        print(f"  出完图存到：{out_dir}（与产物同目录）")
+        print(f"  出完图存到：{out_dir}（按上面的文件名）")
         print(f"  存好后验一遍：image_source.py --check {args.brief}")
+        note = _temp_dir_note(spec_dir)
+        if note:
+            print(note)
         if args.json:
             import json   # noqa: PLC0415
 

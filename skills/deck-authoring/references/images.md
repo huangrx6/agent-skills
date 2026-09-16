@@ -50,6 +50,11 @@ python3 scripts/image_source.py --check your.spec.json      # 验尺寸 / 比例
 `--brief` 会**顺便放一张占位图**：出图要时间，而流水线不该因此停住 —— 先跑通整条链，
 图回来再替换。
 
+**合同落在 spec 同目录（即 deck 项目），永远如此**：`--dir` 只说"图片在哪"（占位图按它
+落），不会把提示词搬走 —— 那份合同是**要交给用户去执行**的东西，跟着临时目录走就等于
+没产出。整份 deck（spec / 风格 / 素材 / 合同）都建在**项目目录**里，别建在 `/tmp`：
+`--brief` 见到临时目录会当场说一声。
+
 ### 资产清单（manifest，§12 统一 Asset Pipeline 的入口 · v1）
 
 spec 同目录放 `assets/manifest.json` 时，图文页的 `image` 写的是 **assetId**
