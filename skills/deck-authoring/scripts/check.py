@@ -370,6 +370,38 @@ def _check_brand(measured: dict, deck: dict, tokens: dict) -> tuple[list[str], l
     return problems, notes
 
 
+# 有变体的版式（提示轮换用；与 render.IMAGE_VARIANTS / TWO_COL_VARIANTS 对应）
+VARIANT_TYPES = ("content-image", "two-column")
+
+
+def _variant_rotation_notes(deck: dict) -> list[str]:
+    """同型页连排且变体一个不换 → 提示轮换（构图节奏的可测代理）。
+
+    反 slop 清单第一条就是"每页同构图"。同 type 连排本身合法（对比页天然
+    成对），但变体全相同是把同一张构图复印几遍 —— hero/镜像/均分这些零成本
+    换法都不用，多半是写 spec 时不知道变体存在（提示里直接指路 SKILL.md）。
+    纯函数：只看 spec。
+    """
+    out: list[str] = []
+    slides = deck.get("slides", [])
+    start = 0
+    for i in range(1, len(slides) + 1):
+        # 段尾判定：i 越界，或 (type, variant) 对不同 → 收一段
+        if i < len(slides):
+            a, b = slides[i - 1], slides[i]
+            if (a.get("type") == b.get("type")
+                    and a.get("variant") == b.get("variant")):
+                continue
+        kind = slides[start].get("type")
+        n = i - start
+        if n >= 2 and kind in VARIANT_TYPES:
+            out.append(f"第 {start + 1}~{i} 页连排 {n} 个 {kind} 且变体全相同"
+                       f"（{slides[start].get('variant') or '默认'}）—— 连排同型页"
+                       f"请轮换变体换构图节奏（支持的变体见 SKILL.md 版式表）")
+        start = i
+    return out
+
+
 def _tier_notes(deck: dict) -> list[str]:
     """字号降档提示：content-text 页条目 >5 会触发 bullet_tier 自动降档。
 
@@ -413,6 +445,7 @@ def _check_deck_shape(measured: dict, deck: dict) -> tuple[list[str], list[str]]
     # 字号降档可见化（纯函数抽出，便于单测）：compile 的 trace 是第一声，
     # 这里是门禁处的第二声。
     notes.extend(_tier_notes(deck))
+    notes.extend(_variant_rotation_notes(deck))
 
     # 版式单一：全是一种版式时，视线没有落点变化。
     content_kinds = [k for k in kinds if k not in ("title", "end")]

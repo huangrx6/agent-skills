@@ -204,6 +204,36 @@ class TestTierAdvisoryAtTheGate(unittest.TestCase):
             {"type": "content-text", "title": "疏", "bullets": ["a", "b"]}]}
         self.assertEqual(check_mod._tier_notes(deck), [])
 
+    def test_same_variant_run_gets_rotation_note(self) -> None:
+        """连排同型同变体 → 轮换提示（"每页同构图"是反 slop 第一条）。"""
+        deck = {"slides": [
+            {"type": "content-image", "title": "a", "image": "x.png"},
+            {"type": "content-image", "title": "b", "image": "y.png"},
+            {"type": "content-image", "title": "c", "image": "z.png"}]}
+        notes = check_mod._variant_rotation_notes(deck)
+        self.assertEqual(len(notes), 1)
+        self.assertIn("轮换变体", notes[0])
+        self.assertIn("第 1~3 页", notes[0])
+
+    def test_rotated_variants_stay_silent(self) -> None:
+        """变体有轮换（right/left/even/hero）→ 不提示；单页也不提示。"""
+        rotated = {"slides": [
+            {"type": "content-image", "title": "a", "image": "x.png"},
+            {"type": "content-image", "title": "b", "image": "y.png",
+             "variant": "visual-left"},
+            {"type": "content-image", "title": "c", "image": "z.png",
+             "variant": "hero"}]}
+        self.assertEqual(check_mod._variant_rotation_notes(rotated), [])
+        single = {"slides": [{"type": "content-image", "title": "a", "image": "x.png"}]}
+        self.assertEqual(check_mod._variant_rotation_notes(single), [])
+
+    def test_variantless_types_not_flagged(self) -> None:
+        """没有变体的版式连排不提示（content-text 无变体可换）。"""
+        deck = {"slides": [
+            {"type": "content-text", "title": "a", "bullets": ["1"]},
+            {"type": "content-text", "title": "b", "bullets": ["2"]}]}
+        self.assertEqual(check_mod._variant_rotation_notes(deck), [])
+
 
 class TestCliRoundTrip(unittest.TestCase):
     """compile CLI 的 -o：退出 0、产物可读、与 compile_spec 全等。
