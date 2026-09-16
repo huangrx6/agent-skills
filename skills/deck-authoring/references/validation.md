@@ -120,7 +120,7 @@
 
 ## ink.py 的门禁（不进 check.py 但同源）
 
-`python3 scripts/ink.py styles/<style>/style.json` 是色板门禁 —— 任何一套色板
+`python3 scripts/ink.py styles/<你的风格>/style.json`（deck 项目里跑）是色板门禁 —— 任何一套色板
 不达标退出 1。它和 `check.py` 第 ① 条共用同一份 token，但视角不同：
 
 - ink.py 看的是**色板本身**（声明的文字色相对纸色是否达标）

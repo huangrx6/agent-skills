@@ -2,7 +2,8 @@
 """deck-spec.json → HTML。
 
 两条硬规矩（都是量出来、并被脚本守着的）：
-1. **渲染层不写死任何颜色/字号/字体** —— 全部来自 `styles/<style>/style.json`。
+1. **渲染层不写死任何颜色/字号/字体** —— 全部来自风格目录的 style.json
+   （deck 项目的 styles/<name>/；--style 也接受路径）。
 2. **同一份 spec + 同一个 seed = 完全一致的输出** —— 错位量/颗粒强度按 (seed, 元素)
    派生，不用全局 random（全局的话两次渲染就不一样，没法回归对比，也没法复现一版给别人）。
 
@@ -193,7 +194,7 @@ def load_style(name: str = DEFAULT_STYLE) -> dict:
                              f"  一个风格目录必须同时有 style.json + skin.css。")
     raise SystemExit(
         f"✗ 没有风格 {name!r}（现有：{style_names()}）\n"
-        f"  自建：styles/<名>/ 里放 style.json + skin.css（形状见 "
+        f"  自建：deck 项目的 styles/<名>/ 里放 style.json + skin.css（在项目目录跑；形状见 "
         f"references/style-architecture.md）；\n"
         f"  dev-tools/style-fixture/swiss-grid 是开发夹具，可作参考拷改。")
 

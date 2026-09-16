@@ -17,8 +17,8 @@ description: >-
 # Deck authoring
 
 把一份 `deck-spec.json` 渲成能直接拿去讲的 deck。**你只写内容，脚本算一切坐标、
-字号与颜色**；风格自建无内置（`styles/` 是**用户自己的目录，skill 不主动写入**，
-参考实现在 `dev-tools/style-fixture/`），加新风格＝加一个目录，不改渲染器。
+字号与颜色**；风格自建无内置（风格放 **deck 项目**的 `styles/<名>/`，随项目交付；
+skill 目录永不写入；参考实现在 `dev-tools/style-fixture/`），加一套＝加一个目录，不改渲染器。
 
 ## 确认门：四样大事，用户点头才动
 
@@ -46,7 +46,7 @@ for s in a b c; do cp -r dev-tools/style-fixture/swiss-grid /tmp/dir-$s   # 改�
 ### 风格：自建，无内置
 
 **内置八套已整体移除**（styles/ 删除，按用户决定）——风格是每份 deck 的表达层，
-不该预置。自建：`styles/<名>/` 放 `style.json + skin.css`（形状与逐键说明见
+不该预置。自建：**deck 项目**的 `styles/<名>/` 放 `style.json + skin.css`（形状与逐键说明见
 `references/style-architecture.md`；字栈参考 `fonts/mapping.json`）。参考实现：
 `dev-tools/style-fixture/swiss-grid`（demo/测试走它，可拷改）。`style.py` 列出
 全部（用户 + 夹具）并逐套过契约；`style.py --sheet -o s.png` 拼对照图。
@@ -76,7 +76,7 @@ for s in a b c; do cp -r dev-tools/style-fixture/swiss-grid /tmp/dir-$s   # 改�
    `references/fonts.md`（--fetch）与 `references/color.md`（--audit）。
 3. **五道门**（顺序有意义：先验输入，再渲，再量，最后判；九站总图见 `references/pipeline.md`）：
    - 规格：`python3 scripts/validate_spec.py your.spec.json`（字段集封闭，未知键直接失败）
-   - 墨色：`python3 scripts/ink.py styles/<style>/style.json`（任一色板不达标退出 1）
+   - 墨色：`ink.py styles/<你的风格>/style.json`（deck 项目里跑；任一色板不达标退 1）
    - 渲染：`python3 scripts/render.py your.spec.json -o out.html`
    - 实测+判定：`python3 scripts/check.py your.spec.json out.html`（真浏览器量完再判，全过退 0；
      只想单独量就 `measure.py out.html`）
@@ -153,7 +153,7 @@ for s in a b c; do cp -r dev-tools/style-fixture/swiss-grid /tmp/dir-$s   # 改�
 
 - **字段不存在** → 刻意不留的三类（坐标/字号/色值）：版式用 `type`+`variant` 表达，
   换色板改 style.json；别把字段删了就交差。
-- **对比度不达标** → `ink.py styles/<style>/style.json` 查各色板；换色板，别动阈值。
+- **对比度不达标** → `ink.py styles/<你的风格>/style.json` 查色板；换色板别动阈值。
 - **`... 越出版面：下缘 ... 越出该页下边界 ...`** → 内容真的撑出这页了（实测）。跑
   `fit.py --slide N` 看哪种版式装得下，再收字 / 拆页。
 - **`... 越出版面：右缘 ...`**（多半在标题）→ 标题是 `nowrap` 的，不折行、直接裁；改短。

@@ -256,7 +256,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="校验 deck-spec.json 规格（字段集封闭）")
     ap.add_argument("spec", help="规格文件路径")
     ap.add_argument("--tokens", default=None,
-                    help="覆盖 token 文件（缺省按 deck.style 去 styles/<style>/ 找）")
+                    help="覆盖 token 文件（缺省按 deck.style 解析：deck 项目 styles/ 优先，--style 也吃路径）")
     ap.add_argument("--json", action="store_true", help="输出 JSON")
     args = ap.parse_args(argv)
 
