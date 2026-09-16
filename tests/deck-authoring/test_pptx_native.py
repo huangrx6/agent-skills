@@ -26,6 +26,7 @@ import json
 import os
 import re
 import sys
+import subprocess
 import tempfile
 import unittest
 import zipfile
@@ -404,3 +405,55 @@ class TestPptxNative(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestResolvedContract(unittest.TestCase):
+    """resolved 完整契约（render --resolved）与 HTML 模式**同核同几何**。
+
+    这是「HTML / PPTX 同源」的验收：几何只在渲染时量一次（写进契约），
+    导出器两条路吃同一份 —— 逐形状坐标必须一致，数数一致不算数。
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.native = _load("deck_native_rc", os.path.join(SCRIPTS, "pptx_native.py"))
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls._tmp.cleanup)
+        td = cls._tmp.name
+        cls.html = os.path.join(td, "out.html")
+        cls.resolved = os.path.join(td, "resolved.deck.json")
+        proc = subprocess.run(
+            ["python3", os.path.join(SCRIPTS, "render.py"), DEMO,
+             "-o", cls.html, "--resolved", cls.resolved],
+            capture_output=True, text=True, timeout=300)
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        contract = json.load(open(cls.resolved, encoding="utf-8"))
+        for key in ("vars", "geometry", "manifest", "baseDir"):
+            assert key in contract, f"契约缺 {key}"
+
+    def test_same_core_same_geometry(self) -> None:
+        out_html = os.path.join(self._tmp.name, "via-html.pptx")
+        out_resolved = os.path.join(self._tmp.name, "via-resolved.pptx")
+        c_html = self.native.build(self.html, out_html)
+        c_res = self.native.build_resolved(self.resolved, out_resolved)
+        # 事实小结逐键一致（bytes 除外 —— 时间戳不同）
+        c_html.pop("bytes")
+        c_res.pop("bytes")
+        self.assertEqual(c_html, c_res)
+        # 逐形状坐标一致（EMU 级）：同核的证据，不是数数
+        from pptx import Presentation
+        a, b = Presentation(out_html), Presentation(out_resolved)
+        self.assertEqual(len(a.slides), len(b.slides))
+        for sa, sb in zip(a.slides, b.slides):
+            ga = [(s.shape_type, round(s.left or 0), round(s.top or 0),
+                   round(s.width or 0), round(s.height or 0)) for s in sa.shapes]
+            gb = [(s.shape_type, round(s.left or 0), round(s.top or 0),
+                   round(s.width or 0), round(s.height or 0)) for s in sb.shapes]
+            self.assertEqual(ga, gb)
+
+    def test_resolved_mode_rejects_incomplete_contract(self) -> None:
+        bad = os.path.join(self._tmp.name, "bad.json")
+        with open(bad, "w", encoding="utf-8") as fh:
+            json.dump({"trace": []}, fh)
+        with self.assertRaises(SystemExit):
+            self.native.build_resolved(bad, os.path.join(self._tmp.name, "x.pptx"))

@@ -67,6 +67,11 @@
 
 ### 贴图版 `pptx_native.py --png-dir`
 
+**可编辑 PPTX 的两种入口（同一构建核）**：`pptx_native.py out.html`（当场实测）
+与 `pptx_native.py --resolved resolved.deck.json`（吃 `render --resolved` 的完整
+契约：语义 + 实测几何 + 颜色变量一次成型）—— 几何只在渲染时定一次，
+HTML 与 PPTX 同源，逐形状 EMU 级一致（有验收测试钉着）。
+
 **是什么**：`python3 scripts/pptx_native.py --png-dir pages/ -o deck.pptx` ——
 16:9 pptx，每页**一张满版贴图**。
 

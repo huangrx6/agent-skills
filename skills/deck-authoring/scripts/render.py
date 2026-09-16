@@ -1390,6 +1390,29 @@ def render_resolved(resolved: dict) -> str:
 measure_mod = _load_sibling("measure")   # 实测层（repair 循环里量产物）
 
 
+_ROOT_VARS_RE = None  # 惰性编译（模块级 re 已 import）
+
+
+def _root_vars(page: str) -> dict:
+    """从产物文本抠 `:root{--k:v}` —— 与 pptx_native.parse_root_vars 同一份契约。
+
+    resolved 契约要带颜色变量，导出器就不必再解析 HTML（HTML 只剩给人看）。
+    """
+    import re as _re
+    global _ROOT_VARS_RE
+    if _ROOT_VARS_RE is None:
+        _ROOT_VARS_RE = _re.compile(r":root\s*\{(.*?)\}", _re.S)
+    m = _ROOT_VARS_RE.search(page)
+    out: dict = {}
+    if not m:
+        return out
+    for chunk in m.group(1).split(";"):
+        if ":" in chunk:
+            k, _, v = chunk.partition(":")
+            out[k.strip()] = v.strip()
+    return out
+
+
 def _load_layout():
     """加载 layout/ 包（模型 + 碰撞 + 修复梯）。机制同 _load_sibling。"""
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -1577,9 +1600,22 @@ def main(argv: list[str]) -> int:
     print(f"✓ 已写出 {args.out}（风格 {style['name']} / {len(page)} 字节 / "
           f"{len(deck_spec['deck']['slides'])} 页）")
     if args.resolved:
+        # 完整契约：语义（manifest）+ 真实几何（measure 实测，一次成型）+
+        # 颜色变量 + 资产基准目录。导出器（pptx_native --resolved）只吃这一份，
+        # 不再自己解析 HTML —— HTML 与 PPTX 同源，几何只在渲染时定一次。
+        measured = measure_mod.measure(args.out)
+        resolved["manifest"] = measure_mod.read_manifest(page)
+        resolved["geometry"] = {
+            "slides": measured.get("slides") or [],
+            "elements": measured.get("elements") or [],
+            "decor": measured.get("decor") or [],
+        }
+        resolved["vars"] = _root_vars(page)
+        resolved["baseDir"] = os.path.dirname(os.path.abspath(args.out))
         deckio.write_json(args.resolved, resolved)
+        n_geo = len(resolved["geometry"]["elements"])
         print(f"✓ 已写出 {args.resolved}（{len(resolved['trace'])} 条 trace · "
-              f"colorSet={resolved['colorSet']}）")
+              f"colorSet={resolved['colorSet']} · {n_geo} 个实测元素）")
     if args.trace:
         for t in resolved["trace"]:
             slide = f" 第 {t['slide']} 页" if t.get("slide") else ""

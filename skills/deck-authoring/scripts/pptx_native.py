@@ -34,7 +34,14 @@
   引擎与浏览器不同，边界会有几个像素的出入。
 - **图表是 PowerPoint 原生图表**：数据可改（这是重点），但长相是 PowerPoint 的。
 
-跑法：python3 pptx_native.py out.html -o deck-editable.pptx
+跑法（两条路，同一构建核）：
+    python3 pptx_native.py out.html -o deck-editable.pptx            # HTML 模式（当场实测）
+    python3 pptx_native.py --resolved resolved.deck.json -o deck.pptx  # 契约模式（渲染时几何）
+    python3 pptx_native.py --png-dir pages/ -o deck.pptx               # 贴图模式
+
+契约模式吃 `render.py --resolved` 出的**完整契约**（语义 manifest + 实测几何 +
+颜色变量 + 资产基准目录）：几何只在渲染时量一次，导出不再自己跑测量 ——
+HTML 与 PPTX 同源，两次测量之间的字体/机器差异不再进入产物。
 """
 from __future__ import annotations
 
@@ -390,10 +397,34 @@ def add_chart(slide, el: dict, box: tuple[float, float, float, float],
 
 
 def build(html_path: str, out_path: str) -> dict:
-    """产物 → 可编辑 PPTX。返回一份事实小结（给调用方与校验用）。"""
+    """产物 HTML → 可编辑 PPTX（几何=当场实测）。"""
     html = deckio.read_text(html_path)
-    vars_ = parse_root_vars(html)
-    measured = measure_mod.measure(html_path)          # 真几何，不估
+    return _build(parse_root_vars(html), measure_mod.measure(html_path),
+                  measure_mod.read_manifest(html),
+                  os.path.dirname(os.path.abspath(html_path)), out_path)
+
+
+def build_resolved(resolved_path: str, out_path: str) -> dict:
+    """resolved.deck.json → 可编辑 PPTX（几何=渲染时定好的那份，不再实测）。
+
+    与 HTML 模式**同一个构建核**：HTML/PPTX 同源 —— 几何只在渲染时量一次，
+    导出不再自己跑测量（两次测量之间换字体/换机器就是漂移的来源）。
+    """
+    r = deckio.read_json(resolved_path)
+    missing = [k for k in ("vars", "geometry", "manifest", "baseDir") if k not in r]
+    if missing:
+        raise SystemExit(f"✗ {resolved_path} 不是完整契约（缺 {missing}）—— "
+                          f"用 `render.py … --resolved` 重新生成")
+    return _build(r["vars"],
+                  {"slides": r["geometry"].get("slides") or [],
+                   "elements": r["geometry"].get("elements") or [],
+                   "decor": r["geometry"].get("decor") or []},
+                  r["manifest"], r["baseDir"], out_path)
+
+
+def _build(vars_: dict, measured: dict, manifest: list, base_dir: str,
+           out_path: str) -> dict:
+    """四源（变量 / 实测几何 / 语义清单 / 资产基准目录）→ PPTX。"""
     slides_geo = slide_boxes(measured)
     if not slides_geo:
         raise SystemExit("✗ 测量结果里没有页盒子 —— 产物里没有 section.slide？")
@@ -407,7 +438,6 @@ def build(html_path: str, out_path: str) -> dict:
     # 于是 paper-ink / botanical-dark 那两套 400 字重的标题在 PPTX 里被强制加粗，
     # 而文件照生成、页数照样对，只有把 PPTX 打开看才发现。
     MERGE_MEASURED = {"color": "measuredColor", "fontWeight": "fontWeight"}
-    manifest = measure_mod.read_manifest(html)
     for entry in manifest:
         m = boxes.get(entry["id"])
         if not m:
@@ -458,7 +488,7 @@ def build(html_path: str, out_path: str) -> dict:
                 if entry.get("src_base") == "skill":
                     path = deck_mod.resolve_logo_ref(src)
                 else:
-                    path = os.path.join(os.path.dirname(os.path.abspath(html_path)), src)
+                    path = os.path.join(base_dir, src)
                 if not os.path.isfile(path):
                     counts["skipped"] += 1      # 图不在旁边：跳过并计数，不假装成功
                     continue
@@ -521,6 +551,9 @@ def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(
         description="PPTX：out.html → 可编辑（原生 shapes）；或 --png-dir 贴图模式")
     ap.add_argument("html", nargs="?", help="原生模式：产出的 out.html")
+    ap.add_argument("--resolved", default=None, metavar="PATH",
+                    help="resolved 模式：render --resolved 出的完整契约"
+                         "（几何=渲染时定好的，不再实测；与 HTML 模式同一构建核）")
     ap.add_argument("--png-dir", default=None,
                     help="贴图模式：shots.py 出的 page-*.png 目录（一页一张满版图）")
     ap.add_argument("--width", type=int, default=1600)
@@ -537,9 +570,12 @@ def main(argv: list[str]) -> int:
               f"{os.path.getsize(args.out)} 字节）")
         print("  · 每页是一张满版图：改不了字；要改字回改 spec 再重出")
         return 0
-    if not args.html:
-        raise SystemExit("✗ 原生模式要给 out.html；贴图模式给 --png-dir")
-    counts = build(args.html, args.out)
+    if args.resolved:
+        counts = build_resolved(args.resolved, args.out)
+    elif args.html:
+        counts = build(args.html, args.out)
+    else:
+        raise SystemExit("✗ 三选一：out.html（原生）/ --resolved 契约 / --png-dir 贴图")
     print(f"✓ 已写出 {args.out}")
     print(f"  {counts['slides']} 页 / {counts['bytes'] / 1048576:.2f}MB / "
           f"文本 {counts['text']} / 装饰 {counts['decor']} / 图表 {counts['chart']} / "

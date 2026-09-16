@@ -32,7 +32,7 @@ python3 scripts/check.py your.spec.json out.html                    # 6) 校验
 python3 scripts/pdf.py out.html -o deck.pdf                         # 7) 矢量 PDF
 python3 scripts/shots.py out.html --out-dir pages/ --count 6        # 8) 截图（要 Chrome）
 python3 scripts/pptx_native.py --png-dir pages/ -o deck.pptx        # 9) 出 PPTX（贴图，观感 100%）
-python3 scripts/pptx_native.py out.html -o deck-editable.pptx       # 10) 出 PPTX（原生，能改字）
+python3 scripts/pptx_native.py out.html -o deck-editable.pptx        # 或 --resolved 契约（同核同几何）       # 10) 出 PPTX（原生，能改字）
 python3 scripts/animate.py out.html -o deck.mp4                     # 11) 出视频（另有 GIF）
 ```
 
