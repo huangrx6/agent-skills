@@ -231,6 +231,69 @@ class TestRequiredFields(unittest.TestCase):
             self._codes(_spec([{"type": "content-text", "title": "纯文字",
                                 "bullets": ["a", "b"]}])), set())
 
+
+class TestVisualCarrier(unittest.TestCase):
+    """每页的视觉载体（`visual`）：四档合法 + 自相矛盾当场拦。
+
+    这一栏存在的理由是"配图与元素一直没人主动提"—— 不写下来就等于没决定。
+    形状与一致性归输入层（这里），产物层只负责点名"没决定的页"。
+    """
+
+    @staticmethod
+    def _spec(slide: dict) -> dict:
+        return {"deck": {"style": "swiss-grid", "colorSet": "blue", "seed": 1,
+                         "title": "t", "slides": [slide]}}
+
+    def _codes(self, slide: dict) -> set[str]:
+        return {i["code"] for i in vs.validate(self._spec(slide), None).errors}
+
+    def test_four_kinds_are_accepted(self) -> None:
+        slides = [
+            {"type": "content-text", "title": "t", "bullets": ["a"],
+             "visual": {"kind": "none", "note": "三条结论靠文字立住"}},
+            {"type": "chart", "title": "t", "chart": "bar",
+             "data": [{"label": "甲", "value": 1}],
+             "visual": {"kind": "data", "intent": "对比"}},
+            {"type": "content-image", "title": "t", "image": "a.png",
+             "visual": {"kind": "evidence_image"}},
+            {"type": "content-image", "title": "t", "image": "a.png",
+             "visual": {"kind": "diagram"}},
+        ]
+        for slide in slides:
+            codes = self._codes(slide)
+            self.assertNotIn("BAD_VISUAL", codes, slide)
+            self.assertNotIn("UNKNOWN_FIELD", codes, slide)
+
+    def test_contradiction_between_carrier_and_layout_is_an_error(self) -> None:
+        """声明要用图/图表，版式却装不下 —— 这是客观错误，不是审美。"""
+        cases = [
+            ({"type": "content-text", "title": "t", "bullets": ["a"],
+              "visual": {"kind": "evidence_image"}}, "BAD_VISUAL"),
+            ({"type": "content-text", "title": "t", "bullets": ["a"],
+              "visual": {"kind": "diagram"}}, "BAD_VISUAL"),
+            ({"type": "content-text", "title": "t", "bullets": ["a"],
+              "visual": {"kind": "data"}}, "BAD_VISUAL"),
+            ({"type": "content-image", "title": "t", "image": "a.png",
+              "visual": {"kind": "none"}}, "BAD_VISUAL"),
+            ({"type": "content-text", "title": "t", "bullets": ["a"],
+              "visual": {"kind": "illustration"}}, "BAD_VISUAL"),
+            ({"type": "content-text", "title": "t", "bullets": ["a"],
+              "visual": {"intent": "想要图"}}, "BAD_VISUAL"),
+            ({"type": "content-text", "title": "t", "bullets": ["a"],
+              "visual": {"kind": "none", "priority": "primary"}}, "UNKNOWN_FIELD"),
+            ({"type": "content-text", "title": "t", "bullets": ["a"],
+              "visual": "evidence_image"}, "BAD_VISUAL"),
+        ]
+        for slide, code in cases:
+            self.assertIn(code, self._codes(slide), slide)
+
+    def test_page_may_omit_visual_entirely(self) -> None:
+        """不写不报错（写不写是作者的自由）—— 但 check 会点名，见 test_check_mutations。"""
+        codes = self._codes({"type": "content-text", "title": "t",
+                             "bullets": ["a", "b", "c"]})
+        self.assertNotIn("BAD_VISUAL", codes)
+
+
 if __name__ == "__main__":
     unittest.main()
 

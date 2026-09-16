@@ -186,8 +186,8 @@
 
 两个诚实的说明：
 
-- **字体全部映射到本机可用的族**。社区那些 preset（frontend-slides / html-ppt-skill）
-  大多写 Google Fonts 的名字（Archivo Black / Space Grotesk / Fraunces / Clash Display…），
+- **字体全部映射到本机可用的族**。网上抄来的 preset 大多写 Google Fonts 的名字
+  （Archivo Black / Space Grotesk / Fraunces / Clash Display…），
   本机没有，直接抄进来会静默回退成默认字体 —— 那比不设计还糟（"看着差不多"但品味全丢）。
   所以取的是它们的**意图**（衬线/等宽/几何/高饱和），落在本机真有的族上。
 - **中文没有可用的等宽族**，所以“等宽感”主要由拉丁字母、数字和标点承担，

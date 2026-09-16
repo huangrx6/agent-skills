@@ -873,6 +873,39 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     return problems
 
 
+def _visual_decision_notes(deck: dict) -> list[str]:
+    """内容页没做视觉决定时开口 —— 点页号，并给可选的载体。
+
+    为什么不阻塞：一页"三条结论"确实不需要图，作者写 ``visual: {"kind": "none"}``
+    就通关。但它必须**被决定过** —— 这一门是"配图与元素一直没人提"能被看见的地方。
+    """
+    silent: list[int] = []
+    for i, slide in enumerate(deck.get("slides", []), 1):
+        if not isinstance(slide, dict):
+            continue
+        page = slide.get("type")
+        if page not in ("content-text", "two-column", "timeline"):
+            continue
+        if isinstance(slide.get("visual"), dict):
+            continue
+        if page == "timeline":
+            items = slide.get("nodes") or []
+        elif page == "two-column":
+            items = [b for col in (slide.get("columns") or [])
+                     if isinstance(col, dict) for b in (col.get("bullets") or [])]
+        else:
+            items = slide.get("bullets") or []
+        if len(items) >= 3:
+            silent.append(i)
+    if not silent:
+        return []
+    pages = "、".join(f"第 {n} 页" for n in silent[:6])
+    more = f"（共 {len(silent)} 页）" if len(silent) > 6 else ""
+    return [f"{pages}{more} 没做视觉载体决定 —— 逐页过一个：图 / 结构图 / 图表 / "
+            f"纯文字，写进 spec 的 visual（纯文字也写 {{\"kind\": \"none\"}}）；"
+            f"要什么图、图从哪来见 references/images.md"]
+
+
 def advisories(measured: dict, spec: dict | None = None,
                tokens: dict | None = None) -> list[str]:
     """**不阻塞**的提示。
@@ -891,6 +924,7 @@ def advisories(measured: dict, spec: dict | None = None,
         # 字号体检：这是“每份 deck 字号都偏大”唯一能被当场看见的地方 ——
         # 装得下就不报错，所以以前没有任何一条会开口。
         notes.extend(_check_type_size(measured, spec.get("deck", {}), tokens))
+        notes.extend(_visual_decision_notes(spec.get("deck", {})))
         # 信息层级（文本预算 / 焦点 / 密度）那三条曾由 hierarchy.py 提供，v4 随
         # 该模块一起退役：阈值取决于语境（封面就该空、看板就该满），做成阻塞会
         # 把第一份正常的 deck 挡住；而**装不装得下**这件事已由 measure 实测那两道

@@ -24,7 +24,8 @@ description: >-
 
 > 硬规矩：**给可比较的选项 → 停下等选择 → 才继续**。用户没选，就停在那。
 
-1. **内容大纲**：页序 + 每页一个观点，先过目；点头才写 spec（见 `references/planning.md`）。
+1. **内容大纲 + 每页视觉载体**：页序 + 每页一个观点 + **这页靠什么立住**（图/结构图/
+   图表/纯文字），三样一起过目才写 spec；不写下来等于没决定（见 `references/planning.md`）。
 2. **风格方向**：三版真出图并排（见下），停下等选择；选完记进 spec。
 3. **配色**：从所选风格的 `colorSets` 挑一套具名色板（**spec 必须写名字**），
    三版小样给用户选；品牌色优先。
@@ -36,21 +37,18 @@ description: >-
 **不要把风格列表丢给对方当选择题**——他没见过画面，选不了。做三版真出图：
 
 ```bash
-# 三个方向 = **临时目录**里的三套草稿（按 style-architecture.md 现写，渲完即弃）。
-# 绝不写进 styles/（落盘=变相内置）；styles/ 只放用户明确要保存的东西。
+# 三方向 = 临时目录里的草稿（按 style-architecture.md 现写，渲完即弃；绝不写进 styles/）。
 for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/dir-$s/skin.css
   python3 scripts/render.py spec.json --style $s -o $s.html && python3 scripts/shots.py $s.html --out-dir shots-$s --count 2; done
 ```
 
 **方向从这份 deck 推（观众/场合/材料气质），不从风格史挑、不复用见过的风格名**——
-任何样式清单都会被当成选项清单，所以不设清单、只设四轴取点
-（骨架/字感/密度/色彩），任意两方向至少两轴不同且必含骨架轴（style-architecture.md
-「方向怎么来」）。每版标：**风格名 + 一句为什么这份内容配它 + 适合什么场合**，停下等选。
+任何清单都会被当成选项清单，所以只设四轴取点（骨架/字感/密度/色彩）：任意两方向至少
+两轴不同且必含骨架轴。每版标**风格名 + 一句为什么配它 + 适合什么场合**，停下等选。
 
 ### 风格：自建，无内置
 
-**风格是每份 deck 的表达层，工具链零内置**。
-自建：**deck 项目**的 `styles/<名>/` 放 `style.json + skin.css`（形状与逐键说明见
+**风格是每份 deck 的表达层，工具链零内置**：**deck 项目**的 `styles/<名>/` 放 `style.json + skin.css`（形状与逐键说明见
 `references/style-architecture.md`；字栈参考 `fonts/mapping.json`）。**没有可拷的参考实现，也不携带示例资产**
 （能拷就会拷，拷出来每份 deck 一样）；按契约现写。对比度门禁归 `ink.py`，产物实测门归 `check.py`。
 每个风格可带多个 `colorSet`；**spec 的 `colorSet` 必填具名**（写 auto/mood 一律被拦 ——
@@ -61,14 +59,12 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
 字号、折行、错位量、对比度 —— 都是几何 / 颜色计算，模型直接吐数字必翻车
 （原型实测：主/副色当文字色对比度只有 2.35 / 2.68 ✗）。所以：
 
-- 规格 schema **没有**色值/字号/坐标字段（不存在，不是"不推荐填"）；手写会被
-  `validate_spec.py` 直接判失败 —— 静默最坏：模型以为写进去了，图却没变。
+- 规格 schema **没有**色值/字号/坐标字段（不存在，不是"不推荐填"）：手写会被 `validate_spec.py` 判失败 —— 静默最坏，模型以为写进去了、图却没变。
 - 文字色**只能**是 overprint（两墨叠印）；`check.py` 第 ① 条会拦主/副色当文字色。
 
 ## 起手流程
 
-1. **先读契约**：`references/style-architecture.md` 的 spec 逐键说明与示例（逐键说明见
-   `references/style-architecture.md`；写完跑 `validate_spec.py`）。
+1. **先读契约**：`references/style-architecture.md` 的 spec 逐键说明与示例（写完跑 `validate_spec.py`）。
 2. **写 spec**（前置：大纲已过确认门 ①）：每页只有 `type` + 内容，见
    `references/style-architecture.md`；**写什么内容**见 `references/content-intelligence.md`
    （一页一个观点 / 容量估算 / 观众距离）。拿不准就先渲出来跑 `check.py`。
@@ -85,12 +81,14 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
    - 演示：直接把 `out.html` 给人（`out.html?present` 一页一屏、`←/→` 翻页、`F` 全屏）
    - PDF：`python3 scripts/pdf.py out.html -o deck.pdf`（矢量、能打印；脚本会验页数与页尺寸）
    - PNG 截图：`python3 scripts/shots.py out.html --out-dir pages/ --count N`
-   - PPTX：观感 100% 用 `pptx_native.py --png-dir pages/ -o deck.pptx`（原 `make_pptx.py`
-     已并进这个 `--png-dir` 模式）；**对方要改字**用 `pptx_native.py out.html -o deck.pptx`（原生 shapes，字是真字）
-   - 视频：`python3 scripts/animate.py out.html -o deck.mp4`（GIF：`-o deck.gif --width 960`；
-     无需 ffmpeg）。运动设计与什么时候别用见 `references/animation.md`。
-5. **图页**：`image` 只填文件名；出图走 `--brief` 合同（提示词要到位 —— 出图后**没有**制版
-   后处理 —— 图片按原样用）；存产物同目录、`--check` 验，见 `references/images.md`。
+   - PPTX：观感 100% 用 `pptx_native.py --png-dir pages/ -o deck.pptx`；**对方要改字**用 `pptx_native.py out.html -o deck.pptx`（原生 shapes，字是真字）
+   - 视频：`python3 scripts/animate.py out.html -o deck.mp4`（GIF：`-o deck.gif --width 960`，无需 ffmpeg；何时别用见 `references/animation.md`）。
+5. **素材**：逐页决定这页靠什么立住，写进 spec 的 `visual` 四档 —— 纯文字 `{"kind":"none"}`
+   （不必配图，但必须**决定过**）｜图表 `{"kind":"data"}`（chart 版式）｜结构图/流程图/拓扑/
+   架构 `{"kind":"diagram"}`（**excalidraw.com** 或 **draw.io** 画好导出 PNG 放进 deck 项目）｜
+   照片/插画/主视觉 `{"kind":"evidence_image"}`（`--brief` 出**提示词** → 你出图 → 放回目录 →
+   `--check`）。`image` 只填文件名；**不用 SVG 手搓插图与流程图**（一眼假）—— SVG 只做风格的
+   装饰与几何。真实素材优先，细节见 `references/images.md`。
 
 ## 版式
 
@@ -111,7 +109,7 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
 怎么排由 `skin.css` 写（`[data-layout=...] .main{...}`）—— 脚本不枚举审美。
 风格可声明 `layouts: [...]` 自封闭词表，`check.py` 按表验拼写。
 **同型页连排换布局换节奏**（右图页接左图页、纯文页后配 hero）——每页同构图是
-反 slop 第一条。图位要出图：`image_source.py --brief spec.json` 出提示词合同。
+反 slop 第一条。
 **字号档也由你声明**（无按条数自动升降）：`titleTier`/`bulletTier` 逐页覆写，
 风格可写 `titleTiers`/`bulletDefault` 定缺省；内容多就拆页/收短，不靠悄悄缩字。
 
@@ -134,8 +132,7 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
 
 ## Do NOT
 
-- **不要用动画掩盖内容问题**：它只解决「怎么上台」，解决不了「一页装太多」。先过五道门
-  再谈动效；`animate.py` 也不做转场/配乐/多镜头 —— 那是另一条产线。
+- **不要用动画掩盖内容问题**：它只解决「怎么上台」，装太多仍是装太多；`animate.py` 也不做转场/配乐/多镜头。
 - **不要在内容元素上加 CSS `transition`**：见「动画」节 —— 帧不可复现。
 - **不要在贴图版 PPTX 里改字**：那种每页是一张贴图，改不了字；要改字回改 spec 再重出。
   要「能改字的 pptx」走 `pptx_native.py`（原生 shapes，字是真字）——代价是错位、

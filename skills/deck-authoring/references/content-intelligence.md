@@ -224,12 +224,15 @@ chartSeriesCount + visualRequirementCount。本仓库用一条**确定性公式*
 Content Engine 不决定 Layout，只输出语义关系（如 `"semanticRelation": "comparison"`），
 Page Planner 再映射（comparison → chart / two-column）。
 
-## 31. Visual Requirement
+## 31. Visual Requirement（落进 spec 就是 `visual`）
 
-`{"visualRequirement": {"needed": true, "kind": "data|evidence_image|process|hierarchy|comparison|architecture|mood", "intent": "", "reason": "", "priority": "primary|supporting|decorative"}}`
+每页写 `{"visual": {"kind": "none|evidence_image|diagram|data", "intent": "...", "note": "..."}}`
+—— 这四档就是流水线能交付的四种载体，也是 spec 里唯一承认的形状
+（`validate_spec.py` 拦未知档与自相矛盾；`check.py` 点出没决定的页）。
 
-> `kind` 里的 `mood` 指**视觉氛围需求**这一种；配色不走这条 —— 由 spec 显式写
-> `colorSet`（pipeline §11）。
+语义层可以想得更细（data / evidence_image / process / hierarchy / comparison /
+architecture / mood），但落到 spec 只有上面四档：结构与流程归 `diagram`，图表归 `data`，
+氛围归风格（`colorSet` / `decor` / 字体），**不单独设档** —— 多出来的档没有谁能交付它。
 
 ## 32. 什么时候必须有视觉
 

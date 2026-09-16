@@ -136,15 +136,20 @@ Agent，产出的东西渲染器吃不下，就全白写。
 **页型 → 版式是查表**（下表），AI 判页型、程序决定用哪个
 版式画：
 
-| 页型 | 版式 | 主视觉 |
+| 页型 | 版式 | 主视觉（spec 的 `visual.kind`） |
 | --- | --- | --- |
-| statement | content-text | 无（靠字与留白） |
-| metric | chart（donut + progress） | 大数字（环图中心） |
-| comparison / trend / composition | chart（bar / line / stacked） | 图表 |
-| process | timeline | 时间线 |
-| capabilities | two-column | 无（两组并列） |
-| hero_visual / context_image | content-image | 图 |
-| evidence | content-text | 无（读的页，密一点可以） |
+| statement | content-text | `none`（靠字与留白） |
+| metric | chart（donut + progress） | `data`（大数字在环图中心） |
+| comparison / trend / composition | chart（bar / line / stacked） | `data` |
+| process | timeline | `none`（时间线本身就是视觉结构） |
+| capabilities | two-column | `none`（两组并列） |
+| hero_visual / context_image | content-image | `evidence_image`（提示词出图） |
+| architecture / flow / topology | content-image | `diagram`（excalidraw / draw.io 画好导出） |
+| evidence | content-text | `none`（读的页，密一点可以） |
+
+**`visual` 是必过的一栏**：pageplan 每页写、桥到 spec 同名同值 —— 连纯文字页也要写
+`{"kind": "none"}`。不写下来就等于没决定：`validate_spec.py` 管形状与自相矛盾
+（声明要图却是文字版式、content-image 却声明 none），`check.py` 点出没决定的页。
 
 **复杂度评分与拆页**（确定性公式，自查）：
 

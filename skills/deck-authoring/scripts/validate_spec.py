@@ -40,20 +40,28 @@ DECK_FIELDS = {"colorSet", "seed", "title", "slides", "style", "brand", "note"}
 # 门 ③ 给候选；对比度由 ink.py/check.py 验收）。
 CHART_TYPES = ("bar", "bar-horizontal", "line", "area", "bar-stacked",
                "donut", "scatter", "combo")
+# 视觉载体：每页**显式决定**这页靠什么立住。不写下来就等于没决定 ——
+# 实测的后果是全篇靠文字撑、图与元素一直没人提。四个档就是这条流水线能交付的
+# 四种载体（其余"元素"靠版式与条目形状表达，不另设档）：见 references/images.md。
+VISUAL_KINDS = ("none", "evidence_image", "diagram", "data")
+VISUAL_KEYS = {"kind", "intent", "note"}
+VISUAL_IMAGE_KINDS = ("evidence_image", "diagram")
+
 SLIDE_FIELDS = {
-    "title":         {"type", "title", "subtitle", "color", "titleTier"},
-    "content-text":  {"type", "title", "bullets", "color", "titleTier", "bulletTier"},
+    "title":         {"type", "title", "subtitle", "color", "titleTier", "visual"},
+    "content-text":  {"type", "title", "bullets", "color", "titleTier", "bulletTier",
+                      "visual"},
     "content-image": {"type", "title", "bullets", "image", "caption", "color",
-                   "layout", "titleTier", "bulletTier"},
+                   "layout", "titleTier", "bulletTier", "visual"},
     "two-column":    {"type", "title", "columns", "color", "layout", "titleTier",
-                   "bulletTier"},
-    "timeline":      {"type", "title", "nodes", "color", "titleTier"},
+                   "bulletTier", "visual"},
+    "timeline":      {"type", "title", "nodes", "color", "titleTier", "visual"},
     # 图表的 DSL：几何/样式/动画都不在 spec 里，AI 只写语义。
     # v3：`chart`（图形类型）**必填** —— 推断已退役，见 CHART_TYPES。
     "chart":         {"type", "title", "data", "unit", "caption", "color",
                       "chart", "intent", "message", "series", "emphasis",
-                      "annotations"},
-    "end":           {"type", "title", "color", "titleTier"},
+                      "annotations", "visual"},
+    "end":           {"type", "title", "color", "titleTier", "visual"},
 }
 # **条件必填**：这个版式的全部内容就是那个字段，缺了它这一页不成立。
 #
@@ -225,6 +233,34 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
                          f"未知版式 {kind!r}；支持 {sorted(SLIDE_FIELDS)}")
             continue
         _check_fields(slide, SLIDE_FIELDS[kind], where, issues)
+        # 视觉载体：声明什么载体，就得是能装下它的版式（自相矛盾当场拦）。
+        visual = slide.get("visual")
+        if visual is not None:
+            vwhere = f"{where}.visual"
+            if not isinstance(visual, dict):
+                issues.error("BAD_VISUAL", vwhere,
+                             f"visual 要是对象（{{\"kind\": ...}}），收到 {visual!r}；"
+                             f"四种载体见 references/images.md")
+            else:
+                _check_fields(visual, VISUAL_KEYS, vwhere, issues)
+                vkind = visual.get("kind")
+                if vkind is None:
+                    issues.error("BAD_VISUAL", vwhere, "visual 必须写 kind")
+                elif vkind not in VISUAL_KINDS:
+                    issues.error("BAD_VISUAL", vwhere,
+                                 f"未知载体 {vkind!r}；支持 {list(VISUAL_KINDS)}")
+                elif vkind in VISUAL_IMAGE_KINDS and kind != "content-image":
+                    issues.error("BAD_VISUAL", vwhere,
+                                 f"声明 visual.kind={vkind} 要用图，版式却是 {kind!r} —— "
+                                 f"图没有槽位。改成 content-image（图占一栏）或去掉声明")
+                elif vkind == "data" and kind != "chart":
+                    issues.error("BAD_VISUAL", vwhere,
+                                 f"声明 visual.kind=data 要用图表，版式却是 {kind!r} —— "
+                                 f"改成 chart 版式（chart 字段写图形类型）")
+                elif vkind == "none" and kind == "content-image":
+                    issues.error("BAD_VISUAL", vwhere,
+                                 f"content-image 版式声明 visual.kind=none —— "
+                                 f"这一页的版式就是图：给 image，或换成 content-text")
         # 布局：自由字符串，只拦 "auto"（实测选择已退役）与非字符串
         layout = slide.get("layout")
         if layout is not None:

@@ -268,6 +268,43 @@ class TestCheckMutations(unittest.TestCase):
         self._assert_reports(problems, "错位叠印", "④ 图表区无错位")
 
 
+
+class TestVisualDecisionAdvisory(unittest.TestCase):
+    """没做视觉决定的内容页要被点名（提示，不阻塞）。
+
+    "一页三条结论"确实不必配图 —— 所以不阻塞；但必须**被决定过**：
+    `visual: {"kind": "none"}` 就是显式决定。这条提示是"配图与元素一直没人主动提"
+    唯一能被看见的地方。
+    """
+
+    def test_silent_pages_are_named_and_decided_pages_are_not(self) -> None:
+        deck = {"slides": [
+            {"type": "content-text", "title": "没决定", "bullets": ["a", "b", "c"]},
+            {"type": "content-text", "title": "决定了", "bullets": ["a", "b", "c"],
+             "visual": {"kind": "none"}},
+            {"type": "timeline", "title": "时间线",
+             "nodes": [{"label": "a", "note": "n"}, {"label": "b", "note": "n"},
+                       {"label": "c", "note": "n"}]},
+            {"type": "two-column", "title": "双栏",
+             "columns": [{"title": "左", "bullets": ["a", "b"]},
+                         {"title": "右", "bullets": ["c", "d"]}]},
+            {"type": "content-text", "title": "两条不用图", "bullets": ["a", "b"]},
+        ]}
+        notes = check._visual_decision_notes(deck)
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("第 1 页", notes[0])
+        self.assertIn("第 3 页", notes[0])
+        self.assertIn("第 4 页", notes[0])
+        self.assertNotIn("第 2 页", notes[0])
+        self.assertNotIn("第 5 页", notes[0])
+
+    def test_all_decided_is_silent(self) -> None:
+        deck = {"slides": [{"type": "content-text", "title": "t",
+                            "bullets": ["a", "b", "c"],
+                            "visual": {"kind": "none"}}]}
+        self.assertEqual(check._visual_decision_notes(deck), [])
+
+
 if __name__ == "__main__":
     unittest.main()
 
