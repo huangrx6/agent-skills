@@ -122,7 +122,8 @@ class TestSpacingTokens(unittest.TestCase):
 
     def test_css_vars_are_emitted(self) -> None:
         vars_ = grid.spacing_vars()
-        for key in ("--sp-inner", "--sp-item", "--sp-group", "--sp-section"):
+        for key in ("--sp-inner", "--sp-item", "--sp-block", "--sp-group",
+                    "--sp-section"):
             self.assertIn(key, vars_)
         self.assertEqual(vars_["--sp-item"], f"{grid.SEMANTIC['item']}px")
 

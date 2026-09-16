@@ -302,6 +302,20 @@ def _check_contract_drift(measured: dict, contract: dict) -> list[str]:
     return out
 
 
+def _collision_fix(layout: str | None) -> str:
+    """安全盒碰撞的修法建议 —— hero 与一般页不同，所以分开说。
+
+    hero 的图高是**算出来的**（`render.hero_height`）：正文带减去条目 / 图注 /
+    页脚净距。挤到这个地步说明这一页装不下 —— 而图已经缩到下限不再让
+    （再让就不是"图为主角"了，是一张压成条的图）。所以修法只有换版式或拆页；
+    不说清这一点，人会去调图高。
+    """
+    if layout == "hero":
+        return ("这一页是 hero（满幅图 + 底部标题条）—— 图和条目/图注在抢同一块正文带，"
+                "而图已经缩到下限不再让：换 visual-right / visual-wide，或把这页拆开")
+    return "要么拉开间距（父容器 gap 档），要么这页内容该拆"
+
+
 def _check_local_paths(page: str) -> tuple[list[str], list[str]]:
     """产物里不许出现本机绝对路径（图片阻塞 / 字体提示）。
 
@@ -1360,12 +1374,15 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     hero_pages = frozenset(
         i for i, s in enumerate(deck.get("slides", []), 1)
         if isinstance(s, dict) and s.get("layout") == "hero")
+    slide_layouts = {i: (s.get("layout") if isinstance(s, dict) else None)
+                     for i, s in enumerate(deck.get("slides", []), 1)}
     for v in layout_mod.collision.violations(
             layout_mod.collision.build_boxes(data.get("elements", [])), hero_pages):
+        fix = _collision_fix(slide_layouts.get(v["slide"]))
         problems.append(
             f"第 {v['slide']} 页 {v['a']} 与 {v['b']} 太近"
             f"（{v['group']}：需要 ≥{v['required']:.0f}px，实际 {v['actual']:.0f}px）—— "
-            f"安全盒相交按重叠处理；要么拉开间距（父容器 gap 档），要么这页内容该拆")
+            f"安全盒相交按重叠处理；{fix}")
     # 布局词表：风格声明了 layouts 时，spec 里拼错的布局名当场拦（布局是
     # 自由字符串，拼错会让 skin 里那条规则永远不生效 —— 最难查的那种静默）。
     problems.extend(_layout_vocab_problems(deck, tokens, deck.get("slides", [])))

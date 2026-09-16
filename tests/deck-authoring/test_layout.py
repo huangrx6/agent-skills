@@ -515,7 +515,12 @@ class TestCandidateCLI(unittest.TestCase):
             # （不发类名，逐字节不变），其它变体发 v-<名>。
             self.assertIn('class="two"', html)
             self.assertIn('class="two v-even"', html, "同一页的不同结构要都在对比页里")
-            self.assertIn('class="two v-visual-wide"', html)
+            # 第三个候选是**哪个结构**由适配决定 —— 不钉具体名字。実例：hero 的高度
+            # 改成“按内容算”之后，它从“溢出、不合格”变成合格，于是挤掉了
+            # visual-wide 的位置。那是改进，而钉名字的断言会把它当成失败。
+            # 这里要钉的是“同一页真给出了另一种结构”。
+            self.assertTrue('class="two v-visual-wide"' in html or 'class="herofig"' in html,
+                            "第三个候选必须是另一种结构（v-visual-wide 或 hero）")
 
             report_path = os.path.join(tmp, "out.candidates.json")
             with open(report_path, encoding="utf-8") as fh:

@@ -489,5 +489,62 @@ class TestStyleLocationNote(unittest.TestCase):
         self.assertIsNone(inside, "风格在 deck 项目里就不该念")
 
 
+class TestHeroHeight(unittest.TestCase):
+    """hero 的图高**按这一页要装什么算** —— 不是一个固定值。
+
+    旧写法按"有没有条目"在两个固定值（520/648）里挑，实测后果：条目到 6 条时
+    正文带溢出 81px、caption 顶到页脚上（`check` 报三处越界 + 三处"太近"），
+    而图还占着 520px 不让。这条测试钉住"条目越多、图越矮"这个方向。
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.render = _load("deck_render_heroh", os.path.join(SCRIPTS, "render.py"))
+
+    def _hero(self, bullets: list, caption: bool = False) -> str:
+        slide = {"type": "content-image", "layout": "hero", "title": "页",
+                 "image": "x.png", "bullets": bullets,
+                 "visual": {"kind": "diagram"}}
+        if caption:
+            slide["caption"] = "图注"
+        spec = {"deck": {"style": "swiss-grid", "colorSet": "blue", "seed": 1,
+                         "title": "t", "slides": [slide]}}
+        return self.render.render(spec)
+
+    @staticmethod
+    def _height(html: str) -> int:
+        # 只认那条标签（`class="herofig" … style="height:Npx"`）—— 放宽会把
+        # 壳 CSS 里的 `height:…` 也匹配进来（实测匹配到 56，然后断言全错）
+        hit = re.search(r'class="herofig"[^>]*style="height:(\d+)px', html)
+        assert hit is not None, "hero 页没有渲染出图高"
+        return int(hit.group(1))
+
+    def test_more_items_means_shorter_figure(self) -> None:
+        few = self._height(self._hero(["一", "二"]))
+        many = self._height(self._hero(["一"] * 6))
+        self.assertGreater(few, many, "条目多了图就该让位")
+        self.assertGreaterEqual(many, self.render.HERO_MIN_H,
+                                "图矮到下限就不再让（该换版式/拆页，由 check 说）")
+        self.assertLessEqual(few, self.render.HERO_MAX_H)
+
+    def test_no_items_takes_the_max(self) -> None:
+        self.assertEqual(self._height(self._hero([])), self.render.HERO_MAX_H)
+
+    def test_caption_is_reserved_in_the_height(self) -> None:
+        """有图注要再让出一块 —— 图注是普通流，不像 hero 标题那样住图里。"""
+        self.assertLess(self._height(self._hero(["一"], caption=True)),
+                        self._height(self._hero(["一"])))
+
+    def test_hero_caption_gets_the_clearance_token(self) -> None:
+        """hero 流里的图注是顶层元素（拿不到 figure 成员豁免），必须用够的 token。
+
+        --sp-inner(16) < 安全盒要求的 28（body 下 16 + caption 上 12）——
+        以前就是它导致每张 hero 页都报"太近"。
+        """
+        html = self._hero(["一"], caption=True)
+        self.assertIn(".herofig + .chartcap, .hero-bullets + .chartcap", html)
+        self.assertIn("--sp-block", html)
+
+
 if __name__ == "__main__":
     unittest.main()

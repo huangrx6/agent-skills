@@ -81,8 +81,11 @@ CSS flex/grid：父容器 padding/gap 全走 `--sp-*` 令牌，子元素内容�
 
 ## 9. Spacing Tokens【✅】
 
-Global Ramp：8/12/16/24/32/48/64/96；Alias：inner 16 / item 24 / group 48 /
+Global Ramp：8/12/16/24/32/48/64/96；Alias：inner 16 / item 24 / block 32 / group 48 /
 section 64（+hero 96）。注入产物为 CSS 变量 `--sp-*`；壳里的 gap **全部**走令牌 —— 不出现裸数字。
+（`block` 这一档是**安全盒逼出来的**：body 下 16 + caption 上 12 = 28，而 ramp 里
+比 24 大的下一档是 32。少了这一档，人会去写 `--sp-block` 这种不存在的令牌
+——声明被静默丢弃，间距回到 16，然后门报"太近"。）
 （这条有测试守着：`test_grid.py` 扫 `SHELL_CSS`，25~64px 区间的裸间距直接判失败 ——
 间距无律就是这样长出来的。）
 

@@ -335,6 +335,25 @@ class TestRoleNotes(unittest.TestCase):
         self.assertEqual(check._role_notes(deck), [])
 
 
+class TestCollisionFix(unittest.TestCase):
+    """碰撞的修法建议：hero 页必须说"换版式/拆页"，而不是"拉开间距"。
+
+    为什么值得单独钉：hero 的图高是算出来的且已触下限 —— 让人去"拉开间距"等于
+    让他把图压成一条，换个难看但过门的结果。修法说错比不说更坏。
+    """
+
+    def test_hero_gets_the_layout_switch_advice(self) -> None:
+        fix = check._collision_fix("hero")
+        self.assertIn("hero", fix)
+        self.assertIn("visual-right", fix)
+        self.assertIn("拆开", fix)
+        self.assertNotIn("拉开间距", fix)
+
+    def test_other_layouts_keep_the_generic_advice(self) -> None:
+        for layout in (None, "even", "visual-wide"):
+            self.assertIn("拉开间距", check._collision_fix(layout))
+
+
 class TestContractDrift(unittest.TestCase):
     """契约过期门（`check._check_contract_drift`）：拷进契约的几何 vs 现在量到的几何。
 

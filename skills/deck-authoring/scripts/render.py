@@ -120,6 +120,39 @@ FOOT_BOTTOM, FOOT_H = grid_mod.FOOT_BOTTOM, grid_mod.FOOT_H
 CONTENT_TOP = PAD_Y
 CONTENT_BOTTOM = SLIDE_H - FOOT_BOTTOM - FOOT_H
 
+# ── hero 的图高：**按这一页要装什么算**，不是一个固定值 ─────────────────
+# 正文带 = CONTENT_BOTTOM − CONTENT_TOP（692px，页脚是 absolute，已在 824 之下
+# 留好，不占这里）。图之后还要放条目与图注 —— 这两样都是普通流，所以图必须
+# **先把它们的位置让出来**。旧写法按"有没有条目"在两个固定值（520/648）里挑：
+# 条目多到 6 条时就溢出正文带、压到页脚上，而图还占着 520px 不让。
+#
+# 估算法与 `layout/contracts.py` 同一套（行高 1.55 / 条目间隙 28）——
+# 同一个数字只该有一个出处。HERO_MIN_H 是"图还是主角"的下限：低于它就该
+# 换版式/拆页，而不是把图压成一条（那种页由 check 的越界门接着报）。
+HERO_BAND = CONTENT_BOTTOM - CONTENT_TOP    # 两个常量都是 int，不需要转
+HERO_MAX_H = 648
+HERO_MIN_H = 320
+HERO_LINE = 1.55
+HERO_ITEM_GAP = 28.0
+HERO_ITEM_MARGIN = 24.0        # .hero-bullets 的 margin-top（= --sp-item）
+HERO_CAPTION_MARGIN = 32.0     # = --sp-block：见下方 hero 流里的图注规则
+# 页脚是 absolute（bottom:52），所以流内容的**净距**要自己留出来 ——
+# 安全盒表：body 下 16 + foot 上 24 = 40（有图注时 caption 下 12 + foot 上 24 = 36，
+# 40 更严，取它一个值就够，省掉"按情况分叉"）。
+HERO_FOOT_CLEARANCE = 40.0
+
+
+def hero_height(items_n: int, bsize: float, caption_px: float | None) -> int:
+    """hero 这一页的图该多高：正文带减去条目/图注/页脚净距，夹在上下限之间。"""
+    used = 0.0
+    if items_n:
+        used += HERO_ITEM_MARGIN + items_n * (bsize * HERO_LINE + HERO_ITEM_GAP)
+    if caption_px:
+        used += HERO_CAPTION_MARGIN + caption_px * HERO_LINE
+    room = HERO_BAND - used - HERO_FOOT_CLEARANCE
+    # round 而不是 int()：CSS 要的是整 px，而 round 对负数/边界也不会抛
+    return round(max(HERO_MIN_H, min(HERO_MAX_H, room)))
+
 # 版式 → 用字号级数里的哪一档（级数本身在 style.json 的 type 里，是唯一来源）
 TITLE_TIER = {"title": "cover", "content-text": "compact", "end": "end"}
 DEFAULT_TITLE_TIER = "small"
@@ -429,6 +462,10 @@ html,body{margin:0;background:var(--viewer)}
 .herofig .herobar .title{color:var(--paper);
   font-size:var(--s-colTitle,26px);line-height:1.3;white-space:normal}
 .hero-bullets{margin-top:var(--sp-item)}
+/* hero 流里的图注是**顶层元素**（不在 figure 里，所以拿不到"figure 成员"那条豁免），
+   它必须自己满足安全盒：body 下 16 + caption 上 12 = 28 —— --sp-inner(16) 不达标，
+   用 --sp-block(32)。普通图文页的图注在 <figure> 里，不受这条影响。 */
+.herofig + .chartcap, .hero-bullets + .chartcap{margin-top:var(--sp-block)}
 /* 内容图：**展示比例由槽位定，不由图片自身比例定**。
    生图工具出成 1:1 / 4:3 / 2:1 是常态（提示词按不住比例，各家默认都不同）——
    只写 width 的话高度会跟着图片比例走：1:1 撑出页底（实测溢出 109px）、
@@ -1497,10 +1534,12 @@ def render_resolved(resolved: dict) -> str:
             elif layout == "visual-wide":     # 4+8：图当主角、正文收窄
                 out.append(f'<div class="two v-visual-wide">{main_html}{img_html}</div>')
             elif layout == "hero":            # 图为主角：满幅 + 实心标题条
-                # 无条目 648px（占整页 64% —— check 对 hero 放行，标题仍是
-                # 真 DOM 文本）；带条目压到 520px 给正文留位。caption/条目
-                # 跟在图后的普通流里（对比度走纸面，不走图上）。
-                hero_h = 520 if items else 648
+                # 图高按这一页实际要装的条目/图注算（hero_height）——
+                # 固定值会在"条目多"时把后面的字顶到页脚上（实测 6 条溢出 113px）。
+                # 下限 HERO_MIN_H：真装不下时就该换版式/拆页，不是把图压成一条。
+                hero_h = hero_height(
+                    len(slide.get("bullets") or []), bsize,
+                    tier.get("caption") if slide.get("caption") else None)
                 bullets_html = (f'<ul class="bullets small hero-bullets" '
                                 f'style="--s-bullet:{bsize}px">{items}</ul>'
                                 ) if items else ""
