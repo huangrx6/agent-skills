@@ -115,6 +115,91 @@ def looks_temporal(labels: list) -> bool:
     return bool(labels) and sum(1 for x in labels if _TIME_LABEL.match(str(x))) >= max(1, len(labels) // 2)
 
 
+def g2_spec(slide: dict, colors: dict, emphasis: set | None = None) -> dict:
+    """Chart Resolver 的 G2 产物（§19：链路不绑技术——HTML 路径用 AntV G2）。
+
+    输出 G2 5 的 chart spec（renderer 由壳层指定 svg + animation off——
+    确定性 §41：同输入同输出，measure/check 才有稳定的 DOM 可量）。
+    配色守规矩：muted + 1 accent（emphasis 命中的数据用主色，其余灰化）。
+    """
+    data = _norm_series(slide)[0]["data"]
+    emphasis = emphasis or set()
+    primary = colors.get("primary", "#0033CC")
+    muted_c = muted(primary, colors.get("background", "#FFFFFF"))
+    text = colors.get("text", "#0A0A0A")
+
+    def enc_color(d):
+        return primary if (not emphasis or str(d.get("label")) in emphasis) else muted_c
+
+    kind = infer_chart_type(slide)[0]
+    spec: dict = {
+        "animation": False,                      # 确定性：动画关死（§41/42）
+        "autoFit": False,
+        "padding": "auto",
+    }
+    if kind in ("bar", "bar-horizontal"):
+        rows = sorted(data, key=lambda d: -d.get("value", 0)) \
+            if kind == "bar-horizontal" else data
+        rows = [{**d, "c": enc_color(d)} for d in rows]
+        spec.update({
+            "type": "interval",
+            "data": rows,
+            "encode": {"x": "label", "y": "value", "color": "c"},
+            "scale": {"color": {"type": "identity"}},
+            "labels": [{"text": "value", "style": {"fill": text},
+                        "position": "outside"}],
+        })
+        if kind == "bar-horizontal":
+            spec["coordinate"] = {"transform": [{"type": "transpose"}]}
+    elif kind == "donut":
+        rows = [{**d, "c": enc_color(d)} for d in data]
+        spec.update({
+            "type": "interval",
+            "data": rows,
+            "coordinate": {"transform": [{"type": "transpose"},
+                                         {"type": "theta", "innerRadius": 0.62}]},
+            "encode": {"y": "value", "color": "label"},
+            "scale": {"color": {"range": [d["c"] for d in rows]}},
+            "axis": False,
+            "legend": {"color": {"position": "right"}},
+        })
+    elif kind in ("line", "area"):
+        spec.update({
+            "type": "area" if kind == "area" else "line",
+            "data": data,
+            "encode": {"x": "label", "y": "value"},
+            "style": {"stroke": primary, "lineWidth": 2.5},
+            "labels": [{"text": "value", "style": {"fill": text},
+                        "selector": "last"}],
+            "axis": {"x": {"title": False}, "y": {"title": False}},
+        })
+    elif kind == "scatter":
+        spec.update({
+            "type": "point",
+            "data": data,
+            "encode": {"x": "label", "y": "value", "size": 4},
+            "style": {"fill": primary, "stroke": muted_c},
+            "axis": {"x": {"title": False}, "y": {"title": False}},
+        })
+    elif kind in ("bar-stacked", "combo"):
+        series = slide.get("series") or []
+        rows = []
+        for si, srow in enumerate(series):
+            for d in srow.get("data", []):
+                rows.append({"label": d.get("label"), "value": d.get("value", 0),
+                             "series": srow.get("name", f"系列{si+1}")})
+        spec.update({
+            "type": "interval" if kind == "bar-stacked" else "line",
+            "data": rows,
+            "encode": {"x": "label", "y": "value", "color": "series"},
+            "transform": [{"type": "stackY"}] if kind == "bar-stacked" else [],
+            "scale": {"color": {"range": series_colors(primary, colors.get(
+                "background", "#FFFFFF"), max(1, len(series)))}},
+            "axis": {"x": {"title": False}, "y": {"title": False}},
+        })
+    return spec
+
+
 def resolve_type(intent: str, slide: dict) -> tuple[str, list[str]]:
     """intent + 数据形状 → 图形类型（§19 Chart Resolver v2）。
 
