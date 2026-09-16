@@ -237,6 +237,7 @@ def _slot_geometry(spec_path: str, style: str | None, out_dir: str,
             # "画面里不要有字，字由版面排"——这比笼统的负面词有用。
             "caption": slide.get("caption", ""),
             "type": slide.get("type", ""),
+            "variant": slide.get("variant", ""),
         }
     return (info, style_name)
 
@@ -450,11 +451,8 @@ def _field_values(slot: dict, brief: dict, lang: str) -> list[tuple[str, str]]:
     paper = palette["background"]
     caption = slot.get("caption") or ""
 
+    composition = _composition_text(slot.get("variant") or "", zh=zh)
     if zh:
-        composition = (
-            "**一个**主体，占画面 60~70%；轮廓干净、主体与背景分离明确；背景干净不杂。"
-            "这张图在版面上**只占一栏** —— 它是配图 / 点缀，**不是整页背景**；"
-            "说明文字排在它旁边的另一栏、**不压在图上**，所以不要在图内为文字留白。")
         colour = (f"主色 {primary}、辅色 {secondary}、纸色 {paper}；{mood['色彩'][0]}。"
                   f"色系控制在 1~3 个；最终只保留两墨，**靠明暗层次而不靠色相**")
         # 风格那一栏只留"可执行的视觉语言"本身。第一版写了
@@ -476,12 +474,7 @@ def _field_values(slot: dict, brief: dict, lang: str) -> list[tuple[str, str]]:
                   "（这四样在双色调 + 半调下会糊成一团）；不要多个并列主体或重复主体；"
                   "不要结构变形、过曝、裁切主体")
     else:
-        composition = (
-            "ONE subject filling 60-70% of the frame; clean silhouette, clear "
-            "subject/background separation, uncluttered background. On the slide it "
-            "occupies ONE COLUMN only — it is a supporting image, NOT a full-page "
-            "background. Its caption sits in a SEPARATE column beside it, never "
-            "overlaid, so do NOT reserve space inside the frame for text.")
+        composition = _composition_text(slot.get("variant") or "", zh=False)
         colour = (f"primary {primary}, secondary {secondary}, paper {paper}; "
                   f"{mood['色彩'][1]}. Keep to 1-3 colour families. It ends up as two "
                   f"inks, so it must read by TONAL RANGE, not by hue")
@@ -512,6 +505,38 @@ def _field_values(slot: dict, brief: dict, lang: str) -> list[tuple[str, str]]:
         ("文字", text),
         ("限制", limits),
     ]
+
+
+def _composition_text(variant: str, zh: bool) -> str:
+    """构图指示按**版式变体**分支（审计发现：写死"只占一栏"对 hero 满幅
+    是反指示 —— md:86 的例外在代码里落空）。"""
+    if variant == "hero":
+        if zh:
+            return ("**满幅主角图**：这张图占满整页版面 —— 它是这一页的主角，不是配图。"
+                    "**页面下方有实心标题条压图**：视觉重心与关键内容放在**上 2/3**，"
+                    "下方留出可被条幅从容覆盖的区域；不需要在图内为文字留白"
+                    "（条是实心底，字排在这上面）。")
+        return ("FULL-BLEED HERO: this image fills the entire page — it IS this "
+                "page's protagonist, not a supporting figure. A solid title bar "
+                "overlays the bottom: keep the visual center of gravity in the "
+                "UPPER two-thirds and leave the lower third calm enough to be "
+                "covered. No text space needed inside the frame (the bar is solid).")
+    if zh:
+        return ("**一个**主体，占画面 60~70%；轮廓干净、主体与背景分离明确；背景干净不杂。"
+                "这张图在版面上**只占一栏** —— 它是配图 / 点缀，**不是整页背景**；"
+                "说明文字排在它旁边的另一栏、**不压在图上**，所以不要在图内为文字留白。")
+    return ("ONE subject filling 60-70% of the frame; clean silhouette, clear "
+            "subject/background separation, uncluttered background. On the slide it "
+            "occupies ONE COLUMN only — it is a supporting image, NOT a full-page "
+            "background. Its caption sits in a SEPARATE column beside it, never "
+            "overlaid, so do NOT reserve space inside the frame for text.")
+
+
+def _negative_space_text(variant: str) -> str:
+    if variant == "hero":
+        return ("满幅图：下方实心标题条压图，关键内容放上 2/3；"
+                "图内不必为文字留白（条是实心底）")
+    return "背景干净不杂；说明文字排在旁边的另一栏、不压在图上，图内不必为文字留白"
 
 
 def render_prompt(slot: dict, brief: dict, lang: str = "zh") -> str:
@@ -563,8 +588,7 @@ def _write_asset_requests(brief: dict, measured_px: dict, requests_dir: str) -> 
             # 不许自己编（"用户未提供且会影响事实准确性的内容，不得擅自补充"）。
             "focal": "",
             # negative_space 是工具**知道**的那一半：文字不压在图上，图内不必为文字留白。
-            "negative_space": "背景干净不杂；说明文字排在旁边的另一栏、不压在图上，"
-                              "图内不必为文字留白",
+            "negative_space": _negative_space_text(slot.get("variant") or ""),
             "prompt": render_prompt(slot, brief, "zh"),
             "required": True,            # 版式要图就必须给图（check 的输入门是阻塞级）
             "note": note,

@@ -20,6 +20,7 @@
 python3 scripts/image_source.py --brief your.spec.json      # → image-brief.md + 占位图
 # …… 拿着 prompt 去出图，按文件名存到产物同目录 ……
 python3 scripts/image_source.py --check your.spec.json      # 验尺寸 / 比例 / 在不在
+# --brief 加 --json：把机读 brief 额外打到 stdout（给脚本消费）
 ```
 
 `--brief` 会**顺便放一张占位图**：出图要时间，而流水线不该因此停住 —— 先跑通整条链，

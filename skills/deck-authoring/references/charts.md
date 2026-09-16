@@ -27,7 +27,7 @@ DSL 的边界设计成**渲染器可替换**：`svg()` 的输入是纯数据 + �
 ```json
 {
   "type": "chart",
-  "chart": "bar",                      // 八类之一；不写就按 intent / 数据形状推
+  "chart": "bar",                      // 八类之一；不写 → intent 决定（多系列不写会报错）
   "intent": "comparison",              // 想表达什么（见意图树）
   "message": "DeepSeek 调用量领先第二名 40%",   // ← 结论，会当大标题
   "title": "模型调用量统计",              // ← 数据集名，降为小标签
@@ -58,9 +58,10 @@ python3 scripts/chart.py --explain spec.json   # 每张图为什么用那个图�
 | comparison 比较 | bar | | deviation 偏差 | bar（第一版） |
 | composition 组成 | donut（≤5 条）/ 排序横条（>5） | | distribution 分布 | bar（离散桶）/ line（时间桶） |
 
-没写 `chart` 也没写 `intent` 时按**数据形状**推：多系列 → line；单系列且标签像时间
-（Q1/月份/年份）→ line；否则 bar。理由会写进 `--explain` —— "为什么是这张图"本身
-是信息：AI 改了意图，图就该跟着换。
+没写 `chart` 也没写 `intent` → 缺省 bar（与历史一致）；**多系列直接报错**
+（bar 只画第一系列，猜错 = 静默丢数据）；标签像时间只在 `--explain` 里**建议**
+trend、不当缺省 —— 压测实测过"静默改观感"翻车。写了 intent 的映射见上表
+（`resolve_type` 按数据形状分支），理由进 `--explain` 与 Decision Trace。
 
 ## 好看的三条硬规则
 
@@ -75,7 +76,8 @@ python3 scripts/chart.py --explain spec.json   # 每张图为什么用那个图�
 
 ## 标注（规范第 12 条）
 
-好图表与普通图表的差距多半不在图形，在标注。第一版支持三种：
+好图表与普通图表的差距多半不在图形，在标注。第一版支持三种（**封闭集**，
+`type` 写集外直接 ERROR —— 与 manifest 同款纪律）：
 
 | 类型 | 需要 | 效果 |
 | --- | --- | --- |

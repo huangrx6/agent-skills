@@ -232,6 +232,24 @@ class TestBrief(unittest.TestCase):
         self.assertNotIn(ref, body, "把风格文献塞进提示词了")
 
 
+class TestCompositionByVariant(unittest.TestCase):
+    """构图文案按版式变体分支（审计发现 2：hero 满幅不能说'只占一栏'）。"""
+
+    def test_hero_says_full_bleed_not_one_column(self) -> None:
+        hero = image_source._composition_text("hero", zh=True)
+        self.assertIn("满幅主角", hero)
+        self.assertIn("上 2/3", hero, "没说标题条压图的安全区")
+        self.assertNotIn("只占一栏", hero, "hero 页却说只占一栏 —— 反指示")
+
+    def test_default_still_says_one_column(self) -> None:
+        plain = image_source._composition_text("", zh=True)
+        self.assertIn("只占一栏", plain)
+
+    def test_negative_space_branches(self) -> None:
+        self.assertIn("标题条压图", image_source._negative_space_text("hero"))
+        self.assertIn("另一栏", image_source._negative_space_text(""))
+
+
 class TestAssetRequests(unittest.TestCase):
     """机读的资产请求（`assets/requests/<槽位id>.json`）—— manifest 的上游合同。
 
