@@ -509,6 +509,31 @@ class TestHeroScoring(unittest.TestCase):
         self.assertEqual(fit._balance_score([(1.0, 0.0)]), 0.0)
         self.assertEqual(fit._balance_score(None), 0.5)
 
+    def test_style_match_band_moves_with_temperature(self) -> None:
+        """风格匹配：安静派峰带偏稀，热闹派偏满，同密度得出不同分。"""
+        quiet = {"temperature": "安静 · 冷"}
+        energetic = {"temperature": "热闹 · 暖"}
+        self.assertEqual(fit._style_match_score(0.57, quiet), 1.0)
+        self.assertLess(fit._style_match_score(0.80, quiet), 1.0,
+                        "安静派的高密度候选居然满分 —— 峰带没偏稀")
+        self.assertEqual(fit._style_match_score(0.80, energetic), 1.0)
+        self.assertEqual(fit._style_match_score(0.50, None), 0.5, "无风格数据应中性")
+
+    def test_style_match_neutral_without_tokens(self) -> None:
+        """合成候选不传 tokens：风格维 0.5 中性，不崩。"""
+        _s, parts, _p = fit.score_candidate(
+            {"kind": "content-text", "fits": True, "density": 0.5},
+            {"title": "t", "bullets": ["a"]})
+        self.assertEqual(parts["style_match"], 0.5)
+
+    def test_hero_style_match_is_neutral(self) -> None:
+        """hero 候选风格维中性：图主导页的密度是图的事（hero_whitespace 已量）。"""
+        _s, parts, _p = fit.score_candidate(
+            {"kind": "content-image:hero", "fits": True, "density": 0.93},
+            {"title": "t", "bullets": ["a"], "image": "x.png"},
+            {"temperature": "安静 · 冷"})
+        self.assertEqual(parts["style_match"], 0.5)
+
     def test_text_page_still_gets_crowding_penalty(self) -> None:
         """同一数字 93%：文字主导页照吃拥挤惩罚 —— role-aware 不是放水。"""
         _s, _p, pens = fit.score_candidate(

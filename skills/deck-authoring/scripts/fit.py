@@ -75,7 +75,8 @@ DEAD_SPACE = 0.55          # 内容高度不足正文带的这个比例 → 半�
 # Search 的评分器开始"会看"候选，不只是量密度）。StyleMatch / Rhythm 仍未
 # 接入（要风格模型与跨页序列），report 里如实标注。
 SCORE_WEIGHTS = {"fit": 0.20, "whitespace": 0.15, "semantic": 0.10,
-                 "hierarchy": 0.15, "focal": 0.15, "balance": 0.10}
+                 "hierarchy": 0.15, "focal": 0.15, "balance": 0.10,
+                 "style_match": 0.075}
 CROWDING_ABOVE = 0.85      # 占正文带超过这个比例 → 拥挤惩罚
 CROWDING_PENALTY = 0.10
 SMALLFONT_PENALTY = 0.10
@@ -147,6 +148,30 @@ def _focal_score(el_weights: list | None) -> float:
     return round(min(1.0, gap / hierarchy_mod.MIN_FOCAL_GAP), 3)
 
 
+def _style_match_score(density: float, style_tokens: dict | None) -> float:
+    """风格匹配分：候选密度落不落进**这个风格自己的**舒适带。
+
+    安静派（temperature 含"安静"）峰带偏稀 [0.45, 0.65] —— 留白是它的表达；
+    热闹派（含"热"）峰带偏满 [0.55, 0.80]；没声明取通用舒适带。带内 1.0、
+    带外线性衰减（与 _whitespace_score 同形状，只是峰带随风格移动）。
+    无风格数据（合成候选）→ 0.5 中性。
+    """
+    if not style_tokens:
+        return 0.5
+    temperature = str(style_tokens.get("temperature") or "")
+    if "安静" in temperature:
+        lo, hi = 0.45, 0.65
+    elif "热" in temperature:
+        lo, hi = 0.55, 0.80
+    else:
+        lo, hi = 0.45, 0.75
+    if lo <= density <= hi:
+        return 1.0
+    if density < lo:
+        return round(max(0.0, density / lo), 3)
+    return round(max(0.0, 1.0 - (density - hi) / (1.0 - hi)), 3)
+
+
 def _balance_score(ink_cx: list | None) -> float:
     """平衡分（实测）：墨量加权的左右重心离版心中线的相对距离。"""
     pairs = ink_cx or []
@@ -158,7 +183,8 @@ def _balance_score(ink_cx: list | None) -> float:
     return round(max(0.0, 1.0 - abs(cx - center) / center), 3)
 
 
-def score_candidate(c: dict, content: dict) -> tuple[float, dict, list[str]]:
+def score_candidate(c: dict, content: dict,
+                    style_tokens: dict | None = None) -> tuple[float, dict, list[str]]:
     """一个候选的多目标得分（0~0.45 满分基准）+ 分项 + 惩罚名。纯函数。"""
     is_hero = c["kind"].split(":")[-1] == "hero"
     parts = {"fit": 1.0 if c["fits"] else 0.0,
@@ -169,7 +195,11 @@ def score_candidate(c: dict, content: dict) -> tuple[float, dict, list[str]]:
              # 进候选；没有就 0.5（中性）—— 纯函数路径（合成候选）不崩。
              "hierarchy": _hierarchy_score(c.get("el_weights")),
              "focal": _focal_score(c.get("el_weights")),
-             "balance": _balance_score(c.get("ink_cx"))}
+             "balance": _balance_score(c.get("ink_cx")),
+             # 风格匹配：hero 候选的中性 0.5 —— 图主导页的密度是图的事，
+             # 已经由 _hero_whitespace 用另一把尺子量过了（不吃拥挤惩罚同理）。
+             "style_match": (0.5 if is_hero
+                             else _style_match_score(c["density"], style_tokens))}
     score = sum(parts[k] * SCORE_WEIGHTS[k] for k in SCORE_WEIGHTS)
     penalties: list[str] = []
     if not is_hero and c["density"] > CROWDING_ABOVE:
@@ -316,6 +346,12 @@ def report(result: dict, content: dict, style: str, brand: str | None) -> str:
     bullets = content.get("bullets") or []
     out = [f"试排「{content.get('title', '')}」· {len(bullets)} 条 · 风格 {style}"
            + (f" / 品牌 {brand}" if brand else ""), ""]
+    # 风格匹配分的输入：风格自己的 temperature（安静派峰带偏稀 —— 留白是表达）
+    style_tokens = None
+    try:
+        style_tokens = render.load_style(style)["tokens"]
+    except SystemExit:
+        style_tokens = None
     cands = result["candidates"]
     if not cands:
         out.append("  没有可试的版式（内容里没有条目？）")
@@ -335,18 +371,19 @@ def report(result: dict, content: dict, style: str, brand: str | None) -> str:
     if fits:
         # 建议按**多目标评分**给（不再"越满越好"）：留白在舒适带、语义匹配、
         # 不触发拥挤/最小字号惩罚的候选赢。密度只是 Whitespace 维度的输入。
-        scored = sorted(((*score_candidate(c, content), c) for c in fits),
+        scored = sorted(((*score_candidate(c, content, style_tokens), c) for c in fits),
                         key=lambda t: t[0], reverse=True)
         (score, parts, penalties, best) = scored[0]
         why = (f"留白 {parts['whitespace']:.2f} · 语义 {parts['semantic']:.2f} ·"
                f" 层级 {parts['hierarchy']:.2f} · 焦点 {parts['focal']:.2f} ·"
-               f" 平衡 {parts['balance']:.2f}")
+               f" 平衡 {parts['balance']:.2f} · 风格 {parts['style_match']:.2f}")
         extra = f"；惩罚：{'、'.join(penalties)}" if penalties else ""
         out.append(f"  建议：用 {best['kind']}（candidate score {score:.2f} ——"
                    f" {why}{extra}；占正文带 {best['density']:.0%}）。")
         out.append("  （已接入维度：Fit .20 + 留白 .15 + 语义 .10 + 层级 .15 +"
-                   " 焦点 .15 + 平衡 .10（三维为 hierarchy 实测）− 拥挤/最小字号"
-                   "惩罚；StyleMatch/Rhythm 未接入 —— 需风格模型与跨页序列）")
+                   " 焦点 .15 + 平衡 .10（三维为 hierarchy 实测）+ 风格 .075"
+                   "（temperature 峰带）− 拥挤/最小字号惩罚；仅 Rhythm 未接入 ——"
+                   " 需跨页序列）")
         if all(c["density"] < DEAD_SPACE for c in fits):
             out.append(f"  注意：所有版式都不到 {DEAD_SPACE:.0%}（都偏稀）。"
                        f"稀不是错误 —— 留白是构图，**不要为填满页面加内容**"
@@ -433,12 +470,19 @@ def recommend(measured: dict, labels: dict, spec: dict) -> list[dict]:
                        "el_weights": hierarchy_mod.weights(measured, no),
                        "ink_cx": hierarchy_mod.ink_centers(measured, no)}))
     out: list[dict] = []
+    style_tokens = None
+    try:
+        style_tokens = render.load_style(
+            deck.get("style") or render.DEFAULT_STYLE)["tokens"]
+    except SystemExit:
+        style_tokens = None
     for page_no, rows in sorted(by_page.items()):
         content = slides[page_no - 1] if page_no <= len(slides) else {}
         scored = []
         for variant, extra in rows:
             score, parts, pens = score_candidate(
-                {**extra, "kind": f"content-image:{variant}"}, content)
+                {**extra, "kind": f"content-image:{variant}"}, content,
+                style_tokens)
             scored.append((score, variant, parts, pens, extra["density"]))
         scored.sort(key=lambda t: (-t[0], render.IMAGE_VARIANTS.index(t[1])))
         (score, variant, parts, pens, density) = scored[0]
