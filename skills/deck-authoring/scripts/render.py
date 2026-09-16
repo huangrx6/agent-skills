@@ -339,11 +339,14 @@ html,body{margin:0;background:var(--viewer)}
 .pad{padding:132px 84px}
 /* 标题块：高度是版面几何（每种版式不同），字号由 --s-title 给（来自 type 级数） */
 .titleblock{position:relative;display:block}
-.tb-cover{height:158px}
-.tb-compact{height:104px;margin-bottom:var(--sp-section)}
-.tb-small{height:88px}
+.tb-cover{min-height:158px}
+.tb-compact{min-height:104px}
+.tb-small{min-height:88px}
 .sub{margin:0}
-.two{display:flex;gap:var(--sp-item);align-items:flex-start;margin-top:var(--sp-group)}
+/* 间距治理：块与块的间距全部由 .pad（父容器）的邻接规则给；组件自身零外距。 */
+.pad > .titleblock.tb-compact,
+.pad > .titleblock.tb-small{margin-bottom:var(--sp-section)}
+.two{display:flex;gap:var(--sp-item);align-items:flex-start}
 .two .main{width:825.33px}
 .imgwrap{margin:0;width:582.67px}
 /* content-image 变体：v-even 6+6 均分（704px=span(6)，825.33+582.67+24=1432 不变）；
@@ -360,9 +363,9 @@ html,body{margin:0;background:var(--viewer)}
   padding:18px 30px 18px 0;background:var(--text);color:var(--paper)}
 .herofig .herobar .title{color:var(--paper);
   font-size:var(--s-colTitle,26px);line-height:1.3;white-space:normal}
-.hero-bullets{margin-top:24px}
+.hero-bullets{margin-top:var(--sp-item)}
 .imgwrap img{width:100%;display:block}
-.cols{display:flex;gap:var(--sp-item);margin-top:var(--sp-item)}
+.cols{display:flex;gap:var(--sp-item)}
 .col{flex:1;min-width:0}
 /* two-column 变体：lean-left 左栏 7 栅（825.33px=span(7)），右栏由 flex:1 补齐
    （582.67px=span(5)，825.33+582.67+24=1432 不变）；lean-right 镜像。
@@ -370,7 +373,7 @@ html,body{margin:0;background:var(--viewer)}
    默认路径逐字节不变（test_compile 的黄金对照钉着）。 */
 .cols.v-lean-left .col:first-child{flex:none;width:825.33px}
 .cols.v-lean-right .col:last-child{flex:none;width:825.33px}
-.tl{display:flex;gap:var(--sp-item);list-style:none;padding:0;margin:var(--sp-group) 0 0}
+.tl{display:flex;gap:var(--sp-item);list-style:none;padding:0;margin:0}
 .tl li{flex:1;min-width:0;width:var(--tl-node,300px)}
 .chartsrc{margin:calc(var(--sp-inner) * -0.5) 0 0;color:var(--text);opacity:.55;
   font:400 var(--s-caption,16px)/1.4 var(--body)}

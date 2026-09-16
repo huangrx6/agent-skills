@@ -58,6 +58,23 @@ deck_mod = _load_sibling("deck")       # 品牌资产 + 编译（原 brand/compi
 grid_mod = _load_sibling("grid")     # 网格与间距（版面几何唯一来源）
 
 
+def _load_layout():
+    """加载 ``layout/`` 包（模型 + 碰撞政策）。加载法与 _load_sibling 同源；
+    包的 ``__init__`` 自己设 ``__path__``，子模块由它动态拉起。"""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "layout", "__init__.py")
+    pkg_spec = importlib.util.spec_from_file_location("_deck_layout", path)
+    if pkg_spec is None or pkg_spec.loader is None:
+        raise RuntimeError(f"加载不了 layout 包：{path}")
+    module = importlib.util.module_from_spec(pkg_spec)
+    sys.modules[pkg_spec.name] = module
+    pkg_spec.loader.exec_module(module)
+    return module
+
+
+layout_mod = _load_layout()  # 安全盒碰撞（几何模型 + 政策 + 验收）
+
+
 
 # **两个不同的框，别混用**（我自己第一版就混了 ✗，导致正常产物被误判"溢出"）：
 #   内容区 = 版面减去内边距，量"放不放得下"（宽 1600-2×84 = 1432）
@@ -712,6 +729,18 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     problems.extend(brand_problems)
     # 空内容与品牌无关，但它和越界一样是“一页看着坏了”—— 所以也走阻塞
     problems.extend(_check_empty_content(deck))
+    # ⑥ 安全盒碰撞：不同视觉组之间，安全盒相交即违规（deny 默认）。
+    # 判据全来自实测元素盒 + layout 包的安全距离表；「图表本体没撞、
+    # 标签撞了」「图片没撞、caption 撞了」这两类以前全是沉默的。
+    hero_pages = frozenset(
+        i for i, s in enumerate(deck.get("slides", []), 1)
+        if isinstance(s, dict) and s.get("layout") == "hero")
+    for v in layout_mod.collision.violations(
+            layout_mod.collision.build_boxes(data.get("elements", [])), hero_pages):
+        problems.append(
+            f"第 {v['slide']} 页 {v['a']} 与 {v['b']} 太近"
+            f"（{v['group']}：需要 ≥{v['required']:.0f}px，实际 {v['actual']:.0f}px）—— "
+            f"安全盒相交按重叠处理；要么拉开间距（父容器 gap 档），要么这页内容该拆")
     # 布局词表：风格声明了 layouts 时，spec 里拼错的布局名当场拦（v3 起布局是
     # 自由字符串，拼错会让 skin 里那条规则永远不生效 —— 最难查的那种静默）。
     problems.extend(_layout_vocab_problems(deck, tokens, deck.get("slides", [])))

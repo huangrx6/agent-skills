@@ -99,6 +99,70 @@ Style 不重定义任意 spacing，只允许覆盖语义档（spacingOverrides�
 gap=57/73/101——改后 skin 的手写值收敛到令牌（残余 6~8 处手写值在路线图里
 继续清）。
 
+## 11b. 安全盒（Clearance Box）与碰撞政策【✅ layout/ 包】
+
+页面元素除**视觉边界**外还有一个**安全盒**（四向外扩的视觉安全范围）。
+两个不同视觉组的元素安全盒相交 = 按重叠处理（阻塞）—— 只查真实边界
+看不见「没撞但只剩 3px」的那种挤。
+
+数学在 `scripts/layout/model.py`（`Rect` / `Insets` / `expand_rect` /
+`intersects` / `gap_between` / `required_gap`），政策在
+`scripts/layout/collision.py`。判据全部来自 `measure.py` 的实测元素盒。
+
+**五个性状分组**（同组是一个视觉整体，不互判）：
+
+| 组 | 成员 |
+| --- | --- |
+| title | 标题块（title + subtitle） |
+| body | 正文（bullets / 栏题） |
+| visual | 视觉（chart / image / 时间线节点） |
+| caption | 说明（caption / chartValue / chartLabel） |
+| foot | 页脚行（foot / brandfoot / logo） |
+
+**政策三种**：`deny`（默认，相交即违规）；`decorative`（装饰无 `data-m`、
+不进测量清单，天然不参与）；`intentional`（**只有 hero**：实心反色标题条
+压图是设计本身 —— `spec.layout == "hero"` 声明它）。
+
+**豁免三条**（豁免的是「视觉整体」，不是放水）：
+
+1. 同组成员（列表条目之间、标题块内部、页脚行内部）；
+2. caption 被 visual 包含（figure 的 DOM 子节点；**全幅图包含标题不在此列**
+   —— 那是压字，必须走 hero 声明）；
+3. 同页 visual×caption（caption 属于 figure；图内间距由 figure 自己的
+   padding 管，实测画布→说明 48px）。
+
+**安全距离表**（px，四向外扩；需要间距 = 主导方向两侧外扩量之和）：
+
+| 元素 | 外扩 |
+| --- | --- |
+| title | bottom 28 |
+| subtitle | bottom 20 |
+| bullet | top 20 / bottom 16 |
+| chart | 四向 24 |
+| image | 上 16 / 其余 24 |
+| caption | 四向 12 |
+| foot | top 24 |
+
+报告必须带两个数（只说"撞了"没法修）：
+
+```text
+第 9 页 s9.chart 与 s9.caption 太近（visual×caption：需要 ≥44px，实际 24px）
+```
+
+## 11c. 标题块与装饰锚定【✅】
+
+标题块高度是**内高的下限**（`min-height`），不是钉死的盒子：标题换行 /
+换字体 / 换字号时块随内容长，皮肤锚在 `.titleblock` 上的装饰（侧条 / 下划线）
+跟着真实几何走。`measure.py` 对标题元素额外输出**逐行真实矩形**
+（`lineRects`，Range API）—— 行数与行高变了，装饰是否跟得上拿它验证。
+
+## 11d. 间距治理【✅】
+
+块与块的间距**全部由父容器（`.pad`）的邻接规则给**；组件自身零外距。
+当前只有标题块带 `margin-bottom: var(--sp-section)`（64）；下方组件不写
+`margin-top`（块布局的相邻外距折叠取大者，写不写结果一样，写两处必漂移）。
+安全距离表的最低线（标题底 28 + 正文顶 20 = 48）由这 64 兜住。
+
 ## 12. Alignment【✅ 提示级】
 
 必须检查：标题/正文/卡片/图/图表/表格/题注的左缘与 baseline。落地：锚点元素

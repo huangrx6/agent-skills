@@ -332,7 +332,8 @@ Layout、Design Tokens、**IBCS + ISO 24896**、AntV）、缺什么、以及**�
 skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是这棵树的这部分
 ├── SKILL.md                 # 给模型看的触发条件 + 流程
 ├── README.md                # 给"想跑一下"的人看的
-├── scripts/                 # 流水线十四件（另有 1 个 Swift 编码器 + 1 个 vendor）
+├── scripts/                 # 流水线十四件 + layout/ 包（另有 1 个 Swift 编码器 + 1 个 vendor）
+│   ├── layout/              # 布局层包：几何模型(Rect/安全盒) + 碰撞政策(分组/距离表/豁免)
 │   ├── validate_spec.py     # 输入层校验：字段集封闭（坐标/字号/色值直接判失败）
 │   ├── ink.py               # 墨色推导 + 三色板对比度门禁（不达标退 1）
 │   ├── image_source.py      # 提示词契约(--brief) / 验收(--check) / 生图(--provider-cmd) / 色块拼贴

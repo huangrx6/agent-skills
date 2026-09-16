@@ -175,7 +175,19 @@ PROBE_JS = r"""
           var err = g2.getAttribute('data-chart-error');
           if (err) return 'error:' + err;
           return g2.querySelector('canvas,svg') ? 'ready' : 'pending';
-        })(el.querySelector('.g2[data-g2]'))
+        })(el.querySelector('.g2[data-g2]')),
+        // 标题的**逐行真实矩形**（Range API）：标题装饰（侧条/下划线）锚定的是
+        // 真实行几何，不是容器盒 —— 行数/行高变了装饰要跟着走，验证需要它。
+        lineRects: (function () {
+          var mid = el.getAttribute('data-m') || '';
+          if (!/\.title$/.test(mid)) return null;
+          var range = document.createRange();
+          range.selectNodeContents(el);
+          return Array.prototype.map.call(range.getClientRects(), function (r) {
+            return { x: Math.round(r.x * 10) / 10, y: Math.round(r.y * 10) / 10,
+                     w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10 };
+          });
+        })()
       });
       // 只统计**自己直接渲染文字**的元素。
       //
