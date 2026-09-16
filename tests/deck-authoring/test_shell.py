@@ -343,7 +343,8 @@ class TestImageSlotRatio(unittest.TestCase):
 
     def test_slot_owns_the_display_ratio(self) -> None:
         html = self._page("evidence_image")
-        self.assertIn("aspect-ratio:3/2", html, "高度必须由槽位定，不由图片自身比例定")
+        self.assertIn("aspect-ratio:var(--img-ratio,3/2)", html,
+                      "高度必须由槽位定（缺省 3:2，可由 visual.ratio 覆盖）")
         self.assertIn("object-fit:cover", html, "照片：按中心裁切")
 
     def test_diagram_is_letterboxed_not_cropped(self) -> None:

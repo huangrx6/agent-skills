@@ -372,7 +372,8 @@ html,body{margin:0;background:var(--viewer)}
      · 照片 / 插画 / 截图 → cover（按中心裁切，主体居中几乎无损）
      · 结构图 / 流程图     → contain（留边不裁 —— 图里每一笔都是信息）
    皮肤的 .imgwrap 想改槽位比例就直接覆盖 aspect-ratio。 */
-.imgwrap img{width:100%;display:block;aspect-ratio:3/2;object-fit:cover}
+.imgwrap img{width:100%;display:block;aspect-ratio:var(--img-ratio,3/2);
+  object-fit:cover}
 .imgwrap[data-fit="contain"] img{object-fit:contain}
 .cols{display:flex;gap:var(--sp-item)}
 .col{flex:1;min-width:0}
@@ -1273,10 +1274,14 @@ def render_resolved(resolved: dict) -> str:
             # （variant 已在 titleblock 之前判定 —— hero 不立独立标题块。）
             main_html = (f'<div class="main"><ul class="bullets" '
                          f'style="--s-bullet:{bsize}px">{items}</ul></div>')
-            # 结构图不裁：图里每一笔都是信息（照片则按中心裁切）
-            vkind = (slide.get("visual") or {}).get("kind") \
-                if isinstance(slide.get("visual"), dict) else None
+            # 结构图不裁：图里每一笔都是信息（照片则按中心裁切）；
+            # 比例由 spec 的 visual.ratio 给（未声明则壳缺省 3:2）。
+            visual = slide.get("visual") if isinstance(slide.get("visual"), dict) else {}
+            vkind = visual.get("kind")
             fit_attr = ' data-fit="contain"' if vkind == "diagram" else ""
+            ratio = visual.get("ratio")
+            if isinstance(ratio, str) and ratio.count(":") == 1:
+                fit_attr += f' style="--img-ratio:{ratio.replace(":", "/")}"'
             img_html = (f'<figure class="imgwrap" {img_attrs}{fit_attr}>'
                         f'<img src="{html.escape(src)}" alt="">{cap}</figure>')
             if layout == "visual-left":       # 图先文后

@@ -44,7 +44,9 @@ CHART_TYPES = ("bar", "bar-horizontal", "line", "area", "bar-stacked",
 # 实测的后果是全篇靠文字撑、图与元素一直没人提。四个档就是这条流水线能交付的
 # 四种载体（其余"元素"靠版式与条目形状表达，不另设档）：见 references/images.md。
 VISUAL_KINDS = ("none", "evidence_image", "diagram", "data")
-VISUAL_KEYS = {"kind", "intent", "note"}
+VISUAL_KEYS = {"kind", "intent", "note", "ratio"}
+# 比例的合理区间（宽/高）。超出就是写错了（把像素当比例、或写了 1:0 这种）。
+RATIO_RANGE = (0.4, 2.6)
 VISUAL_IMAGE_KINDS = ("evidence_image", "diagram")
 
 SLIDE_FIELDS = {
@@ -184,6 +186,20 @@ def _check_items(slide: dict, key: str, where: str, issues: Issues) -> None:
         _check_fields(item, allowed, f"{where}.{key}[{i}]", issues)
 
 
+def _ratio_ok(raw) -> bool:
+    """`"3:2"` → True；非字符串 / 不是 W:H / 超出 RATIO_RANGE 都 False。"""
+    if not isinstance(raw, str) or raw.count(":") != 1:
+        return False
+    a, b = raw.split(":")
+    if not (a.isdigit() and b.isdigit()):
+        return False
+    w, h = int(a), int(b)
+    if w <= 0 or h <= 0 or w > 64 or h > 64:
+        return False
+    lo, hi = RATIO_RANGE
+    return lo <= (w / h) <= hi
+
+
 def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
     issues = Issues()
     if not isinstance(spec, dict):
@@ -261,6 +277,21 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
                     issues.error("BAD_VISUAL", vwhere,
                                  f"content-image 版式声明 visual.kind=none —— "
                                  f"这一页的版式就是图：给 image，或换成 content-text")
+                # 要图 → **必须写清比例**。出图工具的默认比例各家不同（Midjourney 默认
+                # 1:1、SD 看 sampler、DALL·E 只认 prompt），不写下来就等于没定，
+                # 出回来再改成本高得多；槽位高度也按它算。
+                if vkind in VISUAL_IMAGE_KINDS:
+                    ratio = visual.get("ratio")
+                    if ratio is None:
+                        issues.error("MISSING_RATIO", vwhere,
+                                     "要图就得写清比例：visual.ratio（如 \"3:2\" / "
+                                     "\"4:3\" / \"1:1\" / \"16:9\"）—— 出图工具的默认"
+                                     "比例各家不同，不写下来等于没定；槽位高度按它算。"
+                                     "不带 live 空位的图页（没有 visual 声明）不受这条约束")
+                    elif not _ratio_ok(ratio):
+                        issues.error("BAD_RATIO", vwhere,
+                                     f"ratio 要写成 \"宽:高\"（整数，如 \"3:2\"），"
+                                     f"收到 {ratio!r}")
         # 布局：自由字符串，只拦 "auto"（实测选择已退役）与非字符串
         layout = slide.get("layout")
         if layout is not None:

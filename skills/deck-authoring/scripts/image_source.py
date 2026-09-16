@@ -597,8 +597,8 @@ def api_params(brief: dict) -> list[str]:
     """
     w, h = brief["target_px"]
     return [
-        f"尺寸 {w}×{h}px",
-        f"比例 {brief['aspect']}",
+        f"尺寸 {w}×{h}px（槽宽 ×2）",
+        f"比例 {brief['aspect']}（按页面上声明的 visual.ratio；没写就是槽位缺省 3:2）",
         "数量 1 张",
         "不需要透明通道（整张不透明照片）",
         "质量 / seed 随意 —— 这张图是外部素材，不参与 deck 的确定性渲染",
@@ -759,10 +759,23 @@ def check_images(spec_path: str, out_dir: str, style: str | None = None,
     spec = deckio.read_json(spec_path)
     # 逐页收（同一个文件名用在多页时，报第一个用到它的页号，且只验一次）
     wanted: dict[str, int] = {}
+    want_ratio: dict[str, float] = {}
     for page, slide in enumerate(spec.get("deck", {}).get("slides", []), 1):
         name = slide.get("image")
-        if name and str(name) not in wanted:
-            wanted[str(name)] = page
+        if not name or str(name) in wanted:
+            continue
+        wanted[str(name)] = page
+        # 比例以 spec 声明的 `visual.ratio` 为准（缺省才是 brief 推荐值）——
+        # 出图的人按它出，验收当然也按它验。
+        visual = slide.get("visual") if isinstance(slide.get("visual"), dict) else {}
+        # 比例解析：写坏了不在这里报（`validate_spec.py` 的 BAD_RATIO 才是那一道门），
+        # 这里退回 brief 的推荐值 —— 检查器自己不能因为一个坏字段就炸。
+        try:
+            a, b = (int(x) for x in str(visual.get("ratio")).split(":"))
+        except (TypeError, ValueError):
+            continue                     # 坏比例由 validate_spec 的 BAD_RATIO 报
+        if b:
+            want_ratio[str(name)] = a / b
     if not wanted:
         raise SystemExit("✗ 这份 spec 里没有任何 image 槽位")
     want_w = 640 * BRIEF_SCALE
@@ -779,11 +792,11 @@ def check_images(spec_path: str, out_dir: str, style: str | None = None,
             problems.append(
                 f"第 {page} 页：`{name}` 只有 {w}px 宽，契约要 {want_w}px —— "
                 f"放进版面会被放大渲染（会糊）")
-        ratio_want = BRIEF_ASPECT[0] / BRIEF_ASPECT[1]
+        ratio_want = want_ratio.get(name, BRIEF_ASPECT[0] / BRIEF_ASPECT[1])
         ratio_got = w / h
         if abs(ratio_got - ratio_want) > 0.12:
             notes.append(
-                f"第 {page} 页：`{name}` 是 {ratio_got:.2f}:1，槽位是 {ratio_want:.2f}:1"
+                f"第 {page} 页：`{name}` 是 {ratio_got:.2f}:1，槽位要 {ratio_want:.2f}:1"
                 f" —— **不用为比例重出图**：渲染按槽位比例定高度，照片按中心裁切"
                 f"（cover）、结构图留边不裁（contain，按 spec 的 visual.kind 选）。"
                 f"只要主体不贴边、画面里没有文字，裁切看不出来")

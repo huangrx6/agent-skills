@@ -294,6 +294,48 @@ class TestVisualCarrier(unittest.TestCase):
         self.assertNotIn("BAD_VISUAL", codes)
 
 
+
+class TestVisualRatio(unittest.TestCase):
+    """要图就必须**写清比例**（`visual.ratio`）—— 这是规则，不是建议。
+
+    出图工具的默认比例各家不同（Midjourney 1:1 / SD 看 sampler / DALL·E 只认 prompt），
+    而槽位高度按 ratio 算：不写下来等于没定，出回来再改成本高得多。
+    """
+
+    @staticmethod
+    def _spec(visual: dict, kind: str = "content-image") -> dict:
+        slide = {"type": kind, "title": "图页", "visual": visual}
+        if kind == "content-image":
+            slide["image"] = "a.png"
+        else:
+            slide["bullets"] = ["一条"]
+        return {"deck": {"style": "swiss-grid", "colorSet": "blue", "seed": 1,
+                         "title": "t", "slides": [slide]}}
+
+    def _codes(self, visual: dict, kind: str = "content-image") -> set:
+        return {i["code"] for i in vs.validate(self._spec(visual, kind), None).errors}
+
+    def test_ratio_is_required_when_an_image_is_declared(self) -> None:
+        self.assertIn("MISSING_RATIO", self._codes({"kind": "evidence_image"}))
+        self.assertIn("MISSING_RATIO", self._codes({"kind": "diagram"}))
+
+    def test_common_ratios_are_accepted(self) -> None:
+        for ratio in ("3:2", "4:3", "1:1", "16:9", "2:1"):
+            codes = self._codes({"kind": "evidence_image", "ratio": ratio})
+            self.assertNotIn("MISSING_RATIO", codes, ratio)
+            self.assertNotIn("BAD_RATIO", codes, ratio)
+
+    def test_bad_ratio_shapes_are_rejected(self) -> None:
+        for ratio in ("1280x853", "3/2", "3:", ":2", "0:1", "9:1", "a:b", ""):
+            self.assertIn("BAD_RATIO",
+                          self._codes({"kind": "evidence_image", "ratio": ratio}),
+                          ratio)
+
+    def test_no_image_kind_needs_no_ratio(self) -> None:
+        codes = self._codes({"kind": "none"}, kind="content-text")
+        self.assertNotIn("MISSING_RATIO", codes)
+
+
 if __name__ == "__main__":
     unittest.main()
 

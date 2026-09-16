@@ -226,7 +226,9 @@ Page Planner 再映射（comparison → chart / two-column）。
 
 ## 31. Visual Requirement（落进 spec 就是 `visual`）
 
-每页写 `{"visual": {"kind": "none|evidence_image|diagram|data", "intent": "...", "note": "..."}}`
+每页写 `{"visual": {"kind": "none|evidence_image|diagram|data", "ratio": "3:2",
+"intent": "...", "note": "..."}}` —— **要图（`evidence_image`/`diagram`）时 `ratio` 必填**：
+比例要明确写出来（`"3:2"` / `"4:3"` / `"1:1"` / `"16:9"`），槽位高度按它算，出图的人按它出
 —— 这四档就是流水线能交付的四种载体，也是 spec 里唯一承认的形状
 （`validate_spec.py` 拦未知档与自相矛盾；`check.py` 点出没决定的页）。
 
