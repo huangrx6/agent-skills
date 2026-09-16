@@ -255,6 +255,34 @@ def _check_full_page_image(measured: dict, deck: dict) -> list[str]:
     return out
 
 
+PAGE_BOX = (1600, 900)     # 壳的页盒（render.py 的 .slide 尺寸）
+
+
+def _check_page_box(measured: dict) -> list[str]:
+    """页盒必须正好是 1600×900 —— 否则导出/打印时**每页溢出一张**（提示级）。
+
+    实测：一份 17 页 deck 的皮肤给 `.slide` 加了 1px 上边框（一个极其自然的
+    设计动作）→ 页盒 901px → 导 PDF 变 34 页；HTML 在屏幕上看不出来
+    （`overflow:hidden` 把它剪了）。壳已给 `.slide` 上 `box-sizing:border-box`，
+    所以“加边框”本身不再是陷阱；这条门守的是剩下两种：皮肤覆盖 `height`，
+    或给 `.slide` 加外边距。
+    """
+    w_ok, h_ok = PAGE_BOX
+    out: list[str] = []
+    for i, s in enumerate(measured.get("slides") or [], 1):
+        if not isinstance(s, dict):
+            continue
+        w, h = s.get("w"), s.get("h")
+        if not isinstance(w, (int, float)) or not isinstance(h, (int, float)):
+            continue
+        if abs(w - w_ok) > 0.5 or abs(h - h_ok) > 0.5:
+            out.append(
+                f"第 {i} 页的页盒是 {w:g}×{h:g}px（壳的页盒 {w_ok}×{h_ok}）—— 导出 PDF / "
+                f"打印时这一页会溢到下一张（实测：差 1px 就够，17 页会变 34 页）。"
+                f"皮肤别覆盖 .slide 的 height，也别给它加外边距")
+    return out
+
+
 def _check_grid_alignment(measured: dict) -> list[str]:
     """**锚点元素必须吸附到网格列**（提示级）。
 
@@ -273,6 +301,12 @@ def _check_grid_alignment(measured: dict) -> list[str]:
     off: list[tuple[int, float, str]] = []
     for el in measured.get("elements", []):
         if el.get("role") not in anchors:
+            continue
+        # 卡片 / 时间线节点**内部**的元素不比页面网格：它们的锚是那个盒子本身。
+        # 实测：右栏卡片内容 x=832.5 而网格列是 812 —— 那是卡片内缩，不是漂移；
+        # 时间线节点标签同理（x=113 相对节点盒）。盒子内部只查兄弟一致
+        # （`_pair_alignment_notes`），拿它比整页网格是误伤。
+        if re.search(r"\.(col\d+|node\d+)\.", str(el.get("id") or "")):
             continue
         slide_no = el.get("slide")
         x = el.get("x")
@@ -480,7 +514,20 @@ SYSTEM_UI_FAMILIES = {
 }
 
 
-def _check_font_fallback(measured: dict) -> list[str]:
+def _declared_families(tokens: dict | None) -> set[str]:
+    """style.json 的 fonts 里声明过的族（display / body / numeral / mono …）。"""
+    out: set[str] = set()
+    for value in ((tokens or {}).get("fonts") or {}).values():
+        if not isinstance(value, str):
+            continue
+        for f in value.split(","):
+            f = f.strip().strip('"\'')
+            if f:
+                out.add(f)
+    return out
+
+
+def _check_font_fallback(measured: dict, tokens: dict | None = None) -> list[str]:
     """字体两条**提示**（都不阻塞）—— 说清"谁顶上了"，以及"顶上的是不是默认"。
 
     判据来自探针的**像素指纹**（`measure.py`：同字串在"声明的族"与"不存在的族"下各画
@@ -493,6 +540,7 @@ def _check_font_fallback(measured: dict) -> list[str]:
       要的是"换个族 / 自带字体文件"，不是"修回退"。
     """
     fonts = measured.get("fonts", {})
+    declared = _declared_families(tokens)
     out: list[str] = []
     for stack in measured.get("stacks", []):
         first = stack[0] if stack else None
@@ -501,7 +549,17 @@ def _check_font_fallback(measured: dict) -> list[str]:
         info = fonts.get(first, {})
         if info.get("generic"):
             continue                       # 通用族是回退目标，不是"字体"
-        if not info.get("available"):
+        if declared and first not in declared and info.get("defaultLike"):
+            # 栈首既不在 style.json 的声明里，又是本机默认族 —— 这不是"声明了没生效"，
+            # 是**根本没有规则命中这个元素**（壳漏发变量 / 皮肤漏写选择器）。两种毛病
+            # 修法不同，措辞就不该一样：实测拿到的是 UA 的 <h3>（18.7px/700/PingFang）
+            # 而不是阶梯里的 26px，一次错位同时丢了字号、字重、字体族三样。
+            out.append(
+                f"字体（提示）：有元素没拿到字体族，掉到了本机默认 {first!r} —— "
+                f"壳/皮肤的 CSS 没命中它：要么皮肤漏了这个选择器，要么那条规则里的变量"
+                f"不存在（`font: 400 var(--s-bullet)/…` 里变量没定义时**整条 shorthand "
+                f"失效**，字体族一起丢）。补选择器，或给变量带兜底值")
+        elif not info.get("available"):
             winner = next((f for f in stack if fonts.get(f, {}).get("available")), None)
             tail = (f"，实际用的是 {winner!r}" if winner
                     else "，栈里没有一个能带来不同字形 —— **字体等于没生效**"
@@ -993,7 +1051,8 @@ def advisories(measured: dict, spec: dict | None = None,
     能确定性判定的才阻塞；启发式的只提示。字体那条是启发式 —— 拿一个一定不存在的
     族当基准比宽度，衬线撞衬线时可能误报，拿它挡交付会把人逼到忽略整个检查。
     """
-    notes = _check_font_fallback(measured)
+    notes = _check_font_fallback(measured, tokens)
+    notes.extend(_check_page_box(measured))
     notes.extend(_check_grid_alignment(measured))
     if spec is not None and tokens is not None:
         _, brand_notes = _check_brand(measured, spec.get("deck", {}), tokens)

@@ -163,6 +163,31 @@ class TestSystemUiFontNote(unittest.TestCase):
         self.assertEqual(len(notes), 1, notes)
         self.assertIn("字体等于没生效", notes[0])
 
+    def test_undeclared_default_stack_names_the_missing_selector(self) -> None:
+        """栈首既不在声明里、又是本机默认族 → 不是"声明了没生效"，是**没有规则命中**。
+
+        实测：卡片的 `<h3>` 拿到 UA 默认（18.7px/700/PingFang）—— 皮肤写的是
+        `.colTitle` 而壳没发这个类；卡片的 `<li>` 拿到 UA 默认 —— 壳漏发 `--s-bullet`，
+        皮肤那条 `font: 400 var(--s-bullet)/…` 整条失效。两种毛病修法不同
+        （补选择器 / 发变量），所以措辞不能都说成"声明了没生效"。
+        """
+        notes = self.check._check_font_fallback(
+            {"fonts": {"PingFang SC": {"available": False, "defaultLike": True}},
+             "stacks": [["PingFang SC"]]},
+            {"fonts": {"display": "Songti SC, serif", "body": "Songti SC, serif"}})
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("没拿到字体族", notes[0])
+        self.assertNotIn("声明的", notes[0])
+
+    def test_declared_family_that_failed_still_says_declared(self) -> None:
+        notes = self.check._check_font_fallback(
+            {"fonts": {"MiSans": {"available": False, "defaultLike": True},
+                       "Songti SC": {"available": True}},
+             "stacks": [["MiSans", "Songti SC", "serif"]]},
+            {"fonts": {"body": "MiSans, Songti SC, serif"}})
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("实际用的是 'Songti SC'", notes[0])
+
     def test_fallback_says_who_won(self) -> None:
         notes = self._notes({"MiSans": {"available": False},
                              "Source Han Sans SC": {"available": True}},

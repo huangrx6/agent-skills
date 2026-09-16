@@ -305,6 +305,49 @@ class TestVisualDecisionAdvisory(unittest.TestCase):
         self.assertEqual(check._visual_decision_notes(deck), [])
 
 
+
+class TestPageBox(unittest.TestCase):
+    """页盒差 1px 就够：导出 PDF 每页溢出一张，而屏幕上一点看不出来。
+
+    实测：皮肤给 `.slide` 加 1px 上边框 → 页盒 901px → 17 页的 deck 导成 34 页。
+    """
+
+    def test_page_box_off_by_one_pixel_is_reported(self) -> None:
+        notes = check._check_page_box({"slides": [{"w": 1600, "h": 901}]})
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("901", notes[0])
+        self.assertIn("溢到下一张", notes[0])
+
+    def test_exact_page_box_is_silent(self) -> None:
+        self.assertEqual(
+            check._check_page_box({"slides": [{"w": 1600, "h": 900},
+                                               {"w": 1600, "h": 900}]}), [])
+
+
+class TestGridAnchorScope(unittest.TestCase):
+    """锚点门只管**页面级**锚点；卡片 / 时间线节点内部不比整页网格。
+
+    实测误伤：右栏卡片内容 x=832.5（网格列 812）、时间线节点标签 x=113 —— 都是组件
+    盒子的内缩。拿它们比整页网格，会让人以为"皮肤全歪了"，然后把整个门忽略掉。
+    """
+
+    def test_container_children_are_not_compared_to_the_page_grid(self) -> None:
+        measured = {"elements": [
+            {"id": "s1.col1.title", "role": "subtitle", "slide": 1, "x": 832.5},
+            {"id": "s1.node2.label", "role": "subtitle", "slide": 1, "x": 113.0},
+        ]}
+        self.assertEqual(check._check_grid_alignment(measured), [])
+
+    def test_top_level_anchor_drift_is_still_reported(self) -> None:
+        measured = {"elements": [
+            {"id": "s1.subtitle", "role": "subtitle", "slide": 1, "x": 113.0},
+        ]}
+        notes = check._check_grid_alignment(measured)
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn("没吸附到网格列", notes[0])
+        self.assertIn("x=113", notes[0])
+
+
 if __name__ == "__main__":
     unittest.main()
 

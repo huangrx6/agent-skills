@@ -381,7 +381,16 @@ SKELETON_CSS = """
 :root{ __VARS__ }
 html,body{margin:0;background:var(--viewer)}
 .slide{position:relative;width:1600px;height:900px;background:var(--paper);
-  overflow:hidden;margin:0 auto 36px}
+  overflow:hidden;margin:0 auto 36px;
+  /* 页盒必须**永远**是 1600×900：border-box 下皮肤加边框/内边距都往内吃，
+     不会把盒子掉大。没有这句的后果实测过：皮肤给 .slide 加了 1px 上边框
+     （一个极其自然的设计动作）→ 页盒 901px → 导 PDF 每页多溢出一张，
+     17 页的 deck 变 34 页；HTML 屏上一点看不出来（overflow 剪掉）。 */
+  box-sizing:border-box;
+  /* 基准字体族：skin 没写到的选择器就从这里继承 —— 否则会静默掉到浏览器
+     UA 默认族（CJK 在 macOS 上是 PingFang SC）：同一页里一半宋体一半系统 UI 族，
+     而且换台机器字形全变。皮肤的显式规则照旧覆盖它。 */
+  font-family:var(--body)}
 .pad{padding:132px 84px}
 /* 标题块：高度是版面几何（每种版式不同），字号由 --s-title 给（来自 type 级数） */
 .titleblock{position:relative;display:block}
@@ -1370,10 +1379,17 @@ def render_resolved(resolved: dict) -> str:
                 coltitle = col.get("title", "")
                 h3_attrs = tag(f"s{i}.col{ci}.title", i, "subtitle", coltitle,
                                tier["colTitle"])
+                # 类名 `colTitle` 是给皮肤的钩子（与 type 阶梯同名）—— 没有它，
+                # 皮肤只能猜标签名，猜错就掉回 UA 的 <h3> 样式（实测 18.7px/700 而非
+                # 阶梯里的 26px）。`--s-bullet` 同理：顶层列表一直发，这里漏发过一次，
+                # 皮肤那句 `font: 400 var(--s-bullet)/…` 因变量不存在**整条失效**，
+                # 连字体族一起丢（掉到 UA 默认）。同一个角色，发的东西必须一致。
                 cols.append(f'<div class="col"><div class="band {band}"></div>'
-                            f'<h3 {h3_attrs} style="--s-colTitle:{tier["colTitle"]}px">'
+                            f'<h3 class="colTitle" {h3_attrs} '
+                            f'style="--s-colTitle:{tier["colTitle"]}px">'
                             f'{rich(coltitle)}</h3>'
-                            f'<ul class="bullets small">{li}</ul></div>')
+                            f'<ul class="bullets small" style="--s-bullet:{bsize}px">'
+                            f'{li}</ul></div>')
             # 非默认结构布局加 v-<layout> 类（宽度规则在骨架 CSS）；even 是缺省，
             # 不加类 —— 旧输出（flex 等分 6+6）一个字节都不动。自造布局名则加
             # data-layout 钩子（结构仍是缺省，排法交给 skin）。

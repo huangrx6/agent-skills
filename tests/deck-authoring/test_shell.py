@@ -358,6 +358,45 @@ class TestImageSlotRatio(unittest.TestCase):
 
 
 
+class TestColumnHooks(unittest.TestCase):
+    """卡片（two-column）要发跟顶层一样的东西：钩子类 + 阶梯变量。
+
+    实测缺陷：卡片的 `<h3>` 没类（皮肤写 `.colTitle` 从不命中 → 渲染成 UA 的
+    `<h3>`：18.7px/700/系统默认族，而阶梯里是 26px 展示衬线）；卡片的 `<ul>` 漏发
+    `--s-bullet`（皮肤那条 `font: 400 var(--s-bullet)/…` 因变量不存在**整条失效**，
+    连字体族一起丢）。同一个角色，壳发的东西必须一致 —— 否则“字号/字重/字体族”
+    三样会一起静默跑偏，而门只能看见“字体族丢了”这一面。
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.render = _load("deck_render_colhooks", os.path.join(SCRIPTS, "render.py"))
+
+    def _page(self) -> str:
+        spec = {"deck": {"style": "swiss-grid", "colorSet": "blue", "seed": 1,
+                         "title": "t", "slides": [
+                             {"type": "two-column", "title": "双栏",
+                              "columns": [{"title": "左", "bullets": ["a", "b"]},
+                                          {"title": "右", "bullets": ["c", "d"]}]}]}}
+        return self.render.render(spec)
+
+    def test_slide_box_keeps_its_size(self) -> None:
+        """皮肤给 `.slide` 加边框不能把页盒掉大（实测 1px 就把 PDF 变成两倍页数）。"""
+        html = self._page()
+        m = re.search(r"\.slide\{[^}]*\}", html)
+        assert m is not None
+        self.assertIn("box-sizing:border-box", m.group(0))
+
+    def test_column_title_carries_the_hook_class(self) -> None:
+        self.assertIn('<h3 class="colTitle"', self._page())
+
+    def test_column_list_carries_the_tier_variable(self) -> None:
+        html = self._page()
+        m = re.search(r'<ul class="bullets small"[^>]*>', html)
+        assert m is not None, "卡片的列表没渲出来"
+        self.assertIn("--s-bullet:", m.group(0))
+
+
 class TestStyleLocationNote(unittest.TestCase):
     """风格的位置要开口说：**风格随 deck 项目交付**。
 

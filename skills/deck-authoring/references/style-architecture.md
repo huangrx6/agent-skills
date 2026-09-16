@@ -229,9 +229,26 @@ styles/<name>/
 
 #### 风格契约（skin.css 只能长在这几个钩子上）
 
-渲染器只出**语义骨架**：`section.slide` + `.title` / `.subtitle` / `.bullets` /
-`.col` / `.tl` / `.chartwrap` / `.foot` 加几何。skin.css 负责它们的"长相"，
-并把风格专属零件（纸纹 `.grain`、装饰 `.halftone`）接上去。
+渲染器只出**语义骨架**，类名就是契约 —— 皮肤只能选这份清单里的东西。写清单外的
+类名**不会报错**，只是永远不命中：元素静默掉回浏览器默认样式（字号、字重、字体族
+三样一起跑偏，门只看得见"字体族丢了"那一面）。
+
+| 钩子 | 是什么 |
+| --- | --- |
+| `section.slide` | 一页；`data-page="<版式>"` 做版式级微调 |
+| `.title` / `.subtitle` | 页标题 / 副标题 |
+| `.bullets`、`.bullets.small`（卡片与 hero 里的列表） | 条目列表，标记由 `.bullets li::before` 画 |
+| `.col` / `.colTitle` | 双栏的一栏 / 栏标题 |
+| `.tl`、`.tl .label`、`.tl .note` | 时间线 / 节点标题 / 节点说明 |
+| `.imgwrap`（`data-fit` 为 `contain` 或 `cover`）/ `.chartwrap` | 图槽 / 图表槽 |
+| `.chartcap` / `.foot` / `.band` | 图注 / 页脚 / 栏顶色条 |
+| 风格专属零件（`.grain`、`.halftone`…） | 自己加的，自己负责 |
+
+**变量要带兜底，或确认壳会发**：`--s-*` 是**逐元素**注入的（壳发在那个元素的容器上，
+如 `style="--s-bullet:20px"`），`--t-*` 是整份注入的全局级数。皮肤里 `font: 400
+var(--s-bullet)/1.55 var(--body)` 这种写法，一旦 `--s-bullet` 在某个元素上不存在，
+**整条 shorthand 失效** —— 连字体族一起丢，元素掉回浏览器默认族（那正是"同一页
+一半宋体一半系统 UI 族"的来源）。写成 `var(--s-bullet, 20px)` 就不会踩。
 
 **条目标记归皮肤**：壳只做结构 reset（`.bullets` 无默认圆点、无缩进），标记由
 `.bullets li::before` 画（要短横 / 方块 / 数字 / 不画都行，那是设计决定）。
