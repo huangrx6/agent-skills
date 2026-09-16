@@ -82,6 +82,10 @@
 
 ## PPTX（两种，先说清楚要哪一种）
 
+**导之前先验契约没过期**（可编辑那条路吃的是 `resolved.deck.json` 里的几何）：
+`check.py spec.json out.html --resolved resolved.deck.json` —— 契约是渲染时烤进去的，
+改过内容/风格后它就旧了，而旧契约能导出一份"成功但和 HTML 不一样"的 PPTX。
+
 同一个"PPTX"有两个做法，**取舍相反，不能兼得**：
 
 | | 贴图版 `pptx_native.py --png-dir` | 可编辑版 `pptx_native.py` |

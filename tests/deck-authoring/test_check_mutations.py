@@ -335,6 +335,66 @@ class TestRoleNotes(unittest.TestCase):
         self.assertEqual(check._role_notes(deck), [])
 
 
+class TestContractDrift(unittest.TestCase):
+    """契约过期门（`check._check_contract_drift`）：拷进契约的几何 vs 现在量到的几何。
+
+    为什么它值得一道阻塞门：导 PPTX 走的是契约里那份几何，而契约会过期（改字、
+    换风格、换台机器字体不同）。那时 HTML 与 PPTX **不一样**，而两边各自都
+    "成功"了。实测噪声底是 **0px**（同一份 HTML 量两次、以及契约 vs 现测同一份
+    HTML 都是 0）—— 所以卡 1px 是安全的。
+    """
+
+    @staticmethod
+    def _geo(elements, slides=2):
+        return {"geometry": {"slides": [{}] * slides, "elements": elements}}
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.ELS = [{"id": "s1.title", "x": 84, "y": 100, "w": 700, "h": 90},
+                   {"id": "s2.img", "x": 800, "y": 200, "w": 400, "h": 300}]
+
+    def _measured(self, elements, slides=2):
+        return {"slides": [{}] * slides, "elements": elements}
+
+    def test_same_source_is_silent(self) -> None:
+        self.assertEqual(
+            check._check_contract_drift(self._measured(self.ELS),
+                                        self._geo(self.ELS)), [])
+
+    def test_sub_pixel_rounding_is_tolerated(self) -> None:
+        moved = [dict(self.ELS[0], x=84.5), self.ELS[1]]
+        self.assertEqual(
+            check._check_contract_drift(self._measured(moved),
+                                        self._geo(self.ELS)), [])
+
+    def test_moved_element_names_the_delta_and_the_fix(self) -> None:
+        moved = [dict(self.ELS[0], y=142), self.ELS[1]]
+        problems = check._check_contract_drift(self._measured(moved),
+                                              self._geo(self.ELS))
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("s1.title", problems[0])
+        self.assertIn("42px", problems[0])
+        self.assertIn("--resolved", problems[0], "要给出修法")
+
+    def test_element_missing_on_either_side(self) -> None:
+        only_measured = check._check_contract_drift(
+            self._measured(self.ELS), self._geo(self.ELS[:1]))
+        self.assertTrue(any("不在契约里" in p for p in only_measured), only_measured)
+        only_contract = check._check_contract_drift(
+            self._measured(self.ELS[:1]), self._geo(self.ELS))
+        self.assertTrue(any("找不到" in p for p in only_contract), only_contract)
+
+    def test_page_count_mismatch(self) -> None:
+        problems = check._check_contract_drift(self._measured(self.ELS, slides=1),
+                                               self._geo(self.ELS, slides=2))
+        self.assertTrue(any("页数都对不上" in p for p in problems), problems)
+
+    def test_contract_without_geometry_is_rejected(self) -> None:
+        problems = check._check_contract_drift(self._measured(self.ELS), {"trace": []})
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("完整契约", problems[0])
+
+
 class TestLocalPaths(unittest.TestCase):
     """产物不许带本机绝对路径：图片**阻塞**（拷到别处就裂图），字体是提示。
 

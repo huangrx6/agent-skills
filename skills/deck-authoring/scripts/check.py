@@ -235,6 +235,73 @@ ABS_PATH_RE = re.compile(
     r'|[A-Za-z]:\\\\[^\s"\')]+')
 
 
+# 契约几何与现测几何的允许差（px）。**实测噪声底是 0**：同一份 HTML 量两次、
+# 以及「契约 vs 现测同一份 HTML」都是逐元素 0px。所以 1px 只是给亚像素取整留余地 ——
+# 超过它就是真的不一样了（内容/风格/字体变过）。
+CONTRACT_DRIFT_PX = 1.0
+
+
+def _check_contract_drift(measured: dict, contract: dict) -> list[str]:
+    """resolved 契约里的几何 vs 当前产物的实测几何（**阻塞**）。
+
+    为什么要有这一条：契约（`render.py … --resolved`）把**当时的**几何烤了进去，
+    导出 PPTX 走的就是那一份。但契约会过期 —— 改了两行字、换了一次风格、换了台
+    机器（字体不同，行高就变），HTML 重渲一遍版面就动了，而契约还停在原地。
+    那时导出的 PPTX 与 HTML **不一样**，而两边各自都"成功"了，没人会知道。
+
+    实测数据支持这个门的敏度：同一份 HTML 量两次、契约与现测同一份 HTML，
+    逐元素差都是 0px（管线是确定性的）—— 所以任何超过 1px 的差都是真漂移。
+    """
+    geo = contract.get("geometry")
+    if not isinstance(geo, dict):
+        return ["契约里没有 geometry —— 不是 `render.py … --resolved` 出的完整契约，"
+                "重新生成一份再导出"]
+    out: list[str] = []
+    fix = ("重跑 `render.py <spec> -o out.html --resolved resolved.deck.json` 拿一份"
+           "与新产物同源的契约；用旧契约导 PPTX 会得到与 HTML 不同的版面")
+
+    def by_id(rows) -> dict:
+        return {r["id"]: r for r in (rows or [])
+                if isinstance(r, dict) and isinstance(r.get("id"), str)}
+
+    want, got = by_id(geo.get("elements")), by_id(measured.get("elements"))
+    if not want:
+        return [f"契约里的 geometry.elements 是空的 —— {fix}"]
+    only_contract = sorted(set(want) - set(got))
+    only_measured = sorted(set(got) - set(want))
+    if only_contract:
+        shown = "、".join(only_contract[:4])
+        out.append(f"契约里有 {len(only_contract)} 个元素在当前产物里找不到"
+                   f"（{shown}{'…' if len(only_contract) > 4 else ''}）—— {fix}")
+    if only_measured:
+        shown = "、".join(only_measured[:4])
+        out.append(f"当前产物里有 {len(only_measured)} 个元素不在契约里"
+                   f"（{shown}{'…' if len(only_measured) > 4 else ''}）—— {fix}")
+    drifted: list[tuple[float, str, str, float, float]] = []
+    for eid in sorted(set(want) & set(got)):
+        a, b = want[eid], got[eid]
+        for field in ("x", "y", "w", "h"):
+            one, two = a.get(field), b.get(field)
+            if not isinstance(one, (int, float)) or not isinstance(two, (int, float)):
+                continue
+            delta = abs(one - two)
+            if delta > CONTRACT_DRIFT_PX:
+                drifted.append((delta, eid, field, one, two))
+    if drifted:
+        drifted.sort(reverse=True)
+        shown = "、".join(f"{eid}.{f} 差 {d:.0f}px（契约 {a:.0f} / 实测 {b:.0f}）"
+                         for d, eid, f, a, b in drifted[:3])
+        out.append(f"契约几何与当前产物不一致：{shown}"
+                   f"{f' 等 {len(drifted)} 处' if len(drifted) > 3 else ''} 超过 "
+                   f"{CONTRACT_DRIFT_PX:g}px —— {fix}")
+    slides_contract = len(geo.get("slides") or [])
+    slides_now = len(measured.get("slides") or [])
+    if slides_contract and slides_now and slides_contract != slides_now:
+        out.append(f"契约里 {slides_contract} 页、当前产物 {slides_now} 页 —— "
+                   f"页数都对不上，契约是旧的；{fix}")
+    return out
+
+
 def _check_local_paths(page: str) -> tuple[list[str], list[str]]:
     """产物里不许出现本机绝对路径（图片阻塞 / 字体提示）。
 
@@ -1249,7 +1316,7 @@ def style_tokens(spec: dict, override: dict | None = None) -> dict:
 
 
 def check(spec: dict, html_path: str, tokens: dict | None = None,
-          measured: dict | None = None) -> list[str]:
+          measured: dict | None = None, contract: dict | None = None) -> list[str]:
     """跑全部阻塞检查，返回问题清单（空的 = 全过）。
 
     `tokens=None` 时按 spec 里的风格去加载 —— 调用方多数情况下不该手递 token。
@@ -1259,6 +1326,11 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     page = deckio.read_text(html_path)      # 只读一次，校验与提示共用
     deck = spec["deck"]
     problems.extend(_check_presenter_contract(page, deck))
+    if contract is not None:
+        # 传了契约 = "我要从这份契约导 PPTX"，那就必须验它跟现在的产物还是不是一回事
+        data_for_contract: dict = measured if measured is not None \
+            else measure_mod.measure(html_path)
+        problems.extend(_check_contract_drift(data_for_contract, contract))
     path_problems, _path_notes = _check_local_paths(page)
     problems.extend(path_problems)
     colors = tokens["colorSets"][render_mod.resolve_color_set(tokens, deck)]
@@ -1537,13 +1609,17 @@ def main(argv: list[str]) -> int:
     ap.add_argument("html")
     ap.add_argument("--tokens", default=None,
                     help="覆盖 token 文件（缺省按 spec 的 deck.style 去找）")
+    ap.add_argument("--resolved", default=None, metavar="PATH",
+                    help="**验契约没过期**：拿 resolved 契约里的几何与当前产物的"
+                         "实测几何对账（导出 PPTX 前用它 —— 契约会过期）")
     args = ap.parse_args(argv[1:])
     spec = deckio.read_json(args.spec)
     tokens = deckio.read_json(args.tokens) if args.tokens else None
     measured = measure_mod.measure(args.html)      # 只量一次，校验与提示共用
     page = deckio.read_text(args.html)             # 产物文本（路径门/提示用）
     tokens = style_tokens(spec, tokens)
-    problems = check(spec, args.html, tokens, measured=measured)
+    contract = deckio.read_json(args.resolved) if args.resolved else None
+    problems = check(spec, args.html, tokens, measured=measured, contract=contract)
     if problems:
         print(f"✗ {len(problems)} 个问题：")
         for p in problems:
