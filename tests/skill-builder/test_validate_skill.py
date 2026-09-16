@@ -85,18 +85,23 @@ class ValidateSkillTest(unittest.TestCase):
 
     # ── 防线 1:正文行数边界(阻塞性,差一行就会误挡或漏放) ──
     def test_body_line_limit_boundary(self):
+        limit = self.mod.MAX_BODY_LINES
         self.assertFalse(
-            self.fails(_skill(self.tmp, "at-limit", body=_body_of_exactly(150))),
-            "正文恰好 150 行应当通过",
+            self.fails(_skill(self.tmp, "at-limit", body=_body_of_exactly(limit))),
+            f"正文恰好 {limit} 行应当通过",
         )
         self.assertTrue(
-            self.fails(_skill(self.tmp, "over-limit", body=_body_of_exactly(151))),
-            "正文 151 行应当失败",
+            self.fails(_skill(self.tmp, "over-limit", body=_body_of_exactly(limit + 1))),
+            f"正文 {limit + 1} 行应当失败",
         )
 
     # ── 防线 2:余量提示边界(只提示不失败) ──
     def test_headroom_notes_boundary(self):
-        cases = [(139, False), (140, False), (141, True), (150, True)]
+        limit = self.mod.MAX_BODY_LINES
+        floor = self.mod.HEADROOM_MIN
+        # 提示在「余量 < floor」时出现:边界两侧各取一行验证,不硬编码具体数字
+        cases = [(limit - floor - 1, False), (limit - floor, False),
+                 (limit - floor + 1, True), (limit, True)]
         for lines, should_note in cases:
             with self.subTest(body_lines=lines):
                 r = self.check(_skill(self.tmp, f"h{lines}", body=_body_of_exactly(lines)))
@@ -108,7 +113,8 @@ class ValidateSkillTest(unittest.TestCase):
                 self.assertFalse(r["errors"], f"正文 {lines} 行不该判失败(只提示)")
 
     def test_headroom_note_text_mentions_next_step(self):
-        r = self.check(_skill(self.tmp, "headroom-text", body=_body_of_exactly(145)))
+        limit = self.mod.MAX_BODY_LINES
+        r = self.check(_skill(self.tmp, "headroom-text", body=_body_of_exactly(limit - 5)))
         self.assertTrue(r.get("notes"), "余量不足应有提示")
         self.assertIn("瘦身", r["notes"][0], "提示要说清下一步该做什么")
 

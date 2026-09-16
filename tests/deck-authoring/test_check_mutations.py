@@ -306,6 +306,35 @@ class TestVisualDecisionAdvisory(unittest.TestCase):
 
 
 
+class TestRoleNotes(unittest.TestCase):
+    """角色门（`check._role_notes`）：不合与重复两件事。
+
+    “每页都长一样”最容易被算出来的那一种：同角色 + 同页型 + 同 layout ——
+    观感上就是同一个版式换了两批字。
+    """
+
+    def test_mismatch_and_duplicate_are_reported(self) -> None:
+        deck = {"slides": [
+            {"type": "timeline", "role": "trend"},
+            {"type": "two-column", "role": "trend"},
+            {"type": "two-column", "role": "risks"},
+            {"type": "two-column", "role": "risks"},
+        ]}
+        notes = check._role_notes(deck)
+        self.assertTrue(any("role=trend" in n and "two-column" in n for n in notes),
+                        notes)
+        self.assertTrue(any("同角色" in n and "第 3 页" in n and "第 4 页" in n
+                            for n in notes), notes)
+
+    def test_matching_roles_are_silent(self) -> None:
+        deck = {"slides": [
+            {"type": "timeline", "role": "trend"},
+            {"type": "two-column", "layout": "lean-left", "role": "risks"},
+            {"type": "two-column", "layout": "even", "role": "risks"},
+        ]}
+        self.assertEqual(check._role_notes(deck), [])
+
+
 class TestPageBox(unittest.TestCase):
     """页盒差 1px 就够：导出 PDF 每页溢出一张，而屏幕上一点看不出来。
 

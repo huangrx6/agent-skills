@@ -295,6 +295,59 @@ class TestVisualCarrier(unittest.TestCase):
 
 
 
+class TestPageRole(unittest.TestCase):
+    """页面角色（`role`）：说这一页"在干什么"，与页型（结构）分开。
+
+    词表是封闭的 —— 拼错的角色名会让它静默失效（配版式、看重复都靠它）。
+    类型映射在 layout/roles.py（validate_spec 零依赖，只持名字）；两份的名字
+    由下面那条一致性测试钉住。
+    """
+
+    @staticmethod
+    def _spec(slide: dict) -> dict:
+        return {"deck": {"style": "swiss-grid", "colorSet": "blue", "seed": 1,
+                         "title": "t", "slides": [slide]}}
+
+    def _codes(self, slide: dict) -> set[str]:
+        return {i["code"] for i in vs.validate(self._spec(slide), None).errors}
+
+    def test_every_page_type_accepts_a_role(self) -> None:
+        slides = [
+            {"type": "title", "title": "t", "role": "cover"},
+            {"type": "content-text", "title": "t", "bullets": ["a"],
+             "role": "breakdown"},
+            {"type": "content-image", "title": "t", "image": "x.png",
+             "visual": {"kind": "evidence_image", "ratio": "3:2"}, "role": "context_image"},
+            {"type": "two-column", "title": "t",
+             "columns": [{"bullets": ["a"]}], "role": "comparison"},
+            {"type": "timeline", "title": "t", "nodes": [{"label": "a"}],
+             "role": "process"},
+            {"type": "chart", "title": "t", "chart": "bar",
+             "data": [{"label": "a", "value": 1}], "role": "metric"},
+            {"type": "end", "title": "t", "role": "closing"},
+        ]
+        for slide in slides:
+            self.assertNotIn("BAD_ROLE", self._codes(slide), slide["type"])
+            self.assertNotIn("BAD_TYPE", self._codes(slide), slide["type"])
+
+    def test_unknown_role_is_an_error_with_the_vocabulary(self) -> None:
+        codes = self._codes({"type": "content-text", "title": "t",
+                             "bullets": ["a"], "role": "metricks"})
+        self.assertIn("BAD_ROLE", codes)
+
+    def test_non_string_role_is_an_error(self) -> None:
+        codes = self._codes({"type": "content-text", "title": "t",
+                             "bullets": ["a"], "role": 7})
+        self.assertIn("BAD_ROLE", codes)
+
+    def test_role_vocabulary_matches_the_mapping_module(self) -> None:
+        """两份名字必须一致（一份在零依赖的 schema，一份带类型映射）。"""
+        pkg = _load("_deck_test_role_pkg",
+                    os.path.join(SCRIPTS, "layout", "__init__.py"))
+        self.assertEqual(tuple(vs.ROLES), tuple(pkg.roles.ROLES),
+                         "validate_spec.ROLES 与 layout/roles.py 漂移了")
+
+
 class TestVisualRatio(unittest.TestCase):
     """要图就必须**写清比例**（`visual.ratio`）—— 这是规则，不是建议。
 

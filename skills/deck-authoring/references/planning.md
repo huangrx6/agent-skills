@@ -133,19 +133,46 @@ Agent，产出的东西渲染器吃不下，就全白写。
 }
 ```
 
-**页型 → 版式是查表**（下表），AI 判页型、程序决定用哪个
-版式画：
+**角色 → 页型是查表**（下表）：AI 判**角色**（这一页在干什么），角色决定
+能用的**页型**（结构），再按页型写 `visual.kind`（四档见 images.md）。
 
-| 页型 | 版式 | 主视觉（spec 的 `visual.kind`） |
-| --- | --- | --- |
-| statement | content-text | `none`（靠字与留白） |
-| metric | chart（donut + progress） | `data`（大数字在环图中心） |
-| comparison / trend / composition | chart（bar / line / stacked） | `data` |
-| process | timeline | `none`（时间线本身就是视觉结构） |
-| capabilities | two-column | `none`（两组并列） |
-| hero_visual / context_image | content-image | `evidence_image`（提示词出图） |
-| architecture / flow / topology | content-image | `diagram`（excalidraw / draw.io 画好导出） |
-| evidence | content-text | `none`（读的页，密一点可以） |
+| 角色（spec 的 `role`） | 页型（结构） | 主视觉档 | 什么时候用它 |
+| --- | --- | --- | --- |
+| `cover` | title | `none` | 第一页；标题 + 副题 + 一句定位 |
+| `transition` | title | `none` | 换章；只给章节名 |
+| `statement` | content-text / title | `none` | 一个判断，字少、字大 |
+| `breakdown` | content-text / two-column | `none` | 把后面要讲的东西列成几块 |
+| `evidence` | content-text / content-image | `none` / `evidence_image` / `diagram` | 给人读的页；有截图/材料就配图 |
+| `metric` | chart / content-text | `data` / `none` | 数字是主角；能画图就画图 |
+| `trend` | chart / timeline | `data` / `none` | 随时间变化；折线或横向时间线 |
+| `composition` | chart | `data` | 构成与份额 |
+| `comparison` | two-column / chart / content-image | `none` / `data` / `evidence_image` / `diagram` | 两边对照；两栏、对比图或文图 |
+| `process` | timeline / content-image | `none` / `evidence_image` / `diagram` | 有几步、有先后 |
+| `capabilities` | two-column / content-text | `none` | 几项对等的能力/模块 |
+| `architecture` | content-image | `evidence_image` / `diagram` | 层与层的关系；结构图（excalidraw / draw.io） |
+| `flow` | content-image | `evidence_image` / `diagram` | 节点与连线；结构图 |
+| `topology` | content-image | `evidence_image` / `diagram` | 多节点的连接关系；结构图 |
+| `hero_visual` | content-image | `evidence_image` / `diagram` | 一张图承担这一页的主要信息 |
+| `context_image` | content-image | `evidence_image` / `diagram` | 图说明背景，文字仍是主角 |
+| `risks` | content-text / two-column | `none` | 可能出问题的地方 |
+| `actions` | content-text / two-column | `none` | 读完要干什么 |
+| `result` | content-text / chart | `none` / `data` | 把结论收成一句或几个数 |
+| `observation` | content-text / two-column | `none` | 判断与看法 |
+| `team` | content-image / content-text | `evidence_image` / `diagram` / `none` | 谁在做 |
+| `closing` | end | `none` | 最后一页 |
+
+**`role` 是语义，不是结构枚举**：同一个角色可以落在不同页型上（`comparison`
+可以两栏、对比图或文图）。它管三件事：配版式的依据、deck 级的重复检测、
+内容规划时先回答"这一页在干什么"。
+
+**两道门**（都不阻塞，编辑上的例外是真实的）：
+
+- **不合**：`role=trend` 却渲成纯文字两栏（`check.py` 点名页号 + 通常该用的页型）；
+- **重复**：同一角色的两页**页型与 layout 都一样** —— 观感上就是同一个版式换了
+  两批字（换其中一页的 layout，或让它们承担不同的叙事作用）。
+
+**选版式**：结构有得挑的页（content-image / two-column）用 `render --candidates`
+出对比页，在页面上挑（见 layout-system.md §18）。
 
 **`visual` 是必过的一栏**：pageplan 每页写、桥到 spec 同名同值 —— 连纯文字页也要写
 `{"kind": "none"}`。不写下来就等于没决定：`validate_spec.py` 管形状与自相矛盾

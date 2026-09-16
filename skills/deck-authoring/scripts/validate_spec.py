@@ -43,6 +43,14 @@ CHART_TYPES = ("bar", "bar-horizontal", "line", "area", "bar-stacked",
 # 视觉载体：每页**显式决定**这页靠什么立住。不写下来就等于没决定 ——
 # 实测的后果是全篇靠文字撑、图与元素一直没人提。四个档就是这条流水线能交付的
 # 四种载体（其余"元素"靠版式与条目形状表达，不另设档）：见 references/images.md。
+# 页面角色（这一页"在干什么"）：**语义**，不是结构枚举 —— 页型说结构（双栏/
+# 图页/图表），角色说意图。配版式、看重复、写内容都先看它。
+# 词表是封闭的：拼错的角色名会让它静默失效（和拼错 layout 名一个性质）。
+# 类型映射（哪几个页型承载得了哪个角色）在 layout/roles.py —— 两份的**名字**
+# 由测试钉住一致（validate_spec 零依赖，不导入 layout/）。
+ROLES = ("cover", "transition", "statement", "breakdown", "evidence", "metric", "trend", "composition",
+         "comparison", "process", "capabilities", "architecture", "flow", "topology", "hero_visual", "context_image",
+         "risks", "actions", "result", "observation", "team", "closing")
 VISUAL_KINDS = ("none", "evidence_image", "diagram", "data")
 VISUAL_KEYS = {"kind", "intent", "note", "ratio"}
 # 比例的合理区间（宽/高）。超出就是写错了（把像素当比例、或写了 1:0 这种）。
@@ -50,20 +58,22 @@ RATIO_RANGE = (0.4, 2.6)
 VISUAL_IMAGE_KINDS = ("evidence_image", "diagram")
 
 SLIDE_FIELDS = {
-    "title":         {"type", "title", "subtitle", "color", "titleTier", "visual"},
+    "title":         {"type", "title", "subtitle", "color", "titleTier", "visual",
+                      "role"},
     "content-text":  {"type", "title", "bullets", "color", "titleTier", "bulletTier",
-                      "visual"},
+                      "visual", "role"},
     "content-image": {"type", "title", "bullets", "image", "caption", "color",
-                   "layout", "titleTier", "bulletTier", "visual"},
+                   "layout", "titleTier", "bulletTier", "visual", "role"},
     "two-column":    {"type", "title", "columns", "color", "layout", "titleTier",
-                   "bulletTier", "visual"},
-    "timeline":      {"type", "title", "nodes", "color", "titleTier", "visual"},
+                   "bulletTier", "visual", "role"},
+    "timeline":      {"type", "title", "nodes", "color", "titleTier", "visual",
+                      "role"},
     # 图表的 DSL：几何/样式/动画都不在 spec 里，AI 只写语义。
     # v3：`chart`（图形类型）**必填** —— 推断已退役，见 CHART_TYPES。
     "chart":         {"type", "title", "data", "unit", "caption", "color",
                       "chart", "intent", "message", "series", "emphasis",
-                      "annotations", "visual"},
-    "end":           {"type", "title", "color", "titleTier", "visual"},
+                      "annotations", "visual", "role"},
+    "end":           {"type", "title", "color", "titleTier", "visual", "role"},
 }
 # **条件必填**：这个版式的全部内容就是那个字段，缺了它这一页不成立。
 #
@@ -292,6 +302,16 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
                         issues.error("BAD_RATIO", vwhere,
                                      f"ratio 要写成 \"宽:高\"（整数，如 \"3:2\"），"
                                      f"收到 {ratio!r}")
+        # 角色：封闭词表（拼错的角色名 = 静默失效，与 layout 同名一个性质）
+        role = slide.get("role")
+        if role is not None:
+            if not isinstance(role, str) or not role:
+                issues.error("BAD_ROLE", f"{where}.role",
+                             f"role 要是非空字符串，得到 {role!r}")
+            elif role not in ROLES:
+                issues.error("BAD_ROLE", f"{where}.role",
+                             f"未知角色 {role!r}；支持 {list(ROLES)} —— "
+                             f"角色说这一页在干什么（配版式、看重复都靠它）")
         # 布局：自由字符串，只拦 "auto"（实测选择已退役）与非字符串
         layout = slide.get("layout")
         if layout is not None:

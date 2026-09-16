@@ -687,6 +687,41 @@ def _layout_vocab_problems(deck: dict, tokens: dict, slides: list) -> list[str]:
     return out
 
 
+def _role_notes(deck: dict) -> list[str]:
+    """页面角色（这一页在干什么）：**不合**与**重复**两条提示。
+
+    - 不合：`role=trend` 却渲成纯文字两栏 —— 语义说要走势，结构给了并列段落。
+      只提示不阻塞：编辑上的例外是真实的（拿两栏对比讲趋势也是合理写法）。
+    - 重复：同一角色的两页**结构完全一样**（页型 + layout 都相同）—— 观感上就是
+      同一个版式换了两批字。这是"每页都长一样"最容易被算出来的那一种。
+    """
+    roles_mod = layout_mod.roles
+    slides = [s for s in (deck.get("slides") or []) if isinstance(s, dict)]
+    out: list[str] = []
+    for i, s in enumerate(slides, 1):
+        role = s.get("role")
+        if not isinstance(role, str) or not role:
+            continue
+        why = roles_mod.mismatch_reason(s.get("type"), role)
+        if why:
+            out.append(f"第 {i} 页 {why}")
+
+    seen: dict = {}
+    for i, s in enumerate(slides, 1):
+        role = s.get("role")
+        if not isinstance(role, str) or not role:
+            continue
+        key = (role, s.get("type"), s.get("layout"))
+        if key in seen:
+            out.append(
+                f"第 {seen[key]} 页与第 {i} 页同角色（{roles_mod.label(role)}）且结构"
+                f"完全一样（{s.get('type')} / layout={s.get('layout') or '缺省'}）—— "
+                f"换其中一页的 layout，或让它们承担不同的叙事作用")
+        else:
+            seen[key] = i
+    return out
+
+
 def _tier_notes(deck: dict) -> list[str]:
     """字号档提示：条目多的 content-text 页在缺省档下会偏挤。
 
@@ -731,6 +766,7 @@ def _check_deck_shape(measured: dict, deck: dict,
     # 档位提示（纯函数抽出，便于单测）：风格/作者声明档位，脚本不再自动升降。
     notes.extend(_tier_notes(deck))
     notes.extend(_layout_rotation_notes(deck))
+    notes.extend(_role_notes(deck))
     problems.extend(_layout_vocab_problems(deck, tokens or {},
                                            deck.get("slides", [])))
 

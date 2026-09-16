@@ -71,7 +71,7 @@ P0 是新 skill 的最佳档。P1 / P2 一开始就要警惕——很可能该�
 
 写不完 = 范围太大,先回到 Q4 拆。
 
-如果 Q4 已经 P0 还写不完 = SKILL.md 超过 ~150 行,把长文背景知识移到 `references/`,正文只留决策表和 anti-pattern。
+如果 Q4 已经 P0 还写不完 = SKILL.md 超过 ~240 行,把长文背景知识移到 `references/`,正文只留决策表和 anti-pattern。
 
 ## Trigger Description 写作规范
 
@@ -116,7 +116,7 @@ python3 scripts/check_pointers.py                # 找出“这事定义在别�
 python3 scripts/preflight.py                     # 报告前跑：全部检查 + 事实快照
 ```
 
-脚本覆盖：SKILL.md 存在 / 可读 / frontmatter 存在 / YAML 可解析 / `name` == 目录名 / description < 800 字符 / 含触发表达 / 含 Do NOT 边界 / 正文 ≤ 150 行 / 含表格或清单。退出码 `0` 通过、`1` 失败。
+脚本覆盖：SKILL.md 存在 / 可读 / frontmatter 存在 / YAML 可解析 / `name` == 目录名 / description < 800 字符 / 含触发表达 / 含 Do NOT 边界 / 正文 ≤ 240 行 / 含表格或清单。退出码 `0` 通过、`1` 失败。
 
 **加内容前先看余量**：脚本会报「正文余量只剩 N 行」。余量 < 10 时**先瘦身再加**（把长规则移到 `references/`）—— 硬塞的结果是三个 skill 一起顶到 150 行，下一次真实需求反而被迫先瘦身，更费事。余量提示不影响退出码，就是个提醒：瘦身由下一次真实需求触发，而不靠“等哪天有空”。
 
