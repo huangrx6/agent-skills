@@ -33,6 +33,7 @@ import os
 import random
 import re
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -178,6 +179,35 @@ def style_folder(name: str) -> str | None:
         folder = os.path.join(root, name)
         if os.path.isfile(os.path.join(folder, "style.json")):
             return folder
+    return None
+
+
+def style_location_note(folder: str | None, spec_path: str) -> str | None:
+    """风格目录在临时目录里 / 在 deck 项目之外 → 说一声（不阻塞）。
+
+    为什么必须开口：风格是 deck 的**表达层，随项目交付**。放在 /tmp 里，重启或被
+    清理就没了 —— 实测发生过：一份 17 页 deck 的风格目录被清掉，spec 里的
+    `deck.style` 成了死链，整套版式再也复现不出来。修复动作只有一个：
+    把 `styles/<名>/` 挪进 deck 项目，spec 改指它。
+    """
+    if not folder or not os.path.isabs(folder):
+        return None
+    spec_dir = os.path.dirname(os.path.abspath(spec_path))
+    real = os.path.realpath(folder).rstrip(os.sep) + os.sep
+    temp_root = os.path.realpath(tempfile.gettempdir()).rstrip(os.sep) + os.sep
+    if real.startswith(temp_root) or real.startswith("/private/tmp/"):
+        spec_real = os.path.realpath(spec_dir).rstrip(os.sep) + os.sep
+        if spec_real.startswith(temp_root) or spec_real.startswith("/private/tmp/"):
+            return (f"⚠️ **整个 deck 项目都在临时目录里**：spec={spec_dir} / 风格={folder}\n"
+                    f"   重启或被清理就全没了（实测发生过：风格目录被清掉，spec 里的 "
+                    f"deck.style 成了死链）—— 把 spec + styles/ + assets/ 一起挪进"
+                    f"**项目目录**（随项目交付）")
+        return (f"⚠️ 风格在临时目录里：{folder}\n"
+                f"   风格随 deck 项目交付 —— 挪进 {spec_dir}/styles/<名>/，"
+                f"再把 spec 的 deck.style 改成那个名字；临时目录重启即失")
+    if not real.startswith(os.path.realpath(spec_dir).rstrip(os.sep) + os.sep):
+        return (f"⚠️ 风格在 deck 项目之外：{folder}\n"
+                f"   交付 / 换台机器就找不到它 —— 建议挪进 {spec_dir}/styles/<名>/")
     return None
 
 
@@ -1674,6 +1704,9 @@ def main(argv: list[str]) -> int:
     deckio.write_text(args.out, page)
     print(f"✓ 已写出 {args.out}（风格 {style['name']} / {len(page)} 字节 / "
           f"{len(deck_spec['deck']['slides'])} 页）")
+    loc_note = style_location_note(style_folder(name), args.spec)
+    if loc_note:
+        print(loc_note)
     if args.resolved:
         # 完整契约：语义（manifest）+ 真实几何（measure 实测，一次成型）+
         # 颜色变量 + 资产基准目录。导出器（pptx_native --resolved）只吃这一份，

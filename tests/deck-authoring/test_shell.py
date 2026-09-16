@@ -357,5 +357,35 @@ class TestImageSlotRatio(unittest.TestCase):
         self.assertNotIn("data-fit", fig2.group(0))
 
 
+
+class TestStyleLocationNote(unittest.TestCase):
+    """风格的位置要开口说：**风格随 deck 项目交付**。
+
+    实测事故：一份 17 页 deck 的风格目录放在 /tmp，被清掉后 spec 里的 deck.style
+    成了死链，整套版式再也复现不出来。这条提示就是那次事故的产物。
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.render = _load("deck_render_styleloc", os.path.join(SCRIPTS, "render.py"))
+
+    def test_temp_style_is_flagged(self) -> None:
+        note = self.render.style_location_note("/tmp/some-style", "/tmp/deck.spec.json")
+        self.assertIsNotNone(note)
+        self.assertIn("临时目录", note or "")
+        self.assertIn("项目目录", note or "")
+
+    def test_style_outside_the_deck_project_is_flagged(self) -> None:
+        # 两边都得在**非临时目录**里，才能测到"项目之外"那一条：
+        # 夹具目录当 deck 项目，skill 目录当"项目之外"的风格根。
+        spec = os.path.join(FIXTURES_DIR, "demo.spec.json")
+        skill_dir = os.path.dirname(SCRIPTS)
+        outside = self.render.style_location_note(skill_dir, spec)
+        self.assertIn("项目之外", outside or "")
+        inside = self.render.style_location_note(
+            os.path.join(FIXTURES_DIR, "styles", "swiss-grid"), spec)
+        self.assertIsNone(inside, "风格在 deck 项目里就不该念")
+
+
 if __name__ == "__main__":
     unittest.main()
