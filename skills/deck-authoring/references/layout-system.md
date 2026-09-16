@@ -698,7 +698,7 @@ canvas/safe area/grid/margin/gutter/spacing tokens/footer zone/logo zone
 ## 83. Benchmark【部分 ✅】
 
 固定测试集覆盖：Cover/Text/Text+Image/Comparison/Timeline/Chart/长中文/长
-英文/中英混排/Image-heavy/Data-heavy —— 压测 spec 21 页（测试夹具里有）
+英文/中英混排/Image-heavy/Data-heavy —— 压测 21 页
 真实形状（长标题/密页/疏页/全部版式）+ demo。缺：Table/Architecture/
 Dashboard 版式。
 

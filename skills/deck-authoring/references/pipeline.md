@@ -420,9 +420,10 @@ Gate3 Layout（check.py 硬约束）/ Gate4 Visual（check.py 实测+抽帧）/ 
 
 ## 53. Benchmark【手工】
 
-基线集 = 测试夹具（demo + stress + chart-intents，不在本 skill 目录内）。
-没有回归基准脚本：跑这三份夹具手工（render + check）看。缺：Table-heavy /
-Diagram-heavy 版式（版式本身未建，建了才进基线）、五类真实场景语料。
+基线集**自备**：一份 21 页左右的压测 spec（长中文 / 长英文 / 中英混排 /
+Chart-heavy / Image-heavy / 全部版式）+ 一份八类图形展示面。没有回归基准
+脚本：手工 render + check 看。缺：Table-heavy / Diagram-heavy 版式
+（版式本身未建，建了才进基线）、五类真实场景语料。
 
 ## 54. Benchmark 指标【手工】
 
