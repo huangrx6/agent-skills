@@ -92,11 +92,24 @@ _ADVANCE = _advance_table((
 FONT_TITLE = 24.0
 FONT_NODE = 16.0
 FONT_DETAIL = 12.0
-LINE_HEIGHT = 1.25
+
+# 行框系数。2026-09-16 由 1.25 提到 1.4：
+# 实测反馈是“文字总和框覆盖重叠，而不是在框内部”（用户原话），逐节点量出来的
+# 数据是单行节点上下余量只剩 12px、圆柱只剩 9.9px —— 再叠上 Excalidraw 真实字体
+# 的墨迹溢出（CJK 字形占满 em，行框外的上伸/下延还有 ~0.1-0.2em）和手绘描边
+# ±2-3px 的抖动，视觉余量归零。这个值会写进元素的 lineHeight，Excalidraw 按它
+# 排版文字块，而容器尺寸用同一个数反推 —— 两边同源，加大它就是整体加大呼吸，
+# 行间空气也从 0.25em 涨到 0.4em（标题与 detail 的分隔感同步变好）。
+LINE_HEIGHT = 1.4
 
 # ── 容器内边距 ──────────────────────────────────────────────
-PADDING_X = 16.0
-PADDING_Y = 12.0
+# 2026-09-16 两连跳：12 → 16 → 24。第一轮按“不贴边”修（16），用户拿着真实渲染
+# 的要点卡片反馈“还是挤得满满的，小家子气，不够大气，框就不能大一些吗”——
+# 那就一次到位：对齐同类工具的盒大字小比例（单行节点 44px → 70px 高）。
+# 水平方向实测最少余量 44px 本来就不挤，PADDING_X 只跟一小步（16 → 22）
+# 保持盒字比例协调。垂直余量 = PADDING_Y，它是手绘抖动与字体溢出的唯一吸收层。
+PADDING_X = 22.0
+PADDING_Y = 24.0
 
 # ── 断行宽度档位（加权单位）────────────────────────────────
 # 注意这里定义的是**断行宽度**，不是容器宽度；容器宽度由它算出来。
@@ -178,7 +191,35 @@ def _tokens(line: str) -> list[str]:
             buf.append(ch)
     if buf:
         toks.append("".join(buf))
-    return toks
+    return _glue_kinsoku(toks)
+
+
+# 中文排印的**避头尾**（禁则）：下面两类字符不能出现在行首 / 行尾。
+# 不处理的话图里会出现以"；"或"，"开头的行（实测出过），看起来像排错了。
+# 做法是与邻字**黏成一块**（不可拆的 token）：断行时拆不开它们，宽度也不变。
+_NO_LINE_START = "、。，．；：？！）］｝〉》」』】〕…—～·!?,.;:)]}"
+_NO_LINE_END = "（［｛〈《「『【〔([{"
+
+
+def _glue_kinsoku(toks: list[str]) -> list[str]:
+    """把避头尾字符与邻字黏成一块（纯文本拼接，不动字符本身）。"""
+    out: list[str] = []
+    index = 0
+    while index < len(toks):
+        tok = toks[index]
+        bare = tok.strip()
+        if out and bare and all(c in _NO_LINE_START for c in bare):
+            out[-1] += tok                   # 行首禁则：黏到前一块尾巴上
+            index += 1
+            continue
+        if (bare and all(c in _NO_LINE_END for c in bare)
+                and index + 1 < len(toks)):
+            out.append(tok + toks[index + 1])  # 行尾禁则：与后一块一起下移
+            index += 2
+            continue
+        out.append(tok)
+        index += 1
+    return out
 
 
 def _force_break(token: str, max_units: float) -> list[str]:
@@ -193,6 +234,31 @@ def _force_break(token: str, max_units: float) -> list[str]:
     if cur:
         pieces.append(cur)
     return pieces or [token]
+
+
+def wrap_balanced(text: str, max_units: float) -> tuple[list[str], list[str]]:
+    """同行数前提下挑**最均衡**的一版断行。
+
+    贪心断行会把末行剩一两个字（实测卡片条目把"降级"切成孤字"级"），
+    而把断行宽度收窄一档就能断在词的空隙上。行数**必须不变** —— 行数一变，
+    容器高度就变，尺寸链两头就对不上了。这与 `layout.region_label_lines`
+    里那段均衡搜索是同一件事；那边因为还要返回像素宽度单独实现，
+    这边是条目/说明类的通用入口。
+    """
+    lines, forced = wrap(text, max_units)
+    if len(lines) <= 1:
+        return lines, forced
+    count = len(lines)
+    widest = max(weighted_units(line) for line in lines)
+    for factor in (0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5):
+        candidate, candidate_forced = wrap(text, max_units * factor)
+        if len(candidate) != count:
+            continue
+        candidate_widest = max(weighted_units(line) for line in candidate)
+        if candidate_widest < widest - 1e-6:
+            lines, widest = candidate, candidate_widest
+            forced = candidate_forced
+    return lines, forced
 
 
 def wrap(text: str, max_units: float) -> tuple[list[str], list[str]]:
@@ -258,11 +324,30 @@ class TextBox:
 def measure(label: str, detail: str = "", *, font_size: float = FONT_NODE) -> TextBox:
     """由文字推容器尺寸。
 
-    档位由**标题**的加权长度决定（detail 是次要行，宽度不够时跟着断行，不反过来撑大容器）。
+    **档位由标题与说明一起决定**（两者都折算成节点字号的等效长度，取最大值）。
+    旧规矩是只看标题（"说明是次要行，不反过来撑大容器"），实测的后果就是用户截图里的
+    样子：一个长说明的节点，框停在 S 档的 204px，说明挤成 ~110px 的窄列一直断行，
+    长标识符还被拦腰截断。用户原话："如果一个框中文本较多，直接将框设置的稍微宽一些，
+    不要一直换行换行的，很难受"。
+
+    **说明的断行宽度按字号比折算**，所以它与标题用**同一条像素宽度** —— 不折算的话
+    同一串单位数在 12px 下只画出 16px 的 75%，说明会永久比标题窄一截。
+
+    两个桶都用**均衡**断行（同行数下挑最均匀的那版）：行数一样，但避免末行只剩一两个字。
     """
-    class_name, break_units = size_class_for(weighted_units(label))
-    lines, forced_label = wrap(label, break_units)
-    detail_lines, forced_detail = wrap(detail, break_units) if detail else ([], [])
+    label_units = weighted_units(label)
+    # 折算到标题字号才能比较"谁更长"：说明是 12px，同样的字符数占的位置更小
+    detail_units_as_node = (weighted_units(detail) * FONT_DETAIL / font_size
+                            if detail else 0.0)
+    class_name, break_units = size_class_for(max(label_units, detail_units_as_node))
+    # 用**均衡**断行（不是贪心）：行数一样，但末行不会只剩一两个字。
+    # 贪心断行的末行实测出现过单个字符（"…三项都匹配才接" / "受"），
+    # 用户截图里那个孤零零的 `.` 也是同一回事。
+    lines, forced_label = wrap_balanced(label, break_units)
+    # 同一条像素宽度 = break_units × font_size；说明字号小，能放的单位数按比例多
+    detail_units = break_units * font_size / FONT_DETAIL
+    detail_lines, forced_detail = (wrap_balanced(detail, detail_units)
+                                  if detail else ([], []))
 
     width = break_units * font_size + 2 * PADDING_X
     line_total = len(lines) + (len(detail_lines) if detail_lines else 0)

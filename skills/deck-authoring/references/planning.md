@@ -136,7 +136,7 @@ Agent，产出的东西渲染器吃不下，就全白写。
 **角色 → 页型是查表**（下表）：AI 判**角色**（这一页在干什么），角色决定
 能用的**页型**（结构），再按页型写 `visual.kind`（四档见 images.md）。
 
-<!-- roles:start（这张表由 scripts/layout/roles.py 生成 —— 改角色请改那里，test_doc_contract.py 会逐字比对）-->
+<!-- roles:start（这张表由 scripts/layout/roles.py 生成 —— 改角色请改那里；表与脚本的一致性由一条机械校验逐字比对）-->
 | 角色（spec 的 `role`） | 页型（结构） | 主视觉档 | 什么时候用它 |
 | --- | --- | --- | --- |
 | `cover` | title | `none` | 第一页；标题 + 副题 + 一句定位 |

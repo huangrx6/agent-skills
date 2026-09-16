@@ -262,6 +262,9 @@ def main_axis(spec: dict) -> str:
 # 而 0.72 是**待验证**值（没有真实数据校准过，见 diagram-spec.md 的信任状态总表）。
 # 只有一条边时**不铺开**，贴点就是边中点 —— 与改之前完全一致（零回归）。
 ATTACH_SPAN = 0.72
+# 贴点离盒面两角的最小距离（对照同类渲染器的 port gutter = 16px）。
+# 线从框角进出像是贴着边框溜走，而手绘描边在角上抖得最厉害。
+ANCHOR_CORNER_GUTTER = 16.0
 # 虚节点在交叉轴上的间距。不复用 nodeSeparation（70）—— 虚节点高度为 0，
 # 给它一整个节点间距会把层横向撑得很空；但也不能是 0，否则自同一节点出发的
 # 平行长边会完全重叠、看上去是一条线。20 取自 Dagre 的 edgesep 默认值。
@@ -1880,14 +1883,26 @@ def _anchor_slots(resolved: list, placed: dict[str, Placed],
 
 def _slots(groups: dict[str, list], placed: dict[str, Placed],
            direction: str) -> dict:
-    """一张贴点表：同一节点上的多条边沿这一侧均分。"""
+    """一张贴点表：同一节点上的多条边沿这一侧均分。
+
+    贴点**不许离盒面的两个角太近**（2026-09-16，对照同类渲染器的 port gutter）：
+    线从框角进出看起来像贴着边框溜走，而且手绘描边在角上抖得最厉害。
+    均分窗口先按 `ATTACH_SPAN` 取，再夹进「两端各留 `ANCHOR_CORNER_GUTTER`」
+    的范围内；面太小放不下完整避让时，避让量按比例收缩（不收缩的话小节点上
+    多条边会被挤成一个点，退回喷泉）。
+    """
     out: dict[int, float] = {}
     for nid, items in groups.items():
         p = placed[nid]
         if direction == "LR":
-            span = p.height * ATTACH_SPAN
+            extent = p.height
         else:
-            span = p.width * ATTACH_SPAN
+            extent = p.width
+        span = extent * ATTACH_SPAN
+        # 角落避让：窗口不许越过「两端各留 gutter」的线。gutter 按面长自适应：
+        # 16px 是正常节点的取值；面比 64px 还短时按 1/4 面长收缩，保证窗口非负。
+        gutter = min(ANCHOR_CORNER_GUTTER, extent / 4.0)
+        limit = max(0.0, extent / 2.0 - gutter)
 
         def other_axis(item, _p=p):
             """另一端在交叉轴上的坐标（LR 的交叉轴是 y，TB 是 x）。"""
@@ -1901,7 +1916,8 @@ def _slots(groups: dict[str, list], placed: dict[str, Placed],
             if count == 1:
                 out[idx] = 0.0
             else:
-                out[idx] = ((j + 0.5) / count - 0.5) * span
+                raw = ((j + 0.5) / count - 0.5) * span
+                out[idx] = max(-limit, min(limit, raw))
     return out
 
 
@@ -3281,20 +3297,27 @@ class NodeBox:
 #
 # ⚠️ 标题**不参与布局**（它画在内容上方，y 可以是负的）。放这里是因为两个后端都要用它
 # —— 同一件几何量只能有一处定义（这个仓库已经吃过两次「两处各留一份、然后漂掉」的亏）。
-TITLE_GAP = 28.0
+TITLE_GAP = 36.0
 
 # ── 结论卡片（cards）的几何常量 ─────────────────────────────
 #
-# 卡片是图下方的锗点（模仿 archify 的 cards）：支撑性细节放卡片，不堆进图里。
+# 卡片是图下方的锗点：支撑性细节放卡片，不堆进图里。
 # 与标题同一条规矩：**不参与布局**，内容算完之后才落位；两个后端共用这几个数，
 # 同一件几何量只留这一处。断行用的 `wrap` 在 text_metrics，两个后端各自调。
-CARD_GAP_BELOW = 48.0        # 内容底边到第一行卡片顶边
-CARD_GAP_BETWEEN = 24.0       # 同行卡片之间的空隙
-CARD_PAD_X = 12.0             # 卡片内边距（左右）
-CARD_PAD_Y = 10.0             # 卡片内边距（上下；标题与条目之间也用它）
-CARD_WRAP_UNITS = 24.0        # 条目断行宽度（单位数，与 L 档一致）
+CARD_GAP_BELOW = 64.0        # 内容底边到第一行卡片顶边
+CARD_GAP_BETWEEN = 40.0       # 同行卡片之间的空隙
+CARD_PAD_X = 24.0             # 卡片内边距（左右）
+CARD_PAD_Y = 18.0             # 卡片内边距（上下；标题与条目之间也用它）
+# 条目列表的行距档位。列表比正文需要更松的行距才不显挤（2026-09-16 用户反馈
+# “挤得满满的”第二轮：卡内文字块行距 1.4 仍是主要密集感来源）。写进元素
+# lineHeight 的值与 `card_rows` 算高度用的是同一个数 —— 两边同源。
+CARD_ITEM_LINE_HEIGHT = 1.6
+CARD_WRAP_UNITS = 24.0        # 条目**自然**断行宽度（单位数，与 L 档一致）
+# 卡片在行内**平分内容宽**（栅格化）时单张的宽度上限。
+# 为什么要有上限：只有一张卡时它会撑满整幅图的宽，成了"横幅"而不是"卡"。
+CARD_MAX_W = 480.0
 
-REGION_PAD = 26.0        # 区域边框到成员节点的距离
+REGION_PAD = 34.0        # 区域边框到成员节点的距离
 # 区域标题的字号：比节点标题（16）大一步 —— 参考图里它就是整块区域的名字。
 REGION_LABEL_SIZE = 20.0
 REGION_LABEL_TOP = 10.0      # 标题离区域顶边的距离
@@ -3304,7 +3327,7 @@ REGION_LABEL_MARGIN = 8.0
 # 单行标题时占的高度。**它就是下面那个和**（10 + 20×1.25 + 5 = 40），
 # 由 `test_region_head_matches_the_single_line_band` 钉住 —— 两处各写一个数迟早会漂。
 # 多行时的高度**逐区域由断行结果算**（见 `region_boxes`），不是这个常数。
-REGION_HEAD = 40.0
+REGION_HEAD = 43.0
 # 标题最多断成几行。**这是判断，不是推导**：标题带是为了让区域有个名字，
 # 不是拿来放一段话的。超过就报告建议缩短 —— 与节点那边
 # 「标签超过最大断行档位就判失败」是同一类内容级问题。
@@ -3317,8 +3340,10 @@ def card_rows(spec: dict, content_left: float, content_right: float,
     """把 `cards` 排成内容下方的若干行，返回每张卡的折行与几何（绝对坐标）。
 
     两个后端共用这一份推导（同一件几何量只留一处）：
-      - 断行宽度 = `CARD_WRAP_UNITS` 单位（标题按字号比折算，条目用原始单位）；
-      - 行宽以**内容宽**为上限；单张卡超限时独占一行 —— 卡片内容比排版优先；
+      - 打包按**自然**断行宽度（`CARD_WRAP_UNITS`，标题按字号比折算）；
+      - 然后**行内平分内容宽**（上限 `CARD_MAX_W`）：撑成栅格、行数更少，
+        也不会出现"窄条里挤五行"的样子（用户反馈"换了那么多行，就不能框宽一点吗"）；
+      - 宽度不够平分时退回内容宽（卡片内容是硬要求，不能被排版挤掉）；
       - 行内居中于内容宽，新行的 y 在上一行最高那张卡之下。
 
     卡片**不参与布局**（与标题同一条规矩）：它在内容算完之后才落位，
@@ -3328,26 +3353,11 @@ def card_rows(spec: dict, content_left: float, content_right: float,
     if not cards:
         return []
     usable = max(240.0, content_right - content_left)
-    wrap_units_items = CARD_WRAP_UNITS
-    wrap_units_title = CARD_WRAP_UNITS * _tm.FONT_DETAIL / _tm.FONT_NODE
+    title_units = CARD_WRAP_UNITS * _tm.FONT_DETAIL / _tm.FONT_NODE
 
-    entries: list[dict] = []
-    for index, card in enumerate(cards):
-        title_lines, _ = _tm.wrap(str(card.get("title", "")), wrap_units_title)
-        item_lines: list[str] = []
-        for item in card.get("items", []):
-            got, _ = _tm.wrap(f"• {item}", wrap_units_items)
-            item_lines.extend(got)
-        title_w = max([_tm.weighted_units(l) for l in title_lines] or [0.0]) * _tm.FONT_NODE
-        items_w = max([_tm.weighted_units(l) for l in item_lines] or [0.0]) * _tm.FONT_DETAIL
-        width = round(max(title_w, items_w) + 2 * CARD_PAD_X, 2)
-        title_h = len(title_lines) * _tm.FONT_NODE * _tm.LINE_HEIGHT
-        items_h = len(item_lines) * _tm.FONT_DETAIL * _tm.LINE_HEIGHT
-        height = round(title_h + (CARD_PAD_Y if item_lines else 0.0)
-                       + items_h + 2 * CARD_PAD_Y, 2)
-        entries.append({"index": index, "title_lines": title_lines,
-                        "item_lines": item_lines,
-                        "width": width, "height": height})
+    # 第一遍：按**自然**断行宽度算每张卡的最小尺寸（打包按这个来）
+    entries = [_card_entry(i, card, CARD_WRAP_UNITS, title_units)
+               for i, card in enumerate(cards)]
 
     rows: list[list[dict]] = []
     current: list[dict] = []
@@ -3362,17 +3372,50 @@ def card_rows(spec: dict, content_left: float, content_right: float,
     if current:
         rows.append(current)
 
+    # 第二遍：行内**平分**内容宽 —— 卡片撑成栅格，行数随之变少（用户要的"大气"），
+    # 多行文本也不再挤在窄条里。宽度不够平分时退回各自的内容宽。
     y = content_bottom + CARD_GAP_BELOW
+    placed: list[dict] = []
     for row in rows:
-        total = sum(c["width"] for c in row) + CARD_GAP_BETWEEN * (len(row) - 1)
+        gaps = CARD_GAP_BETWEEN * max(0, len(row) - 1)
+        share = (usable - gaps) / len(row)
+        needed = max(c["width"] for c in row)
+        if needed <= share:
+            uniform = max(min(share, CARD_MAX_W), needed)
+            row = [_card_entry(c["index"], cards[c["index"]],
+                               max(1.0, (uniform - 2 * CARD_PAD_X) / _tm.FONT_DETAIL),
+                               max(1.0, (uniform - 2 * CARD_PAD_X) / _tm.FONT_NODE))
+                   for c in row]
+            for card in row:
+                card["width"] = uniform      # 宽度由栅格定，内容不再回改它
+        total = sum(c["width"] for c in row) + gaps
         x = (usable - total) / 2.0 if total < usable else 0.0
         row_height = max(c["height"] for c in row)
         for card in row:
             card["x"] = round(content_left + x, 2)
             card["y"] = round(y, 2)
+            placed.append(card)
             x += card["width"] + CARD_GAP_BETWEEN
         y += row_height + CARD_GAP_BETWEEN
-    return entries
+    return placed
+
+
+def _card_entry(index: int, card: dict, item_units: float,
+                title_units: float) -> dict:
+    """一张卡在给定断行宽度下的折行与自然尺寸（不含位置）。"""
+    title_lines, _ = _tm.wrap_balanced(str(card.get("title", "")), title_units)
+    item_lines: list[str] = []
+    for item in card.get("items", []):
+        got, _ = _tm.wrap_balanced(f"• {item}", item_units)
+        item_lines.extend(got)
+    title_w = max([_tm.weighted_units(l) for l in title_lines] or [0.0]) * _tm.FONT_NODE
+    items_w = max([_tm.weighted_units(l) for l in item_lines] or [0.0]) * _tm.FONT_DETAIL
+    title_h = len(title_lines) * _tm.FONT_NODE * _tm.LINE_HEIGHT
+    items_h = len(item_lines) * _tm.FONT_DETAIL * CARD_ITEM_LINE_HEIGHT
+    return {"index": index, "title_lines": title_lines, "item_lines": item_lines,
+            "width": round(max(title_w, items_w) + 2 * CARD_PAD_X, 2),
+            "height": round(title_h + (CARD_PAD_Y if item_lines else 0.0)
+                            + items_h + 2 * CARD_PAD_Y, 2)}
 
 
 def region_label_lines(label: str, width: float) -> tuple[list[str], float]:
@@ -3558,6 +3601,17 @@ def boxes_from_spec(spec: dict, icon_sizes: dict | None = None) -> dict[str, Any
             icon_w, icon_h = sizes.get(n["id"], (0.0, 0.0))
             width += (icon_w or ICON_RESERVE) + ICON_GAP
             height = max(height, icon_h + 2 * ICON_VERTICAL_PAD)
+            # **框自动适配内容**：宽到“内边距 + 图标 + 间隔 + 可见文字”一定放得下。
+            # 为什么必须在这里保证：图标的位置是从"整组居中"推出来的
+            # （emit：icon_left = 文字中心 − 可见宽/2 − 间隔 − 图标宽），
+            # 框不够宽的话它就会越出左边框 —— 而用钳位去救会把图标推到文字底下
+            # （看起来像"图标没了"）。用户原话："你应该考虑的是将框弄的自动适配宽度
+            # 而不是删除icon"。
+            visible = max(
+                max([tm.weighted_units(line) for line in text.lines] or [0.0]) * text.font_size,
+                max([tm.weighted_units(line) for line in text.detail_lines] or [0.0]) * tm.FONT_DETAIL,
+            )
+            width = max(width, visible + (icon_w or ICON_RESERVE) + ICON_GAP + 2 * tm.PADDING_X)
         out[n["id"]] = NodeBox(id=n["id"], shape=shape, width=width,
                                 height=height, text=text)
     return out

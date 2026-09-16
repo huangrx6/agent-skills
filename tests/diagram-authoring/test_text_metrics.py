@@ -127,16 +127,64 @@ class TextMetricsTest(unittest.TestCase):
 
     # ── 防线 3:耦合不变量（前作真正栽的地方） ──
     def test_container_never_narrower_than_text(self):
+        """容器不能比文字窄（前作的病灶就是这个耦合被破坏）。
+
+        **每桶按自己的字号算**：标题 16px、说明 12px。拿标题的字号去量说明行是在算
+        一个不存在的宽度 —— 那会把"说明列只有标题列的 75% 宽"这个 bug 当成正确的
+        （2026-09-16 实测就是它把这次修改拦下来的）。
+        """
         for s in SAMPLES:
             with self.subTest(sample=s):
                 box = self.m.measure(s, "次要说明 secondary detail")
                 budget = box.width - 2 * self.m.PADDING_X
-                for line in box.lines + box.detail_lines:
+                for line in box.lines:
                     self.assertLessEqual(
                         self.m.weighted_units(line) * self.m.FONT_NODE,
                         budget + 1e-6,
-                        f"容器比文字窄 —— 耦合被破坏了（前作的病灶）：{s!r}",
+                        f"标题行比容器宽 —— 耦合被破坏了：{s!r}",
                     )
+                for line in box.detail_lines:
+                    self.assertLessEqual(
+                        self.m.weighted_units(line) * self.m.FONT_DETAIL,
+                        budget + 1e-6,
+                        f"说明行比容器宽（说明是 12px，要用它自己的字号量）：{s!r}",
+                    )
+
+    def test_detail_uses_the_full_container_width(self):
+        """说明行数必须**少于**按旧规矩断出来的行数。
+
+        旧行为：说明按**标题的单位数**断行 → 12px 的列只有 16px 列宽度的 75%，
+        于是框里出现一条窄列、一直换行，长标识符被拦腰截断。
+        用户截图里的 `LUX_VLM_TASK_MAX_RETR…` 就是这样被切掉的。
+        （不拿"最宽行是否顶满预算"当断言：贪心断行本来就不会顶满。）
+        """
+        label = "任务级 max_attempts"
+        detail = ("确定性失败（插件未注册 / 节点不存在）直接终态；"
+                  "LUX_VLM_TASK_MAX_RETRIES 关掉重试")
+        box = self.m.measure(label, detail)
+        # 旧规矩 = 档位只看标题，说明按标题的单位数断行（12px 只画出 16px 的 75%）
+        old_cap = self.m.size_class_for(self.m.weighted_units(label))[1]
+        old_lines, _ = self.m.wrap(detail, old_cap)
+        self.assertLess(len(box.detail_lines), len(old_lines),
+                        "说明没有利用上容器宽度（说明列又被字号比卡窄了）")
+        self.assertTrue(
+            any("LUX_VLM_TASK_MAX_RETRIES" in l for l in box.detail_lines),
+            "长标识符不该被拦腰截断：断行宽度要么放得下它，要么在它前面断",
+        )
+
+    def test_a_long_detail_widens_the_box(self):
+        """说明长得多的节点要被撑宽，而不是在窄条里一直断行。
+
+        用户原话："如果一个框中文本较多，直接将框设置的稍微宽一些，
+        不要一直换行换行的"。旧规矩只拿标题定档位，说明再长也不撑宽容器。
+        """
+        short = self.m.measure("订单服务", "可重试")
+        long = self.m.measure("订单服务", "重试策略最多三次，超了进死信队列并通知值班，"
+                                          "人工核对之后再重放，不允许自动重放")
+        self.assertGreater(long.width, short.width,
+                           "说明长了一倍，框却一样宽 —— 又回到「一直换行」那版了")
+        self.assertLessEqual(len(long.detail_lines), 2,
+                             "撑宽的目的就是让说明别断成好几行")
 
     def test_overflow_flag_is_always_false(self):
         # 按构造永远为 False；它为 True 只可能是 measure 被改坏了

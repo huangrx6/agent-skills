@@ -251,30 +251,32 @@ class TestIconWiring(unittest.TestCase):
         self.assertGreaterEqual(with_icon.height, plain.height)
 
     def test_scene_contains_the_icon_and_it_is_grouped(self):
-        """按**图标自己的** groupId 筛，不能按"有没有 groupId"筛 ——
-        圆柱的顶盖也带 groupId（它同样是装饰，见 emit 的说明）。"""
+        """图标按 **id 前缀 `icon-`** 筛（组号里现在有嵌套：图标组 + 节点组）。"""
         scene, _, _, _ = self.E.emit(ICON_SPEC, library=V2)
-        group = next(e["groupIds"][0] for e in scene["elements"]
-                     if e["id"].startswith("icon-a"))
-        icons = [e for e in scene["elements"] if e.get("groupIds") == [group]]
+        icons = [e for e in scene["elements"] if e["id"].startswith("icon-a")]
         # 默认只取图形：素材自带的文字被丢掉了（节点自己已经有标签）
         self.assertEqual(1, len(icons), "默认应当只剩图形那一个元素")
         self.assertEqual("rectangle", icons[0]["type"])
+        # 图标要和形状、标签同组 —— 标签解绑之后，靠分组才能在编辑器里一起动
+        node = next(e for e in scene["elements"] if e["id"] == "node-a")
+        title = next(e for e in scene["elements"] if e["id"] == "title-a")
+        self.assertIn(node["groupIds"][0], icons[0]["groupIds"])
+        self.assertEqual(node["groupIds"], title["groupIds"])
 
     def test_full_mode_keeps_the_items_own_text(self):
         """`icon_full=True` 时保留素材自带的文字 —— 两条路都要真的不一样。"""
         scene, _, _, _ = self.E.emit(ICON_SPEC, library=V2, icon_full=True)
-        group = next(e["groupIds"][0] for e in scene["elements"]
-                     if e["id"].startswith("icon-a"))
-        icons = [e for e in scene["elements"] if e.get("groupIds") == [group]]
+        icons = [e for e in scene["elements"] if e["id"].startswith("icon-a")]
         self.assertEqual(2, len(icons))
         self.assertIn("text", [e["type"] for e in icons])
 
     def test_icon_does_not_get_counted_as_a_node(self):
-        """本项目靠“有没有 groupIds”区分节点与装饰（圆柱顶盖也走这条路）。
+        """节点按 **id 前缀 `node-`** 认。
 
-        这条**刻意用两个节点**：一个有图标、一个是圆柱（顶盖也带 groupId），
-        正好覆盖两种“带 groupId 但不是节点”的情况。
+        旧判据是"有没有 groupIds"，带图标的节点引入分组后它不再成立：形状 / 标签
+        / 图标挂同一个组号（标签解绑后要靠分组才能一起拖动），圆柱顶盖也带组号。
+        这条**刻意用两个节点**：一个有图标、一个是圆柱，两种"带组号但不是装饰、
+        或既装饰又同组"的情况都覆盖到。
         """
         two = {"type": "flow", "direction": "TB",
                "nodes": [{"id": "a", "kind": "service", "label": "订单服务",
@@ -282,10 +284,15 @@ class TestIconWiring(unittest.TestCase):
                          {"id": "b", "kind": "data", "label": "订单库"}],
                "edges": [{"from": "a", "to": "b"}]}
         scene, _, _, _ = self.E.emit(two, library=V2)
-        nodes = [e for e in scene["elements"]
-                 if e["type"] in ("rectangle", "ellipse", "diamond") and not e["groupIds"]]
+        # 节点 = `node-<规格里的 id>` 那个元素（圆柱顶盖是 `node-b-cap`，不是节点）
+        want = {self.E._eid("node", n["id"]) for n in two["nodes"]}
+        nodes = [e for e in scene["elements"] if e["id"] in want]
         self.assertEqual(2, len(nodes), "两个节点就是两个；图标与圆柱顶盖都不能算进去")
-        self.assertEqual({"node-a", "node-b"}, {e["id"] for e in nodes})
+        self.assertEqual(want, {e["id"] for e in nodes})
+        decorations = [e["id"] for e in scene["elements"]
+                       if e["id"].startswith("icon-") or e["id"].endswith("-cap")]
+        self.assertTrue(decorations, "这条测试得有装饰可查，否则等于没测")
+        self.assertTrue(all(d not in want for d in decorations))
 
     def test_icon_hugs_the_visible_text(self):
         """图标要紧贴**可见文字**的左边 —— 不是紧贴文字元素那个盒子。
@@ -298,9 +305,7 @@ class TestIconWiring(unittest.TestCase):
         所以这条验的是**可见**的那条边，不是盒子的边。
         """
         scene, _, _, _ = self.E.emit(ICON_SPEC, library=V2)
-        icon_group = next(e["groupIds"][0] for e in scene["elements"]
-                          if e["id"].startswith("icon-a"))
-        icons = [e for e in scene["elements"] if e.get("groupIds") == [icon_group]]
+        icons = [e for e in scene["elements"] if e["id"].startswith("icon-a")]
         icon_right = max(e["x"] + e["width"] for e in icons)
         title = next(e for e in scene["elements"] if e["id"].startswith("title-a"))
         visible_w = max(self.E.tm.weighted_units(line)
@@ -309,27 +314,343 @@ class TestIconWiring(unittest.TestCase):
         self.assertAlmostEqual(self.E.layout_gap(), visible_left - icon_right, places=1,
                                msg="图标与可见文字之间的间隔不是设计值")
 
-    def test_the_title_box_is_centred_in_the_node(self):
-        """文字元素要摆在**官方会把它放的位置**（容器中心），否则预览与真实渲染对不上。
+    def test_icon_group_is_centred_and_the_label_is_unbound(self):
+        """带图标的节点：标签**解绑**，且 (图标 + 间隔 + 可见文字) 整组居中。
 
-        这是这次踩坑的直接教训：写进去的 x 只影响预览，官方会重算。
-        两边的约定不一致时，预览会画出一张真实渲染里不存在的图。
+        官方会把 `containerId` 非空的文字拉回容器中心（我们写的 x 不算数），
+        所以"整组居中"在**绑定**前提下数学上做不到 —— 实测偏左 19px，
+        用户原话"图标和文本，不应该居中吗"。解绑后位置由我们定，这条守住它。
         """
         scene, _, _, _ = self.E.emit(ICON_SPEC, library=V2)
         node = next(e for e in scene["elements"] if e["id"] == "node-a")
-        title = next(e for e in scene["elements"] if e["id"].startswith("title-a"))
+        title = next(e for e in scene["elements"] if e["id"] == "title-a")
+        self.assertIsNone(title["containerId"], "带图标的标签必须解绑，否则居中不了")
+        icons = [e for e in scene["elements"] if e["id"].startswith("icon-a")]
+        visible_w = max(self.E.tm.weighted_units(line)
+                        for line in title["text"].split("\n")) * title["fontSize"]
+        text_center = title["x"] + title["width"] / 2.0
+        group_left = min(e["x"] for e in icons)
+        group_right = max(text_center + visible_w / 2.0,
+                          max(e["x"] + e["width"] for e in icons))
         self.assertAlmostEqual(node["x"] + node["width"] / 2.0,
-                               title["x"] + title["width"] / 2.0, places=1)
+                               (group_left + group_right) / 2.0, places=1,
+                               msg="图标 + 文字的整组重心不在节点中心")
+
+    def test_plain_node_keeps_the_label_bound(self):
+        """没有图标的节点**保持绑定** —— 绑定文字在编辑器里会自动重排，更顺手。
+
+        只有"整组居中"这一个理由值得解绑，没有图标的节点不该跟着付代价。
+        """
+        spec = {"type": "flow", "direction": "TB",
+                "nodes": [{"id": "a", "kind": "service", "label": "订单服务"}],
+                "edges": []}
+        scene, _, _, _ = self.E.emit(spec)
+        title = next(e for e in scene["elements"] if e["id"] == "title-a")
+        self.assertEqual("node-a", title["containerId"])
+        self.assertEqual([], title["groupIds"])
 
     def test_icon_stays_inside_the_padding(self):
         scene, _, _, _ = self.E.emit(ICON_SPEC, library=V2)
         node = next(e for e in scene["elements"] if e["id"] == "node-a")
-        icon_group = next(e["groupIds"][0] for e in scene["elements"]
-                          if e["id"].startswith("icon-a"))
         icon_left = min(e["x"] for e in scene["elements"]
-                        if e.get("groupIds") == [icon_group])
-        self.assertGreaterEqual(icon_left, node["x"] + self.E.tm.PADDING_X - 0.5,
-                                "图标越出了节点的内边距")
+                        if e["id"].startswith("icon-a"))
+        self.assertGreaterEqual(icon_left, node["x"] + 4.0,
+                                "图标越出了节点的边框")
+
+    def test_icon_stays_inside_even_with_a_long_detail(self):
+        """图标 + 长说明时图标也不能越出边框（用户截图里的溢出就是这个）。
+
+        根因是算"可见文字宽度"时把说明行也乘了标题字号（说明实际是 12px）——
+        高估 33%，说明一宽就把图标推到左边框外面。这条臂的两个用例分别卡
+        "没有说明"与"有长说明"两种情况，只测前者是漏的。
+        """
+        detail = ("组合根里的 _LazyQAHistoryRepo：未接线时 reessors 必返 503，"
+                  "而不是假装空列表；落库失败不影响已经给出的答案")
+        for label, got_detail in (("QAHistoryRepo（延迟装配）", detail),
+                                  ("q", "短说明")):
+            spec = {"type": "flow", "direction": "TB", "detail": "diagnostic",
+                    "nodes": [{"id": "a", "kind": "service", "label": label,
+                               "detail": got_detail, "icon": "Bound Box"}],
+                    "edges": []}
+            scene, _, _, _ = self.E.emit(spec, library=V2)
+            node = next(e for e in scene["elements"] if e["id"] == "node-a")
+            icon = [e for e in scene["elements"] if e["id"].startswith("icon-a")]
+            icon_left = min(e["x"] for e in icon)
+            icon_right = max(e["x"] + e["width"] for e in icon)
+            with self.subTest(label=label):
+                self.assertGreaterEqual(
+                    icon_left, node["x"] + 4.0,
+                    f"图标越出了节点左边框（{label!r}）：图标左 {icon_left:.1f} < 框左 {node['x']:.1f}")
+                self.assertLessEqual(
+                    icon_right, node["x"] + node["width"] - 4.0,
+                    f"图标越出了节点右边框（{label!r}）")
+
+    def test_visible_width_uses_the_detail_own_font_size(self):
+        """可见宽度取 max(标题行×16, 说明行×12) —— 不能拿标题字号乘说明行。
+
+        否则同一张图里说明越长、图标越往左跳，最后跑到框外面 ——
+        一个只有"真渲染"才看得出来、而数值上看不出错的偏移。
+        """
+        short = {"type": "flow", "direction": "TB",
+                 "nodes": [{"id": "a", "kind": "service", "label": "订单服务",
+                            "detail": "短说明", "icon": "Bound Box"}], "edges": []}
+        long_detail = "；".join(["说明第一段要足够长才能把可见宽度推起来"] * 3)
+        long = {"type": "flow", "direction": "TB",
+                "nodes": [{"id": "a", "kind": "service", "label": "订单服务",
+                           "detail": long_detail, "icon": "Bound Box"}], "edges": []}
+        a = self.E.emit(short, library=V2)[0]
+        b = self.E.emit(long, library=V2)[0]
+        gap_a = self._icon_gap(a)
+        gap_b = self._icon_gap(b)
+        self.assertAlmostEqual(gap_a, gap_b, places=1,
+                               msg="说明长短不同时图标↔文字间隔应当一致（设计值）")
+
+    def _icon_gap(self, scene: dict) -> float:
+        """图标右边界到可见文字左边界的间隔。"""
+        icon = [e for e in scene["elements"] if e["id"].startswith("icon-a")]
+        title = next(e for e in scene["elements"] if e["id"] == "title-a")
+        detail = next(e for e in scene["elements"] if e["id"] == "detail-a")
+        widest = max(
+            max(self.E.tm.weighted_units(l) for l in title["text"].split("\n")) * title["fontSize"],
+            max(self.E.tm.weighted_units(l) for l in detail["text"].split("\n")) * detail["fontSize"],
+        )
+        visible_left = title["x"] + title["width"] / 2.0 - widest / 2.0
+        icon_right = max(e["x"] + e["width"] for e in icon)
+        return visible_left - icon_right
+
+    def _mixed_library(self, tmp: str) -> str:
+        """造一个"作者风格不一致"的库：一项粗黑实心、一项细线空心。
+
+        真实素材库里这很常见（不同作者 / 同一作者不同批次），也正是用户截图里
+        "粗黑图标和细线图标混在一起"的来源。
+        """
+        path = os.path.join(tmp, "mixed.excalidrawlib")
+
+        def rect(rid, stroke, width, bg):
+            return {"id": rid, "type": "rectangle", "x": 0, "y": 0, "width": 40,
+                    "height": 24, "angle": 0, "strokeColor": stroke,
+                    "backgroundColor": bg, "fillStyle": "solid",
+                    "strokeWidth": width, "strokeStyle": "solid", "roughness": 0,
+                    "opacity": 100, "groupIds": [], "frameId": None, "roundness": None,
+                    "seed": 1, "version": 1, "versionNonce": 1, "isDeleted": False,
+                    "boundElements": [], "updated": 1, "link": None, "locked": False}
+
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"type": "excalidrawlib", "version": 2, "libraryItems": [
+                {"id": "bold", "name": "Bold", "elements": [
+                    rect("b1", "#000000", 4, "#000000")]},
+                {"id": "thin", "name": "Thin", "elements": [
+                    rect("t1", "#888888", 1, "transparent")]},
+                {"id": "dot", "name": "Dot", "elements": [
+                    rect("d1", "#000000", 1, "transparent"),
+                    {"id": "d2", "type": "ellipse", "x": 16, "y": 10, "width": 3,
+                     "height": 3, "angle": 0, "strokeColor": "#000000",
+                     "backgroundColor": "#000000", "fillStyle": "solid",
+                     "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0,
+                     "opacity": 100, "groupIds": [], "frameId": None,
+                     "roundness": None, "seed": 2, "version": 1, "versionNonce": 2,
+                     "isDeleted": False, "boundElements": [], "updated": 1,
+                     "link": None, "locked": False}]},
+            ]}, fh)
+        return path
+
+    def test_icon_style_is_normalised(self):
+        """图标落笔时统一：描边粗细 / 颜色（= 所属节点的描边色）/ 粗糙度 / 填充。
+
+        素材的作者风格一律不保留 —— 否则同一张图里会出现粗黑与细线混排。
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            lib = self._mixed_library(tmp)
+            spec = {"type": "flow", "direction": "TB",
+                    "nodes": [{"id": "a", "kind": "service", "label": "订单服务",
+                               "icon": "Bold"},
+                              {"id": "b", "kind": "service", "label": "支付服务",
+                               "icon": "Thin"}],
+                    "edges": [{"from": "a", "to": "b"}]}
+            scene, _, _, _ = self.E.emit(spec, library=lib)
+        icons = [e for e in scene["elements"] if e["id"].startswith("icon-")]
+        self.assertEqual(2, len(icons))
+        for el in icons:
+            self.assertEqual(self.E.icons.ICON_STROKE_WIDTH, el["strokeWidth"],
+                             "描边粗细必须统一")
+            self.assertEqual(self.E.icons.ICON_ROUGHNESS, el["roughness"])
+            self.assertEqual("solid", el["fillStyle"])
+            self.assertEqual(100, el["opacity"])
+        cols = {el["strokeColor"] for el in icons}
+        self.assertEqual(1, len(cols), f"图标颜色必须统一（现在是 {cols}）")
+        node = next(e for e in scene["elements"] if e["id"] == "node-a")
+        self.assertEqual(node["strokeColor"], icons[0]["strokeColor"],
+                         "图标应当与所属节点同色")
+        # "大块实心"要转成空心（否则一张图里就是实心块 + 细线两套语言）
+        self.assertTrue(all(e["backgroundColor"] == "transparent" for e in icons),
+                        "大块实心没有被转成空心")
+
+    def test_small_filled_details_are_kept_but_recoloured(self):
+        """**小面积实心**（点 / 箭头头部）要保留 —— 那是设计细节，不是风格。
+
+        一刀切"全部转空心"会把我们自己的 `_queue`（三个点）削成三个圈，
+        也会把别家的箭头头部抹掉。
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            lib = self._mixed_library(tmp)
+            spec = {"type": "flow", "direction": "TB",
+                    "nodes": [{"id": "a", "kind": "service", "label": "订单服务",
+                               "icon": "Dot"}], "edges": []}
+            scene, _, _, _ = self.E.emit(spec, library=lib)
+        node = next(e for e in scene["elements"] if e["id"] == "node-a")
+        icons = [e for e in scene["elements"] if e["id"].startswith("icon-a")]
+        kept = [e for e in icons if e["backgroundColor"] != "transparent"]
+        self.assertEqual(1, len(kept), f"应当只保留那个小点，实际保留了 {len(kept)} 个")
+        self.assertEqual(node["strokeColor"], kept[0]["backgroundColor"],
+                         "保留的实心也要换成同一个墨色，不引入第二种颜色")
+
+    def test_sigil_and_library_icon_look_like_one_set(self):
+        """同一张图里**混用**内置 sigil 与素材库图标时，风格必须仍然一致。
+
+        这是用户截图里的场景（粗黑的库图标 + 细线的库图标/内置图形混排）。
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            lib = self._mixed_library(tmp)
+            builtin = sorted(self.E.sigils.NAMES)[0]   # 任意一个内置名（规范名或别名）
+            spec = {"type": "flow", "direction": "TB",
+                    "nodes": [{"id": "a", "kind": "service", "label": "订单服务",
+                               "icon": builtin},
+                              {"id": "b", "kind": "service", "label": "支付服务",
+                               "icon": "Bold"}],
+                    "edges": [{"from": "a", "to": "b"}]}
+            scene, _, _, _ = self.E.emit(spec, library=lib)
+        groups = {}
+        for el in scene["elements"]:
+            for gid in el.get("groupIds") or []:
+                if gid.startswith("icon-"):
+                    groups.setdefault(gid, []).append(el)
+        self.assertEqual(2, len(groups), "两个节点各有一个图标")
+        styles = {(e["strokeWidth"], e["strokeColor"], e["roughness"], e["fillStyle"])
+                  for els in groups.values() for e in els}
+        self.assertEqual(1, len(styles),
+                         f"内置图形与素材库图标必须是一套风格，现在有 {len(styles)} 套：{styles}")
+
+    def test_original_library_elements_are_not_mutated(self):
+        """统一风格改的是**复制品**，不能把调用方（或库里）的元素改掉。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            lib = self._mixed_library(tmp)
+            spec = {"type": "flow", "direction": "TB",
+                    "nodes": [{"id": "a", "kind": "service", "label": "订单服务",
+                               "icon": "Bold"}], "edges": []}
+            self.E.emit(spec, library=lib)
+            with open(lib, encoding="utf-8") as fh:
+                after = json.load(fh)
+        el = after["libraryItems"][0]["elements"][0]
+        self.assertEqual(4, el["strokeWidth"], "素材文件本身不该被改写")
+        self.assertEqual("#000000", el["strokeColor"])
+
+    def _colour_library(self, tmp: str) -> str:
+        """造三种颜色情形的库：单色线描 / 多色但颜色都读得出来 / 多色且有的读不出来。"""
+        path = os.path.join(tmp, "colours.excalidrawlib")
+
+        def item(name: str, stroke: str, fill: str, rid: str) -> dict:
+            return {"id": name, "name": name, "elements": [
+                {"id": rid, "type": "rectangle", "x": 0, "y": 0, "width": 40,
+                 "height": 24, "angle": 0, "strokeColor": stroke,
+                 "backgroundColor": fill, "fillStyle": "solid", "strokeWidth": 2,
+                 "strokeStyle": "solid", "roughness": 0, "opacity": 100,
+                 "groupIds": [], "frameId": None, "roundness": None, "seed": 1,
+                 "version": 1, "versionNonce": 1, "isDeleted": False,
+                 "boundElements": [], "updated": 1, "link": None, "locked": False},
+                {"id": rid + "b", "type": "line", "x": 4, "y": 4, "width": 20,
+                 "height": 0, "points": [[0, 0], [20, 0]], "angle": 0,
+                 "strokeColor": stroke, "backgroundColor": "transparent",
+                 "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid",
+                 "roughness": 0, "opacity": 100, "groupIds": [], "frameId": None,
+                 "roundness": None, "seed": 2, "version": 1, "versionNonce": 2,
+                 "isDeleted": False, "boundElements": [], "updated": 1,
+                 "link": None, "locked": False}]}
+
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"type": "excalidrawlib", "version": 2, "libraryItems": [
+                item("Mono", "#123456", "transparent", "m1"),
+                # 深色画布/浅色画布上都读得出来的两色
+                item("Duo", "#232F3E", "#7BA7E0", "d1"),
+                # 品牌橙在浅画布上对比度只有 2.04 —— 读不出来那一类
+                item("Faint", "#232F3E", "#FF9900", "f1"),
+            ]}, fh)
+        return path
+
+    def _emit_one(self, lib: str, icon: str, style: dict | None = None):
+        spec = {"type": "flow", "direction": "TB", "style": style,
+                "nodes": [{"id": "a", "kind": "service", "label": "订单服务",
+                           "icon": icon}], "edges": []}
+        scene, _, _, _ = self.E.emit(spec, library=lib)
+        node = next(e for e in scene["elements"] if e["id"] == "node-a")
+        icons = [e for e in scene["elements"] if e["id"].startswith("icon-a")]
+        return node, icons
+
+    def test_mono_icon_still_uses_the_node_ink(self):
+        """单色素材是**线描图形**：一律用墨色（与图纸同一套语言）。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            lib = self._colour_library(tmp)
+            node, icons = self._emit_one(lib, "Mono")
+        self.assertTrue(icons)
+        self.assertTrue(all(e["strokeColor"] == node["strokeColor"] for e in icons),
+                        "单色素材必须被换成节点墨色")
+
+    def test_multicolour_icon_keeps_its_colours(self):
+        """多色素材是**作品**（品牌 logo）：保留配色 —— 这就是用户要的"带颜色好看"。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            lib = self._colour_library(tmp)
+            node, icons = self._emit_one(lib, "Duo")
+        strokes = {e["strokeColor"].lower() for e in icons}
+        self.assertIn("#232f3e", strokes, "深蓝是素材原色，应当保留")
+        self.assertNotEqual({node["strokeColor"].lower()}, strokes,
+                            "多色素材不该被压成节点墨色")
+
+    def test_faint_colour_is_darkened_to_a_readable_one(self):
+        """读不出来的品牌色：**保留色相、压到可读**，而不是丢掉颜色或糊在画布上。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            lib = self._colour_library(tmp)
+            node, icons = self._emit_one(lib, "Faint")
+        fills = {e["backgroundColor"] for e in icons if e["backgroundColor"] != "transparent"}
+        self.assertTrue(fills, "多色素材的实心色块要保留（那是 logo 的一部分）")
+        bg = self.E.palette.CANVAS["background"]
+        for got in fills:
+            self.assertGreaterEqual(
+                round(self.E.palette.contrast(got, bg), 2), self.E.icons.ICON_MIN_CONTRAST,
+                f"{got} 在画布上读不出来 —— 没被压暗")
+        self.assertNotIn("#ff9900", {f.lower() for f in fills},
+                         "原始品牌橙对比度不足，必须被压过")
+        self.assertNotEqual({node["strokeColor"]}, fills,
+                            "压暗不是直接换成墨色，应当保留色相")
+        strokes = {e["strokeColor"].lower() for e in icons}
+        self.assertIn("#232f3e", strokes, "读得出来的颜色不该被动")
+
+    def test_ink_mode_forces_monochrome(self):
+        """`style.icons = ink`：严格蓝图风，品牌 logo 也压成单色。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            lib = self._colour_library(tmp)
+            node, icons = self._emit_one(lib, "Duo", style={"icons": "ink"})
+        self.assertTrue(all(e["strokeColor"] == node["strokeColor"] for e in icons))
+        self.assertTrue(all(e["backgroundColor"] == "transparent" for e in icons),
+                        "单色模式下大块实心要转空心")
+
+    def test_native_mode_keeps_colours_untouched(self):
+        """`style.icons = native`：原样保留，连对比度也不改（显式选择，后果自负）。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            lib = self._colour_library(tmp)
+            _node, icons = self._emit_one(lib, "Faint", style={"icons": "native"})
+        fills = {e["backgroundColor"].lower() for e in icons
+                 if e["backgroundColor"] != "transparent"}
+        self.assertIn("#ff9900", fills, "native 档必须原样保留品牌色")
+
+    def test_unknown_icon_colour_mode_is_refused(self):
+        """未知取值要报错，不能静默当成 auto（与未知 kind 同一条规矩）。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            lib = self._colour_library(tmp)
+            spec = {"type": "flow", "direction": "TB", "style": {"icons": "colorful"},
+                    "nodes": [{"id": "a", "kind": "service", "label": "订单服务",
+                               "icon": "Mono"}], "edges": []}
+            with self.assertRaises(Exception) as ctx:
+                self.E.emit(spec, library=lib)
+        self.assertIn("icons", str(ctx.exception))
 
     def test_no_icon_means_the_library_is_never_opened(self):
         """一个图标都不用的话，即使给了一个不存在的库也不该出错。"""

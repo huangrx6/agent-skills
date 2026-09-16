@@ -956,3 +956,119 @@ class TestGeometricCrossing(unittest.TestCase):
             spec = spec_of(["a", "b", "c", "d"], [("a", "b"), ("c", "d")])
             spec["type"] = diagram_type
             self.assertEqual([], C.check_geometric_crossings(spec, result), diagram_type)
+
+
+# ── 质量两档 / JSON 回执 / 可读性下限（quality_profile 一组能力的回归）──
+
+class _Placed:
+    def __init__(self, x, y, w=100.0, h=40.0):
+        self.x, self.y, self.width, self.height = x, y, w, h
+
+
+class TestShowcasePromotion(unittest.TestCase):
+    """#3 质量两档：升级发生在调参之后、返回拷贝。"""
+
+    def test_promote_returns_copy_and_upgrades_softs(self):
+        soft = C.Issue("crossing", False, "a✕b", "测试", advice="拆节点")
+        outcome = C.Outcome(issues=[soft, C.Issue("text", True, "x", "脚本 bug")])
+        promoted = outcome.promote("showcase")
+        self.assertEqual(2, len(promoted.blocking))
+        # 原件不动：那条软项在原 outcome 里必须仍是软的（调参循环还要用它判断可调）
+        original_crossing = next(i for i in outcome.issues if i.check == "crossing")
+        self.assertFalse(original_crossing.blocking,
+                         "promote 必须返回拷贝 —— 原 outcome 的软项不能被就地升级")
+
+    def test_standard_is_identity(self):
+        outcome = C.Outcome(issues=[C.Issue("crossing", False, "a", "b")])
+        self.assertIs(outcome, outcome.promote("standard"))
+
+    def test_readability_and_icon_are_not_promoted(self):
+        outcome = C.Outcome(issues=[
+            C.Issue("readability", False, "整张图", "太宽"),
+            C.Issue("icon", False, "n", "对比度"),
+        ])
+        self.assertFalse(outcome.promote("showcase").blocking,
+                         "readability/icon 不在 showcase 硬集合里")
+
+    def test_unknown_quality_rejected(self):
+        outcome = C.Outcome()
+        with self.assertRaises(ValueError):
+            outcome.promote("ultra")
+
+    def test_tuning_uses_raw_outcome(self):
+        """showcase 升级不得进入调参循环 —— 软项仍然是可调的。"""
+        spec = spec_of(["a", "b", "c"], [("a", "b"), ("b", "c")])
+        boxes = L.boxes_from_spec(spec)
+        _result, outcome, attempts = C.layout_with_retry(spec, boxes)
+        self.assertIsInstance(outcome, C.Outcome)
+        # layout_with_retry 的返回值必须是"未升级"的：软项在场时 converged 仍可能为真
+        for issue in outcome.issues:
+            if issue.check in C.SHOWCASE_HARD:
+                self.assertFalse(issue.blocking or True and issue.blocking,
+                                 "调参循环内部不应看到被升级的软项")
+
+
+class TestJsonReceipt(unittest.TestCase):
+    """#1 JSON 诊断回执的形状与措辞。"""
+
+    def _receipt(self, issues):
+        outcome = C.Outcome(issues=issues)
+        result = type("R", (), {"real_nodes": lambda s: {}, "edges": [],
+                                "crossings": 0})()
+        attempt = C.Attempt(round_no=0, params=dict(L.DEFAULT_PARAMS), outcome=outcome)
+        return C.build_receipt({}, result, [attempt], outcome, "showcase")
+
+    def test_shape(self):
+        r = self._receipt([C.Issue("gap", True, "a ↔ b", "间隙 4px", advice="拆节点",
+                                   evidence={"gapPx": 4})])
+        self.assertFalse(r["ok"])
+        self.assertEqual("showcase", r["quality"])
+        d = r["diagnostics"][0]
+        self.assertEqual("layout/gap", d["code"])
+        self.assertEqual("error", d["severity"])
+        self.assertEqual({"gapPx": 4}, d["evidence"])
+        self.assertEqual(["拆节点"], d["suggestedFixes"])
+        self.assertIn({"name": "gap", "ok": False}, r["checks"])
+        self.assertIn({"name": "crossing", "ok": True}, r["checks"])
+
+    def test_soft_issue_is_warning_severity(self):
+        r = self._receipt([C.Issue("bend", False, "a→b", "5 个折点")])
+        self.assertEqual("warning", r["diagnostics"][0]["severity"])
+        self.assertEqual([], r["diagnostics"][0]["suggestedFixes"])
+
+    def test_no_param_names_in_receipt(self):
+        """回执与人读报告同一条规矩：参数名不出现。"""
+        r = self._receipt([C.Issue("gap", True, "a ↔ b", "间隙 4px", advice="拆节点",
+                                   evidence={"gapPx": 4})])
+        text = json.dumps(r, ensure_ascii=False)
+        for name in C.PARAM_SPOKEN:
+            self.assertNotIn(name, text)
+
+
+class TestReadability(unittest.TestCase):
+    """#5 桌面可读性：宽画布投影字号。"""
+
+    def test_narrow_canvas_is_quiet(self):
+        placed = {"a": _Placed(0, 0), "b": _Placed(700, 0)}
+        result = type("R", (), {"real_nodes": lambda s: placed, "edges": [],
+                                "crossings": 0})()
+        self.assertEqual([], C.check_readability({}, result))
+
+    def test_wide_canvas_reports_without_blocking(self):
+        placed = {"a": _Placed(0, 0), "b": _Placed(2400, 0)}
+        result = type("R", (), {"real_nodes": lambda s: placed, "edges": [],
+                                "crossings": 0})()
+        issues = C.check_readability({}, result)
+        self.assertEqual(1, len(issues))
+        self.assertFalse(issues[0].blocking)
+        self.assertNotIn(issues[0].check, C.STEPPABLE,
+                         "可读性不进调参：加大间距只会让画布更宽")
+
+    def test_threshold_boundary(self):
+        # 12px × 960/1920 = 6px —— 恰好在下限上，不该报
+        placed = {"a": _Placed(0, 0), "b": _Placed(1820, 0, 100, 40)}
+        result = type("R", (), {"real_nodes": lambda s: placed, "edges": [],
+                                "crossings": 0})()
+        self.assertEqual([], C.check_readability({}, result))
+
+

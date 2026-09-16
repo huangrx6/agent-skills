@@ -193,13 +193,47 @@ class TestBindings(unittest.TestCase):
                 self.assertTrue(el["endBinding"])
 
     def test_detail_produces_a_second_text(self):
+        """带 detail 的节点仍然有两个文字块 —— 但**都不能绑容器**。
+
+        ⚠ 这是实测抓到的真 bug：一个容器只认第一个绑定文字（标题），
+        说明虽然写在 JSON 里，官方渲染器**根本不画它**。而且两个绑定文字会互相压住
+        （标题被拉回容器中心，说明按我们算的位置落在旁边）。
+        所以有 detail 时两者一起自由放置，并同挂一个 groupId（拖动仍然是一体）。
+        """
         def texts_of(node_id: str) -> list[dict]:
             return [e for e in self.scene["elements"]
                     if e["type"] == "text"
-                    and e.get("containerId") == E._eid("node", node_id)]
+                    and e["id"].startswith(("title-", "detail-"))
+                    and e["id"].split("-", 1)[1] == node_id]
 
         self.assertEqual(2, len(texts_of("api")), "带 detail 的节点应该有两个文字块")
         self.assertEqual(1, len(texts_of("web")), "不带 detail 的节点只该有一个")
+        for el in texts_of("api"):
+            self.assertIsNone(el["containerId"],
+                              "说明/标题都不能绑容器：绑了说明就不会被画出来")
+            self.assertEqual([E._eid("group", "api")], el["groupIds"],
+                             "自由文字必须与形状同组，否则拖动会散架")
+        node = next(e for e in self.scene["elements"] if e["id"] == "node-api")
+        bound_texts = [b for b in (node["boundElements"] or []) if b["type"] == "text"]
+        self.assertEqual([], bound_texts, "形状的 boundElements 不该再列文字")
+
+    def test_no_container_has_two_bound_texts(self):
+        """**场景级不变量**：任何容器最多只能有一个绑定文字。
+
+        Excalidraw 的 `getBoundTextElement` 只看第一个 —— 多出来的那个不会被画。
+        这条错误在 JSON 里看不出来（元素都在、引用也对），只有真实渲染才暴露；
+        就靠它钉住，别让第二个绑定文字再回来。
+        """
+        for el in self.scene["elements"]:
+            if el["type"] != "text":
+                continue
+            cid = el.get("containerId")
+            if not cid:
+                continue
+            same = [e["id"] for e in self.scene["elements"]
+                    if e["type"] == "text" and e.get("containerId") == cid]
+            self.assertEqual(1, len(same),
+                             f"容器 {cid} 绑了 {len(same)} 个文字：{same}（只会画第一个）")
 
 
 class TestArrowGeometry(unittest.TestCase):
@@ -975,7 +1009,10 @@ class TestEdgeLabelCollisions(unittest.TestCase):
             pts = edge["points"]
             worst = max(worst, min(_point_segment_distance(centre, a, b)
                                    for a, b in zip(pts, pts[1:])))
-        self.assertLessEqual(worst, 60.0,
+        # 2026-09-16 由 60 重新标定到 75:节点盒子整体放大（大气改造）后，
+        # 避让需要推开的空间等比变大 —— 密集场景实测最远 68px。
+        # 历史基线仍在：P18 修复前最远 191px，修复后 31px，都是旧几何下的数。
+        self.assertLessEqual(worst, 75.0,
                              f"有标签离自己那条线 {worst:.0f}px —— 看不出它属于哪条边")
 
 
@@ -1150,3 +1187,40 @@ class TestEveryLabelSurvives(unittest.TestCase):
                 self.assertEqual(edge["label"], drawn[eid],
                                  f"{os.path.basename(path)}：{eid} 的标注被换成了别的字")
         self.assertGreater(checked, 0, "夹具里居然没有一条带标注的边，这条用例等于没跑")
+
+
+class TestCardsRender(unittest.TestCase):
+    """cards 几何单一来源（layout.card_rows）+ 元素形态（装饰带 groupIds）。"""
+
+    @staticmethod
+    def _spec(cards):
+        # 不能用本文件的 spec_of：它会丢弃未知 kwargs，cards 会被静默吞掉
+        return {"type": "architecture", "direction": "LR",
+                "nodes": [{"id": "a", "kind": "service", "label": "A"},
+                          {"id": "b", "kind": "service", "label": "B"}],
+                "edges": [{"from": "a", "to": "b"}],
+                "cards": cards}
+
+    def test_card_rows_lays_out_below_content(self):
+        rows = L.card_rows(self._spec([{"title": "一", "items": ["甲"]},
+                                       {"title": "二", "items": ["乙"]}]),
+                           0.0, 900.0, 200.0)
+        self.assertEqual(2, len(rows))
+        self.assertGreaterEqual(rows[0]["y"], 200.0 + L.CARD_GAP_BELOW)
+        first, second = sorted(rows, key=lambda c: c["x"])
+        self.assertLessEqual(first["x"] + first["width"] + L.CARD_GAP_BETWEEN,
+                             second["x"])
+
+    def test_scene_contains_card_elements_with_group_ids(self):
+        scene, _result, outcome, _attempts = E.emit(
+            self._spec([{"title": "说明", "items": ["一条"]}]))
+        self.assertFalse(outcome.blocking)
+        cards = [e for e in scene["elements"] if str(e["id"]).startswith("card-")]
+        self.assertTrue(cards, "场景里应有卡片元素")
+        for el in cards:
+            self.assertTrue(el.get("groupIds"), "卡片是装饰，必须挂 groupIds")
+
+    def test_no_cards_means_no_card_elements(self):
+        scene, _r, _o, _a = E.emit(spec_of(["a", "b"], [("a", "b")]))
+        self.assertEqual([], [e for e in scene["elements"]
+                              if str(e["id"]).startswith("card-")])

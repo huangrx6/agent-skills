@@ -644,7 +644,7 @@ def emit(spec: dict, *, params: dict | None = None, scheme: str | None = None,
 
 def _atomic_write(path: str, payload: str) -> None:
     """先写同目录临时文件，再原子换入 —— 目标路径上要么是旧版、要么是完整新版。
-    与 Excalidraw 后端同一个办法（模仿 archify 的 deliver 提交）。"""
+    与 Excalidraw 后端同一个办法（同目录临时文件 + 原子换入）。"""
     tmp = os.path.join(os.path.dirname(os.path.abspath(path)),
                        f".{os.path.basename(path)}.tmp-{os.getpid()}")
     try:

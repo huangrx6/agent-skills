@@ -157,6 +157,34 @@ SVG。中文在导出 PDF/SVG 后仍是文字（不会变路径），要继续�
 导出是**人在应用里点一下**的事，而 `.drawio` 本身是我们可以自己生成的纯 XML。
 （这也正是"不需要安装任何东西"这个结论的由来。）
 
+### 5.2 官方命令行导出：**已实测**（2026-09-17，draw.io 31.4.5，macOS）
+
+装上桌面版之后实测通过，`dev-tools/export_drawio.py` 把那套参数封了一层
+（**默认留白 48 图内单位** —— 官方默认 0 会贴边，见下表）：
+
+```sh
+python3 dev-tools/export_drawio.py x.drawio -o x.png --scale 2      # PNG 1778×892（场景 889×446 @2x）
+python3 dev-tools/export_drawio.py x.drawio -o x.svg --format svg   # 矢量
+python3 dev-tools/export_drawio.py x.drawio -o x.pdf --format pdf --crop
+python3 dev-tools/export_drawio.py x.drawio -o x.png --border 48 --embed
+```
+
+实测出来的四条事实（都按 `draw.io --help` 的官方说明核对过）：
+
+| 事实 | 说明 |
+| --- | --- |
+| 出图正确 | 标题 / 节点 / 带标签箭头 / 圆柱 / 卡片的粗体与项目符号全部正常，`-s 2` 真的按 2 倍出 |
+| **`--crop` 只对 PDF 有效** | 官方原话是 "crops PDF to diagram size"。图片的裁切默认就是按内容来（`--size diagram`），对 PNG 传 `--crop` 是**静默无效**（实测：产物与不加时**字节完全相同**）。工具遇到这种组合直接报错 |
+| **`-t` 透明常常看不出效果** | `-t` 本身有效（SVG 里确实成了 `background: transparent`），但**去不掉图里那块底色** —— 我们 emit 时刻意写了 `background="…"`（不写底色导出不稳定）。工具会在回执里提示这件事 |
+| **`-b N` 每边只加 0.75×N** | 实测 16→12、32→24、64→48（72dpi/96dpi 换算）。工具的 `--border` 已经替用户换算过，写 48 就是每边 48 图内单位 |
+| **`-b` 官方分得不均，看最紧的一边** | 总量对（每轴 +2B 图内单位），落地是左/上 ≈1.31×B、右/下 ≈0.69×B（实测 `--border 16/32/64` 的右/下只有 11.5/22/43.5）。所以工具默认 **48** —— 最紧一边 ≈33 图内单位，比图内节点自己的内边距（22~24）还松一点 |
+
+还有个交付上用得到的开关：**`-e/--embed`** 会把图**嵌进产物**里（PNG/SVG/PDF），
+所以导出的图片还能在 draw.io 里打开继续改 —— 实测 SVG 里能搜到 `mxGraphModel`。
+
+**定位不变**：它是**可选加速器**。`.drawio` 是纯 XML，我们自己就能生成；导出也可以
+人在应用里点一下（上面 5.1 那条人工路径）。没装 draw.io 时工具明确报环境，不假装成功。
+
 ### 5.1 自动化验证：真实 draw.io 怎么打开我们的文件
 
 **走不通的路（已实测，别再试）**：本地起一个带 CORS 的服务，然后用

@@ -154,22 +154,30 @@ def _polyline(arrow: dict) -> list[tuple]:
     return [(arrow["x"] + p[0], arrow["y"] + p[1]) for p in arrow["points"]]
 
 
-# 节点形状：不再只有矩形。圆柱的**顶盖**也是 ellipse，但它带着 groupIds，
-# 算装饰不算节点（见 emit_excalidraw.shape_elements 里的说明）。
+# 节点形状：不再只有矩形。圆柱的**顶盖**也是 ellipse —— 它算装饰不算节点。
+# 判据不是"有没有 groupIds"（带图标的节点，形状/标签/图标挂着同一个组号），
+# 而是 id：节点形状恰好是 `node-<nid>`，而 `<nid>` 由 `title-<nid>` 反推。
 NODE_TYPES = {"rectangle", "ellipse", "diamond"}
-
-
-def is_node(el: dict) -> bool:
-    return el["type"] in NODE_TYPES and not el.get("groupIds")
 
 
 def measure(scene: dict) -> dict:
     """量一张图。**这里量的每一项都对应问题清单里的一个具体条目。**"""
     elements = scene["elements"]
-    rects = [e for e in elements if is_node(e)]
+    # 节点形状 = `node-<nid>`，`<nid>` 从节点标签的 id（`title-<nid>`）推出来。
+    # 为什么不用"有没有 groupIds"：带图标的节点，形状 / 标签 / 图标挂同一个组号
+    # （标签解绑后靠分组才能在编辑器里一起动），圆柱顶盖也带组号 —— 那条旧判据
+    # 会把它们全算错。
+    node_ids = {"node-" + e["id"][len("title-"):] for e in elements
+                if e["type"] == "text" and e["id"].startswith("title-")}
+    rects = [e for e in elements
+             if e["type"] in NODE_TYPES and e["id"] in node_ids]
     arrows = [e for e in elements if e["type"] == "arrow"]
+    # 自由文字（不绑容器的）：图标题 / 区域标题 / 卡片 / 边标签都算这一桶。
+    # 节点自己的标题与说明**即使解绑了**（带图标的节点会解绑）也不算 ——
+    # 它们在节点里面，"标签压线"那类问题跟它们无关。
     labels = [e for e in elements
-              if e["type"] == "text" and not e.get("containerId")]
+              if e["type"] == "text" and not e.get("containerId")
+              and not e["id"].startswith(("title-", "detail-"))]
 
     # P2：连线穿过**别的**节点（自己的两端不算）
     through = 0

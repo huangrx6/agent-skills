@@ -158,6 +158,13 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
     if has_detail:
         bound.append({"type": "text", "id": detail_id})
     bound += [{"type": "arrow", "id": a} for a in arrows_out + arrows_in]
+    # 带图标的节点例外：标签要**解绑**才能让"图标 + 文字"整组居中，见下面那段。
+    # 带说明的节点同样解绑 —— **一个容器只能有一个绑定文字**，Excalidraw 只画第一个：
+    # 标题绑了容器，说明就永远不出现（JSON 里明明有那个元素，渲染器就是不画）。
+    # 实测见 references/validation.md（2026-09-16：解绑后说明立刻出现）。
+    free_text = bool(icon_src) or has_detail
+    if free_text:
+        bound = [{"type": "arrow", "id": a} for a in arrows_out + arrows_in]
 
     kind = node.get("kind")
     emphasis = node.get("emphasis", palette.DEFAULT_EMPHASIS)
@@ -181,18 +188,20 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
 
     # 图标（可选）与文字的摆放，要按**真实 Excalidraw 的规矩**来算。
     #
-    # 关键事实（实测）：绑定到容器的文字，官方会把它**水平居中于容器**，并且
-    # 重算位置 —— 我们写进去的 x 只影响预览。第一版不知道这一点，按“图标在左、
-    # 文字在剩余区域居中”算（文本中心 173.6 vs 节点中心 154.7，偏了 19px），
-    # 于是真实渲染里就成了“文字居中、图标丢在左边”。用户的原话：
-    # “为什么图标这么靠左，你要考虑整体的协调啊”。
+    # 关键事实（官方渲染实测，复核工具见 dev-tools/export_excalidraw.py）：
+    # `containerId` 非空的文字，官方会**自己重算位置、水平垂直居中于容器**，
+    # 我们写进去的 x/y 只影响预览。所以"图标 + 文字"整组居中，在**绑定**的前提下
+    # 数学上做不到：文字被钉在容器中心，只把图标贴到可见文字左边，整组重心就
+    # 必然偏左 (图标宽 + 间隔) / 2。实测 19px —— 这就是用户那句"图标和文本，
+    # 不应该居中吗"。
     #
-    # 推论：文字的位置不在我们手里（它总在容器中心），所以“图标+文字整体居中”
-    # **在数学上做不到** —— 强行去居中会让图标和文字叠在一起。
-    # 能做且正确的是：让图标**紧贴可见文字的左边**，间隔就是设计值。
-    # 代价是整组视觉重心比中心偏左 (图标宽 + 间隔) / 2 ≈ 19px —— 在 300px 宽的
-    # 节点上是 6%，基本看不出来；而换成“把文字解绑”能完美居中，但拖动节点时
-    # 文字会留在原地，那是功能倒退，不能接受。
+    # 解法：**带图标的节点，标签不绑容器**（`containerId: None`）。官方就按我们给的
+    # 坐标落笔（已实测：写 145.6，渲染出来就是 145.6），整组于是能精确居中。
+    # 带说明的节点同样解绑（原因不同：一个容器只认一个绑定文字，见上面 `free_text`）。
+    # 代价与补偿：解绑后改标签不会自动重排，且拖动形状时文字不会跟着走 ——
+    # 所以形状 / 图标 / 标签**同挂一个 groupId**，在编辑器里它们仍是一体。
+    # （本项目的"有 groupId 的就不是节点"那条判据随之改成**按 id 前缀认节点**。）
+    # 没有图标也没有说明的节点不牵涉这件事，保持绑定。
     icon_w = 0.0
     height = icon_height if icon_height else icons.ICON_HEIGHT
     if icon_src:
@@ -200,28 +209,65 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
         icon_w = icons.intrinsic_size(icon_src)[0] * scale
 
     gap = (layout_gap() if icon_w else 0.0)
-    # 文字元素本身就是个居中的盒子（宽度 = 断行宽度），可见文字在它里面居中 ——
-    # 所以“可见文字的左边界”是下面这个，而不是盒子的左边界。
-    visible_w = max([tm.weighted_units(line) for line in text.lines]
-                    + [tm.weighted_units(line) for line in text.detail_lines]
-                    or [0.0]) * text.font_size
+    # 可见文字宽度：**每桶按自己的字号算**（标题 16px、说明 12px）。
+    # 拿标题字号去乘说明行会高估 33% —— 说明变宽之后这个高估直接超出框宽，
+    # 图标就被推到左边框外面去了（用户截图里的溢出就是这么来的，2026-09-16 修）。
+    label_visible = (max([tm.weighted_units(line) for line in text.lines] or [0.0])
+                     * text.font_size)
+    detail_visible = (max([tm.weighted_units(line) for line in text.detail_lines] or [0.0])
+                      * tm.FONT_DETAIL)
+    visible_w = max(label_visible, detail_visible)
     center = placed.x + placed.width / 2.0
-    tx = center - content_w / 2.0          # 与真实渲染一致（官方会把它放这里）
+    # 有图标时：文字中心右移半个"图标位"，让 (图标 + 间隔 + 可见文字) 整组居中；
+    # 没有图标时就是盒子中心。
+    text_center = center + (icon_w + gap) / 2.0 if icon_src else center
+    tx = text_center - content_w / 2.0
+    # 自由文字还是绑定文字：
+    #  - 有图标 → 必须自由，否则整组居中做不到（见下面那段）；
+    #  - 有说明 → 必须自由，否则 Excalidraw 只画容器里的第一个绑定文字（标题），
+    #    说明永不出现；而且两个绑定文字会互相压在一起（标题被拉回容器中心）。
+    # 其余（只有标题）保持绑定 —— 那个在编辑器里更顺手（改完自动重排）。
+    label_container = None if free_text else shape_id
+
+    node_group = [_eid("group", nid)] if free_text else []
+    if node_group:
+        # 形状、圆柱顶盖、图标、标签同组：解绑之后它们必须靠分组才能"一起动"
+        for el in elements:
+            if el["groupIds"]:
+                if node_group[0] not in el["groupIds"]:
+                    el["groupIds"] = list(el["groupIds"]) + node_group
+            else:
+                el["groupIds"] = list(node_group)
 
     if icon_src:
-        icon_left = center - visible_w / 2.0 - gap - icon_w
-        icon_left = max(icon_left, placed.x + tm.PADDING_X)   # 不越出内边距
-        # 竖向与**文字块**对齐（不是与整个可放字区域）—— 带 detail 的节点里
-        # 文字是两行，图标对着那两行的中心才协调。
-        elements += icons.place(icon_src, icon_left,
-                                top + (title_h + detail_h) / 2.0 - height / 2.0,
-                                key=_eid("icon", nid), target_height=height)
+        # 图标紧贴可见文字的左边（间隔 = 设计值），竖向与文字块中心对齐。
+        # 位置由"整组居中"推出来；**框在布局阶段已经适配过内容宽度**
+        # （layout.boxes_from_spec：宽 ≥ 内边距×2 + 图标 + 间隔 + 可见文字），
+        # 所以这里算出来必定在框内，不需要（也不应该）钳位 —— 钳位只会把图标
+        # 推到文字底下，看起来像"图标没了"（用户 2026-09-16 的反馈）。
+        icon_left = text_center - visible_w / 2.0 - gap - icon_w
+        icon_els = icons.place(icon_src, icon_left,
+                               top + (title_h + detail_h) / 2.0 - height / 2.0,
+                               key=_eid("icon", nid), target_height=height,
+                               # 单色素材用**所属节点自己的描边色**（图标与框同色）；
+                               # 多色素材（品牌 logo）保留配色，按画布对比度压到可读。
+                               # 策略由样式轴 `style.icons` 决定（auto / ink / native）
+                               stroke=stroke,
+                               canvas=palette.CANVAS.get("background"),
+                               colours=palette.resolve_style(style).get("icons", "auto"))
+        for el in icon_els:
+            el["groupIds"] = list(el["groupIds"]) + node_group
+        elements += icon_els
 
-    elements.append(_text_block(title_id, shape_id, text.lines, tx, top,
-                                content_w, text.font_size))
+    labels = [_text_block(title_id, label_container, text.lines, tx, top,
+                          content_w, text.font_size)]
     if has_detail:
-        elements.append(_text_block(detail_id, shape_id, text.detail_lines, tx,
-                                    top + title_h, content_w, tm.FONT_DETAIL))
+        labels.append(_text_block(detail_id, label_container, text.detail_lines,
+                                  tx, top + title_h, content_w, tm.FONT_DETAIL))
+    if node_group:
+        for el in labels:
+            el["groupIds"] = list(node_group)
+    elements += labels
     return elements
 
 
@@ -366,8 +412,9 @@ def region_elements(region: dict, style: dict | None = None,
     数组顺序，区域是背景 —— 后进数组的话它会盖住里面的节点（参考图里节点是
     清清楚楚压在网格上面的）。
 
-    ⚠️ 贴一个 `groupIds`：本项目"没有 groupId 的才是节点"这条判定靠它区分装饰
-    与节点（见 `node_elements` 附近的说明）。区域是装饰，不带它会把自己混进节点。
+    ⚠️ 贴一个 `groupIds`：装饰件靠它被认出来（**认节点看 id 前缀 `node-`**，
+    不再看有没有组号 —— 带图标的节点形状/标签/图标也挂着组号，见
+    `node_elements` 附近的说明）。区域是装饰，不带会把自己混进节点。
 
     颜色走**层级**而不是写死：`tint`（默认）用极轻的一片，`critical` 用来圈
     "这一段是异常路径"。区域是图上**唯一的整片颜色** —— 在节点只能承载
@@ -428,11 +475,13 @@ def region_elements(region: dict, style: dict | None = None,
     return elements
 
 
-def _text_block(el_id: str, container_id: str, lines: tuple[str, ...],
+def _text_block(el_id: str, container_id: str | None, lines: tuple[str, ...],
                 x: float, y: float, content_width: float, font_size: float) -> dict:
-    """一个容器绑定的文字块。
+    """一个文字块。`container_id` 为空 = **自由文字**。
 
-    x/y 只是初值 —— Excalidraw 对 `containerId` 非空的文字会自己重算位置与换行（见模块顶部那条限制）。
+    x/y 对绑定文字只是初值 —— Excalidraw 对 `containerId` 非空的文字会自己重算
+    位置与换行（见模块顶部那条限制）；`container_id=None`（自由文字）则**完全按
+    我们给的位置落笔**，图标节点就是靠这一点让"图标 + 文字"整组居中。
     高度只由行数与字号决定。
     """
     text = "\n".join(lines)
@@ -726,7 +775,7 @@ def edge_label_element(edge: dict, index: int, obstacles: list | None = None,
     el_id = _eid("elabel", f"{edge['from']}-{edge['to']}", index)
     el = _base(el_id, "text", x, y, width, height,
                palette.CANVAS["text"], "transparent", extra={"roundness": None})
-    # **底色常开**（模仿 archify 的 label mask）：每个标签都垫一枚画布色小牌。
+    # **底色常开**：每个标签都垫一枚画布色小牌。
     # 以前只在“搜不到干净位置”时才铺，但“线从字旁边掠过”在密集图上同样难读；
     # 常开后线到字跟前断开，任何位置都读得清。`needs_backdrop` 保留在返回值里，
     # 只是“这个位置被穿过”的机器可读标记（测试与预览用它）。
@@ -836,7 +885,7 @@ def title_element(title: str | None) -> dict | None:
     }
 
 
-# ── 结论卡片（模仿 archify 的 cards：支撑性细节放卡片，不堆进图里）────
+# ── 结论卡片（cards：支撑性细节放卡片，不堆进图里）────
 # 几何与折行住在 `layout.card_rows`（两个后端同一份推导，常量也在那边）；
 # 这里只负责把排好的卡落成 Excalidraw 元素。
 
@@ -844,8 +893,9 @@ def title_element(title: str | None) -> dict | None:
 def card_elements(laid: list[dict], level: str = "tint") -> list[dict]:
     """卡片 = 便签风矩形（虚线框 + 极轻填充）+ 标题 + 条目。
 
-    与区域同一条规矩：挂 `groupIds`（装饰不是节点）；文字**不绑容器**
+    与区域同一条规矩：挂 `groupIds`（装饰件都挂组号）；文字**不绑容器**
     （卡片不是可拖址的节点，自由文字的位置我们自己算得准）。
+    认节点看 id 前缀（`node-`），不看有没有组号。
     """
     if level not in palette.LEVELS:
         level = "tint"
@@ -884,7 +934,8 @@ def card_elements(laid: list[dict], level: str = "tint") -> list[dict]:
         if card["item_lines"]:
             text = "\n".join(card["item_lines"])
             w = max(tm.weighted_units(l) for l in card["item_lines"]) * tm.FONT_DETAIL
-            h = len(card["item_lines"]) * tm.FONT_DETAIL * tm.LINE_HEIGHT
+            # 行距用卡片段位（CARD_ITEM_LINE_HEIGHT），与 card_rows 算高度同一个数
+            h = len(card["item_lines"]) * tm.FONT_DETAIL * L.CARD_ITEM_LINE_HEIGHT
             elements.append({
                 **_base(_eid("card-items", gid), "text", tx, ty, round(w, 2),
                         round(h, 2), palette.CANVAS["text"],
@@ -893,7 +944,7 @@ def card_elements(laid: list[dict], level: str = "tint") -> list[dict]:
                 "fontSize": tm.FONT_DETAIL,
                 "fontFamily": palette.CANVAS["font_family"],
                 "textAlign": "left", "verticalAlign": "top",
-                "containerId": None, "lineHeight": tm.LINE_HEIGHT,
+                "containerId": None, "lineHeight": L.CARD_ITEM_LINE_HEIGHT,
                 "baseline": round(tm.FONT_DETAIL * BASELINE_RATIO, 2),
                 "strokeWidth": 1,
             })
@@ -1237,7 +1288,7 @@ def _check_layout():
 
 
 def _atomic_write(path: str, payload: str) -> None:
-    """先写同目录临时文件，再原子换入（模仿 archify 的 deliver 提交）。
+    """先写同目录临时文件，再原子换入。
 
     为什么不直接写目标：写到一半被打断（磁盘满 / 进程被杀）会留下**半个文件**，
     而它看起来和正常产物一样 —— 同目录临时文件 + `os.replace` 保证目标路径上
@@ -1259,10 +1310,11 @@ def _atomic_write(path: str, payload: str) -> None:
 
 def _delivery_receipt(out_path: str, spec_path: str, spec_bytes: bytes,
                       artifact: str, receipt: dict) -> None:
-    """三档声明 + SHA-256 双回执（模仿 archify 的交付声明）。三档互不冒充：
+    """三档声明 + SHA-256 双回执。三档互不冒充：
 
     1. 确定性校验 —— 本脚本机器可证；
     2. 自研预览渲染 —— 未验证，须 dev-tools/preview.py 或 excalidraw.com 核对；
+       要渲染器自己画的图用 dev-tools/export_excalidraw.py（官方导出）；
     3. 感知审查 —— pending，**只能人眼看真实渲染**；校验全绿 ≠ 图讲清楚了。
     """
     digest = lambda b: hashlib.sha256(b).hexdigest()
@@ -1270,7 +1322,7 @@ def _delivery_receipt(out_path: str, spec_path: str, spec_bytes: bytes,
     passed = sum(1 for c in checks if c.get("ok"))
     print("── 交付回执 ──")
     print(f"确定性校验: 通过（{passed}/{len(checks)} 项，档位 {receipt.get('quality', 'standard')}）")
-    print("自研预览渲染: 未验证（需 dev-tools/preview.py 或在 Excalidraw 里打开核对）")
+    print("自研预览渲染: 未验证（官方导出 dev-tools/export_excalidraw.py，或预览 dev-tools/preview.py，或在 Excalidraw 里打开核对）")
     print("感知审查: pending（校验全绿 ≠ 图讲清楚了；须人眼看真实渲染）")
     print(f"规格 sha256: {digest(spec_bytes)[:16]}…  "
           f"产物 sha256: {digest(artifact.encode('utf-8'))[:16]}…")

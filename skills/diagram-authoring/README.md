@@ -22,8 +22,9 @@ npx skills add <repo> --skill diagram-authoring --global
 ```
 
 依赖：**核心链路零依赖**（只用 Python 标准库）。
-只有 `dev-tools/preview.py`（用它自己目视复核 PNG 时）需要 PIL —— 它刻意放在 `dev-tools/`
-而不是 `scripts/`，就是为了让「出图零依赖」这句话不被含糊掉。
+`dev-tools/preview.py`（自研预览，需 PIL）与 `dev-tools/export_excalidraw.py`
+（官方导出，需本机有 Chrome，首次联网拉官方包）也在 `dev-tools/` 下 ——
+它们刻意不放在 `scripts/`，就是为了让「出图零依赖」这句话不被含糊掉。
 
 ## 配置
 
@@ -60,9 +61,9 @@ python3 scripts/emit_drawio.py my.diagram.json
 用仓库自带的示例规格跑一遍（已实测）：
 
 ```sh
-$ python3 scripts/emit_excalidraw.py tests/fixtures/specs/01-architecture.json -o /tmp/arch.excalidraw
+$ python3 scripts/emit_excalidraw.py ../../tests/diagram-authoring/fixtures/specs/01-architecture.json -o /tmp/arch.excalidraw
 ✓ /tmp/arch.excalidraw  （14 个节点 / 14 条边 / 50 个元素 / 交叉 0）
-$ python3 scripts/emit_drawio.py tests/fixtures/specs/01-architecture.json -o /tmp/arch.drawio
+$ python3 scripts/emit_drawio.py ../../tests/diagram-authoring/fixtures/specs/01-architecture.json -o /tmp/arch.drawio
 ✓ 已写出 /tmp/arch.drawio（14 个节点 / 14 条边 / 98 行 XML）
 ```
 
@@ -84,9 +85,12 @@ $ python3 scripts/emit_drawio.py tests/fixtures/specs/01-architecture.json -o /t
 | `.drawio` 结构自检 | `check_drawio.py x.drawio` | `id=0/1`、id 唯一、引用完整、几何合法；**打不开的图在这里拦住** |
 | 量文字尺寸 | `text_metrics.py "节点标题"` | 文字 → 容器尺寸的实际推算 |
 | 看色板 | `palette.py` | 打印色板与 `kind` 的合法取值 |
+| 找/取图标（官方目录） | `icons_fetch.py --search <中文关键词>` / `--get "<库名>"` | 官方素材库目录（200+ 个库、几千个图形）里搜与取；取到本地缓存后用 `--library <库名>`。**需要联网**，仅用于图标 |
 | 挑主题方向 | `direction_preview.py` | **用户没指定风格时**出图前跑它，5 个方向并排给人挑 |
 | 在官网接着画 | `open_excalidraw_com.py x.excalidraw` | 起一个只服务单文件、只允许 excalidraw.com 的本地服务，用 `#url=` 导入官网画布（已实测：23 个元素全进画布、可直接接着改） |
-| 目视复核 | `dev-tools/preview.py x.excalidraw out.png` | **需要 PIL**；给我自己看排版用的，不是运行时的一部分 |
+| 目视复核（自研预览） | `dev-tools/preview.py x.excalidraw out.png` | **需要 PIL**；画的是我们自己的布局模型，看不见渲染器差异 |
+| 真实渲染（官方导出） | `dev-tools/export_excalidraw.py x.excalidraw -o x.png --svg x.svg --scale 2` | **需要 Chrome**；走 Excalidraw 官方 `exportToBlob`/`exportToSvg`，出的是**渲染器自己画**的 PNG/SVG |
+| drawio 导出（官方 CLI） | `dev-tools/export_drawio.py x.drawio -o x.png --scale 2 [--border 48] [--embed]` | **需要 draw.io 桌面版**；**已实测**（31.4.5，macOS）：PNG/SVG/PDF 都对。默认留白 48 图内单位（官方默认 0 会贴边，且官方把 border 分得不均）；`--crop` 只对 PDF 有效、`-t` 被文件自带的底色挡住 —— 这几种"看着成功其实没生效"的组合会被工具**明确报出**，不静默 |
 
 **两个后端怎么选**：要标准图元（云/K8s/UML/BPMN/泳道）或要导出 PNG/PDF/SVG → draw.io；
 其余（默认）→ Excalidraw。拿不准就问「给谁看、要不要导出成图片」。细节见
@@ -122,17 +126,19 @@ diagram-authoring/
 │   ├── icons.md            # 图标（内置 sigil + 素材库）：怎么查、怎么选、为什么它是外部尺寸来源
 │   ├── excalidraw-backend.md  # 默认后端：plain JSON 的理由、官网接着改、它自己重排文字这个限制
 │   └── drawio-backend.md   # 另一个后端：不压缩 XML、形状映射表、与 Excalidraw 有意不同的地方、导出步骤
-├── scripts/                # 校验 / 布局 / 两个后端出图 / 结构自检 / 文字测量 / 色板 / 素材 / 内置 sigil / 方向与配色预览 / 官网打开 / 场景路由 guide
-├── dev-tools/preview.py    # 出 PNG 供目视复核（需 PIL，非运行时）
-├── benchmarks/first-pass/  # first-pass 可用性基准：manifest + 三门验证器 + 协议（模仿 archify ordinary-model-floor）
+├── scripts/                # 校验 / 布局 / 两个后端出图 / 结构自检 / 文字测量 / 色板 / 素材 / 内置 sigil / **官方素材库搜索下载** / 方向与配色预览 / 官网打开 / 场景路由 guide
+├── dev-tools/
+│   ├── preview.py          # 自研预览：出 PNG 供目视复核（需 PIL，非运行时）
+│   ├── export_excalidraw.py # 官方导出：真实渲染 PNG/SVG（需 Chrome，非运行时）
+│   └── export_drawio.py    # draw.io 官方 CLI 导出的封装（需 draw.io 桌面版；已实测 31.4.5）
+├── benchmarks/first-pass/  # first-pass 可用性基准：manifest + 三门验证器 + 协议（普通模型第一次生成能不能用）
 └── evals/
     └── evals.json          # 6 条行为评估（不写坐标 / 类型判断 / 风格先问 / 报告改内容）
 ```
 
 ## 边界（不该用它的时候）
 
-- 想**写 / 整理 / 归位**笔记 → `obsidian-personal-knowledge-base`。
-- 想**记录已完成的工作、写发版文档** → `obsidian-work-log-release-recorder`。
+- 想**写 / 整理 / 归位**笔记、**记录已完成的工作、写发版文档** → 不属于本 skill 的边界（它只画解释性技术图）。
 - 想做装饰性插图、海报、线框图 → 它只画解释性技术图，这类需求不接。
 
 ## 验证
@@ -140,8 +146,8 @@ diagram-authoring/
 ```sh
 cd skills/diagram-authoring
 python3 -m unittest discover -s tests/<skill> -v     # 全绿（约 11 秒）
-python3 scripts/emit_excalidraw.py tests/fixtures/specs/07-regions.json -o /tmp/a.excalidraw
-python3 scripts/emit_drawio.py tests/fixtures/specs/07-regions.json -o /tmp/a.drawio
+python3 scripts/emit_excalidraw.py ../../tests/diagram-authoring/fixtures/specs/07-regions.json -o /tmp/a.excalidraw
+python3 scripts/emit_drawio.py ../../tests/diagram-authoring/fixtures/specs/07-regions.json -o /tmp/a.drawio
 ```
 
 「通过」的意思是：规格的封闭字段集挡住了含坐标/未知 kind 的写法；七份示例规格都能出图；
@@ -156,5 +162,5 @@ python3 scripts/emit_drawio.py tests/fixtures/specs/07-regions.json -o /tmp/a.dr
 | 「元素间隙」「文字溢出」两项校验 | 是**后置断言**：坐标与尺寸出自同一批参数，构造上不可能失败。真报了是脚本内部不一致，不是内容有问题 |
 | 「交叉数」是软项 | 不挡输出，但**仍然会被调参** —— 把它当成「不报错」会不知道它到底调没调 |
 | 一批常量标着**待验证** | 断行档位 10/16/24、`nodeSeparation`/`rankSeparation` 120、阈值 12/24px、车道步长 34、区域标题字号 20…… 都来自前作数值与常识起点，**没有用真实数据校准过**（清单在 `references/diagram-spec.md` 的参数表里） |
-| `dev-tools/preview.py` 的盲区 | 它画的是我们自己的布局模型（与 `layout.py` 同源），所以**构造上**看不见「渲染器与模型不一致」这类问题 —— 那类只有真实 Excalidraw 才算数 |
+| `dev-tools/preview.py` 的盲区 | 它画的是我们自己的布局模型（与 `layout.py` 同源），所以**构造上**看不见「渲染器与模型不一致」这类问题 —— 那类只有真实 Excalidraw 才算数（要看就拿 `dev-tools/export_excalidraw.py` 出图，它走官方导出） |
 | `#url=` 导入官网 | 实测跑通，但它依赖 Excalidraw 的一个无 UI 入口（PR #2726）；官网改版就可能失效 |

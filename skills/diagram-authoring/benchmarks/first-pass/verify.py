@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""first-pass 基准的验证器 —— 三门：语义 / 确定性校验 / 人审（模仿 archify 的 benchmark.mjs）。
+"""first-pass 基准的验证器 —— 三门：语义 / 确定性校验 / 人审。
 
 ## 它量什么
 

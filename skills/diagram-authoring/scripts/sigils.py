@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """内置语义 sigil —— 不依赖外部素材库的 16px 极简图形。
 
-## 为什么要有这一层（模仿 archify 的 semantic sigil）
+## 为什么要有这一层
 
-archify 每个节点左上角有一个 16×16 的语义小图形（浏览器窗 / 括号 / 圆柱 /
-盾牌……），由渲染器自绘、随语义类型自动上色 —— **零外部依赖、宽度可控**。
+每个节点放一个小小的 16px 语义图形（浏览器窗 / 括号 / 圆柱 / 盾牌……），
+由脚本自绘、随当前画布墨色上色 —— **零外部依赖、宽度可控**。
 
 本 skill 原有的 `icon` 字段指向外部 `.excalidrawlib` 素材库：库不在，图标就
 用不了。这一层补上"常用语义图标不装库也能用"：`icon: "database"` 这类**内置名**
@@ -65,7 +65,7 @@ def _rect(x: float, y: float, w: float, h: float, stroke: str, i: int) -> dict:
 
 # ── 图形目录（每个都是 0..16 坐标框里的原始元素列表）─────────────
 #
-# 造型参考 archify 的 SIGIL_SHAPE，但用 Excalidraw 原语（线/椭圆/矩形）重画 ——
+# 造型是自绘的：用 Excalidraw 原语（线/椭圆/矩形）拼出可辨识的极简轮廓 ——
 # 手绘抖动由渲染器的 roughness 提供，这里只给几何。
 def _user(s: str) -> list[dict]:
     return [

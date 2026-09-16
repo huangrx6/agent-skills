@@ -257,3 +257,32 @@ class TestTypeEnumHasOneSource(unittest.TestCase):
             spec = {"type": name, "nodes": [], "edges": []}
             codes = {i["code"] for i in self.mod.validate(spec).errors}
             self.assertNotIn("BAD_TYPE", codes, f"{name} 被白名单接受但校验报 BAD_TYPE")
+
+
+class TestCardsSpec(unittest.TestCase):
+    """cards 字段契约：封闭字段集 + 空卡不静默。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.V = _load("validate_spec_dv", os.path.join(SCRIPTS, "validate_spec.py"))
+
+    def _spec(self, cards):
+        return {"type": "architecture",
+                "nodes": [{"id": "a", "label": "A", "kind": "service"},
+                          {"id": "b", "label": "B", "kind": "service"}],
+                "edges": [{"from": "a", "to": "b"}],
+                "cards": cards}
+
+    def test_valid_cards_pass_validation(self):
+        self.assertEqual([], self.V.validate(self._spec(
+            [{"title": "说明", "items": ["一条", "两条"]}])).errors)
+
+    def test_unknown_card_field_fails(self):
+        errors = self.V.validate(self._spec(
+            [{"title": "t", "items": ["x"], "color": "#fff"}])).errors
+        self.assertTrue(any(e["code"] == "UNKNOWN_FIELD" for e in errors),
+                        "cards 也是封闭字段集")
+
+    def test_empty_items_fail(self):
+        errors = self.V.validate(self._spec([{"title": "t", "items": []}])).errors
+        self.assertTrue(any(e["code"] == "MISSING_CARD_ITEMS" for e in errors))

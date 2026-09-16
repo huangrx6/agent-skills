@@ -100,7 +100,7 @@ STEPPABLE = frozenset({"gap", "edge", "crossing", "through", "overlap", "slant"}
 # 刚刚好压在实测带之上：宁可当保安，不当噪声源。
 BEND_MAX = 4
 
-# ── 质量两档（模仿 archify 的 quality_profile）─────────────────────
+# ── 质量两档（quality_profile：standard / showcase）──────────────
 #
 # standard（默认）= 现有行为：软项报告不阻塞。
 # showcase = 交付档：把「结构上不该出现」的软项升级为阻塞 —— 调参循环
@@ -113,7 +113,7 @@ QUALITY_LEVELS = ("standard", "showcase")
 SHOWCASE_HARD = frozenset({"crossing", "overlap", "slant", "bend",
                            "intersect", "through"})
 
-# ── 桌面可读性下限（模仿 archify 的 desktop-readability）──────────
+# ── 桌面可读性下限（投影字号）──────────────────────────────────
 #
 # 图按宽度缩到一块典型阅读屏里时，最小的字投影后还有多大？
 # 参考 width 960 = 一块笔记本主区；低于 6px 的字在那个尺度上已不可读。
@@ -695,9 +695,8 @@ def check_regions(spec: dict, result: ResultT, boxes: dict[str, BoxT]) -> list[I
 def check_readability(spec: dict, result: ResultT) -> list[Issue]:
     """图按宽度缩进一块典型阅读屏后，最小的字还有多大。
 
-    模仿 archify 的 `desktop-readability`：它用 `projected = font × min(1, 960/viewBoxWidth)`
-    保证交付产物在真实浏览器里不小于 6px。我们这里的对应物是“整张图缩到适合屏宽时”，
-    最小的字（次要说明那档，12px）投影后是否还看得见。
+    投影模型：`projected = font × min(1, 960/画布宽)` —— 图按宽度缩进一块典型阅读屏后，
+    最小的字（次要说明那档，12px）还有多大。低于 6px 在那个尺度上已不可读。
 
     为什么只告知、不阻塞也不调参：能修它的是**内容**（拆图 / 折行 / 降层级），
     间距参数对它只有反作用 —— 加大间距让画布更宽，投影更小。把它塞进调参循环
@@ -859,19 +858,19 @@ def layout_with_retry(spec: dict, boxes: dict[str, BoxT],
 
 
 # ── 报告 ────────────────────────────────────────────────────
-# ── 机器可读回执（模仿 archify 的修复回执）──────────────────
+# ── 机器可读回执（结构化诊断，供修复循环与基准消费）──────────
 def build_receipt(spec: dict, result: ResultT, attempts: list[Attempt],
                   outcome: Outcome, quality: str = "standard") -> dict:
-    """archify 风格的结构化诊断：code / severity / subject / evidence / suggestedFixes。
+    """结构化诊断：code / severity / subject / evidence / suggestedFixes。
 
     给**机器消费方**（emit 的交付门、基准的 verify、上游 agent 的修复循环）用；
     人看的报告仍然是 `format_report` 那三段。两套输出**同一份 Outcome**，不会各说各话。
 
-    与 archify 的两点刻意差异：
+    与「模型写坐标」那类渲染路线相比，两点刻意差异：
       1. **suggestedFixes 里不出现参数名** —— 那是本 skill 的硬规则（报告措辞由
          `_assert_no_param_names` 钉着），回执里同样遵守：建议全部是内容层的。
-      2. **不给具体坐标建议** —— archify 可以给（坐标是模型写的，脚本算一个更好的
-         还回去）；我们的坐标是脚本推导的，模型不该拿坐标，也就不该收坐标。
+      2. **不给具体坐标建议** —— 「模型写坐标」的路线可以给（坐标是模型写的，脚本算
+         一个更好的还回去）；我们的坐标是脚本推导的，模型不该拿坐标，也就不该收坐标。
          修复建议里能给的是“量到了什么 / 阈值是多少”，不是“挪到哪”。
     """
     if quality not in QUALITY_LEVELS:

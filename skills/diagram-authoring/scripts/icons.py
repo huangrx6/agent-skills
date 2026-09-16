@@ -44,6 +44,25 @@ import zlib
 
 # 图标放进节点盒子里的默认高度（没有给具体节点时用）。
 ICON_HEIGHT = 28.0
+# 图标**统一描边宽度**。为什么要有这个数：素材库是不同作者做的，同一个库里
+# 都能出现 strokeWidth 1 与 4 混用 —— 直接照抄进图里就成了"粗黑图标 + 细线图标"
+# 混在一起（用户 2026-09-16 反馈："图标风格不一致"）。所以 place() 落笔时一律改写成它。
+# 【待验证】2.0 是取了内置 sigil 那一档（两者必须看起来是一套），没有做过用户校准。
+ICON_STROKE_WIDTH = 2.0
+# 图标的粗糙度：与图纸的手绘调子一致（0 = 光滑，1 = 手绘）
+ICON_ROUGHNESS = 1
+# 图标里**允许保留的实心**上限：该元素面积 ≤ 图标整体包围盒的这个比例时算"细节"
+# （点、箭头头部），保留其实心；超过就当"大块实心"转成空心。
+# 为什么需要这条：素材里"整块填黑"的图形和"细线描边"的图形放在一张图上，
+# 是两套视觉语言（用户 2026-09-16："图标风格不一致"）。我们自己的 sigil 里
+# `_queue` 的三个点、`_plain` 的点也是实心，它们属于细节，必须留下。
+ICON_SOLID_MAX_SHARE = 0.25
+# 图标颜色在画布上的最低对比度。WCAG 对"非文本图形"的要求是 3:1 —— 照它来。
+# 为什么需要这条：品牌色常常在我们这套浅画布上读不出来（实测 AWS 橙 #FF9900
+# 对比度只有 2.04）。这时候**保留色相、往墨色压**，而不是丢掉颜色或让它糊掉。
+ICON_MIN_CONTRAST = 3.0
+# 图标颜色策略：auto（默认）/ ink（一律单色）/ native（原样保留）
+ICON_COLOUR_MODES = ("auto", "ink", "native")
 # 按**节点自身的高度**算图标高度，再夹到这个区间里。
 #
 # 为什么按比例而不是固定值：用户的原话是"让它更加适配每一个元素"——
@@ -89,16 +108,54 @@ class LibraryError(ValueError):
     """素材库本身的问题（读不了 / 格式不认识 / 名字不存在）。"""
 
 
+# 官方素材库的本地缓存目录（`scripts/icons_fetch.py` 往里下载）。
+# 它是**唯一**说"缓存在哪"的地方；取库的工具从这里读，避免两处各写一份。
+ICON_CACHE_ENV = "DIAGRAM_ICON_CACHE"
+
+
+def cache_dir(explicit: str | None = None) -> str:
+    env = os.environ.get(ICON_CACHE_ENV, "").strip()
+    base = explicit or env or os.path.join(
+        os.path.expanduser("~"), ".cache", "diagram-authoring", "libraries")
+    return os.path.expanduser(base)
+
+
+def cached_libraries(where: str | None = None) -> dict[str, str]:
+    """缓存里有哪些库：`{slug: 路径}`。slug 就是文件名去掉后缀。"""
+    got: dict[str, str] = {}
+    try:
+        entries = sorted(os.listdir(cache_dir(where)))
+    except OSError:
+        return got
+    for name in entries:
+        if name.endswith(".excalidrawlib"):
+            got[name[: -len(".excalidrawlib")]] = os.path.join(cache_dir(where), name)
+    return got
+
+
 def library_path(explicit: str | None = None) -> tuple[str | None, str]:
     """素材库路径从哪来：命令行 > 环境变量 > 配置文件。与 vault 路径同一套优先级。
 
     为什么不做成仓库内的配置：素材库是**几 MB 的第三方文件**，
     放进仓库既有体积问题也有许可问题。所以路径可配、文件不入库。
+
+    `--library` 还接受**缓存里的库名**（`scripts/icons_fetch.py --get` 下来的那些）：
+    写 `--library it-icons` 与写全路径等价 —— 名字对不上时把缓存里有什么列出来。
     """
     env = os.environ.get("EXCALIDRAW_LIBRARY", "").strip()
     config = os.path.expanduser("~/.config/excalidraw-library-path")
     if explicit:
-        return explicit, "命令行参数"
+        if os.path.isfile(explicit):
+            return explicit, "命令行参数"
+        hit = cached_libraries().get(explicit.strip()) or cached_libraries().get(
+            explicit.strip().lower())
+        if hit:
+            return hit, f"官方素材库缓存里的 {explicit!r}"
+        have = "、".join(sorted(cached_libraries())) or "（缓存是空的）"
+        return None, (f"命令行参数 {explicit!r} 既不是文件，本地缓存里也没有它；"
+                      f"缓存里有：{have}。"
+                      f"用 python3 scripts/icons_fetch.py --search <关键词> 从官方目录里找，"
+                      f"--get <库名> 下载")
     if env:
         return env, "环境变量 EXCALIDRAW_LIBRARY"
     if os.path.isfile(config):
@@ -177,9 +234,53 @@ def _scale_points(points: list, scale: float) -> list:
     return [[round(p[0] * scale, 2), round(p[1] * scale, 2)] for p in points]
 
 
+_PALETTE = None
+
+
+def _palette():
+    """惰性加载同目录的 palette。
+
+    本模块刻意**不在 import 期**依赖兄弟模块（方便单独测试、也避免循环）；
+    但"把颜色压到可读"这件事必须只有一份实现，它住在 palette 里。
+    """
+    global _PALETTE
+    if _PALETTE is None:
+        import importlib.util
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "palette.py")
+        spec = importlib.util.spec_from_file_location("_diagram_palette_for_icons", path)
+        if spec is None or spec.loader is None:
+            raise RuntimeError(f"加载不了 {path}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        _PALETTE = module
+    return _PALETTE
+
+
+def _readable(colour: str, ink: str, canvas: str | None) -> str:
+    """把一个颜色压到画布上可读（保留色相）—— 实现住在 `palette.readable_on`。"""
+    if not canvas or not colour.startswith("#"):
+        return colour
+    return _palette().readable_on(colour, ink, canvas, ICON_MIN_CONTRAST)
+
+
 def place(elements: list, left: float, top: float, *, key: str,
-          target_height: float = ICON_HEIGHT) -> list[dict]:
-    """把一项素材复制进场景：缩放到目标高度、移到 (left, top)、换成全新的 id。
+          target_height: float = ICON_HEIGHT,
+          stroke: str | None = None,
+          canvas: str | None = None,
+          colours: str = "auto") -> list[dict]:
+    """把一项素材复制进场景：缩放到目标高度、移到 (left, top)、换成全新的 id，
+    并把**风格统一**（描边粗细 / 颜色 / 粗糙度 / 填充）。
+
+    ## 为什么要统一风格（而不是"尊重素材原样"）
+
+    素材是不同作者做的：同一个库里都能出现 `strokeWidth: 1` 与 `: 4` 混用，
+    颜色有的是纯黑、有的是深灰，填充有的实心有的空。照抄进同一张图，结果就是
+    **粗黑图标和细线图标混着**（用户原话："图标风格不一致啊"）。
+
+    规矩：**描边粗细一律 `ICON_STROKE_WIDTH`；颜色一律用调用方给的墨色
+    （＝所属节点自己的描边色，所以图标与它所在的框同色）；有填充的图形
+    填充色也换成同一个墨色（保持"实心/空心"的设计，但不引入第二种颜色）。**
 
     ## 为什么必须重映射 id 与引用
 
@@ -206,6 +307,28 @@ def place(elements: list, left: float, top: float, *, key: str,
     group_id = f"{key}-group"
     id_map = {el["id"]: f"{key}-{i}" for i, el in enumerate(elements)}
 
+    # 图标整体包围盒 —— 用来判断某个实心元素是"细节"还是"大块"
+    glyph_x = min(el["x"] for el in elements)
+    glyph_y = min(el["y"] for el in elements)
+    glyph_w = max(el["x"] + el.get("width", 0) for el in elements) - glyph_x
+    glyph_h = max(el["y"] + el.get("height", 0) for el in elements) - glyph_y
+    glyph_area = glyph_w * glyph_h
+
+    # ── 颜色策略（见 ICON_MIN_CONTRAST / ICON_COLOUR_MODES）──
+    # 多色素材（品牌 logo、彩色图标）是**作品**：保留它的配色，只把读不出来的颜色压一压；
+    # 单色素材是**线描图形**：一律用墨色，跟图纸同一套语言。
+    distinct = {c.lower() for c in visible_colours(elements)}
+    multicolour = len(distinct) >= 2
+    keep_native = colours == "native" or (colours == "auto" and multicolour)
+    ink = stroke or elements[0].get("strokeColor") or "#000000"
+
+    def _colour(original: str) -> str:
+        if not keep_native:
+            return ink
+        if colours == "native":
+            return original
+        return _readable(original, ink, canvas)
+
     out: list[dict] = []
     for el, original in zip(elements, elements):
         new = copy.deepcopy(original)                   # 不动调用方的东西
@@ -216,6 +339,22 @@ def place(elements: list, left: float, top: float, *, key: str,
         new["height"] = round(original.get("height", 0) * scale, 2)
         new["groupIds"] = [group_id]
         new["frameId"] = None
+        # ── 风格统一（见函数说明）──
+        new["strokeWidth"] = ICON_STROKE_WIDTH
+        new["roughness"] = ICON_ROUGHNESS
+        new["opacity"] = 100
+        new["strokeColor"] = _colour(original.get("strokeColor") or ink)
+        # 实心处理：多色素材的实心**属于作品**（品牌 logo 的色块），保留；
+        # 单色素材里小面积实心（点 / 箭头头部）也保留，大块实心转空心
+        # —— 线描风格才是这一套图的统一语言。
+        filled = (original.get("backgroundColor") or "transparent") != "transparent"
+        area = (original.get("width") or 0) * (original.get("height") or 0)
+        detail = glyph_area > 0 and area / glyph_area <= ICON_SOLID_MAX_SHARE
+        if filled and (keep_native or detail):
+            new["backgroundColor"] = _colour(original["backgroundColor"])
+        else:
+            new["backgroundColor"] = "transparent"
+        new["fillStyle"] = "solid"
         new["seed"] = _seed(new["id"])
         new["versionNonce"] = _seed(new["id"] + "nonce")
         new["isDeleted"] = False
@@ -236,8 +375,10 @@ def place(elements: list, left: float, top: float, *, key: str,
             new["points"] = _scale_points(original["points"], scale)
         if original.get("fontSize"):
             new["fontSize"] = round(original["fontSize"] * scale, 2)
-        if original.get("strokeWidth"):
-            new["strokeWidth"] = round(original["strokeWidth"] * scale, 2)
+        # ⚠ 这里**刻意不**把 strokeWidth 按 scale 缩放。
+        # 按比例缩放看着"更忠实素材"，但它会让同一张图里 22px 的小图标与 44px 的
+        # 大图标描边粗细不同 —— 那正是用户说的"图标风格不一致"。
+        # 统一粗细（ICON_STROKE_WIDTH）才是这套图的目标：所有图标视觉重量一致。
         out.append(new)
     return out
 

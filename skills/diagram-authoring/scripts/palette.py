@@ -102,14 +102,19 @@ CORNER_STYLES = ("shape", "sharp", "round")
 LINE_STYLES = ("straight", "sketch", "rough")
 ROUGHNESS_OF = {"straight": 0, "sketch": 1, "rough": 2}
 
+ICON_COLOUR_MODES = ("auto", "ink", "native")
+
 STYLE_AXES: dict[str, tuple[str, ...]] = {
     "fill": FILL_STYLES,
     "stroke": STROKE_STYLES,
     "corners": CORNER_STYLES,
     "line": LINE_STYLES,
+    # 图标颜色：auto = 多色素材保留原色（压到可读）、单色素材用墨色；
+    # ink = 一律单色（严格蓝图风）；native = 原样保留（不管对比度）
+    "icons": ICON_COLOUR_MODES,
 }
 STYLE_DEFAULT = {"fill": "hachure", "stroke": "shape", "corners": "shape",
-                 "line": "sketch"}
+                 "line": "sketch", "icons": "auto"}
 
 
 def resolve_style(raw: dict | None) -> dict:
@@ -472,6 +477,24 @@ def contrast(a: str, b: str) -> float:
     la, lb = relative_luminance(a), relative_luminance(b)
     lighter, darker = max(la, lb), min(la, lb)
     return (lighter + 0.05) / (darker + 0.05)
+
+
+def readable_on(colour: str, ink: str, background: str,
+                minimum: float = 3.0) -> str:
+    """把 `colour` 压到在 `background` 上可读 —— **保留色相**，按 10% 一档往墨色混。
+
+    给谁用：多色素材（品牌 logo）保留配色时，有些颜色在画布上读不出来
+    （实测 AWS 橙 `#FF9900` 在浅画布上对比度只有 2.04）。混到够对比度就停，
+    都试完还不够就用墨色 —— 宁可丢掉颜色，也不留一个看不清的图形。
+    """
+    for step in range(0, 11):
+        candidate = colour if step == 0 else _mix(colour, ink, step / 10.0)
+        try:
+            if contrast(candidate, background) >= minimum:
+                return candidate
+        except ValueError:
+            return ink
+    return ink
 
 
 def saturation(colour: str) -> float:

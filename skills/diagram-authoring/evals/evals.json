@@ -34,7 +34,7 @@
     {
       "id": 6,
       "prompt": "把我刚才这张图的说明整理成一篇笔记，放进知识库里。",
-      "expected_output": "**不该触发本 skill** —— 它的 Do NOT 明确排除了「编辑 / 移动 / 整理笔记」，那属于 obsidian-personal-knowledge-base；如果是「记录已完成的工作 / 写发版文档」则属于 obsidian-work-log-release-recorder。正确行为是指出该用哪个 skill，而不是顺手把笔记写了。"
+      "expected_output": "**不该触发本 skill** —— 它的 Do NOT 边界明确排除了「编辑 / 移动 / 整理笔记」和「记录已完成的工作 / 写发版文档」。正确行为是说明这件事不在本 skill 的能力范围内（本 skill 只画解释性技术图），而不是顺手把笔记写了；各 skill 相互独立，不需要也不应该指名其他 skill。"
     }
   ]
 }

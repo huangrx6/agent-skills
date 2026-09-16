@@ -451,7 +451,7 @@ mkdir -p <deck项目>/styles/<名> && $EDITOR <deck项目>/styles/<名>/style.js
 解析只发生在 compile：assetId → `"assets/<file>"`（§14 优先级链 v1 —— **manifest 即
 选择**），页对象携带最终路径，渲染器不见 assetId；每条解析写进 compile trace
 （deck.py:522-530）。缺文件由 `check.py` 的「图片加载」门实测拦。
-清单的上游（`assets/requests/<槽位id>.json` 先要、图回来登记进 manifest）见
+清单的上游（图纸项目里的 `assets/requests/` 目录：先要一条槽位合同、图回来登记进 manifest）见
 `references/images.md`。
 
 ## seed 的不可替代性

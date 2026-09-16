@@ -918,7 +918,9 @@ class TestRegions(unittest.TestCase):
         self.assertGreater(region["height"], 0)
         self.assertAlmostEqual(
             region["label_height"],
-            len(region["label_lines"]) * L.REGION_LABEL_SIZE * 1.25, places=2)
+            len(region["label_lines"]) * L.REGION_LABEL_SIZE
+            * _load("tm_for_region_test", os.path.join(SCRIPTS, "text_metrics.py")).LINE_HEIGHT,
+            places=2)
         top_of_members = min(placed[n].y for n in ("a", "b"))
         self.assertLessEqual(region["label_y"] + region["label_height"],
                              top_of_members - L.REGION_PAD + 0.01)

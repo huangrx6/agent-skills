@@ -272,7 +272,7 @@ def validate(spec: dict) -> Issues:
         if pin is not None and pin not in PINS:
             issues.error("BAD_PIN", f"{where}.pin", f"pin 只允许 {sorted(PINS)}")
 
-    # cards：结论卡片（模仿 archify 的 cards —— 支撑性细节放卡片，不堆进图里）。
+    # cards：结论卡片 —— 支撑性细节放卡片，不堆进图里。
     # 与 group 同一条规矩：**写了却没内容就报错**，不让它静默不生效。
     cards = spec.get("cards", [])
     if cards is not None and not isinstance(cards, list):
