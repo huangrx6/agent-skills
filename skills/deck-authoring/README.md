@@ -103,7 +103,7 @@ python3 scripts/image_source.py --check your.spec.json             # 验尺寸�
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 224 条，约 3 分钟（负载敏感）（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 232 条，约 3 分钟（负载敏感）（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时两三分钟，
