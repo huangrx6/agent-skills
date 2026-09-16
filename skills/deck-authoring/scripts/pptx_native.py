@@ -53,7 +53,7 @@ from pptx.enum.dml import MSO_PATTERN
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
 from pptx.oxml.ns import qn
-from pptx.util import Emu, Pt
+from pptx.util import Emu, Inches, Pt
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -75,7 +75,7 @@ def _load_sibling(name: str):
 
 deckio = _load_sibling("deckio")
 measure_mod = _load_sibling("measure")
-brand_mod = _load_sibling("brand")     # 品牌 logo：路径解析 + 矢量栅格化
+deck_mod = _load_sibling("deck")       # 品牌 logo：路径解析 + 矢量栅格化
 
 # 1 CSS px = 0.75pt = 9525 EMU。版面 1600×900px → 1200×675pt。
 EMU_PER_PX = 9525
@@ -456,7 +456,7 @@ def build(html_path: str, out_path: str) -> dict:
                 # base=skill：品牌 logo 走的是**技能相对**路径（brands/<name>/logo.svg）。
                 # 内容图（image 字段）则是相对 HTML 的 —— 两种基准不能混。
                 if entry.get("src_base") == "skill":
-                    path = brand_mod.resolve_logo_ref(src)
+                    path = deck_mod.resolve_logo_ref(src)
                 else:
                     path = os.path.join(os.path.dirname(os.path.abspath(html_path)), src)
                 if not os.path.isfile(path):
@@ -464,11 +464,11 @@ def build(html_path: str, out_path: str) -> dict:
                     continue
                 # 原生 PPTX 只吃位图：矢量 logo 当场用 Chrome 栅格化。
                 # 栅格化不了会**明说**（异常带原因），不静默少一个 logo。
-                if role == "logo" and brand_mod.need_raster(src):
+                if role == "logo" and deck_mod.need_raster(src):
                     try:
                         # 传**实测的盒子尺寸**：栅格化要保住宽高比（第一版传了个标量，
                         # 出来是正方形，图要么被拉要么大片透明）。
-                        path = brand_mod.rasterize(path, box[2], box[3])
+                        path = deck_mod.rasterize(path, box[2], box[3])
                     except SystemExit as exc:
                         counts["skipped"] += 1
                         notes.append(str(exc))
@@ -490,11 +490,55 @@ def build(html_path: str, out_path: str) -> dict:
     return counts
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# 贴图模式（`--png-dir`）：每页截图 → 16:9 pptx，一页一张满版图。
+#
+# 为什么还留它：浏览器渲染是**唯一**能 100% 还原风格效果（错位/颗粒/网点/G2 图表）
+# 的路径。代价是每页一张图、**改不了字** —— 要改字回改 spec 再重出，或者用同文件
+# 的原生 shapes 模式（`pptx_native.py out.html`）。两条不能兼得，按要"像"还是要"改"选。
+# ═══════════════════════════════════════════════════════════════════════════
+def build_from_pngs(png_paths: list[str], out: str, width: int, height: int) -> None:
+    if width <= 0 or height <= 0:
+        raise SystemExit(f"✗ 版心必须是正数，收到 {width}x{height}")
+    prs = Presentation()
+    # 用整数运算算高度：`Emu(int(slide_width / ratio))` 先转 float 再取整，是多余的
+    # 精度往返，且 height=0 时会 ZeroDivisionError（前面已拦住）。
+    # `slide_width * height // width` 结果一样、全整数 —— 与 layout.py 同一手法：
+    # 遇到不需要转换的地方就换个写法，而不是加一个永远不会触发的 try。
+    slide_width = Inches(13.333)
+    slide_height = Emu(slide_width * height // width)
+    prs.slide_width = slide_width
+    prs.slide_height = slide_height
+    blank = prs.slide_layouts[6]                       # 空白版式，不放任何占位符
+    for path in png_paths:
+        slide = prs.slides.add_slide(blank)
+        slide.shapes.add_picture(path, Emu(0), Emu(0), width=slide_width, height=slide_height)
+    prs.save(out)
+
+
+
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(description="out.html → 可编辑 PPTX（原生 shapes）")
-    ap.add_argument("html")
+    ap = argparse.ArgumentParser(
+        description="PPTX：out.html → 可编辑（原生 shapes）；或 --png-dir 贴图模式")
+    ap.add_argument("html", nargs="?", help="原生模式：产出的 out.html")
+    ap.add_argument("--png-dir", default=None,
+                    help="贴图模式：shots.py 出的 page-*.png 目录（一页一张满版图）")
+    ap.add_argument("--width", type=int, default=1600)
+    ap.add_argument("--height", type=int, default=900)
     ap.add_argument("-o", "--out", required=True)
     args = ap.parse_args(argv[1:])
+    if args.png_dir:
+        import glob as _glob
+        pages = sorted(_glob.glob(os.path.join(args.png_dir, "page-*.png")))
+        if not pages:
+            raise SystemExit(f"✗ {args.png_dir} 里没有 page-*.png")
+        build_from_pngs(pages, args.out, args.width, args.height)
+        print(f"✓ 已写出 {args.out}（{len(pages)} 页贴图 / "
+              f"{os.path.getsize(args.out)} 字节）")
+        print("  · 每页是一张满版图：改不了字；要改字回改 spec 再重出")
+        return 0
+    if not args.html:
+        raise SystemExit("✗ 原生模式要给 out.html；贴图模式给 --png-dir")
     counts = build(args.html, args.out)
     print(f"✓ 已写出 {args.out}")
     print(f"  {counts['slides']} 页 / {counts['bytes'] / 1048576:.2f}MB / "

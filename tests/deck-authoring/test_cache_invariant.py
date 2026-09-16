@@ -58,6 +58,12 @@ from PIL import Image  # noqa: E402
 
 
 class TestCacheInvariant(unittest.TestCase):
+    """说明（v4）：原先这里还有两条"缓存图必须落在色板三角形里"的用例 ——
+    它们测的是 **plate.py 的双色调 + 半调制版后处理**（那张图会被压成两墨色，
+    所以能用三角形判定）。v4 删掉 plate.py：图片按原样使用，色板三角形判据
+    对真实照片不再适用（照片本来就有千百种颜色）。出图阶段的色彩约束改由
+    提示词 + `--brief` 的构图字段承担，见 references/images.md。
+    """
     def setUp(self) -> None:
         with open(TOKENS, encoding="utf-8") as fh:
             tokens = json.load(fh)
@@ -84,43 +90,9 @@ class TestCacheInvariant(unittest.TestCase):
         Image.new("RGB", SIZE, STRAY_RGB).save(path)
         return path
 
-    def test_stray_colored_cache_is_rejected_and_redone(self) -> None:
-        """塞一张彩图进缓存 → 必须被拒、缓存被替换、产物在三角形内。"""
-        prompt = "an image that must not survive the palette gate"
-        cached = self._seed_cache_with_stray_image(prompt)
-        before = cached + ".before"
-        os.rename(cached, before)
-        stray = Image.new("RGB", SIZE, STRAY_RGB)
-        stray.save(cached)
-
-        out = os.path.join(self._tmp.name, "out.png")
-        source = image_source.resolve(prompt, self.colors, SIZE, out)
-
-        self.assertNotEqual(source, "cache",
-                            "resolve() 认为是缓存命中 —— 没跑色板不变量就直接拷了")
-        with open(cached, "rb") as fh:
-            after_bytes = fh.read()
-        with open(before, "rb") as fh:
-            before_bytes = fh.read()
-        self.assertNotEqual(after_bytes, before_bytes,
-                            "缓存文件没被替换 —— 不合规图原样留下了")
-
-        self.assertEqual(image_source.in_palette(Image.open(out).convert("RGB"), self.colors), [],
-                         "拒绝后的重做产物仍有色板三角形外的颜色")
-
     def test_palette_detector_actually_flags_a_stray_color(self) -> None:
         """先证明检测器真的会红 —— 否则上一条"没报"可能只是检测器失灵。"""
         stray = Image.new("RGB", SIZE, STRAY_RGB)
         self.assertTrue(image_source.in_palette(stray, self.colors),
                         "检测器对明显异色没反应 —— 上一条用例的保证是假的")
 
-    def test_colorset_native_image_passes_the_detector(self) -> None:
-        """色板内的图必须过 —— 检测器不能对什么都说"违规"。"""
-        paper = image_source.treat_image._rgb(self.colors["background"])
-        clean = Image.new("RGB", SIZE, paper)
-        self.assertEqual(image_source.in_palette(clean, self.colors), [],
-                         "纯纸色被误判成越界 —— 三角形判定退化")
-
-
-if __name__ == "__main__":
-    unittest.main()

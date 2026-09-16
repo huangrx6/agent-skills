@@ -10,7 +10,7 @@
 4. 产物健康   **实测**：图片没加载 / 产物里的脚本报错
 5. 错位区间   从**产物 HTML** 里读实际写进去的 --dx/--dy/--rot，比对 token 区间
 6. 装饰不压文字 墨块必须落在安全区，不与文字栏相交
-7. 图表成比例 柱高两两之间必须与数据成比例（基准取数据最大那条，不拿图形最高那根）
+7. 图表就绪 数据形状对（label 非空 / value 是数字）+ G2 真渲染出来了（实测）
 8. 图表区无错位 图表容器（逐层配对地扫完整个容器）里不许出现 riso 错位元素
 
 **提示**（`advisories()`，不阻塞）：字体回退 —— 启发式，衬线撞衬线会误报。
@@ -54,8 +54,7 @@ ink = _load_sibling("ink")
 deckio = _load_sibling("deckio")   # IO 收口：读不到产物要报清楚，不甩 traceback
 measure_mod = _load_sibling("measure")   # 实测层：版面判断全部走它，不估算
 render_mod = _load_sibling("render")   # 只为拿“同一个风格”的 token（单一来源）
-brand_mod = _load_sibling("brand")     # 品牌资产（logo / 色板 / 字体）
-hierarchy_mod = _load_sibling("hierarchy")   # 文本预算 / 视觉焦点 / 密度
+deck_mod = _load_sibling("deck")       # 品牌资产 + 编译（原 brand/compile）
 grid_mod = _load_sibling("grid")     # 网格与间距（版面几何唯一来源）
 
 TOKENS = os.path.join(HERE, "..", "dev-tools", "style-fixture", "swiss-grid", "style.json")
@@ -318,7 +317,7 @@ def _check_brand(measured: dict, deck: dict, tokens: dict) -> tuple[list[str], l
     name = deck.get("brand")
     if not name:
         return problems, notes
-    brand = brand_mod.load(name)
+    brand = deck_mod.load(name)
     if name == "example":
         notes.append(
             "deck.brand=example 是**演示品牌**（ACME）——它只该出现在 dev-tools 的 "
@@ -348,7 +347,7 @@ def _check_brand(measured: dict, deck: dict, tokens: dict) -> tuple[list[str], l
 
     paper = tokens["colorSets"].get(
         render_mod.resolve_color_set(tokens, deck), {}).get("background", "#FFFFFF")
-    if brand_mod.is_dark_paper(paper) and not brand.get("logoInverse"):
+    if deck_mod.is_dark_paper(paper) and not brand.get("logoInverse"):
         notes.append(
             f"品牌 {name!r} 只给了一个 logo，而这张纸是深底（{paper}）—— "
             f"实测过：白底用的 logo 放到纯黑底上，深色那块会**直接消失**（只剩零星浅色）。"
@@ -474,7 +473,7 @@ def _check_deck_shape(measured: dict, deck: dict,
     if len(set(content_kinds)) == 1 and len(content_kinds) >= 3:
         notes.append(
             f"{len(content_kinds)} 页内容全是一种版式（{content_kinds[0]}）—— "
-            f"构图没有变化。用 fit.py 试排一下别的版式，或把其中几页拆/并")
+            f"构图没有变化。换一页的 layout（结构布局或自造布局），或把其中几页拆/并")
 
     # 图量：**全篇一张图都没有**时提示，并点名最该加图的那几页。
     #
@@ -592,54 +591,38 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     problems.extend(brand_problems)
     # 空内容与品牌无关，但它和越界一样是“一页看着坏了”—— 所以也走阻塞
     problems.extend(_check_empty_content(deck))
+    # 布局词表：风格声明了 layouts 时，spec 里拼错的布局名当场拦（v3 起布局是
+    # 自由字符串，拼错会让 skin 里那条规则永远不生效 —— 最难查的那种静默）。
+    problems.extend(_layout_vocab_problems(deck, tokens, deck.get("slides", [])))
 
     for i, slide in enumerate(deck["slides"], 1):
         declared = slide.get("color")
         if declared and declared != "overprint":
             problems.append(f"第 {i} 页 声明 color={declared!r} —— 主/副色不能承载文字，只允许 overprint")
 
-    # ④ 图表：柱高必须与数据成比例（独立复核，不看渲染器自觉），且图表区不许带错位
+    # ④ 图表：**G2 就绪 + 数据形状**（v4 —— 图表改由 AntV G2 渲染）
     #
-    # 数柱高**必须限定在该页的 <section> 里**。压测之前这里扫的是整页 ——
-    # 一页 deck 只有一张图时看不出问题，三张图时第一张会数到 6+2+3=11 根柱，
-    # 报"柱子 11 根 ≠ 数据 6 条"。那种假报错比不报更坏：它会把一个正常的 deck 挡住。
+    # 为什么不检查"柱高与数据成比例"了：那条门是为**手写 SVG 渲染器**设的
+    # （我们自己算柱高，就得自己复核）。v4 起几何由 G2 的编码算 —— 再量它的
+    # 像素等于用手量尺子。换成的两件事：
+    #   a) G2 真的渲染出来了（容器里有 canvas/svg，且没有 data-chart-error）；
+    #   b) 数据本身是对的（label 非空、value 是数字）—— 数据错才是真错。
     sections = page.split('<section class="slide"')[1:]
     for i, slide in enumerate(deck["slides"], 1):
         if slide.get("type") != "chart":
             continue
         block = sections[i - 1] if i - 1 < len(sections) else ""
-        heights: list[float] = []
-        chart_kind = (re.search(r'data-chart="([\w-]+)"', block) or [None, "bar"])[1]
-        # 柱数/比例检查只对**有柱子的图**有效：line/area/donut/scatter 没有 bar
-        # 元素，套这条检查会报"柱子 0 根 ≠ 数据 N 条"（实测：line 页挂过）。
-        if chart_kind not in ("bar", "bar-horizontal", "bar-stacked", "combo"):
-            continue
-        dim = "width" if chart_kind == "bar-horizontal" else "height"
-        for raw in re.findall(r'class="bar"[^>]*' + dim + r'="([^"]+)"', block):
-            num = _num(raw, f"第 {i} 页图表柱高", problems)
-            if num is not None:
-                heights.append(num)
-        values: list[float] = []
         for k, d in enumerate(slide.get("data", [])):
-            num = _num(str(d.get("value")), f"第 {i} 页图表 data[{k}].value", problems)
-            if num is not None:
-                values.append(num)
-        if len(heights) != len(values):
-            problems.append(f"第 {i} 页图表：柱子 {len(heights)} 根 ≠ 数据 {len(values)} 条")
-        elif values:
-            # **两两比例**判据，不是"对峰值归一"：一旦有一根被改高，峰值基准就跟着错，
-            # 于是六根全报（实测过 ✗）—— 那种输出等于没说清是谁错了。
-            # 两两比例与基准无关，只会指向真的那一根。
-            # 基准取**数据最大**的那条，不是图形最高的那根 —— 拿图形当基准的话，
-            # 被篡改的那根一旦成为最高，它自己就被跳过、而无辜的柱子被报（实测过 ✗）。
-            base = max(range(len(values)), key=lambda k: values[k])
-            for k, (h, v) in enumerate(zip(heights, values)):
-                if k == base or not values[base]:
-                    continue
-                want = heights[base] * v / values[base]
-                if abs(h - want) > 1.5:
-                    problems.append(f"第 {i} 页图表第 {k + 1} 根柱高 {h:.1f}px 与数据 {v} 不成比例"
-                                    f"（按最高那根的长度换算应为 {want:.1f}px）")
+            if not str(d.get("label", "")).strip():
+                problems.append(f"第 {i} 页图表 data[{k}].label 是空的 —— 轴上会缺一个标签")
+            _num(str(d.get("value")), f"第 {i} 页图表 data[{k}].value", problems)
+        # 就绪看**实测**（静态 HTML 里只有容器与 spec，判断不出来）
+        measured_chart = next((e for e in data.get("elements", [])
+                               if e.get("slide") == i and e.get("id") == f"s{i}.chart"), None)
+        state = (measured_chart or {}).get("chartReady")
+        if state and state.startswith("error"):
+            problems.append(f"第 {i} 页图表：G2 渲染失败（{state.split(':', 1)[1]}）"
+                            f" —— 产物里那一页是空的")
     # ④ 图表区无错位：**逐层配对**扫整个容器，不是扫到第一个 </div> 就停。
     for hit in re.finditer(r'<div class="chartwrap"', page):
         block = _div_subtree(page, hit.start())
@@ -693,13 +676,10 @@ def advisories(measured: dict, spec: dict | None = None,
         notes.extend(brand_notes)
         _, shape_notes = _check_deck_shape(measured, spec.get("deck", {}), tokens)
         notes.extend(shape_notes)
-        # 信息层级那三条（预算 / 焦点 / 密度）**全是提示**，理由见 hierarchy.py：
-        # 它们的阈值取决于语境（封面就该空、看板就该满），做成阻塞的话第一份正常的
-        # deck 就被挡住，然后所有人开始忽略检查。这里只把结论并进提示流。
-        deck = spec.get("deck", {})
-        notes.extend(hierarchy_mod.budget_issues(deck))
-        notes.extend(hierarchy_mod.focal_issues(measured, deck))
-        notes.extend(hierarchy_mod.density_issues(measured, deck))
+        # 信息层级（文本预算 / 焦点 / 密度）那三条曾由 hierarchy.py 提供，v4 随
+        # 该模块一起退役：阈值取决于语境（封面就该空、看板就该满），做成阻塞会
+        # 把第一份正常的 deck 挡住；而**装不装得下**这件事已由 measure 实测那两道
+        # （越界 / 裁切）定死。腾出的「构图节奏」类提示保留在 _layout_rotation_notes。
     return notes
 
 

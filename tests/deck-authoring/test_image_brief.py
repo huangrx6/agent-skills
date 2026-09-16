@@ -170,15 +170,6 @@ class TestBrief(unittest.TestCase):
         chunk = self.md.split(head, 1)[1]
         return chunk.split("```text", 1)[1].split("```", 1)[0]
 
-    def test_prompt_knows_the_halftone_constraint(self) -> None:
-        """提示词必须说清"会被压成两墨 + 半调" —— 这是这条流水线特有的约束。
-
-        不写的话模型会交一张很漂亮、制完版就糊掉的图（细密纹理/细线是主要的坑）。
-        """
-        for token in ("半调", "两个墨色"):
-            self.assertIn(token, self.md)
-        self.assertIn("fine mesh", self.md)          # 英文那侧的负面清单
-
     def test_prompt_does_not_tell_the_model_to_leave_room_for_overlay(self) -> None:
         """**不能**说"给文字留压字空间"：我们的版式里文字是独立一栏，不压在图上。
 

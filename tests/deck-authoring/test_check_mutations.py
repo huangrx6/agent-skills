@@ -93,6 +93,12 @@ class TestCheckMutations(unittest.TestCase):
         cls.chart_spec["deck"]["slides"].append(copy.deepcopy(CHART_SLIDE))
         cls.demo_html = render.render(cls.demo, cls.style)
         cls.chart_html = render.render(cls.chart_spec, cls.style)
+        # 写一份产物到磁盘：G2 就绪那条用例要拿真实文件路径喂 check
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls._tmp.cleanup)
+        cls.chart_path = os.path.join(cls._tmp.name, "chart.html")
+        with open(cls.chart_path, "w", encoding="utf-8") as fh:
+            fh.write(cls.chart_html)
 
     def _problems(self, spec: dict, html_text: str, tokens: dict | None = None) -> list[str]:
         with tempfile.TemporaryDirectory() as td:
@@ -191,18 +197,36 @@ class TestCheckMutations(unittest.TestCase):
 
     # ── ④ 柱高成比例 ──────────────────────────────────────────────────────
 
-    def test_chart_proportion_mutation_is_caught(self) -> None:
-        """变异：把第二种柱子的真实 height 改成 999。"""
-        bars = list(re.finditer(r'(class="bar"[^>]*height=")([\d.]+)("[^>]*/?>)',
-                                self.chart_html))
-        self.assertGreaterEqual(len(bars), 2, "产物里柱条不足两根 —— render.py 改格式了")
-        match = bars[1]
-        mutated = (self.chart_html[:match.start()] + match.group(1) + "999"
-                   + match.group(3) + self.chart_html[match.end():])
-        problems = self._problems(self.chart_spec, mutated)
-        self._assert_reports(problems, "不成比例", "④ 柱高成比例")
+    def test_chart_g2_ready_is_required(self) -> None:
+        """变异：把 G2 容器标成渲染失败 → check 必须报出来。
 
-    # ── ④ 图表区无错位 ────────────────────────────────────────────────────
+        v4 换掉的是**判据**而不是牙口：手写 SVG 时代查"柱高与数据成比例"，
+        现在几何由 G2 算，查的是"G2 真渲染出来了"（实测 chartReady 字段，
+        静态 HTML 里只有容器与 spec，判断不出来）。
+        """
+        chart_no = len(self.chart_spec["deck"]["slides"])
+        measured = {"elements": [
+            {"id": f"s{chart_no}.chart", "slide": chart_no, "role": "chart",
+             "x": 84, "y": 500, "w": 1432, "h": 330, "chartReady": "error:render",
+             "visible": True}],
+            "images": [], "fonts": {}}
+        problems = check.check(self.chart_spec, self.chart_path, tokens=self.tokens,
+                               measured=measured)
+        self._assert_reports(problems, "G2 渲染失败", "④ 图表就绪")
+
+    def test_chart_data_shape_is_required(self) -> None:
+        """变异：把某条数据的 value 改成非数字 → check 必须报出来（数据错才是真错）。"""
+        spec = copy.deepcopy(self.chart_spec)
+        spec["deck"]["slides"][-1]["data"][0]["value"] = "三十二"
+        problems = self._problems(spec, self.chart_html)
+        self.assertTrue(any("value" in p for p in problems), problems)
+
+    def test_chart_label_must_not_be_empty(self) -> None:
+        """变异：标签清空 → 轴上会缺一个标签。"""
+        spec = copy.deepcopy(self.chart_spec)
+        spec["deck"]["slides"][-1]["data"][0]["label"] = ""
+        problems = self._problems(spec, self.chart_html)
+        self.assertTrue(any("label" in p for p in problems), problems)
 
     def test_chart_riso_mutation_is_caught(self) -> None:
         """变异：往真实的 chartwrap 容器里塞一个 riso 元素。"""

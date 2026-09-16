@@ -163,7 +163,14 @@ PROBE_JS = r"""
                    ? el.querySelector('img').naturalHeight : 0) || 0,
         color: cs.color,
         overflow: cs.overflow,
-        visible: cs.visibility !== 'hidden' && cs.display !== 'none' && parseFloat(cs.opacity) > 0
+        visible: cs.visibility !== 'hidden' && cs.display !== 'none' && parseFloat(cs.opacity) > 0,
+        // 图表就绪（v4）：G2 在浏览器里现渲染 —— 容器里有没有 canvas/svg、
+        // 有没有报错，**只有真浏览器知道**。静态读 HTML 判断不出来（产物里
+        // 只有容器与 spec），所以 readiness 由这里实测并写进结果。
+        chartReady: el.hasAttribute('data-g2')
+          ? (el.getAttribute('data-chart-error') ? 'error:' + el.getAttribute('data-chart-error')
+             : (el.querySelector('canvas,svg') ? 'ready' : 'pending'))
+          : null
       });
       // 只统计**自己直接渲染文字**的元素。
       //

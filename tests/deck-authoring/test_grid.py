@@ -180,35 +180,6 @@ class TestTypeLadder(unittest.TestCase):
                 self.assertLess(t["bulletSmall"], t["bullet"])
                 self.assertLess(t["bullet"], t["bulletLarge"])
 
-    def test_style_audit_catches_a_collision(self) -> None:
-        style = _load("style")
-        with open(os.path.join(STYLES, "swiss-grid", "style.json"), encoding="utf-8") as fh:
-            payload = json.load(fh)
-        saved = payload["type"]["subtitle"]
-        payload["type"]["subtitle"] = payload["type"]["bullet"]      # 故意撞
-        path = os.path.join(STYLES, "zz_test_ladder", "style.json")
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-
-        def _cleanup() -> None:
-            # addCleanup 是 LIFO，两条 lambda 的顺序会反 —— 收成一个函数，
-            # 先删文件再删目录（目录非空时 rmdir 会炸）。
-            if os.path.isfile(path):
-                os.remove(path)
-            d = os.path.dirname(path)
-            if os.path.isdir(d):
-                os.rmdir(d)
-
-        self.addCleanup(_cleanup)
-        with open(path, "w", encoding="utf-8") as fh:
-            json.dump(payload, fh, ensure_ascii=False)
-        problems = style.audit("zz_test_ladder")
-        self.assertTrue(any("同级碰撞" in p for p in problems), problems)
-        payload["type"]["subtitle"] = saved
-
-
-class TestGridAlignmentCheck(unittest.TestCase):
-    """锚点对齐：网格化后该安静，偏离列该响。"""
-
     @classmethod
     def setUpClass(cls) -> None:
         import tempfile

@@ -38,8 +38,7 @@ def _load(name: str):
 
 
 render = _load("render")
-compile_mod = _load("compile")
-fit = _load("fit")
+deck_mod = _load("deck")
 
 MANIFEST = {"schemaVersion": 1, "assets": {
     "cover-photo": {"file": "generated/cover.png", "source": "generated"}}}
@@ -110,7 +109,7 @@ class TestCompileResolvesAssetIds(unittest.TestCase):
         return spec
 
     def test_asset_id_resolved_and_traced(self) -> None:
-        resolved = compile_mod.compile_spec(self._spec("cover-photo"), assets=MANIFEST)
+        resolved = deck_mod.compile_spec(self._spec("cover-photo"), assets=MANIFEST)
         page = resolved["deck"]["slides"][0]
         self.assertEqual(page["image"], "assets/generated/cover.png")
         # demo 带品牌 → trace 里还有一条 logo 的 asset 记录；按决策内容挑
@@ -120,11 +119,11 @@ class TestCompileResolvesAssetIds(unittest.TestCase):
         self.assertIn("source=generated", "".join(entry["reason"]))
 
     def test_plain_path_untouched(self) -> None:
-        resolved = compile_mod.compile_spec(self._spec("photo.png"), assets=MANIFEST)
+        resolved = deck_mod.compile_spec(self._spec("photo.png"), assets=MANIFEST)
         self.assertEqual(resolved["deck"]["slides"][0]["image"], "photo.png")
 
     def test_without_assets_behaves_as_before(self) -> None:
-        resolved = compile_mod.compile_spec(self._spec("photo.png"))
+        resolved = deck_mod.compile_spec(self._spec("photo.png"))
         self.assertEqual(resolved["deck"]["slides"][0]["image"], "photo.png")
 
     def test_render_emits_resolved_src(self) -> None:

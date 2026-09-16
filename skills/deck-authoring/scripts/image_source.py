@@ -48,8 +48,6 @@ def _load_sibling(name: str):
 
 ink = _load_sibling("ink")
 deckio = _load_sibling("deckio")   # IO 收口：本来就是本仓库的规矩，这个文件是最后一个没跟上的
-# 文件名是 plate.py，但下游用法是 `treat_image.xxx` —— 绑定同名以最小化变更。
-treat_image = _load_sibling("plate")
 
 CACHE_DIR_VAR = "AGENT_SKILLS_CACHE_DIR"
 
@@ -91,11 +89,44 @@ def collage(seed: int, colors: dict, size: tuple[int, int]) -> Image.Image:
     return image.convert("RGB")
 
 
+def _rgb(h: str) -> tuple[int, int, int]:
+    """HEX → RGB 三元组。"""
+    h = h.lstrip("#")
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+
+def _in_triangle(point: tuple[int, int, int], a, b, c, tol: float = 1e-6) -> bool:
+    """点是否落在三角形内 —— **三维**重心坐标，不是二维投影。
+
+    拿 x/y 两个坐标做二维叉积是错的：三角形长在 RGB 三维空间里，投影出去会把
+    "空间内但在 R–G 平面外"的点误判成越界（实测 3 个紫色 ✗）。正确做法：
+    解 p = a + u(b−a) + v(c−a)，要求 u, v ≥ 0、u+v ≤ 1 且残差≈0。
+    整数化容差是明文的：逐通道 int() 取整会让"恰在边界上"的点落到界外一丝
+    （实测 v ≈ −0.002 的紫色点）—— 残差那一关仍然卡着颜色真的跑偏的情况。
+    """
+    v1 = [b[i] - a[i] for i in range(3)]
+    v2 = [c[i] - a[i] for i in range(3)]
+    w = [point[i] - a[i] for i in range(3)]
+    vv1, vv2 = sum(x * x for x in v1), sum(x * x for x in v2)
+    v12 = sum(v1[i] * v2[i] for i in range(3))
+    wv1 = sum(w[i] * v1[i] for i in range(3))
+    wv2 = sum(w[i] * v2[i] for i in range(3))
+    det = vv1 * vv2 - v12 * v12
+    if abs(det) < 1e-9:
+        return False
+    u = (wv1 * vv2 - wv2 * v12) / det
+    v = (vv1 * wv2 - v12 * wv1) / det
+    residual = [w[i] - u * v1[i] - v * v2[i] for i in range(3)]
+    if max(abs(x) for x in residual) > 1.5:
+        return False
+    return (u >= -0.01) and (v >= -0.01) and (u + v <= 1.01)
+
+
 def in_palette(image: Image.Image, colors: dict, tol: float = 0.01) -> list[tuple[int, int, int]]:
     """不变量：图里任何颜色都必须落在「主色 / 叠印墨 / 纸色」三角形内。"""
-    tri = (treat_image._rgb(colors["primary"]),
-           treat_image._rgb(ink.overprint(colors["primary"], colors["secondary"])),
-           treat_image._rgb(colors["background"]))
+    tri = (_rgb(colors["primary"]),
+           _rgb(ink.overprint(colors["primary"], colors["secondary"])),
+           _rgb(colors["background"]))
     entries = image.getcolors(maxcolors=1 << 20) or []
     stray: list[tuple[int, int, int]] = []
     for entry in entries:
@@ -105,7 +136,7 @@ def in_palette(image: Image.Image, colors: dict, tol: float = 0.01) -> list[tupl
         if not isinstance(color, tuple) or len(color) != 3:
             continue
         rgb = (color[0], color[1], color[2])
-        if not treat_image._in_triangle(rgb, *tri, tol=tol):
+        if not _in_triangle(rgb, *tri, tol=tol):
             stray.append(rgb)
     return stray
 
@@ -147,15 +178,15 @@ def resolve(prompt: str, colors: dict, size: tuple[int, int], out: str,
             print(f"✗ 生图失败（{exc.returncode}）→ 降级为几何色块拼贴")
     else:
         print("· 未配置生图（--provider-cmd）→ 用几何色块拼贴（它本身就是版画式的拼贴，不是灰占位图）")
+    # v4：制版处理（双色调 + 半调网点）随 plate.py 一起退役 —— 图片按原样使用。
+    # 想要版画质感就在出图提示词里要（`--brief` 的构图/负空间字段），而不是
+    # 在交付链里做一道后处理：后处理会让"check 说合规、交付图却不一样"。
     if source is None:
         image = collage(abs(hash(cache_key(prompt, colors, size))) % (10 ** 6), colors, size)
-        treated = treat_image.duotone(image, colors["primary"], colors["secondary"],
-                                      colors["background"], dots=3)
     else:
-        treated = treat_image.duotone(Image.open(path).convert("RGB"), colors["primary"],
-                                      colors["secondary"], colors["background"], dots=3)
-    treated.save(path)
-    treated.save(out)
+        image = Image.open(path).convert("RGB")
+    image.save(path)
+    image.save(out)
     print(f"✓ 已写出 {out}（来源：{source or '几何色块拼贴'}，已缓存为 {os.path.basename(path)}）")
     return source or "collage"
 
@@ -638,7 +669,7 @@ def write_brief_md(brief: dict, out_path: str) -> str:
         "读这四件事，而「对方要改字」正是这个 skill 能出原生 PPTX 的理由。"
         "所以**一张图盖住整页是不允许的**（`check.py` 会拦）。",
         "",
-        "**这些图会被压成两个墨色 + 半调网点**（见 `plate.py`）——这是为什么提示词里"
+        "**这些图会进版式与验收链**（色彩要落在风格色板里）——这是为什么提示词里"
         "反复强调「靠大块明暗和强形状」：靠颜色、细密纹理、细线立住的图会糊成一团。"
         "「限制」栏里只列与这条管线相关的项，没有通用负面词堆砌。",
         "",

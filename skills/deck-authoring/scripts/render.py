@@ -352,13 +352,13 @@ html,body{margin:0;background:var(--viewer)}
 .chartsrc{margin:calc(var(--sp-inner) * -0.5) 0 0;color:var(--text);opacity:.55;
   font:400 var(--s-caption,22px)/1.4 var(--body)}
 .chartwrap{margin-top:var(--sp-item);width:1432px;padding:var(--sp-item);position:relative}
-/* 图表的高度**由壳给死**（330px），宽度按 viewBox 比例自己算。
-   为什么不能让它 width:100% 自己撑：那样高度会跟着容器宽度变 ——
-   而各风格的 .chartwrap 内边距不同（34px vs 30px vs 0），于是同一张图表
-   在不同风格里高 40~50px，页脚余量从 43 到 92 不等，有的发空有的贴边。
-   钉死高度之后八套一致，余量稳定在 30~50px。 */
-.chartwrap svg{position:relative;display:block;height:330px;width:auto;
-  max-width:100%;margin:0 auto}
+/* 图表容器高度**由壳给死**（330px）—— v4 起图表是 G2（默认 canvas 渲染器），
+   而 G2 的 autoFit 从容器取尺寸：容器没有高度就会在渲染时抛错（实测）。
+   高度钉在 .g2 上而不是 .chartwrap svg 上：canvas/svg 都由 G2 自己塞进去。
+   为什么不让它 width:100% 自己撑：那样高度会跟着容器宽度变 —— 而各风格的
+   .chartwrap 内边距不同，同一张图表在不同风格里会差 40~50px。 */
+.chartwrap .g2{position:relative;display:block;height:330px;width:100%}
+.chartwrap .g2 canvas,.chartwrap .g2 svg{display:block;max-width:100%}
 .end{position:absolute;left:84px;top:330px}
 /* 页脚一行：页脚 + 品牌署名同在左下这一带。
    不用 space-between 把署名推到右边 —— 那样它会压在巨号页码上（三套风格都把右下
@@ -376,59 +376,6 @@ html,body{margin:0;background:var(--viewer)}
 """
 
 
-def chart_svg(data: list[dict], unit: str = "", tag_attr: str = "") -> str:
-    """柱状图：**几何全部由脚本算**，模型只出数据。
-
-    方案里的规矩（第 2 层）：数据图表页的特色效果适用度低 —— 错位会毁掉可读性。
-    所以这里只有**容器**做风格处理（半调底纹 + 描边框），柱与刻度保持干净、不带错位。
-    柱高与数据成比例是硬要求，且由 check.py 独立复核（不是靠这里自觉）。
-    """
-    if not data:
-        raise SystemExit("✗ chart 页需要 data: [{label, value}, …]")
-    values: list[float] = []
-    for k, d in enumerate(data):
-        v = d.get("value")
-        if not isinstance(v, (int, float)) or isinstance(v, bool):
-            raise SystemExit(f"✗ 第 {k} 条 chart 数据的 value 不是数字：{v!r}"
-                             f"（图表页需要真数字，字符串会画不出比例）")
-        # 上面已经确认是 int/float 且排除了 bool —— 不用再 float() 转一次
-        values.append(v)
-    peak = max(values) or 1.0
-    # 图表自身的**比例**决定它在页面上占多高（SVG 是 width:100%，高度按比例来）。
-    # 压测之前这里是 1100×460 —— 满宽渲染出 ~462px 高，加上标题块(152) + 容器上下
-    # padding(68) + 图注(60) + 页边(132)，整页要 911px，**八套风格全部**把图注压进了
-    # 页脚区，paper-ink 直接裁掉。demo 里根本没有图表页，所以从来没人看见。
-    # 现在压到 1100×330：满宽渲染 ~331px，整页 ~787px，留 37px 余量。
-    # 柱区占 250/330（比例与原来一致），上下给刻度标签留了头。
-    w, h, base = 1100, 250, 286
-    slot = w / len(data)
-    bar_w = min(120.0, slot * 0.55)
-    parts = [f'<svg viewBox="0 0 {w} {base + 44}" role="img" {tag_attr}>']
-    for k, (d, v) in enumerate(zip(data, values)):
-        bh = h * (v / peak)
-        x = k * slot + (slot - bar_w) / 2
-        y = base - bh
-        parts.append(f'<rect class="bar" x="{x:.1f}" y="{y:.1f}" '
-                     f'width="{bar_w:.1f}" height="{bh:.1f}"/>')
-        parts.append(f'<text class="val" x="{x + bar_w / 2:.1f}" y="{y - 10:.1f}" '
-                     f'text-anchor="middle">{d["value"]}{unit}</text>')
-        parts.append(f'<text class="lbl" x="{x + bar_w / 2:.1f}" y="{base + 26:.1f}" '
-                     f'text-anchor="middle">{html.escape(str(d["label"]))}</text>')
-    parts.append(f'<line class="axis" x1="0" y1="{base}" x2="{w}" y2="{base}"/>')
-    parts.append("</svg>")
-    # 外层 chartwrap 是**结构**（图表容器 + 校验与测量的锚点），留在骨架里。
-    # `.hf` 是**给 skin 留的钩子**（孔版在里面铺半调底纹）；不用它的 skin 拿到的
-    # 是一个没有尺寸的空 div（skin 不写 .hf 样式就没任何视觉影响）。
-    return f'<div class="chartwrap" {tag_attr}><div class="hf"></div>' + "".join(parts) + "</div>"
-
-
-# ── deck 外壳：演示态（自动缩放 + letterbox + 键盘翻页 + 页码）──────────────
-# 刻意做成**运行时的视图**，不是产物本身的版式。
-#
-# 产物文件永远是 1600×900、未缩放的竖向堆叠 —— 测量层（measure.py）用
-# getBoundingClientRect 量真实像素，截图层（shots.py）按真实偏移滚屏，两者都依赖
-# 这个几何。演示态只额外叠一层**整体相似变换**：等比缩放不会引入裁切，所以
-# “量未缩放的原件”依然成立，不用为了演示能力推翻整个度量层。
 SHELL_CSS = """
 /* --k 由脚本按视口算；CSS 里算不出来 —— scale() 要的是无量纲数，
    而 min(100vw/1600, 100vh/900) 得到的是长度，两者不能互转。 */
@@ -798,11 +745,8 @@ def _grain_svg(tokens: dict) -> str:
 
 
 ink_module = _load_sibling("ink")  # 叠印与对比度只有一处定义，不重抄
-brand_module = _load_sibling("brand")
+deck_mod = _load_sibling("deck")    # 品牌并入 + spec→resolved 编译（原 brand/compile）
 fonts_module = _load_sibling("fonts")  # 字体清单与 @font-face（清单是数据，不是硬编码）
-chart_module = _load_sibling("chart")   # 图表引擎：DSL → 确定性 SVG（八类）
-palette_module = _load_sibling("palette")  # 色彩语法与 OKLCH 数学（验收用）
-compile_module = _load_sibling("compile")  # 决策层：spec→resolved（render 只画）
 
 
 def _apply_brand(style: dict, brand: dict) -> dict:
@@ -817,12 +761,195 @@ def _apply_brand(style: dict, brand: dict) -> dict:
     if not brand:
         return style
     tokens = dict(style["tokens"])
-    tokens["fonts"] = brand_module.merge_fonts(tokens["fonts"], brand)
-    tokens["colorSets"] = brand_module.merge_color_sets(tokens["colorSets"], brand)
+    tokens["fonts"] = deck_mod.merge_fonts(tokens["fonts"], brand)
+    tokens["colorSets"] = deck_mod.merge_color_sets(tokens["colorSets"], brand)
     merged = dict(style)
     merged["tokens"] = tokens
     return merged
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 图表：**AntV G2**（v4 —— 手写 SVG 渲染器已整体删除）
+#
+# 为什么换掉手写 SVG：那一版只有圆角/网格线/单字重的极简骨架，用户实测的评语是
+# "可丑的原生感"。G2 是成熟的声明式图形语法：编码、坐标轴、标注、堆叠都由它做，
+# 我们只出 spec（数据 → 编码），不手绘几何。
+#
+# 确定性（§41/42）：`animation: false` 关死；G2 的 SVG 输出是同步的纯函数，
+# 同 spec 同输出 —— measure/check 才有稳定 DOM 可量。
+# ═══════════════════════════════════════════════════════════════════════════
+CHART_TYPES = ("bar", "bar-horizontal", "line", "area", "bar-stacked",
+               "donut", "scatter", "combo")
+
+
+def chart_declared_type(slide: dict) -> str:
+    """图形类型 —— **spec 显式声明**（v3 起无推断）。"""
+    declared = slide.get("chart")
+    if not declared:
+        raise SystemExit(
+            "✗ 图表页缺 `chart` —— 图形类型由作者显式声明（八类："
+            f"{list(CHART_TYPES)}）。validate_spec.py 会先拦住这种 spec。")
+    if declared not in CHART_TYPES:
+        raise SystemExit(f"✗ chart={declared!r} 不在八类里（{list(CHART_TYPES)}）")
+    return declared
+
+
+def chart_data(slide: dict) -> list[dict]:
+    """单系列数据（[{label, value}]）；多系列见 series。"""
+    return list(slide.get("data", []))
+
+
+def _hex_mix(a: str, b: str, t: float) -> str:
+    """线性混两个 HEX（t=0 是 a，t=1 是 b）。"""
+    pa, pb = a.lstrip("#"), b.lstrip("#")
+    ea = [int(pa[i:i + 2], 16) for i in (0, 2, 4)]
+    eb = [int(pb[i:i + 2], 16) for i in (0, 2, 4)]
+    return "#" + "".join(f"{round(x + (y - x) * t):02X}" for x, y in zip(ea, eb))
+
+
+def chart_muted(primary: str, background: str) -> str:
+    """muted = 主色向纸色褪 55% —— 有色相但退到背景里，让 accent 独占注意力。"""
+    return _hex_mix(primary, background, 0.55)
+
+
+def chart_series_colors(primary: str, background: str, n: int) -> list[str]:
+    """多系列用主色的深浅阶（不是彩虹）：向纸色分档褪色。"""
+    if n <= 1:
+        return [primary]
+    return [_hex_mix(primary, background, 0.62 * i / max(1, n - 1)) for i in range(n)]
+
+
+def chart_emphasis_set(slide: dict) -> set:
+    """被强调的标签集合（`emphasis.values`）。"""
+    em = slide.get("emphasis") or {}
+    return {str(v) for v in em.get("values", [])}
+
+
+def _chart_norm_series(slide: dict) -> list[dict]:
+    """统一成 [{name, data:[{label,value}]}]（单系列 data 与多系列 series 都收）。"""
+    series = slide.get("series")
+    if series:
+        return [{"name": str(s.get("name", "")), "data": list(s.get("data", []))}
+                for s in series]
+    return [{"name": "", "data": list(slide.get("data", []))}]
+
+
+def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None) -> dict:
+    """Chart Resolver 的 G2 产物（§19：链路不绑技术——HTML 路径用 AntV G2）。
+
+    输出 G2 5 的 chart spec（renderer 由壳层指定 svg + animation off——
+    确定性 §41：同输入同输出，measure/check 才有稳定的 DOM 可量）。
+    配色守规矩：muted + 1 accent（emphasis 命中的数据用主色，其余灰化）。
+    """
+    data = _chart_norm_series(slide)[0]["data"]
+    emphasis = emphasis or set()
+    primary = colors.get("primary", "#0033CC")
+    muted_c = chart_muted(primary, colors.get("background", "#FFFFFF"))
+    text = colors.get("text", "#0A0A0A")
+
+    def enc_color(d):
+        return primary if (not emphasis or str(d.get("label")) in emphasis) else muted_c
+
+    kind = chart_declared_type(slide)
+    spec: dict = {
+        "animation": False,                      # 确定性：动画关死（§41/42）
+        "autoFit": False,
+        "padding": "auto",
+    }
+    if kind in ("bar", "bar-horizontal"):
+        rows = sorted(data, key=lambda d: -d.get("value", 0)) \
+            if kind == "bar-horizontal" else data
+        rows = [{**d, "c": enc_color(d)} for d in rows]
+        spec.update({
+            "type": "interval",
+            "data": rows,
+            "encode": {"x": "label", "y": "value", "color": "c"},
+            "scale": {"color": {"type": "identity"}},
+            "labels": [{"text": "value", "style": {"fill": text},
+                        "position": "outside"}],
+        })
+        if kind == "bar-horizontal":
+            spec["coordinate"] = {"transform": [{"type": "transpose"}]}
+    elif kind == "donut":
+        rows = [{**d, "c": enc_color(d)} for d in data]
+        spec.update({
+            "type": "interval",
+            "data": rows,
+            "coordinate": {"transform": [{"type": "transpose"},
+                                         {"type": "theta", "innerRadius": 0.62}]},
+            "encode": {"y": "value", "color": "label"},
+            "scale": {"color": {"range": [d["c"] for d in rows]}},
+            "axis": False,
+            "legend": {"color": {"position": "right"}},
+        })
+    elif kind in ("line", "area"):
+        spec.update({
+            "type": "area" if kind == "area" else "line",
+            "data": data,
+            "encode": {"x": "label", "y": "value"},
+            "style": {"stroke": primary, "lineWidth": 2.5},
+            "labels": [{"text": "value", "style": {"fill": text},
+                        "selector": "last"}],
+            "axis": {"x": {"title": False}, "y": {"title": False}},
+        })
+    elif kind == "scatter":
+        spec.update({
+            "type": "point",
+            "data": data,
+            "encode": {"x": "label", "y": "value", "size": 4},
+            "style": {"fill": primary, "stroke": muted_c},
+            "axis": {"x": {"title": False}, "y": {"title": False}},
+        })
+    elif kind in ("bar-stacked", "combo"):
+        series = slide.get("series") or []
+        rows = []
+        for si, srow in enumerate(series):
+            for d in srow.get("data", []):
+                rows.append({"label": d.get("label"), "value": d.get("value", 0),
+                             "series": srow.get("name", f"系列{si+1}")})
+        spec.update({
+            "type": "interval" if kind == "bar-stacked" else "line",
+            "data": rows,
+            "encode": {"x": "label", "y": "value", "color": "series"},
+            "transform": [{"type": "stackY"}] if kind == "bar-stacked" else [],
+            "scale": {"color": {"range": chart_series_colors(primary, colors.get(
+                "background", "#FFFFFF"), max(1, len(series)))}},
+            "axis": {"x": {"title": False}, "y": {"title": False}},
+        })
+    return spec
+
+
+
+
+# G2 vendor（版本锁死，保确定性）：内联进产物，离线可用、无 CDN 依赖。
+G2_VENDOR = os.path.join(HERE, "vendor", "g2-5.2.10.min.js")
+
+# 实例化：把每页的 data-g2 spec 交给 G2（animation 关死，确定性）。
+# G2 5 的 API 是 chart.options(spec) + chart.render()；不写 width/height ——
+# autoFit 跟容器走，容器尺寸由壳的 CSS 定（几何 SSOT 在 grid.py）。
+# ⚠️ 不要传 `renderer:` 字符串：这份 UMD bundle 只带默认 canvas 渲染器，
+# 字符串会在运行时抛 `registerPlugin is not a function`（实测）。
+G2_INIT_JS = """
+(function(){
+  var nodes=[].slice.call(document.querySelectorAll('.g2[data-g2]'));
+  if(!nodes.length) return;
+  if(!window.G2){ nodes.forEach(function(n){ n.setAttribute('data-chart-error','no-g2'); }); return; }
+  nodes.forEach(function(n){
+    var spec; try{ spec=JSON.parse(n.getAttribute('data-g2')); }catch(e){
+      n.setAttribute('data-chart-error','bad-spec'); return; }
+    try{
+      var chart=new G2.Chart({container:n, autoFit:true, renderer:'svg',
+                              animation:false, padding:'auto'});
+      chart.options(spec);
+      chart.render();
+      n.setAttribute('data-chart-ready','1');
+    }catch(e){ n.setAttribute('data-chart-error','render'); }
+  });
+})();
+"""
+
+def _render_manifest_placeholder():
+    pass
 
 def resolve_color_set(tokens: dict, deck: dict) -> str:
     """colorSet 名 —— **spec 显式声明**（v3：配色由作者定，脚本只验收）。
@@ -911,9 +1038,9 @@ def render(deck_spec: dict, style: dict | None = None,
     assets：`load_assets` 的产物（spec 同目录 assets/manifest.json）——
     assetId → 文件的映射只发生在 compile（决策层），渲染器只见最终路径。
     """
-    if compile_module.is_resolved(deck_spec):
+    if deck_mod.is_resolved(deck_spec):
         return render_resolved(deck_spec)
-    return render_resolved(compile_module.compile_spec(deck_spec, style,
+    return render_resolved(deck_mod.compile_spec(deck_spec, style,
                                                        assets=assets))
 
 
@@ -933,6 +1060,7 @@ def render_resolved(resolved: dict) -> str:
     out = [_head(resolved["title"], style, seed, resolved["colorSet"])]
 
     man: list[dict] = []          # 语义清单：元素身份 + 意图（几何由 measure.py 量）
+    g2_specs: list[str] = []      # 图表页的 G2 spec（文档末尾统一实例化）
 
     def tag(mid: str, slide_no: int, role: str, text: str = "", size: float | None = None,
             **extra) -> str:
@@ -953,8 +1081,8 @@ def render_resolved(resolved: dict) -> str:
     # 这里只把文件变成内嵌 URI 与导出路径引用，不做选择。
     logo_file = resolved["logoFile"]
     colors = resolved["colors"]
-    logo_uri = brand_module.logo_data_uri(brand, logo_file)
-    logo_ref = brand_module.logo_ref(brand, logo_file)
+    logo_uri = deck_mod.logo_data_uri(brand, logo_file)
+    logo_ref = deck_mod.logo_ref(brand, logo_file)
 
     def title_html(text: str, mid_attr: str) -> str:
         """标题：**单层**。`data-text` 留给 skin 想做叠加装饰时用（attr() 取）。"""
@@ -1137,14 +1265,18 @@ def render_resolved(resolved: dict) -> str:
             chart_attrs = tag(f"s{i}.chart", i, "chart", "", None,
                               data=slide.get("data", []),
                               series=slide.get("series", []),
-                              chart=chart_module.declared_type(slide),
+                              chart=chart_declared_type(slide),
                               emphasis=slide.get("emphasis", {}),
                               unit=slide.get("unit", ""))
-            # ⚠️ 外层 chartwrap 是**结构**：校验与测量的锚点（tag_attr 挂它身上），
-            # `.hf` 是给 skin 的半调钩子。旧 chart_svg() 自己包这层，换引擎时丢过
-            # 一次 —— check.py 两条图表检查都以它为锚，丢了就全部静默通过（实测）。
-            out.append(f'<div class="chartwrap" {chart_attrs}><div class="hf"></div>'
-                       + chart_module.svg(slide, colors) + "</div>")
+            # ⚠️ 外层 chartwrap 是**结构**：校验与测量的锚点（tag_attr 挂它身上）。
+            # 里层 .g2 拿 data-g2（G2 spec JSON）—— 文档末尾统一实例化：
+            # 声明式图形语法只出 spec，几何由 G2 算（v4：手写 SVG 渲染器已删除）。
+            g2_json = json.dumps(
+                chart_g2_spec(slide, colors, chart_emphasis_set(slide)),
+                ensure_ascii=True, separators=(",", ":")).replace("'", "&#39;")
+            g2_specs.append(g2_json)
+            out.append(f'<div class="chartwrap" {chart_attrs}>'
+                       f'<div class="g2" data-g2=\'{g2_json}\'></div></div>')
             if slide.get("caption"):
                 cap_attrs = tag(f"s{i}.caption", i, "bullet", slide["caption"],
                                 tier["caption"])
@@ -1174,7 +1306,7 @@ def render_resolved(resolved: dict) -> str:
         # src 是 base64 内嵌（产物自己完整，挪到哪都不裂）；清单里给的却是
         # **技能相对**路径（导出脚本据此找原图）—— 所以标了 src_base，让导出端知道
         # 该往哪儿解析（`image` 字段那种相对 HTML 的解析在这里是错的）。
-        if logo_uri and brand_module.shows_logo(brand, kind, i, end_slide):
+        if logo_uri and deck_mod.shows_logo(brand, kind, i, end_slide):
             out.append(f'<img class="brandlogo" src="{logo_uri}" alt="" '
                        f'{tag(f"s{i}.logo", i, "logo", logo_ref, None, src_base="skill")}>')
         # 纸纹层只在风格声明了 texture 时发射 —— 没有纸纹的风格**不该**有
@@ -1202,6 +1334,16 @@ def render_resolved(resolved: dict) -> str:
     # 它们是壳不是内容，进了清单就会污染“清单条数 == 实测元素数”那条不变量。
     out.append(f'<div class="hud"><span id="__deck_page">1 / {total}</span></div>')
     out.append('<div class="hint">← → 翻页 · F 全屏 · P 演示/滚动</div>')
+    # 图表：先内联 G2 vendor（锁版本、离线可用），再实例化每页的 spec。
+    # renderer: svg + animation: false —— 确定性（§41：同输入同输出）；
+    # 渲染完打 data-chart-ready，测量端据此知道图表 DOM 已就绪。
+    if g2_specs:
+        try:
+            with open(G2_VENDOR, encoding="utf-8") as fh:
+                out.append(f"<script>{fh.read()}</script>")
+        except OSError as exc:
+            raise SystemExit(f"✗ 读不了 G2 vendor（{G2_VENDOR}）：{exc}") from exc
+        out.append("<script>\n" + G2_INIT_JS + "\n</script>")
     out.append(f"<script>{SHELL_JS}</script>")
     out.append("</body></html>")
     return "\n".join(out)
