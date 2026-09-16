@@ -2,7 +2,7 @@
 name: deck-authoring
 description: >-
   Build slide decks from a structural spec. Styles are authored per deck
-  (styles/<名>/ 自建，无内置；dev-tools/style-fixture/swiss-grid 为参考实现).
+  (styles/<名>/ 自建，无内置，无可拷模板).
   Pipeline: deck-spec.json → HTML (可演讲) → 矢量 PDF / 可编辑 PPTX / 每页 PNG / MP4·GIF 动画.
   Brand assets are a third layer (brands/<name>/: logo 含反白版 / 色号 / 字体 / 署名) — 报出
   公司名就能套上，deck.brand 一个字段.
@@ -18,7 +18,7 @@ description: >-
 
 把一份 `deck-spec.json` 渲成能直接拿去讲的 deck。**你只写内容，脚本算一切坐标、
 字号与颜色**；风格自建无内置（风格放 **deck 项目**的 `styles/<名>/`，随项目交付；
-skill 目录永不写入；参考实现在 `dev-tools/style-fixture/`），加一套＝加一个目录，不改渲染器。
+skill 目录永不写入），加一套＝加一个目录，不改渲染器。
 
 ## 确认门：四样大事，用户点头才动
 
@@ -36,9 +36,9 @@ skill 目录永不写入；参考实现在 `dev-tools/style-fixture/`），加�
 **不要把风格列表丢给对方当选择题**——他没见过画面，选不了。做三版真出图：
 
 ```bash
-# 三个方向 = **临时目录**里的三套草稿（拷 dev-tools/style-fixture 改，渲完即弃）。
+# 三个方向 = **临时目录**里的三套草稿（按 style-architecture.md 现写，渲完即弃）。
 # 绝不写进 styles/（落盘=变相内置）；styles/ 只放用户明确要保存的东西。
-for s in a b c; do cp -r dev-tools/style-fixture/swiss-grid /tmp/dir-$s   # 改完再渲
+for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/dir-$s/skin.css
   python3 scripts/render.py spec.json --style $s -o $s.html && python3 scripts/shots.py $s.html --out-dir shots-$s --count 2; done
 ```
 
@@ -50,9 +50,9 @@ for s in a b c; do cp -r dev-tools/style-fixture/swiss-grid /tmp/dir-$s   # 改�
 
 **内置八套已整体移除**（styles/ 删除，按用户决定）——风格是每份 deck 的表达层。
 自建：**deck 项目**的 `styles/<名>/` 放 `style.json + skin.css`（形状与逐键说明见
-`references/style-architecture.md`；字栈参考 `fonts/mapping.json`）。参考实现：
-`dev-tools/style-fixture/swiss-grid`（可拷改）。`style.py` 列全部并逐套过契约；
-`style.py --new <名>` 拷一份脚手架到 `<cwd>/styles/`。
+`references/style-architecture.md`；字栈参考 `fonts/mapping.json`）。脚手架 = 拷夹具：
+在 `<deck项目>/styles/<名>/` 里放 `style.json` + `skin.css`。列风格 / 契约体检 / 联系表
+（`style.py` 全部子命令）已退役 —— 对比度归 `ink.py`，实测门归 `check.py`。
 每个风格可带多个 `colorSet`；**spec 的 `colorSet` 必填具名**（auto/mood 已退役 ——
 选色是审美决策，脚本只验对比度）。换风格/换色板只改 spec 两个字段，内容一字不动。
 
@@ -67,30 +67,30 @@ for s in a b c; do cp -r dev-tools/style-fixture/swiss-grid /tmp/dir-$s   # 改�
 
 ## 起手流程
 
-1. **先读 demo**：`dev-tools/demo.spec.json` 以它为准（逐键说明见
+1. **先读契约**：`references/style-architecture.md` 的 spec 逐键说明与示例（逐键说明见
    `references/style-architecture.md`；写完跑 `validate_spec.py`）。
 2. **写 spec**（前置：大纲已过确认门 ①）：每页只有 `type` + 内容，见
    `references/style-architecture.md`；**写什么内容**见 `references/content-intelligence.md`
-   （一页一个观点 / 容量估算 / 观众距离）。拿不准一页装不装得下就先跑 `fit.py`。
+   （一页一个观点 / 容量估算 / 观众距离）。拿不准就先渲出来跑 `check.py`（`fit.py` 试排已退役）。
    `seed` 显式写（默认 1）：错位与颗粒按 (seed, 元素) 派生，否则没法回归。
    有品牌资产加一行 `deck.brand`（见 brand-assets.md：**品牌赢在“是谁”，风格赢在
    “怎么表达”**；demo 的 example/ACME 是演示品牌，抄模板记得删）。
 3. **五道门**（顺序有意义：先验输入，再渲，再量，最后判；九站总图见 `references/pipeline.md`）：
    - 规格：`python3 scripts/validate_spec.py your.spec.json`（字段集封闭，未知键直接失败）
    - 墨色：`ink.py styles/<你的风格>/style.json`（deck 项目里跑；任一色板不达标退 1）
-   - 渲染：`python3 scripts/render.py your.spec.json -o out.html`
+   - 渲染：`python3 scripts/render.py your.spec.json -o out.html`（中间产物就加 `--resolved resolved.deck.json --trace`）
    - 实测+判定：`python3 scripts/check.py your.spec.json out.html`（真浏览器量完再判，全过退 0；
      只想单独量就 `measure.py out.html`）
 4. **可选交付**：
    - 演示：直接把 `out.html` 给人（`out.html?present` 一页一屏、`←/→` 翻页、`F` 全屏）
    - PDF：`python3 scripts/pdf.py out.html -o deck.pdf`（矢量、能打印；脚本会验页数与页尺寸）
    - PNG 截图：`python3 scripts/shots.py out.html --out-dir pages/ --count N`
-   - PPTX：观感 100% 用 `make_pptx.py --png-dir pages/`；**对方要改字**用
-     `pptx_native.py out.html`（原生 shapes，字是真字）
+   - PPTX：观感 100% 用 `pptx_native.py --png-dir pages/ -o deck.pptx`（原 `make_pptx.py`
+     已并进这个 `--png-dir` 模式）；**对方要改字**用 `pptx_native.py out.html -o deck.pptx`（原生 shapes，字是真字）
    - 视频：`python3 scripts/animate.py out.html -o deck.mp4`（GIF：`-o deck.gif --width 960`；
      无需 ffmpeg）。运动设计与什么时候别用见 `references/animation.md`。
-5. **图页**：`image` 只填文件名；出图走 `--brief` 合同（存产物同目录，`--check` 验），
-   分工理由见 `references/images.md`。
+5. **图页**：`image` 只填文件名；出图走 `--brief` 合同（提示词要到位 —— 出图后**没有**制版
+   后处理，图片按原样用，`plate.py` 已退役）；存产物同目录、`--check` 验，见 `references/images.md`。
 
 ## 版式
 
@@ -103,7 +103,7 @@ for s in a b c; do cp -r dev-tools/style-fixture/swiss-grid /tmp/dir-$s   # 改�
 | `content-image` | 图文页 | 结构布局：`visual-right` 缺省 / `visual-left` 图先文后 / `even` 6+6 / `hero` 图为主角满幅+标题条 |
 | `two-column` | 双栏 | 结构布局：`even` 缺省 / `lean-left` 左栏宽 / `lean-right` 右栏宽 |
 | `timeline` | 时间线 | —（节点标签走数字档） |
-| `chart` | 图表 | 图形由 **`chart` 字段显式声明**（八类：bar/bar-horizontal/line/area/bar-stacked/donut/scatter/combo）；`intent` 是可选语义标注 |
+| `chart` | 图表 | 图形由 **`chart` 字段显式声明**（八类：bar/bar-horizontal/line/area/bar-stacked/donut/scatter/combo；HTML 路径由 **AntV G2** 画 —— vendor 锁版本内联、动画关死）；`intent` 是可选语义标注、不参与渲染 |
 | `end` | 收尾 | —（居中大字） |
 
 **结构布局 = 渲染器能力（像图表的八类图形），名字由你定**：写一个表外的
@@ -154,12 +154,12 @@ for s in a b c; do cp -r dev-tools/style-fixture/swiss-grid /tmp/dir-$s   # 改�
 - **字段不存在** → 刻意不留的三类（坐标/字号/色值）：版式用 `type`+`layout` 表达，
   换色板改 style.json；别把字段删了就交差。
 - **对比度不达标** → `ink.py styles/<你的风格>/style.json` 查色板；换色板别动阈值。
-- **`... 越出版面：下缘 ... 越出该页下边界 ...`** → 内容真的撑出这页了（实测）。跑
-  `fit.py --slide N` 看哪种版式装得下，再收字 / 拆页。
+- **`... 越出版面：下缘 ... 越出该页下边界 ...`** → 内容真的撑出这页了（实测）。
+  `measure.py out.html` 会点名越界的是哪个元素，据此收字 / 拆页 / 换 `layout`（`fit.py` 已退役）。
 - **`... 越出版面：右缘 ...`**（多半在标题）→ 标题是 `nowrap` 的，不折行、直接裁；改短。
 - **`图片没加载`** → 相对路径挪目录就裂图；同目录交付或 base64（见 images.md）。
 - **字体回退提示** → 声明的族本机没有，后面栈顶上；不阻塞，交付前确认。
 - **错位值越界** → spec 不能硬塞 `--dx/--dy/--rot`，只能脚本派生。
 - **装饰压文字** → validation.md 第 ⑤ 条；墨块只落右侧两角。
-- **图表柱高不成比例** → 数据 `value` 是不是数字、是不是都被图渲染了
-  （`references/validation.md` 第 ⑤ 条）。
+- **图表那页是空的 / `check.py` 报 G2 渲染失败** → `measure.py out.html` 看该页 `chartReady`
+  是 `pending` 还是 `error`；再查数据 `label` 非空、`value` 是数字（几何由 G2 算，不再量柱高）。

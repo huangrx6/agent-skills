@@ -453,7 +453,7 @@ def compile_spec(deck_spec: dict, style: dict | None = None,
 
     # ── Theme：风格（双根）→ 品牌合并 → colorSet ─────────────────────────
     resolved_style: dict = (style if style is not None
-                            else r.load_style(deck.get("style", r.DEFAULT_STYLE)))
+                            else r.load_style(deck.get("style")))
     brand = brand_mod.load(deck.get("brand"))
     if brand:
         trace.append({"stage": "theme", "decision": f"brand:{deck.get('brand')}",

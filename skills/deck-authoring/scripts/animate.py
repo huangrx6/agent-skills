@@ -423,7 +423,7 @@ def main(argv: list[str]) -> int:
             raise SystemExit(f"✗ 产物里的时间轴读不出来（产物损坏？）：{exc}") from exc
         total = spans[-1]["start"] + spans[-1]["enter"] + spans[-1]["hold"]
     else:
-        style = render.load_style(spec["deck"].get("style", render.DEFAULT_STYLE))
+        style = render.load_style(spec["deck"].get("style"))
         total = render.total_duration(spec["deck"], style["tokens"])
 
     print(f"· 时间轴总长 {total:.2f}s @ {fps}fps → {max(2, round(total * fps))} 帧"

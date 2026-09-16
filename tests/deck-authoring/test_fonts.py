@@ -29,6 +29,13 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
+# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
+# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
+os.environ.setdefault("DECK_STYLES",
+                      os.path.join(FIXTURES_DIR, "styles"))
 SCRIPTS = os.path.join(SKILL, "scripts")
 
 
@@ -107,7 +114,7 @@ class TestMapping(unittest.TestCase):
 
     def test_every_style_is_covered(self) -> None:
         styles = set(render.available_styles()) if hasattr(render, "available_styles") \
-            else set(fonts.deckio.list_dirs(os.path.join(SKILL, "dev-tools", "style-fixture")))
+            else set(fonts.deckio.list_dirs(os.path.join(FIXTURES_DIR, "styles")))
         missing = styles - set(self.map["styles"])
         self.assertEqual(missing, set(), f"这些风格没有字体映射：{sorted(missing)}")
 
@@ -264,9 +271,9 @@ class TestRenderIntegration(unittest.TestCase):
         if entry is None:
             raise unittest.SkipTest("本地没有已下载的字体（先跑 fonts.py --fetch）")
         self.font_name = entry["name"]
-        self.style_dir = os.path.join(SKILL, "dev-tools", "style-fixture", self.STYLE)
+        self.style_dir = os.path.join(FIXTURES_DIR, "styles", self.STYLE)
         shutil.rmtree(self.style_dir, ignore_errors=True)
-        shutil.copytree(os.path.join(SKILL, "dev-tools", "style-fixture", "swiss-grid"), self.style_dir)
+        shutil.copytree(os.path.join(FIXTURES_DIR, "styles", "swiss-grid"), self.style_dir)
         self.addCleanup(shutil.rmtree, self.style_dir, True)
         path = os.path.join(self.style_dir, "style.json")
         payload = json.loads(open(path, encoding="utf-8").read())
@@ -447,12 +454,12 @@ class TestStylesUseFreeArtFonts(unittest.TestCase):
         cls.cat_fonts = list(cls.license)
 
     def _styles(self):
-        root = os.path.join(SKILL, "dev-tools", "style-fixture")
+        root = os.path.join(FIXTURES_DIR, "styles")
         return sorted(d for d in os.listdir(root) if not d.startswith("zz_")
                       and os.path.isfile(os.path.join(root, d, "style.json")))
 
     def _stack(self, style: str, slot: str) -> list[str]:
-        with open(os.path.join(SKILL, "dev-tools", "style-fixture", style, "style.json"), encoding="utf-8") as fh:
+        with open(os.path.join(FIXTURES_DIR, "styles", style, "style.json"), encoding="utf-8") as fh:
             return [s.strip() for s in json.load(fh)["fonts"][slot].split(",")]
 
     def test_every_style_leads_with_a_free_art_font(self) -> None:

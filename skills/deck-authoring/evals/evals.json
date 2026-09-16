@@ -4,9 +4,10 @@
     {
       "id": 1,
       "prompt": "帮我做一份十页的产品复盘 deck，做成苹果发布会那种感觉。",
-      "expected_output": "**先说风格，再说内容。** 用户给了风格词（\"苹果发布会那种\"）也不豁免三方向门 —— 风格词收窄的是解释空间，不转移选择权：黑底巨字、大白底衬线都是合法诠释。所以先读 dev-tools/demo.spec.json 摸字段集，然后用 `--style` 把同一份内容渲成 2~3 个方向（至少 `keynote-dark` 与 `swiss-grid` 各一版）真出图给他看，摆完**停下等选择**。选定后才写正式 deck-spec.json —— 每页只有 type + 内容（标题 / 条目 / 时间点 / 数据 / 图片），**不要**写坐标、字号、色值。填完跑 scripts/ink.py 看色板门禁 → scripts/render.py 出 HTML → scripts/check.py 过校验。所有门全过再交付；任何一项不过就报告问题，不要靠放宽阈值蒙混。",
+      "expected_output": "**先说风格，再说内容。** 用户给了风格词（\"苹果发布会那种\"）也不豁免三方向门 —— 风格词收窄的是解释空间，不转移选择权：黑底巨字、大白底衬线都是合法诠释。所以先读 your.spec.json 摸字段集，然后用 `--style` 把同一份内容渲成 2~3 个方向（至少 `keynote-dark` 与 `swiss-grid` 各一版）真出图给他看，摆完**停下等选择**。选定后才写正式 deck-spec.json —— 每页只有 type + 内容（标题 / 条目 / 时间点 / 数据 / 图片），**不要**写坐标、字号、色值。填完跑 scripts/ink.py 看色板门禁 → scripts/render.py 出 HTML → scripts/check.py 过校验。所有门全过再交付；任何一项不过就报告问题，不要靠放宽阈值蒙混。",
       "files": [
-        "dev-tools/demo.spec.json"
+        "SKILL.md",
+        "references/style-architecture.md"
       ]
     },
     {
@@ -14,7 +15,7 @@
       "prompt": "标题字号我想大一点，120px。",
       "expected_output": "拒绝在 spec 层面改：字号、坐标、色值都不在 schema 里 —— 不存在，不是「不推荐填」。字号参与对比度分档（由 token.contrast.largeTextPx 判定），由 render.py 派生。允许的做法是改 style.json 的 fonts.display（字体族）或 contrast 阈值；不允许在 spec 里写 fontSize 字段。如果用户坚持要 120px 的视觉感受，那属于改渲染器行为，要在 references/style-architecture.md 里同步说明。",
       "files": [
-        "dev-tools/style-fixture/swiss-grid/style.json"
+        "references/style-architecture.md"
       ]
     },
     {
@@ -22,7 +23,7 @@
       "prompt": "对比度 4.5 太严了，能不能降到 3.5 让更多色板能用？",
       "expected_output": "**不调阈值**。4.5 是 WCAG AA 正文底线，3.0 是大字底线；降了等于让「荧光色当正文」那种事故合法化。正确做法：换色板 —— style.json 里 colorSets 新加一套，或改现有一整套让声明的文字色变深（ink.rule 已经写了「每套色板必须含一个深墨」）。跑 scripts/ink.py 自检。",
       "files": [
-        "dev-tools/style-fixture/swiss-grid/style.json",
+        "references/style-architecture.md",
         "references/validation.md"
       ]
     },

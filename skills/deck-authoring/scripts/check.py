@@ -57,7 +57,7 @@ render_mod = _load_sibling("render")   # 只为拿“同一个风格”的 token
 deck_mod = _load_sibling("deck")       # 品牌资产 + 编译（原 brand/compile）
 grid_mod = _load_sibling("grid")     # 网格与间距（版面几何唯一来源）
 
-TOKENS = os.path.join(HERE, "..", "dev-tools", "style-fixture", "swiss-grid", "style.json")
+
 
 # **两个不同的框，别混用**（我自己第一版就混了 ✗，导致正常产物被误判"溢出"）：
 #   内容区 = 版面减去内边距，量"放不放得下"（宽 1600-2×84 = 1432）
@@ -320,7 +320,7 @@ def _check_brand(measured: dict, deck: dict, tokens: dict) -> tuple[list[str], l
     brand = deck_mod.load(name)
     if name == "example":
         notes.append(
-            "deck.brand=example 是**演示品牌**（ACME）——它只该出现在 dev-tools 的 "
+            "deck.brand=example 是**演示品牌**（ACME）——它只该出现在测试夹具里。"
             "demo/stress 里。做自己的 deck 请删掉这行，或建 brands/<你的品牌>/"
             "（见 references/brand-assets.md）。示例 logo 出现在真实交付里就是事故")
     els: list[dict] = measured.get("elements", [])
@@ -557,7 +557,7 @@ def style_tokens(spec: dict, override: dict | None = None) -> dict:
     """
     if override is not None:
         return override
-    return render_mod.load_style(spec["deck"].get("style", render_mod.DEFAULT_STYLE))["tokens"]
+    return render_mod.load_style(spec["deck"].get("style"))["tokens"]
 
 
 def check(spec: dict, html_path: str, tokens: dict | None = None,

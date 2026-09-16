@@ -10,8 +10,10 @@
 
 1. `<当前目录>/styles/` —— 风格跟着 deck 项目走（随项目交付、可移植）；
 2. skill 自己的 `styles/` —— 用户**显式托管**的全局风格；**工具链永不写入**
-   （写它 = 变相内置，用户明令禁止过；`style.py --new` 有守卫，见下文「从脚手架起手」）；
-3. `dev-tools/style-fixture/` —— 开发夹具（minimal-baseline / swiss-grid），当参考拷改。
+   （写它 = 变相内置，用户明令禁止过；脚手架只往 deck 项目的 `styles/` 拷，见下文「从脚手架起手」）；
+3. **（已删除）** `dev-tools/style-fixture/` 曾是可拷的参考实现 —— 已随 v4 移除：
+   可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。风格按本文档的
+   契约现写；测试用的两份风格在测试夹具里（**不在本 skill 目录内**、不随 skill 发布）。
 
 缺省风格 `swiss-grid`（render.py:71 `DEFAULT_STYLE`）；`--style` 吃名字也吃路径。
 
@@ -19,11 +21,13 @@
 
 ```jsonc
 {
-  // ── 必填顶层键 11 个（style.py:64 REQUIRED_KEYS；缺一个 --check 当场指名报）──
+  // ── 必填顶层键 11 个（**形状契约**；`style.py --check` v4 已删，没有"当场指名报"了 ——
+  //    缺键会在渲染 / 校验时暴露：如 fonts.display|body 缺键渲染器 KeyError、
+  //    type 缺档 deck 编译 SystemExit）──
   "version": 1,                          // schema 版本号；改了字段就 +1
-  "label":       "瑞士栅格 Swiss Grid",   // 风格显示名（style.py 摘要 / 联系表用）
-  "temperature": "安静 · 冷",            // 一句话气质（联系表行标签）
-  "reference":   "...",                  // 风格参考出处（style.py 摘要显示）
+  "label":       "瑞士栅格 Swiss Grid",   // 风格显示名（`image_source.py --brief` / 字体表用）
+  "temperature": "安静 · 冷",            // 一句话气质（--brief 按它挑提示词的气质档）
+  "reference":   "...",                  // 风格参考出处（--brief 的样式行显示）
   "note":        "...",                  // 设计缘由（给后人读）
   "colorSets": {
     "<name>": {                          // 色板集；spec 用 colorSet 字段引用名
@@ -36,7 +40,7 @@
   },
   // ── 以下四键是**可选 effect**（缺 = 该风格没有这个效果，不是"声明一堆零"）：
   //    ink / texture / decor / misregistration。普通风格（Swiss/Minimal/Glass…）
-  //    照 dev-tools/style-fixture/minimal-baseline 起手即可，一个都不用写。
+  //    不写 = 这套风格没有该效果（零错位、无纸纹层、无装饰）。
   "ink": {                                 // （可选）孔版/印刷系的叠印声明
     // ⚠️ **说明性元数据**：没有任何脚本读 ink.*；声明/派生的实际开关是
     // colorSets.*.text 是否存在（ink.py text_color()）。写这块只为留设计缘由。
@@ -70,12 +74,12 @@
   "fonts": {
     "display": "Songti SC, Georgia, serif", // 标题字体栈（**必填**）
     "body":    "SF Mono, Menlo, monospace"  // 正文 / 注释字体栈（**必填**）
-    // display / body 少一键渲染器直接 KeyError（render.py:765、787 读的就是这两键）
+    // display / body 少一键渲染器直接 KeyError（render.py:704、726 读的就是这两键）
   },
   "viewerBackground": "#141414",         // 浏览器外底色（让纸色边能看见）
-  "motion": {                            // 动效时间轴 —— 7 键必填（style.py:73 REQUIRED_MOTION）
-    "easing":      "expoOut",                       // 只认 expoOut / overshoot（style.py:78）
-    "cssEase":     "cubic-bezier(0.16, 1, 0.3, 1)", // 注入 CSS；linear/ease 系 --check 拦
+  "motion": {                            // 动效时间轴 —— 7 键必填；缺键 render.timeline 直接 KeyError（render.py:227）
+    "easing":      "expoOut",                       // 只认 expoOut / overshoot（render.py:501 的 ease()）
+    "cssEase":     "cubic-bezier(0.16, 1, 0.3, 1)", // 注入 CSS；现在无脚本校验（写 linear/ease 系显似 AI slop，自查）
     "enterMs": 520, "staggerMs": 70,                // 入场时长 / 逐条错峰
     "titleHoldMs": 260,                             // 标题独占期
     "holdMs": 2600, "readPerItemMs": 760            // 每页停留 / 逐条阅读时长
@@ -113,9 +117,10 @@
 
 ### 历史八套风格对照（内置已删 —— 表保留作自建参考）
 
-选风格看的是**画面**，不是这张表 —— 先跑 `python3 scripts/style.py --sheet -o s.png`
-把现有的每套风格拼进一张图（内置八套已删；现在渲的是夹具两套
-minimal-baseline / swiss-grid，外加你自建的），再回来看哪个适合场合。
+选风格看的是**画面**，不是这张表 —— 先拿几套风格各渲一页出来看
+（`python3 scripts/render.py spec.json --style <名> -o out.html` 再 `shots.py` 出图），
+再回来看哪个适合场合。（原 `style.py --sheet` 的拼图工具已随脚本 v4 退役；
+现在只渲你手里有的：夹具两套 minimal-baseline / swiss-grid，外加你自建的。）
 
 | `style` | 温度 | 构图锚点 | 适合 | 不适合 |
 | --- | --- | --- | --- | --- |
@@ -164,7 +169,7 @@ styles/<name>/
   skin.css     视觉层：颜色、字体、纹理、装饰观感
 ```
 
-**加一种风格 = 拷一份目录改内容，不碰任何 .py。** 历史八套全部是这样做出来的（已移除；参考实现 dev-tools/style-fixture/swiss-grid）
+**加一种风格 = 写一个目录（style.json + skin.css），不碰任何 .py。** 历史八套都是这样做的（已移除；v4 起也不再保留任何可拷的参考实现 —— 模板必然变成默认答案）
 （`keynote-dark` / `swiss-grid` / `billboard` / `notebook` / `botanical-dark` /
 `terminal` / `paper-ink` / `pastel-geometry`），除了给 token 添了一个可选字段
 （`colorSets.*.text`，见下）以外，渲染/校验/导出的代码一行未改。
@@ -207,9 +212,9 @@ styles/<name>/
   的缝。要启用它（做一套真正的孔版风格）请把新风格渲出来量一遍对比度，
   别因为测试是绿的就当它已经在生产里跑过。
 - **`decor.kind`**：放什么装饰 —— `halftone-circle`（网点圆）/ `accent-block`
-  （大色块，render.py:279）；不写或 `null` = 无装饰（render.py:273 提前返回）。
+  （大色块，render.py:271）；不写或 `null` = 无装饰（render.py:268 提前返回）。
   写了 kind 就要配 **`decor.sizes`**（装饰尺寸池，渲染器按 (seed, index) 从里抽，
-  render.py:283、297）。连带 `decor.types`（哪些版式放）与 `decor.zones`（放哪个角）
+  render.py:279-280、285-286）。连带 `decor.types`（哪些版式放）与 `decor.zones`（放哪个角）
   都是**风格自报的**，不是写死在渲染器里的。
 
 #### token 里的三个可选**作者数据**键（v3）
@@ -219,10 +224,10 @@ styles/<name>/
 - **`titleTiers`**：`{版式: 档名}`，覆盖渲染器的缺省映射 `render.TITLE_TIER`
   （`{title: cover, content-text: compact, end: end}`，render.py:105）。值域 =
   `REQUIRED_TYPE_TIERS`（render.py:116 的档名集合）。合并顺序：缺省映射 →
-  风格 `titleTiers` → spec 逐页 `titleTier`（compile.py:134、140）。
+  风格 `titleTiers` → spec 逐页 `titleTier`（deck.py:484、490）。
 - **`bulletDefault`**：content-text / content-image 页的缺省条目档名，缺省值
   `"bullet"`（`render.DEFAULT_BULLET_TIER`，render.py:129）；spec 逐页 `bulletTier`
-  覆盖它（compile.py:136、148）。two-column 仍固定 `bulletSmall`（结构事实，
+  覆盖它（deck.py:486、496-498）。two-column 仍固定 `bulletSmall`（结构事实，
   不受此键影响）。
 - **`layouts`**：这套风格自报的**布局词表**（非空字符串数组）。渲染器认的结构布局
   （`IMAGE_LAYOUTS`、`TWO_COL_LAYOUTS`，render.py:84、88）之外，作者自造的布局名
@@ -230,39 +235,36 @@ styles/<name>/
   `layouts` 时，把不在词表里、又不是结构布局的 `spec.layout` 判成**阻塞** problem
   —— 自造名写错一个字母，skin 里那条规则就永远不生效，最难查的那种静默。
 
-`style.py --check`（`audit()`，style.py:174-190）会校验三者的形状与值域：
-`titleTiers` 的每个值、`bulletDefault` 都得是 `REQUIRED_TYPE_TIERS` 里的档名，
-`layouts` 必须是非空字符串数组 —— 形状/值域不对当场报，不等它静默走默认
-（静默最难查）。
+这三者的校验**随 `style.py --check` 退役后分给了两处**：`titleTiers` / `bulletDefault`
+的档名由 `deck.py::compile_spec`（deck.py:504-509）在编译时报 —— 档名不在风格的
+`type` 块里直接 SystemExit；`layouts` 的词表门由 `check.py::_layout_vocab_problems`
+（check.py:405）在产物校验时按词表拦拼写。形状的其余部分（如 `layouts` 必须是
+非空字符串数组）没有单独的"契约体检"了 —— 写错会在用到它的那条路上暴露。
 
 #### 换风格需要重审什么
 
 `check.py` 的门槛**全部从所选风格的 token 读**，不用改代码；但要确认新 token 里
 这几项填得合理：`type` 的级数（字号是否匹配观看距离）、`contrast` 门槛、
 `motion` 的时间轴（快慢节奏要配风格气质 —— 缓动只认 expoOut / overshoot，
-style.py:78；7 个时间键缺一个，style.py:73 的 REQUIRED_MOTION 会报）、
+render.py:501；7 个时间键缺一个，`render.timeline` 读 `tokens["motion"]` 时直接
+KeyError，render.py:227）、
 `misregistration`（要做错位才写区间 —— ③ 那条区间校验只在**写了**时生效；
 不做错位的风格直接不写这个键）。
 
-### C. 从脚手架起手（`style.py --new`）
+### C. 从脚手架起手（`cp -r` 夹具）
 
-不想从零拷目录时，`style.py --new` 先替你拷一份**契约完整**的脚手架 ——
-底座取夹具 tokens（字号档 / 字栈 / 动效 / 契约齐全），再拷一份夹具 `skin.css`：
+**从零写。** 契约全在本文档里（顶层键 / 字号档 / 色板 / motion / 可选 effect）——
+`minimal-baseline`）就是一份契约完整的参考实现（字号档 / 字栈 / 动效齐全），
+拷进 deck 项目的 `styles/` 改名即可：
 
 ```bash
-python3 scripts/style.py --new my-style            # 写 <当前目录>/styles/my-style/
-python3 scripts/style.py --new my-style --dir /项目/styles
+mkdir -p <deck项目>/styles/<名> && $EDITOR <deck项目>/styles/<名>/style.json
 ```
 
-行为（`new_style()`，style.py:81）：
-
-- v3 **不再有方向预设**（`PRESETS` 已删除）—— 方向是模型读规则后按题目自己造的，
-  预设等于内置（用户明令禁止）。脚手架只保证"起手就过契约"，字号档 / 字栈 /
-  色板 / 气质都由作者按题目改；
-- **缺省写 `<当前目录>/styles/<name>/`**（风格跟 deck 项目走），`--dir` 可指到别处；
-- 生成后立刻过契约体检（`--new` 会调 `audit()`），不过当场退出 1；
-- **守卫：拒绝写进 skill 自己的 `styles/`**（style.py:107）—— 那里是用户显式托管的
-  全局风格，工具链往里写 = 变相内置（用户明令禁止过，实测踩过两次）。
+（原 `style.py --new` 的脚手架生成器已随脚本 v4 退役 —— 它做的事就是"拷一份夹具"，
+一条 `cp -r` 替掉。拷进 **deck 项目的 `styles/`**：skill 自己的 `styles/` 是用户
+显式托管的全局风格，工具链与手工都不该往里写 = 变相内置（用户明令禁止过）。
+脚手架只保证"起手就过契约"，字号档 / 字栈 / 色板 / 气质都由作者按题目改。）
 
 ## spec 字段集（deck-spec.json）
 
@@ -270,14 +272,14 @@ python3 scripts/style.py --new my-style --dir /项目/styles
 {
   "deck": {
     "style":    "swiss-grid",         // 可选；缺省 swiss-grid。风格名（三根顺序查找）或路径
-    "colorSet": "vivid",              // **必填具名**（v3：auto/mood 派生已退役）——
+    "colorSet": "blue",               // **必填具名**（v3：auto/mood 派生已退役）——
                                       // 写名 = 该风格 token.colorSets 的键；缺失或写
                                       // "auto" → validate_spec 判 MISSING_COLOR_SET，
                                       // render.resolve_color_set 再拦一道 SystemExit
     "seed":     11,                   // 建议显式写（缺省 1）；错位/颗粒按 (seed, 元素) 派生
     "title":    "封面文案",
     "brand":    "acme",               // 可选；品牌协议 —— 字体并入、色板同名键品牌赢
-                                      // （compile.py:124）
+                                      // （deck.py:462）
     "note":     "...",                // 可选；deck 级备注（封闭字段集放行，工具链不消费）
     "slides": [
       {
@@ -302,17 +304,17 @@ python3 scripts/style.py --new my-style --dir /项目/styles
         "nodes":    [{label, note}, ...],     // 仅 timeline
         "chart":    "bar",            // 仅 chart；**必填**的显式图形（bar / bar-horizontal /
                                       //   line / area / bar-stacked / donut / scatter /
-                                      //   combo 八类，chart.py:92）；缺失 = MISSING_CHART_TYPE
+                                      //   combo 八类，render.py:780 / validate_spec.py:41）；缺失 = MISSING_CHART_TYPE
         "intent":   "comparison",     // 仅 chart；可选**语义标注**（不决定图形）——
                                       //   trend / ranking / comparison / correlation /
                                       //   deviation / distribution / composition /
                                       //   progress，八值封闭，validate_spec 校验
-        "message":  "结论一句话",      // 仅 chart；写了就当图表**大标题**（render.py:1118），
+        "message":  "结论一句话",      // 仅 chart；写了就当图表**大标题**（render.py:1252-1258），
                                       // 原 title 降为数据集名
         "data":     [{label, value}, ...],    // 仅 chart（scatter 豁免 x/y）
         "series":   [{name, data}, ...],      // 仅 chart；多序列
         "emphasis": {"values": ["标签"]},     // 仅 chart；命中的用主色，其余灰化
-        "annotations": [{type, target, text, value}, ...],  // 仅 chart
+        "annotations": [{type, target, text, value}, ...],  // 仅 chart；v4 不渲染（见 charts.md「标注」）
         "unit":     "%",              // 仅 chart；数值单位
         "caption":  "...",            // 仅 chart / content-image
         "color":    "overprint"       // 可选；只允许 "overprint"（不写也行）
@@ -339,11 +341,11 @@ v3 退役的两个字段现在都是未知键，写它们会被判 `UNKNOWN_FIEL
 - **相对路径**（旧语义，全兼容）：spec 同目录没有 `assets/manifest.json` 时照旧用；
 - **assetId**（语义引用）：放了 manifest 时，`image` 写清单里的 id。清单是**封闭
   schema v1**：`{"schemaVersion": 1, "assets": {id: {file, source, note}}}`
-  （render.py:851-855），`file` 相对 `assets/` 目录。
+  （render.py:977-978），`file` 相对 `assets/` 目录。
 
 解析只发生在 compile：assetId → `"assets/<file>"`（§14 优先级链 v1 —— **manifest 即
 选择**），页对象携带最终路径，渲染器不见 assetId；每条解析写进 compile trace
-（compile.py:180-193）。缺文件由 `check.py` 的「图片加载」门实测拦。
+（deck.py:522-530）。缺文件由 `check.py` 的「图片加载」门实测拦。
 清单的上游（`assets/requests/<槽位id>.json` 先要、图回来登记进 manifest）见
 `references/images.md`。
 

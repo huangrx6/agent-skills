@@ -53,7 +53,7 @@
 
 同一个"PPTX"有两个做法，**取舍相反，不能兼得**：
 
-| | 贴图版 `make_pptx.py` | 可编辑版 `pptx_native.py` |
+| | 贴图版 `pptx_native.py --png-dir` | 可编辑版 `pptx_native.py` |
 | --- | --- | --- |
 | 每页内容 | 一张 2x 截图 | 原生文本框 / 椭圆 / 原生图表 |
 | 改字 | 改不了 | **能改** |
@@ -66,9 +66,11 @@
 - 要**对方改字** → 可编辑版
 - 两者都要 → 各出一份（都从同一份 HTML 出，不会跑偏）
 
-### 贴图版 `make_pptx.py`
+### 贴图版 `pptx_native.py --png-dir`
 
-**是什么**：16:9 pptx，每页**一张满版贴图**。
+**是什么**：`python3 scripts/pptx_native.py --png-dir pages/ -o deck.pptx` ——
+16:9 pptx，每页**一张满版贴图**。（原 `make_pptx.py` v4 并入 `pptx_native.py` 的
+`--png-dir` 模式，独立脚本已退役。）
 
 **什么时候用**：带去现场演示（PPT 切页不会被打断、不用担心字号自适应）；
 给非技术受众 / 客户演示（"PPT"是他们的默认预期）。
@@ -111,19 +113,16 @@
 单件都有测试，**但"串起来"是另一回事** —— 这条最贵的三次教训都来自同一个动作：
 **把产物打开看**，而不是只看命令返回 0。
 
-**一条命令的版本**（推荐 —— 它顺带把"打开看"变成一张对比图 + 一组可判事实）：
+**交付演练：手工跑**（推荐 —— 逐条跑、每步的退出码就是闸门。原 `deliver.py` 的
+"一条命令"编排 v4 已整文件退役，它把"打开看"做成一张对比图的便利也一并退役）：
 
-```bash
-python3 scripts/deliver.py your.spec.json --out /tmp/deliver --pages 1,9,12
-python3 scripts/deliver.py your.spec.json --video      # 连 MP4 一起（慢，几分钟）
-```
+原 `deliver.py` 做的事（留作验收口径）：跑完整条链 → 对指定几页把
+**HTML / 打印 PDF / 原生 PPTX** 三个版本各渲一张图拼成对比表 → 把每个版本与
+HTML **逐像素比**并报差异百分比 → 汇总每件产物的事实。校验不过就**中止**（把一份
+已知有问题的 deck 做成五种格式，只是把问题复制五份）。实测 6 页 / 2 页比对约
+**50 秒**。
 
-它做的事：跑完整条链 → 对指定几页把 **HTML / 打印 PDF / 原生 PPTX** 三个版本各渲一张图
-拼成对比表 → 把每个版本与 HTML **逐像素比**并报差异百分比 → 汇总每件产物的事实。
-校验不过就**中止**（把一份已知有问题的 deck 做成五种格式，只是把问题复制五份）。
-实测 6 页 / 2 页比对约 **50 秒**。
-
-逐像素差的实测值与容忍线：
+它用过的逐像素差实测值与容忍线（保留作参考基线）：
 
 | 版本 | 实测 | 容忍 | 为什么 |
 | --- | --- | --- | --- |
@@ -138,18 +137,20 @@ python3 scripts/deliver.py your.spec.json --video      # 连 MP4 一起（慢，
 ```bash
 cd 你的交付目录
 S=…/skills/deck-authoring/scripts
-python3 $S/validate_spec.py deck.spec.json          # 1 规格
-python3 $S/plate.py in.jpg -o sample-treated.png     # 2 造图（图文页要用；
-                                                     #   或给 deliver 加 --allow-placeholder
-                                                     #   让它造占位测试卡空跑）
-python3 $S/render.py deck.spec.json -o out.html      # 3 出 HTML
-python3 $S/check.py  deck.spec.json out.html         # 4 校验（真浏览器量）
-python3 $S/pdf.py    out.html -o deck.pdf            # 5 矢量 PDF
-python3 $S/shots.py  out.html --out-dir pages --count N   # 6 逐页 PNG
-python3 $S/make_pptx.py    --png-dir pages -o deck.pptx        # 7 贴图版
-python3 $S/pptx_native.py  out.html -o deck-editable.pptx      # 8 原生版
-python3 $S/animate.py      out.html -o deck.mp4                # 9 视频
+python3 $S/validate_spec.py deck.spec.json           # 1 规格
+python3 $S/render.py deck.spec.json -o out.html       # 2 出 HTML
+python3 $S/check.py  deck.spec.json out.html          # 3 校验（真浏览器量）
+python3 $S/pdf.py    out.html -o deck.pdf             # 4 矢量 PDF
+python3 $S/shots.py  out.html --out-dir pages --count N   # 5 逐页 PNG
+python3 $S/pptx_native.py --png-dir pages -o deck.pptx         # 6 贴图版
+python3 $S/pptx_native.py  out.html -o deck-editable.pptx      # 7 原生版
+python3 $S/animate.py      out.html -o deck.mp4                # 8 视频
 ```
+
+> 原第 2 步 `plate.py in.jpg -o sample-treated.png`（出图后的制版后处理）v4 已
+> 退役：图片按原样使用，出图的色彩与构图约束改由 `image_source.py --brief` 的
+> 提示词与构图字段承担（见 `images.md`）；`deliver.py --allow-placeholder` 的
+> 空跑演练也随该脚本退役。
 
 ### 实测代价（21 页真实 deck，本机）
 
@@ -196,15 +197,16 @@ python3 $S/animate.py      out.html -o deck.mp4                # 9 视频
 
 ```text
 deck-spec.json ─┐
-                ├─→ render.py ─→ out.html ─┬─→ shots.py ──────→ pages/*.png ─→ make_pptx.py ─→ deck.pptx（贴图）
+                ├─→ render.py ─→ out.html ─┬─→ shots.py ──→ pages/*.png ─→ pptx_native.py --png-dir ─→ deck.pptx（贴图）
 style.json  ───┘        │                 ├─→ pdf.py ─────────→ deck.pdf（矢量）
                         │                 └─→ pptx_native.py ─→ deck-editable.pptx（可编辑）
                         │
                         └─→ check.py（验 HTML；内部调 measure.py 实测真盒子）
 ```
 
-`check.py` 是**对 HTML 跑的**，不是对 PNG / PDF / PPTX 跑的 —— 错位区间、柱高都从
-HTML 里读，同一份事实两个视角，避免"渲染器自觉"导致的输出自检失效。
+`check.py` 是**对 HTML 跑的**，不是对 PNG / PDF / PPTX 跑的 —— 错位区间、图表
+就绪（G2 的 `chartReady` 只能真浏览器量）都从 HTML 里读，同一份事实两个视角，避免
+"渲染器自觉"导致的输出自检失效。
 三种产物都从同一份 HTML 出，所以它们不会跑偏；`pdf.py` / `pptx_native.py` 还会各自
 验一遍产物（页数、页尺寸、位图数、字是否真字）。
 

@@ -44,7 +44,7 @@ Timeline → Deterministic Runtime → Motion QA（Effect Registry 见 §5 的�
 每页先定 intent：introduce / reveal / explain / compare / progress / focus /
 transform / connect / conclude / transition（如
 `{"motion_intent": "explain", "narrative_direction": "left_to_right", "energy": 0.55}`）。
-本仓库由 plan.py 的页型/图表 intent 承担其职，未单独建 intent 字段。
+本仓库由 spec 的页型与图表 `intent` 标注承担其职，未单独建 intent 字段。
 
 ## 4. 四类 Motion Role
 
@@ -52,7 +52,9 @@ transform / connect / conclude / transition（如
   零依赖确定性管线不接 Aurora/Liquid Chrome/Particle Text 这类 WebGL/Shader 效果；
   要它们就换工具链，别在纯函数管线里塞】
 + **Semantic Motion**（数字 Count Up、柱图 Grow、折线 Path Draw、流程渐进）：
-  【✅ 柱 growY/growX、折线 pathDraw、点 pop、段式线 growX 已进 paint】
+  【✅ 段式线 growX、标题/正文/图的揭示已进 paint；**图表的数据动画
+  （柱生长 / 折线描画 / 点弹出）随 v4 的手写 SVG 渲染器一并关死** ——
+  图表页只有容器入场，见 §19/§31】
 + **Ambient Motion**（低幅低速氛围）：【约定——背景纹理静态；grain 在帧模式/
   reduced-motion 下隐藏。"观众不该感觉背景在表演"由"背景根本不动"满足】
 + **Transition**（跨页）：【约定——当前是页内入场 + 切页；Shared Element/FLIP
@@ -69,8 +71,9 @@ export/limits/incompatible_with…）。本仓库的效果面很小且全部自�
 
 Typography Reveal / Ambient Background / Shader Material / Grid Digital / Particle /
 Reveal / Spatial Layout / Card Effects / Border Effects / Diagram Motion / Data Motion /
-Interactive Motion —— 本仓库只实现其中 Data Motion（grow/draw/count 走语义）与
-Reveal（mask/wipe）两族；交互类（Magnet/Cursor）只可能出现在 HTML，视频导出必禁。
+Interactive Motion —— 本仓库只实现 Reveal（mask / wipe）与段式线 growX 等少数语义
+效果；**图表侧的 Data Motion（grow / draw）v4 已关死**（G2 `animation:false`）；
+交互类（Magnet / Cursor）只可能出现在 HTML，视频导出必禁。
 
 ## 7. Page Type 与 Motion Budget【✅ 换算落地】
 
@@ -81,8 +84,9 @@ Reveal（mask/wipe）两族；交互类（Magnet/Cursor）只可能出现在 HTM
 
 ## 8. Page Type 推荐效果【✅ 等价落地】
 
-Cover/Statement → 标题 maskRevealY + 正文 fadeRise；Chart → 容器先行 + 柱生长 +
-折线描画（**禁**大面积 glitch/粒子——本管线没有这些，等于结构性满足）；
+Cover/Statement → 标题 maskRevealY + 正文 fadeRise；Chart → **只有容器先行**
+（v4 图表动画关死，柱生长 / 折线描画已无）（**禁**大面积 glitch/粒子——本管线
+没有这些，等于结构性满足）；
 Cards → Cluster/近同时揭示（stagger 50-130ms，禁 card1→4 大间隔依次飞入
 —— stagger 由风格 token 统一，不会写出大间隔）。
 
@@ -109,9 +113,9 @@ personality→easing 曲线，tempo→enter/stagger，continuity→titleHold。
 
 duration xs180/sm300/md520/lg800/xl1200、distance 4/6/12/24、stagger 35/70/120、
 ease enter=expoOut…**禁止每个元素随机写毫秒和位移**。落地：所有毫秒/位移来自
-`style.json` 的 `motion` 块（一套风格一份）+ `chart.py` 的 `MOTION_TOKENS`
-（duration 300/600/1000、stagger 40/80/120、page_total_max 1500ms）；代码里没有
-第二个写毫秒的地方。本页位移：标题 26px、正文 16px、图表容器 10px、页码 0。
+`style.json` 的 `motion` 块（一套风格一份）；**图表侧原先的
+`chart.py::MOTION_TOKENS`（duration 300/600/1000、stagger 40/80/120）已随脚本
+退役** —— v4 图表动画关死，代码里没有第二个写毫秒的地方。本页位移：标题 26px、正文 16px、图表容器 10px、页码 0。
 
 ## 12. Motion Budget 规则【✅ 结构性满足】
 
@@ -149,8 +153,9 @@ P1 主视觉（完整入场）/ P2 标题（mask+落定）/ P3 支撑（fadeRise
 
 max_primary_motion_types = 2。本页两族：**遮罩/淡入族**（title mask、body fade）
 
-+ **结构生长族**（rule growX、chart grow/draw、image wipe 同属"揭示"一族的
-方向变体——这里的"方向"指效果方向，与 spec 的 `layout` 布局无关）——同页不会
++ **结构生长族**（rule growX、image wipe 同属"揭示"一族的
+方向变体——这里的"方向"指效果方向，与 spec 的 `layout` 布局无关；
+原 chart grow/draw 已随图表动画关死）——同页不会
 出现 Fade+Slide+Scale+Rotate+Blur+Bounce+Glow+Glitch
 同台（后四样本管线不存在，前几样按元素类型各归其位）。
 
@@ -168,12 +173,14 @@ max_primary_motion_types = 2。本页两族：**遮罩/淡入族**（title mask�
 | 标题（含父块） | maskRevealY | clip-path inset 从下揭开 + 26px 落定 + 1.012 settle |
 | 段式线 .rule | growX | scaleX 0→1、origin left（线是"画"出来的） |
 | 图片 | imageReveal | 横向揭开（inset 右收）+ 1.02→1 settle |
-| 图表容器 | 容器先行 | 淡入 + 10px 微升 |
-| 柱 .bar | growY/growX | fill-box 原点从基线/左缘生长（宽高比判向） |
-| 折线 .line | pathDraw | stroke-dasharray/offset 沿线描画 |
-| 点 .dot | pop | fill-box 中心缩放 |
+| 图表容器 | 容器先行 | 淡入 + 10px 微升（图表页**只有这一层**，见下） |
 | 正文/副题 | fadeRise | 0→1 + 16px（**不是** 0.4→1：第 0 帧必须是干净空态，ghost 起点会破坏抽帧 QA） |
 | 页码/壳 | chrome | 只淡入不位移，跟标题走 |
+
+**图表内部的数据动画（`.bar` growY/growX、`.line` pathDraw、`.dot` pop）已随 v4 退役**：
+v4 起图表由 AntV G2 渲染（`animation:false`，见 `charts.md`），产物里没有
+`.bar` / `.line` / `.dot` 这些元素 —— `paint()` 里对应几行的选择器匹配不到任何
+东西，不产生效果。图表页只剩上面那一行**容器级**入场。
 
 ## 20. Animation Direction【✅】
 
@@ -185,7 +192,8 @@ inset 方向）；时间线/流程按序 stagger（DOM 顺序即编排顺序）�
 
 duration = base × visual_mass（Caption 0.5 / Body 0.7 / Card 0.9 / Title 1.0 /
 Hero 1.3 / Architecture 1.6）。落地为编排：标题先落定 → titleHold → 正文
-stagger → 图表容器先于数据 6%——重的东西晚、久，轻的东西早、快，同一 easing。
+stagger；（原「图表容器先于数据 6%」随图表数据动画关死而失效：容器即图表，
+没有第二层）——重的东西晚、久，轻的东西早、快，同一 easing。
 
 ## 22. Motion Quiet Zone【✅ 结构性满足】
 
@@ -229,22 +237,22 @@ seed 已显式进 spec（错位/颗粒按 (seed,元素) 派生）。
 ## 29. Motion Graph【✅ 简化】
 
 after/before/with/sync/overlap —— 落地为编排表的 delay 数学：body 在 title
-之后（enter×0.55 + titleHold），图表数据在容器之后（+6%），页码与标题同拍。
-复杂依赖图未做（没有需要它的页面结构）。
+之后（enter×0.55 + titleHold），页码与标题同拍。（原「图表数据在容器之后
+（+6%）」随 v4 图表动画关死而失效。）复杂依赖图未做（没有需要它的页面结构）。
 
 ## 30. 基础 Preset Library【✅ 子集】
 
 规范第一版 15 个：fadeSoft fadeRise maskRevealX maskRevealY imageReveal
 scaleFocus growX growY pathDraw countUp highlight crossFade sharedMove
-blurToClear accentSweep。**已实现规范 preset 6 个**：fadeRise、maskRevealY、
-imageReveal、growX（线）、growY/growX（柱）、pathDraw；编外 **pop**（点弹出）
-已实现、未入规范 15 名单（§4 Semantic Motion 已记）；countUp/highlight/
-sharedMove 等记在路线图。高级 Shader 效果不进 preset（见 §5）。
+blurToClear accentSweep。**已实现规范 preset 4 个**：fadeRise、maskRevealY、
+imageReveal、growX；编外 **pop** 曾用于散点。**growY（柱）与 pathDraw
+（折线）已随 v4 图表动画关死而退役**；countUp/highlight/sharedMove 等记在路线图。高级 Shader 效果不进 preset（见 §5）。
 
 ## 31. Page Choreography【✅】
 
 Cover：Ambient（无）→ 主标题 maskReveal → 副题 → 稳定终态。
-Chart：结论标题 → 容器先行 → 柱生长/折线描画 → 标注/页码 → 稳定。
+Chart：结论标题 → 容器先行（淡入 + 10px）→ 页码 → 稳定（**图表内部不再动**，
+见 §19）。
 Cards/正文：标题落定 → 停顿 → 条目近同时揭示（stagger 50-130ms）。
 每页进**稳定终态**（hold 段无动画）——末帧即终态。
 
@@ -263,7 +271,7 @@ reading_time = base_hold + text_complexity + chart_complexity…
 ## 34. Motion Density【✅ 等价】
 
 none/low/medium/high；Cover high、Content low、Table none。本仓库密度由页型
-结构决定：图表页 = 容器+数据两层，文本页 = 标题+条目，表格/代码页 = 静态满态
+结构决定：图表页 = 只有容器一层（数据动画关死），文本页 = 标题+条目，表格/代码页 = 静态满态
 （滚动态交付时零动画）。
 
 ## 35. Typography Effect 等级【✅ 等价】
@@ -276,7 +284,7 @@ settle scale 1.012 只在标题）/ L3 Experimental（Particle/Decrypted…—�
 
 用了 Liquid Chrome/Hyperspeed/Particle Text 等则标题降为简单 mask、正文 fadeSoft、
 转场 cut——本仓库没有 Signature，降级规则空转；"高级效果越强其余越克制"的
-精神体现在：图表页正文条目不与柱生长抢拍（titleHold 隔开）。
+精神体现在：图表页标题/条目按序落定，图表容器不与它们抢拍（titleHold 隔开）。
 
 ## 37. 推荐 Effect Source Pool【约定】
 

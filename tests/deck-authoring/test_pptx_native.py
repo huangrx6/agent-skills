@@ -32,10 +32,20 @@ import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
+# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
+# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
+os.environ.setdefault("DECK_STYLES",
+                      os.path.join(FIXTURES_DIR, "styles"))
+
+# 夹具第一套风格（tests/fixtures/styles 下；风格不再有内置解析根）
+FIXTURE_STYLE = os.path.join(FIXTURES_DIR, "styles", "swiss-grid")
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "dev-tools", "style-fixture", "swiss-grid", "style.json")
-STYLES = os.path.join(SKILL, "dev-tools", "style-fixture")
-DEMO = os.path.join(SKILL, "dev-tools", "demo.spec.json")
+TOKENS = os.path.join(FIXTURES_DIR, "styles", "swiss-grid", "style.json")
+STYLES = os.path.join(FIXTURES_DIR, "styles")
+DEMO = os.path.join(FIXTURES_DIR, "demo.spec.json")
 
 # 版面 1600×900px → EMU。1 CSS px = 9525 EMU（= 0.75pt）。
 EMU_PER_PX = 9525
@@ -217,7 +227,7 @@ class TestPptxNative(unittest.TestCase):
             spec = self.render.load_style(name)["tokens"].get("decor") or {}
             if spec.get("kind"):
                 declared.add(spec["kind"])
-        base = self.render.load_style("swiss-grid")
+        base = self.render.load_style(FIXTURE_STYLE)
         for kind in ("accent-block", "halftone-circle"):
             variant = dict(base, tokens=dict(base["tokens"],
                                              decor={"kind": kind}))
@@ -231,7 +241,7 @@ class TestPptxNative(unittest.TestCase):
         """有装饰的风格，装饰要真的落成一个原生形状（不是被静默吞掉）。"""
         # billboard（自带 accent-block 装饰）已随 styles/ 删除：注入同款 token
         # 驱动同一分支 —— 测的是"声明的装饰真的落成原生形状"，与哪套风格无关。
-        style = self.render.load_style("swiss-grid")
+        style = self.render.load_style(FIXTURE_STYLE)
         style = dict(style, tokens=dict(style["tokens"], decor={
             "kind": "accent-block", "types": ["title"], "zones": ["br"],
             "sizes": [400]}))
@@ -261,7 +271,7 @@ class TestPptxNative(unittest.TestCase):
         会被当成普通属性默默吞掉，XML 里 `<a:pattFill>` 光秃秃没有 prst，
         渲染出来是个空圈 —— 实测踩过，而且文件生成/页数全对，不查就发现不了。
         """
-        base = self.render.load_style("swiss-grid")
+        base = self.render.load_style(FIXTURE_STYLE)
         style = dict(base, tokens=copy.deepcopy(base["tokens"]))
         style["tokens"]["decor"] = {"kind": "halftone-circle", "types": ["title"],
                                     "zones": ["br"], "sizes": [400]}
@@ -359,7 +369,7 @@ class TestPptxNative(unittest.TestCase):
         # 两个变体 —— 原版（UA 默认 h1=700）与注入 h1{font-weight:400} 的变体。
         # 同风格只动一个变量，"导出跟实测字重走、不按角色写死"测得更直接。
         demo = json.loads(json.dumps(self.demo))
-        base = self.render.load_style("swiss-grid")
+        base = self.render.load_style(FIXTURE_STYLE)
         light = dict(base, skin=base["skin"] + "\nh1.title{font-weight:400}\n")
         results = {}
         for tag, st in (("heavy", base), ("light", light)):

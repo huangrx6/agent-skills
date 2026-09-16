@@ -32,8 +32,6 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STYLES_DIR = os.path.join(HERE, "..", "styles")
-DEFAULT_STYLE = "swiss-grid"
-DEFAULT_TOKENS = os.path.join(STYLES_DIR, DEFAULT_STYLE, "style.json")
 
 # 封闭字段集。加字段要同时改这里与 `references/style-architecture.md` ——
 # 这正是设计意图：让"顺手加一个"变得有摩擦。
@@ -191,6 +189,13 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
         return issues
     _check_fields(deck, DECK_FIELDS, "deck", issues)
 
+    # 风格必填（工具链不内置任何风格 —— 见 references/style-architecture.md）
+    if not deck.get("style"):
+        issues.error("MISSING_STYLE", "deck.style",
+                     "v4 起 deck.style 必填 —— 工具链不内置任何风格，也没有可拷的"
+                     "参考实现：在 deck 项目的 styles/<名>/ 里放 style.json + skin.css，"
+                     "spec 写 \"style\": \"<名>\"（形状见 references/style-architecture.md）")
+
     # 配色必填具名（v3：auto/mood 退役）
     if deck.get("colorSet") in (None, "auto"):
         issues.error("MISSING_COLOR_SET", "deck.colorSet",
@@ -280,23 +285,27 @@ def main(argv: list[str] | None = None) -> int:
 
     # token 读不到**不算** spec 的错（可能只是没带对路径）—— 那就跳过 colorSet 存在性校验，
     # 而不是把一件读不到的事报成"规格有问题"。
-    # 风格从 spec 的 deck.style 解析（缺省 swiss-grid）：多风格之后，色板名单必须按
-    # **这一份 deck 选的风格**去查，拿别的风格的名单去核会误报。
+    # 风格从 spec 的 deck.style 解析（v4：必填，无内置风格）：多风格之后，色板名单必须
+    # 按**这一份 deck 选的风格**去查，拿别的风格的名单去核会误报。
     tokens_path = args.tokens
     if tokens_path is None:
-        style_name = DEFAULT_STYLE
         deck = spec.get("deck") if isinstance(spec, dict) else None
-        if isinstance(deck, dict) and isinstance(deck.get("style"), str):
-            style_name = deck["style"]
-        tokens_path = os.path.join(STYLES_DIR, style_name, "style.json")
+        style_name = deck.get("style") if isinstance(deck, dict) else None
+        if isinstance(style_name, str) and style_name:
+            tokens_path = os.path.join(STYLES_DIR, style_name, "style.json")
     color_sets: set[str] | None = None
-    try:
-        with open(tokens_path, encoding="utf-8") as fh:
-            color_sets = set(json.load(fh)["colorSets"])
-    except (OSError, json.JSONDecodeError, KeyError, TypeError):
-        color_sets = None
-
-    issues = validate(spec, color_sets)
+    if tokens_path is None:
+        # 没声明风格（或声明了但找不到 token 文件）—— 不在这里报错：
+        # MISSING_STYLE / 风格缺失由 validate() 与 check.py 各自负责，
+        # 这里只把"查不了色板名单"的降级写在脸上（跳过名单存在性校验）。
+        issues = validate(spec, None)
+    else:
+        try:
+            with open(tokens_path, encoding="utf-8") as fh:
+                color_sets = set(json.load(fh)["colorSets"])
+        except (OSError, json.JSONDecodeError, KeyError, TypeError):
+            color_sets = None
+        issues = validate(spec, color_sets)
 
     if args.json:
         print(json.dumps({"spec": args.spec, "error_count": len(issues.errors),

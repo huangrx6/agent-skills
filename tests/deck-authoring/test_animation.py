@@ -32,21 +32,29 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
+# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
+# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
+os.environ.setdefault("DECK_STYLES",
+                      os.path.join(FIXTURES_DIR, "styles"))
 SCRIPTS = os.path.join(SKILL, "scripts")
-DEMO = os.path.join(SKILL, "dev-tools", "demo.spec.json")
-STYLES = os.path.join(SKILL, "dev-tools", "style-fixture")
+DEMO = os.path.join(FIXTURES_DIR, "demo.spec.json")
+STYLES = os.path.join(FIXTURES_DIR, "styles")
 
 
-def _style_names() -> list[str]:
+def _style_paths() -> list[str]:
     """所有风格 —— **读目录，不写死名单**。
 
     写死名单的代价是实测过的：加了四套新风格之后，那份写死的名单让它们全部逃过了
     运动 / 装饰 / 版式表三条检查 —— 而测试是绿的。目录才是唯一事实来源。
     """
-    return sorted(d for d in os.listdir(STYLES) if os.path.isdir(os.path.join(STYLES, d)))
+    return sorted(os.path.join(STYLES, d) for d in os.listdir(STYLES)
+                  if os.path.isdir(os.path.join(STYLES, d)))
 
 
-STYLE_NAMES = _style_names()
+STYLE_PATHS = _style_paths()
 
 
 def _load(name: str, path: str):
@@ -70,7 +78,7 @@ class TestTimeline(unittest.TestCase):
     def setUpClass(cls) -> None:
         with open(DEMO, encoding="utf-8") as fh:
             cls.spec = json.load(fh)
-        cls.style = render.load_style(cls.spec["deck"].get("style", render.DEFAULT_STYLE))
+        cls.style = render.load_style(os.path.join(STYLES, cls.spec["deck"]["style"]))
         cls.tokens = cls.style["tokens"]
 
     def test_timeline_is_deterministic(self) -> None:
@@ -135,7 +143,7 @@ class TestTimeline(unittest.TestCase):
 class TestMotionTokens(unittest.TestCase):
     def test_every_style_declares_motion(self) -> None:
         """每种风格都必须声明运动参数 —— 运动是风格的一部分，不是全局开关。"""
-        for name in STYLE_NAMES:
+        for name in STYLE_PATHS:
             with self.subTest(style=name):
                 tokens = render.load_style(name)["tokens"]
                 self.assertIn("motion", tokens, f"{name} 没声明 motion")
@@ -147,13 +155,13 @@ class TestMotionTokens(unittest.TestCase):
     def test_styles_differ_in_motion(self) -> None:
         """不同风格的运动参数**不能完全一样** —— 否则“运动是风格的一部分”是假的。"""
         params = {name: tuple(sorted(render.load_style(name)["tokens"]["motion"].items()))
-                  for name in STYLE_NAMES}
-        self.assertEqual(len(set(params.values())), len(STYLE_NAMES),
+                  for name in STYLE_PATHS}
+        self.assertEqual(len(set(params.values())), len(STYLE_PATHS),
                          "有两套风格的运动参数完全一样 —— 运动层没真的按风格分化")
 
     def test_no_linear_easing(self) -> None:
         """缓动不能是 linear / ease —— 那是 AI slop 的第一特征（数字元素没有重量）。"""
-        for name in STYLE_NAMES:
+        for name in STYLE_PATHS:
             with self.subTest(style=name):
                 css = render.load_style(name)["tokens"]["motion"]["cssEase"]
                 self.assertNotIn(css, ("linear", "ease", "ease-in-out"),
@@ -168,7 +176,7 @@ class TestMotionPresets(unittest.TestCase):
         with open(DEMO, encoding="utf-8") as fh:
             cls.spec = json.load(fh)
         cls.html = render.render(cls.spec, render.load_style(
-            cls.spec["deck"].get("style", render.DEFAULT_STYLE)))
+            os.path.join(STYLES, cls.spec["deck"]["style"])))
         cls.js = cls.html[cls.html.index("window.__deck_timeline="):]
 
     def test_title_uses_mask_reveal(self) -> None:
@@ -210,7 +218,7 @@ class TestRenderPathIsSeekable(unittest.TestCase):
     def setUpClass(cls) -> None:
         with open(DEMO, encoding="utf-8") as fh:
             cls.spec = json.load(fh)
-        cls.style = render.load_style(cls.spec["deck"].get("style", render.DEFAULT_STYLE))
+        cls.style = render.load_style(os.path.join(STYLES, cls.spec["deck"]["style"]))
         cls.html = render.render(cls.spec, cls.style)
 
     def test_no_css_transition_on_the_content_path(self) -> None:

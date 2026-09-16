@@ -11,8 +11,9 @@
 
 > 字段口径：本文 JSON 示例是规范推荐形（camelCase）；本仓库 schema 用 snake_case
 > （`source_ref` / `source_type`），fact 的 `inferred` 即规范的 `derived` 语义，
-> claim 的 `type` 用 `original | derived`。执行标记：【拦】= `plan.py --check` 阻塞，
-> 【提示】= 开口不拦。schema 全表见 `planning.md`。
+> claim 的 `type` 用 `original | derived`。执行标记：【拦】= 硬约束（**原由
+> `plan.py --check` 阻塞；该脚本 v4 已删，改为按本文自查**），【提示】= 开口不拦。
+> schema 全表见 `planning.md`。
 
 ## 0. 核心原则
 
@@ -119,7 +120,7 @@ must_have（没它论证不成立）/ supporting（增强可信度）/ optional 
 
 ## 13. Storyline Archetype（不从零自由生成故事）
 
-预定义骨架（`plan.py --archetypes` 列全表）：problem_solution（问题→影响→方案→证明，
+预定义骨架（`planning.md` 列全表）：problem_solution（问题→影响→方案→证明，
 适合方案/产品/销售）、scr（情境→冲突→解法，咨询/决策）、why_what_how（技术方案/
 战略）、project_report（项目汇报，周报/月报/阶段汇报）、goal_progress_result（汇报/复盘）、
 overview_detail_evidence（评审/研究）、product_capability_value（产品/售前）、
@@ -194,9 +195,9 @@ Decorative（只承担氛围）。Page Planner 优先保留 Primary。
 ## 25. Copy Level
 
 重要文本同时生成 `{"long": "", "medium": "", "short": ""}`，版面按真实空间选。
-**Renderer 不允许临时截断句子**（fit 量的是"装不装得下"，装不下回来改文案或减条目）。
+**Renderer 不允许临时截断句子**（`measure.py` 量的是"装不装得下"，装不下回来改文案或减条目）。
 
-## 26. Content Budget（语义预算，几何仍由 fit 实测）
+## 26. Content Budget（语义预算，几何仍由 measure 实测）
 
 `{"headline": {"preferredChars": 24, "maxLines": 2}, "supportingPoints": {"preferredCount": 3, "maxCount": 5}, "body": {"preferredChars": 80}}`
 
@@ -208,12 +209,11 @@ Decorative（只承担氛围）。Page Planner 优先保留 Primary。
 ## 28. 内容复杂度评分【≥0.70 未标 split=拦】
 
 complexity = textAmount + nodeCount + evidenceCount + hierarchyDepth +
-chartSeriesCount + visualRequirementCount。本仓库实现（plan.py:175-194）：
-`complexity()` 返回**裸 float 分数**（`字符/120 + 节点×0.12 + 图表×0.25 +
-图×0.15 + (层级-1)×0.10`，封顶 1.0），`should_split()` 返回（是否超阈值,
-分数）二元组 —— 没有 `complexityScore` / `risk` / `splitSuggested` 这类输出
-字段。`plan.py --check` 按它落门（plan.py:384-390）：≥0.70 未标 split =
-阻塞；标了 split 而分数不够 = 提示。
+chartSeriesCount + visualRequirementCount。本仓库实现（原 `plan.py` 的 `complexity()`，
+v4 随脚本删除）是一条**确定性公式**：`字符/120 + 节点×0.12 + 图表×0.25 +
+图×0.15 + (层级-1)×0.10`，封顶 1.0 —— 没有 `complexityScore` / `risk` /
+`splitSuggested` 这类输出字段，现在也没有脚本替你算：**≥ 0.70 且没标拆页 = 硬约束**
+（自查；这条以前是 `plan.py --check` 的阻塞门）。标了拆页而内容很轻则会把一页拆散。
 
 ## 29. 拆页策略
 
@@ -322,8 +322,8 @@ Story Graph 不允许逻辑断层：Problem → Implementation 缺 Solution → 
 
 ## 50. 空洞语言检测【变化词且全句无数字=提示】
 
-提升 / 优化 / 降低 / 提高 / 改善 / 赋能 / 助力 / 领先 / 先进（与 plan.py:211-212
-的 VAGUE_CHANGE_WORDS 九词同步）——
+提升 / 优化 / 降低 / 提高 / 改善 / 赋能 / 助力 / 领先 / 先进（原 `plan.py` 的
+`VAGUE_CHANGE_WORDS` 九词；脚本已删，照词表自查）——
 单独出现就追问：提升什么？优化多少？为什么？有什么证据？
 
 ## 51. 数字优先
@@ -358,20 +358,21 @@ Story Graph 不允许逻辑断层：Problem → Implementation 缺 Solution → 
  "sources": ["doc01:p8", "doc02:p14"]}
 ```
 
-本仓库对应：pageplan 的页对象（message_ref + 页型 + data/nodes/columns），由
-`to_spec` 确定性映射成 deck-spec 的 slide。
+本仓库对应：pageplan 的页对象（message_ref + 页型 + data/nodes/columns）—— 原先由
+`plan.py --to-spec` 确定性映射成 deck-spec 的 slide；**该脚本 v4 已删，现在这一步
+由 AI 自己写**（写完跑 `validate_spec.py` + `check.py`）。
 
 ## 56. Presentation Plan（推荐）
 
-`{"brief", "coreThesis", "storyArchetype", "sections": [{"id", "title", "message", "slides": []}], "slides": []}` —— 本仓库拆成三份 JSON（content / storyline / pageplan），
-`plan.py --check` 分别校验。
+`{"brief", "coreThesis", "storyArchetype", "sections": [{"id", "title", "message", "slides": []}], "slides": []}` —— 本仓库拆成三份 JSON（content / storyline / pageplan），**由 AI 按本文自查**（原先 `plan.py --check` 分别校验；脚本已删）。
 
 ## 57. Content QA（进 Page Planner 前必须完成）
 
 Thesis（存在且与 desiredAction 一致）/ Coverage（must_have 全覆盖）/ Evidence /
 Traceability / Unsupported Claim / Redundancy / Narrative Flow / One Takeaway /
-Audience Fit / Density Risk / Relevance。落地：`plan.py --check` 覆盖其中的
-可判定项，其余人工过。
+Audience Fit / Density Risk / Relevance。落地：**内容层没有自动门**（原先
+`plan.py --check` 覆盖其中的可判定项，脚本 v4 已删）—— 这一节靠人/AI 自查；
+产物层的硬门由 `check.py` 兜。
 
 ## 58. Content QA Score
 
@@ -394,10 +395,11 @@ Audience Fit / Density Risk / Relevance。落地：`plan.py --check` 覆盖其�
 修事实和数字 → 补来源 → 重写 Core Thesis → 删无关 → 合并重复 Claim → 补证据 →
 修 Storyline → 拆多观点页 → 压 Copy → 调 Appendix → **最后才动页数**。
 
-## 62. 与 fit.py 的接口
+## 62. 与实测层的接口
 
-fit.py 只判断"装不装得下"：Content Planner → Content Budget → Page Planner →
-Layout Resolver → **fit 实测** → Repair。Content Engine 判断"值不值得说"。
+"装不装得下"由 `measure.py` 实测：Content Planner → Content Budget → Page Planner →
+Layout Resolver → **实测** → Repair。Content Engine 判断"值不值得说"。（原先这层是
+`fit.py` 的容量试排，v4 已删；现在**装不下**由 `check.py` 的越界 / 裁切两道门直接报。）
 
 ## 63. 与 Page Planner 的接口
 
@@ -414,7 +416,7 @@ Color/比例/留白由 Image Pipeline 生成（`image_source.py --brief`）。
 
 Content 输出 data intent / message / metrics / comparison relation；图形类型
 （`chart`，八类）由 spec 显式声明（v3 起不再由 intent 推断），Chart Engine
-负责编码、标注、强调、动画（`chart.py`）。
+负责编码、标注、强调（`render.py::chart_g2_spec`，AntV G2；图表动画 v4 关死）。
 
 ## 66. 与 Motion Engine 的接口
 
@@ -449,7 +451,7 @@ Takeaway。Rule 5 重要 Claim 必须有 Evidence。Rule 6 原始事实、推断
 Rule 9 内容价值高于页面填满程度。Rule 10 标题优先表达结论，而不只是主题。
 Rule 11 文案压缩不得改变事实和因果。Rule 12 视觉需求由语义决定，不由"页面空
 不空"决定。Rule 13 Content Engine 决定"说什么"，Page Planner 决定"怎么表达"。
-Rule 14 fit.py 只判断"装不装得下"，不能反过来决定"值不值得说"。Rule 15 任何
+Rule 14 实测层只判断"装不装得下"（原 `fit.py`，现 `measure.py`），不能反过来决定"值不值得说"。Rule 15 任何
 视觉设计开始前，Content QA 必须通过。
 
 ## 71. 一句话定义

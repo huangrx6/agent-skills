@@ -5,22 +5,27 @@
 ```text
 AI 只写 DSL（chart / intent / message / data / series / emphasis / annotations）
         ↓
-chart.py：图形类型（作者声明）+ 规则 + 确定性 SVG   ← Web / 预览 / PDF 都用它
+render.py：图形类型（作者声明）+ 规则 → AntV G2 spec   ← Web / 预览 / PDF 都用它
         ↓
 pptx_native.py：按类型映射成原生图表       ← 可编辑的 PPT 层
 ```
 
-**为什么 Web 层是手写 SVG 而不是 G2/ECharts** —— 不是没考虑，是按本仓库的四条硬
-约束选的：
+**v4：Web 层改用 AntV G2 渲染**（`render.py::chart_g2_spec`，render.py:837）—— 原先是
+711 行的**手写 SVG 渲染器**（`chart.py`），用户实测的评语是"可丑的原生感"：手写几何
+只有极简骨架，成熟图形语法（编码 / 坐标轴 / 标注 / 堆叠）都得自己重做。G2 是声明式
+图形语法，**我们只出 spec（数据 → 编码），几何由 G2 算**。
 
-1. **零依赖**（仓库的老规矩：GIF 用 Pillow、H.264 用 AVFoundation、截帧用系统
-   Chrome）—— G2 minified 几百 KB，要么打进每份产物、要么走 CDN 断网即裂；
-2. **自包含产物**（logo base64、字体 @font-face 本地路径）—— JS 依赖会破坏它；
-3. **PDF 矢量** —— SVG 直接进 PDF 的文字与形状层；Canvas 出来是位图；
-4. **确定性** —— `animate.py` 靠"同一 t 渲出同一帧"做 MP4，手写 SVG 的几何是纯函数。
+换取成熟度付出的确定性代价，用三条守住：
 
-DSL 的边界设计成**渲染器可替换**：`svg()` 的输入是纯数据 + 颜色，哪天要换 G2 渲染器，
-把这层换掉即可，DSL 与 PPT 层都不用动。
+- **vendor 锁版本内联进产物**：`scripts/vendor/g2-5.2.10.min.js` 整段写进 HTML
+  （`G2_VENDOR`，render.py:925），离线可用、无 CDN 依赖，产物仍自包含。
+- **animation 关死**：G2 spec 里 `"animation": false`（render.py:837 起）—— 同 spec
+  同输出，`measure.py` / `check.py` 才有稳定 DOM 可量，`animate.py` 的逐帧才有确定性。
+- **壳给容器高度**：`.chartwrap .g2{height:330px}`（render.py:360）—— G2 的 `autoFit`
+  从容器取尺寸，容器没有高度会在渲染时抛错（实测）。
+
+DSL 的边界仍设计成**渲染器可替换**：`chart_g2_spec()` 的输入是纯数据 + 颜色，
+换渲染器只换这一层，DSL 与 PPT 层都不用动。
 
 ## AI 只写这个（DSL）
 
@@ -34,16 +39,18 @@ DSL 的边界设计成**渲染器可替换**：`svg()` 的输入是纯数据 + �
   "data":  [{"label": "DeepSeek", "value": 86}, ...],
   "series": [{"name": "直连", "data": [...]}, ...],   // 多系列（line/stacked/combo）
   "emphasis": {"values": ["DeepSeek"]},               // 谁是重点
-  "annotations": [{"type": "reference", "value": 80, "text": "目标 80%"}],
+  "annotations": [{"type": "reference", "value": 80, "text": "目标 80%"}],  // 字段仍在 schema，但 v4 不渲染（见下「标注」）
   "unit": "%"
 }
 ```
 
 散点的 `data` 项是 `{label, x, y}`（`value` 视同 `y`，向后兼容）。
 
+渲一张图表页就是渲一份 deck（图表不再有单独的 CLI）：
+
 ```bash
-python3 scripts/chart.py --demo all       # 八类各渲一个样例
-python3 scripts/chart.py --explain spec.json   # 打印每页声明的图形类型
+python3 scripts/render.py your.spec.json -o out.html   # 图表页在产物里由 G2 现渲染
+python3 scripts/check.py your.spec.json out.html       # 图表门：G2 就绪 + 数据形状
 ```
 
 ## 图形类型（规范第 3/16 条）：**作者声明**，脚本不推断
@@ -55,9 +62,8 @@ chart: "bar" | "bar-horizontal" | "line" | "area"
      | "bar-stacked" | "donut" | "scatter" | "combo"   （八类，封闭）
 ```
 
-落地（`chart.py` 的 `declared_type()`）：**缺 `chart` → SystemExit**（缺哪一类
-由作者定，脚本猜不了）；**`chart` 不在八类里 → SystemExit**。`--explain` 打印
-每页声明的类型，并在该页没写 `message` 时点名提醒（规范第 5 条：标题应是结论）。
+落地（`render.py::chart_declared_type`，render.py:785）：**缺 `chart` → SystemExit**
+（缺哪一类由作者定，脚本猜不了）；**`chart` 不在八类里 → SystemExit**。
 两道图前门在 `validate_spec.py`：缺类型报 `MISSING_CHART_TYPE`、写错报
 `UNKNOWN_CHART_TYPE`（见 `validation.md`），本该在渲染之前就拦住。
 
@@ -73,44 +79,46 @@ correlation/progress/deviation/distribution）现在是**可选语义标注**：
    Accent，其余降成 muted（主色向纸色褪 55%）。八根柱子八种颜色是业余的第一特征。
    **没写 emphasis 时不悄悄改观感** —— 全部主色，与从前一致。
 2. **结论先行**（规范第 5 条）：`message` 当大标题（"DeepSeek 调用量领先"），
-   `title` 降为小标签（数据集名）。没写 message 时维持旧行为，`--explain` 会点名。
-3. **不画图例、不画坐标轴数字、不画网格线**：数值直接标在图形上（这本来就是本仓库
-   的既定风格，PDF/PPTX 两侧都验证过）。折线只标**首/尾/峰**三处 —— 一排数字会把
-   线埋掉。多系列的名字标在线尾，不画图例。
+   `title` 降为小标签（数据集名）（render.py:1252-1258）。没写 message 时维持旧行为。
+3. **图形上只标数值，不画坐标系杂物**：数值直接标在图形上（这本来就是本仓库
+   的既定风格，PDF/PPTX 两侧都验证过）—— 具体落点见下，都是 `chart_g2_spec`
+   （render.py:837 起）里显式写下的编码：
+   - 柱图（含横柱）：每根标数值（`labels` position outside）；
+   - 折线 / 面积：只标**最后一个点**（`selector: last`）—— 一排数字会把线埋掉；
+   - 散点 / 堆叠 / 组合：当前不标数值；
+   - 坐标轴**标题**在折线 / 面积 / 散点 / 堆叠 / 组合上关掉（`axis.*.title:false`），
+     环图整条轴关掉（`axis:false`）；
+   - 环图例外地画**右侧颜色图例**（扇区名字必须能对上），其余图形不画图例。
 
-## 标注（规范第 12 条）
+   坐标系的其它杂物（刻度数字 / 网格线）旧版手写 SVG 是彻底不画；G2 路径改由
+   各图的 `axis` 配置决定 —— 当前柱图未显式关轴，这块是待收的遗留（见文末
+   「第二阶段」）。
 
-好图表与普通图表的差距多半不在图形，在标注。第一版支持三种（**封闭集**，
-`type` 写集外直接 ERROR —— 与 manifest 同款纪律）：
+## 标注（规范第 12 条）—— 已退役
 
-| 类型 | 需要 | 效果 |
-| --- | --- | --- |
-| `reference` | `value`（+可选 `text`） | 虚线水平参考线 + 标签 |
-| `callout` | `target`（data 里的标签名）+ `text` | 指向该数据点的引线 + 文字 |
-| `peak` | `text`（自动找最大值） | 峰值标注 |
+好图表与普通图表的差距多半不在图形，在标注 —— 这条规则仍然成立。但**承载它的
+渲染已随 `chart.py` 退役**：第一版那三种标注（`reference` 参考线 / `callout` 引线 /
+`peak` 峰值）是手写 SVG 实现的，G2 路径没有接。spec 的 `annotations` 字段**仍在封闭
+schema 里**（`validate_spec.py` 不拦），但 v4 渲染器**不消费它** —— 写了不报错，
+也不会有标注。
 
-`target` 在 data 里找不到会**报错**（而不是默默不画）。
+现在图表上有的标注是 G2 自带的：**数值标签**（柱 / 折线末端，见上「好看的三条硬
+规则」第 3 条）与**环图的右侧颜色图例**。要恢复 reference / callout / peak，
+需要把 `annotations` 翻译成 G2 的 mark / annotation —— 记在文末「第二阶段」。
 
-## 动画令牌（规范第 6~9 条）—— 数值已成文，接线在第二阶段
+## 图表动画（规范第 6~9 条）—— 已关死（v4）
 
-动画的"高级感"不在效果多，而在**克制且一致**。令牌不先定下来，每张图各写各的
-731ms/1247ms，那就是"弹跳杂耍"的来源：
+动画的"高级感"不在效果多，而在**克制且一致**。但 **v4 图表动画整体关死**：
+G2 spec 里 `"animation": false`（保确定性）—— 图表在产物里是**一次画完的静态图**，
+不再逐柱生长 / 逐线描画。原先 `chart.py` 那套 `MOTION_TOKENS`（`chart_enter` /
+`chart_stagger` / `highlight`…）与每类图形的进入语言（bar 的 growInY、line 的 pathIn、
+donut 的 sweep…）**随该脚本一起退役**。
 
-```python
-MOTION_TOKENS = {"chart_enter": 700, "chart_stagger": 60, "highlight": 300,
-                 "page_total_max": 1500, "story_total_max": 3000, ...}
-```
-
-每类图形的动画语言（第二阶段接进 `animate.py` 的时间线）：
-
-| 图形 | 进入 | | 图形 | 进入 |
-| --- | --- | --- | --- | --- |
-| bar | growInY（0→高度） | | donut | sweep + 中心数字 fade |
-| bar-horizontal | growInX | | scatter | scale 0.6→1 + fade |
-| line / area | pathIn（左到右画） | | axis / grid / label | fade（永远不是主角） |
-
-规范定的预算：普通进入 500~800ms、整张图 < 1.5s、storytelling 页 < 3s。
-**禁止** bounce / spin / fly-in / 疯狂 zoom。
+所以在 MP4/GIF 里，图表页只有**页面级**的进入动效：图表容器跟随页面进场淡入 +
+微升（见 `animation.md` 的角色表），容器里的图本身不动。规范定的预算
+（普通进入 500~800ms、整张图 < 1.5s、storytelling 页 < 3s）与禁令
+（**禁止** bounce / spin / fly-in / 疯狂 zoom）仍然成立 —— 只是现在没有"逐图形动画"
+这一层来违反它们。
 
 ## PPT 层（`pptx_native.py`）
 
@@ -125,13 +133,17 @@ MOTION_TOKENS = {"chart_enter": 700, "chart_stagger": 60, "highlight": 300,
 | scatter | XY_SCATTER（要 `XyChartData`，不是 CategoryChartData） |
 
 多系列会画**底部小图例**（不画分不开系列；单系列坚决不画）；系列上色用 accent 向
-纸色分档褪色（与 SVG 层同一条规则，不是彩虹）。
+纸色分档褪色（与 Web 层同一条规则：主色向纸色分档褪色，不是彩虹）。
 
 ## 第二阶段（还没做，别假装做了）
 
 - Sankey / Treemap / Heatmap / Radar / Gauge / Waterfall / Funnel
 - 组合图的原生输出（目前 combo 在 PPT 层降级为柱）
-- 数据驱动动画（growInY/pathIn 接进 `animate.py` 的时间线；目前图表作为一个整体
-  元素跟随页面的进场动效）
-- 每根柱子单独的 `data-m`（可以逐根 stagger；这会改变现有动画测试的预期，
-  所以单独一步做）
+- 把 `annotations`（reference / callout / peak）翻译成 G2 的 mark / annotation ——
+  第一版手写 SVG 有，v4 还没接（见上「标注」）
+- 收起柱图未显式关掉的坐标轴刻度 / 网格线（`chart_g2_spec` 的 bar 分支目前只写
+  了 `labels`，`axis` 走 G2 默认）
+- 每根柱子单独的 `data-m`（可以逐根 stagger）
+
+**已取消**：数据驱动动画（growInY / pathIn 接进 `animate.py` 的时间线）—— v4 已
+关死图表动画（G2 `animation: false`），图表在产物里是静态图，只跟随页面容器入场。

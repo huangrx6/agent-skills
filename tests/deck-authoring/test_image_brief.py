@@ -28,8 +28,15 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
+# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
+# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
+os.environ.setdefault("DECK_STYLES",
+                      os.path.join(FIXTURES_DIR, "styles"))
 SCRIPTS = os.path.join(SKILL, "scripts")
-STRESS = os.path.join(SKILL, "dev-tools", "stress.spec.json")
+STRESS = os.path.join(FIXTURES_DIR, "stress.spec.json")
 
 
 def _load(name: str):
@@ -82,7 +89,7 @@ class TestBrief(unittest.TestCase):
 
     def test_contract_states_every_thing_the_user_listed(self) -> None:
         """用户点名的每一项都要在契约里：名称 / 大小 / 透明度 / 风格 / 内容 / 元素。"""
-        for key in ("文件名", "尺寸", "透明通道", "会被制版处理", "内容"):
+        for key in ("文件名", "尺寸", "透明通道", "色彩要落在色板内", "内容"):
             with self.subTest(field=key):
                 self.assertIn(key, self.md, f"契约里没写「{key}」")
 
@@ -184,7 +191,8 @@ class TestBrief(unittest.TestCase):
         block = self._prompt_block("zh")
         limits = block.split("【限制】")[1]
         self.assertIn("细线", limits)
-        self.assertIn("双色调", limits)
+        # v4：制版后处理已退役 —— 限制项改成"进版式会糊"这条管线事实
+        self.assertIn("糊成一团", limits)
         for generic in ("水印", "额外人物", "畸形手指"):
             self.assertNotIn(generic, limits)
 

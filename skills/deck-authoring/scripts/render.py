@@ -56,19 +56,34 @@ def _load_sibling(name: str):
 
 deckio = _load_sibling("deckio")   # IO 收口：参数写错要报清楚，不甩 traceback
 
-# 风格解析根（顺序即优先级）：用户自建 styles/ 在前；dev-tools/style-fixture/
-# 是开发/测试夹具（demo、stress、测试套件用它跑通全链），**不是交付物**。
-# 发布的 skill 不内置任何风格 —— 每份 deck 的风格按规则自建，
-# 形状与自建指南见 references/style-architecture.md。
-# 风格解析三根，顺序有意义：
+# 风格解析根（顺序即优先级），**只有两根**：
 #   1. <deck 项目>/styles/   —— 风格跟着 deck 项目走（随项目交付、可移植）；
-#     脚本从项目目录跑时 cwd 就是项目根。工具链写风格也只写这里（style.new）。
+#     工具链只写这里。
 #   2. skill 的 styles/      —— 用户**显式托管**的全局风格；工具链永不写入。
-#   3. dev-tools 夹具        —— 参考实现（demo/测试走它），不是交付物。
-STYLE_ROOTS = (os.path.join(os.getcwd(), "styles"),
-               os.path.join(HERE, "..", "styles"),
-               os.path.join(HERE, "..", "dev-tools", "style-fixture"))
-DEFAULT_STYLE = "swiss-grid"
+#
+# 没有第三根、也没有内置参考风格：夹具时代结束了。那份夹具被拷来拷去的结果是
+# 每份 deck 长得一样（用户实测："无论换什么主题，产物永远一个样式"）——
+# 一个可拷贝的模板必然会变成默认答案。风格按规则现写，形状见
+# references/style-architecture.md。
+def style_roots() -> tuple[str, ...]:
+    """风格解析根（**每次调用时算**，不是 import 时冻结）。
+
+    顺序即优先级：
+      1. 环境变量 DECK_STYLES 指的根（`:` 分隔）—— 测试夹具、预览草稿、
+         或风格放在 deck 项目之外时的显式入口；
+      2. <当前目录>/styles —— 风格跟着 deck 项目走（工具链只写这里）；
+      3. skill 的 styles/ —— 用户显式托管的全局风格（工具链永不写入）。
+
+    为什么是函数而不是常量：常量会在 import 时把 cwd 冻住 —— 调用方（尤其测试）
+    之后改 cwd 或设环境变量都无效，于是"为什么找不到风格"变成谜。
+    """
+    roots: list[str] = []
+    extra = os.environ.get("DECK_STYLES")
+    if extra:
+        roots.extend(p for p in extra.split(os.pathsep) if p)
+    roots.append(os.path.join(os.getcwd(), "styles"))
+    roots.append(os.path.join(HERE, "..", "styles"))
+    return tuple(roots)
 # content-image 的**结构布局**（渲染器能力 —— 像图表的八类图形，不是审美枚举）：
 #   visual-right = 文 7 栅 + 图 5 栅（缺省结构）
 #   visual-left  = 图先文后（镜像）
@@ -140,7 +155,7 @@ def style_names() -> list[str]:
     清单的目录是"还没成风格的文件夹"，不是坏风格，不该出现在任何列表里。
     """
     names: list[str] = []
-    for root in STYLE_ROOTS:
+    for root in style_roots():
         for n in deckio.list_dirs(root):
             if n in names:
                 continue
@@ -158,37 +173,45 @@ def style_folder(name: str) -> str | None:
     """
     if os.path.isdir(name) and os.path.isfile(os.path.join(name, "style.json")):
         return os.path.abspath(name)
-    for root in STYLE_ROOTS:
+    for root in style_roots():
         folder = os.path.join(root, name)
         if os.path.isfile(os.path.join(folder, "style.json")):
             return folder
     return None
 
 
-def load_style(name: str = DEFAULT_STYLE) -> dict:
+def load_style(name: str | None = None) -> dict:
     """加载一个风格目录 → `{"name", "tokens", "skin"}`。
 
-    两个文件都必须有：只有 token 没有 skin 会渲染出「有颜色没版式」的东西，
-    只有 skin 没有 token 连色都没得填。缺一个就明确报出来，不猜。
+    `name` 既可以是**风格名**（在两根里找），也可以是**显式目录路径** ——
+    预览草稿放 /tmp 里也能直接渲。两个文件都必须有：只有 token 没 skin 会渲出
+    「有颜色没版式」的东西，只有 skin 没 token 连色都没得填；缺一个就明确报出来。
     """
-    for root in STYLE_ROOTS:
-        folder = os.path.join(root, name)
-        tokens_path = os.path.join(folder, "style.json")
-        skin_path = os.path.join(folder, "skin.css")
-        has_tokens = os.path.isfile(tokens_path)
-        has_skin = os.path.isfile(skin_path)
-        if has_tokens and has_skin:
-            return {"name": name, "tokens": deckio.read_json(tokens_path),
-                    "skin": deckio.read_text(skin_path)}
-        if has_tokens or has_skin:
-            raise SystemExit(f"✗ 风格 {name!r} 缺文件："
-                             f"{'skin.css' if has_tokens else 'style.json'}\n"
-                             f"  一个风格目录必须同时有 style.json + skin.css。")
-    raise SystemExit(
-        f"✗ 没有风格 {name!r}（现有：{style_names()}）\n"
-        f"  自建：deck 项目的 styles/<名>/ 里放 style.json + skin.css（在项目目录跑；形状见 "
-        f"references/style-architecture.md）；\n"
-        f"  dev-tools/style-fixture/swiss-grid 是开发夹具，可作参考拷改。")
+    if not name:
+        raise SystemExit(
+            "✗ 这份 deck 没写 deck.style —— 风格必须由 deck 自己带"
+            "（工具链不内置任何风格，也没有可拷的参考实现）。\n"
+            "  做法：在 deck 项目的 styles/<名>/ 里放 style.json + skin.css，"
+            "spec 里写 \"style\": \"<名>\"；\n"
+            "  style.json 的契约（顶层键 / 字号档 / 色板 / motion / 可选 effect）"
+            "见 references/style-architecture.md。")
+    folder = style_folder(name)
+    if folder is None:
+        raise SystemExit(
+            f"✗ 没有风格 {name!r}（现有：{style_names()}）\n"
+            f"  风格按规则现写：deck 项目的 styles/<名>/ 里放 style.json + skin.css"
+            f"（形状见 references/style-architecture.md）。")
+    tokens_path = os.path.join(folder, "style.json")
+    skin_path = os.path.join(folder, "skin.css")
+    has_tokens = os.path.isfile(tokens_path)
+    has_skin = os.path.isfile(skin_path)
+    if not (has_tokens and has_skin):
+        raise SystemExit(
+            f"✗ 风格 {name!r} 缺文件：{'skin.css' if has_tokens else 'style.json'}\n"
+            f"  一个风格目录必须同时有 style.json + skin.css。")
+    return {"name": os.path.basename(folder),
+            "tokens": deckio.read_json(tokens_path),
+            "skin": deckio.read_text(skin_path)}
 
 
 def misregistration(tokens: dict, seed, *parts) -> tuple[float, float, float]:
@@ -938,7 +961,10 @@ G2_INIT_JS = """
     var spec; try{ spec=JSON.parse(n.getAttribute('data-g2')); }catch(e){
       n.setAttribute('data-chart-error','bad-spec'); return; }
     try{
-      var chart=new G2.Chart({container:n, autoFit:true, renderer:'svg',
+      // 不要传 renderer: 这份 UMD bundle 只带默认（canvas）渲染器 —— 传字符串
+      // 会在运行时抛 registerPlugin is not a function（实测踩过）。
+      // devicePixelRatio 2：位图在两倍像素下渲染，进 PDF 时够锐。
+      var chart=new G2.Chart({container:n, autoFit:true, devicePixelRatio:2,
                               animation:false, padding:'auto'});
       chart.options(spec);
       chart.render();
@@ -947,9 +973,6 @@ G2_INIT_JS = """
   });
 })();
 """
-
-def _render_manifest_placeholder():
-    pass
 
 def resolve_color_set(tokens: dict, deck: dict) -> str:
     """colorSet 名 —— **spec 显式声明**（v3：配色由作者定，脚本只验收）。
@@ -1354,7 +1377,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("spec")
     ap.add_argument("-o", "--out", required=True)
     ap.add_argument("--style", default=None,
-                    help=f"风格目录名（缺省读 spec 的 deck.style，再缺省 {DEFAULT_STYLE}）")
+                    help="风格目录名（缺省读 spec 的 deck.style；spec 必须写它）")
     ap.add_argument("--resolved", default=None, metavar="PATH",
                     help="额外导出 resolved.deck.json（渲染器的唯一输入，含决策 trace）")
     ap.add_argument("--trace", action="store_true",
@@ -1362,7 +1385,7 @@ def main(argv: list[str]) -> int:
     args = ap.parse_args(argv[1:])
     deck_spec = deckio.read_json(args.spec)
     assets = load_assets(args.spec)      # assets/manifest.json（§12 管线入口）
-    name = args.style or deck_spec["deck"].get("style", DEFAULT_STYLE)
+    name = args.style or deck_spec["deck"].get("style")
     style = load_style(name)
     resolved = deck_mod.compile_spec(deck_spec, style, assets=assets)
     page = render_resolved(resolved)

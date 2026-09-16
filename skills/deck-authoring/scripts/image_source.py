@@ -179,6 +179,7 @@ def resolve(prompt: str, colors: dict, size: tuple[int, int], out: str,
     else:
         print("· 未配置生图（--provider-cmd）→ 用几何色块拼贴（它本身就是版画式的拼贴，不是灰占位图）")
     # v4：制版处理（双色调 + 半调网点）随 plate.py 一起退役 —— 图片按原样使用。
+    # 提示词里那条"会被制版处理"的说明随之改成"色彩要落在色板里"（见 _brief 文案）。
     # 想要版画质感就在出图提示词里要（`--brief` 的构图/负空间字段），而不是
     # 在交付链里做一道后处理：后处理会让"check 说合规、交付图却不一样"。
     if source is None:
@@ -234,7 +235,7 @@ def _slot_geometry(spec_path: str, style: str | None, out_dir: str,
     measure_mod = _load_sibling("measure")
     spec = deckio.read_json(spec_path)
     deck = spec.get("deck", {})
-    style_name = style or deck.get("style") or render_mod.DEFAULT_STYLE
+    style_name = style or deck.get("style")
     tokens = render_mod.load_style(style_name)["tokens"]
     color_set = deck.get("colorSet") or next(iter(tokens["colorSets"]), "")
     colors = tokens["colorSets"].get(color_set) or next(iter(tokens["colorSets"].values()))
@@ -387,13 +388,13 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None) -> dict:
 #   · 把尺寸与比例写进 prompt 正文 → API 有独立参数的东西写进去只会打架。
 #     现在它们只出现在「参数」栏，明写"不要写进 prompt"（规则 14）。
 #   · 负面词是一堆通用 boilerplate（水印 / 界面截图 / 不要额外人物）→ 限制项
-#     必须与任务相关。现在只留**与这条管线有关**的：双色调 + 半调会毁掉的那些
+#     必须与任务相关。现在只留**与这条管线有关**的：色彩与构图要可用的那些
 #     （规则 13）。
 #
 # 冲突时的优先级（规则 12）：用户明确要求 > 主体准确性 > 文字与品牌准确性 >
 # 构图 > 场景 > 光线 > 风格 > 装饰细节。**低优先级的不得破坏高优先级的** ——
 # 这条在本流水线里真的有冲突点：风格的强色相（低优先级）不许破坏
-# "双色调能活下来"（构图/细节级），见「风格」那一栏的写法。
+# "照片本身要能直接用"（构图 / 色彩级），见「风格」那一栏的写法。
 # ═══════════════════════════════════════════════════════════════════════════
 
 # 字段顺序就是优先级顺序，不要调换。
@@ -485,12 +486,13 @@ def _field_values(slot: dict, brief: dict, lang: str) -> list[tuple[str, str]]:
     composition = _composition_text(slot.get("variant") or "", zh=zh)
     if zh:
         colour = (f"主色 {primary}、辅色 {secondary}、纸色 {paper}；{mood['色彩'][0]}。"
-                  f"色系控制在 1~3 个；最终只保留两墨，**靠明暗层次而不靠色相**")
+                  f"色系控制在 1~3 个；**靠明暗层次而不靠色相**"
+                  f"（图片按原样进产物，不引入色板外的色相）")
         # 风格那一栏只留"可执行的视觉语言"本身。第一版写了
         # "（可执行的视觉语言）"和"优先于任何装饰性的色彩偏好"—— 那是**给读者的
         # 规则说明**，模型会把它当成画面要求，属于把两个读者混在一起。
         style = (f"纪实摄影；{mood['风格'][0]}；靠**大块明暗和强形状**立住"
-                 f"（双色调下只有这些能活下来）")
+                 f"（照片会被直接用进版式，只有这些能活下来）")
         # 用户明确禁掉的那件事写在这里：**这一页的信息不许被画进图里**。
         # 一页的信息（标题/条目/数字/示意）一旦烘进图里，它就同时失去可编辑、
         # 可搜索、可翻译、可被读屏器读 —— 而"对方要改字"正是本 skill 出原生
@@ -502,16 +504,17 @@ def _field_values(slot: dict, brief: dict, lang: str) -> list[tuple[str, str]]:
         if caption:
             text += f"（这一页的说明文字是「{caption}」，它是**排出来的**，不是画出来的）"
         limits = ("不要：细线、细密网格或织物纹理、柔和渐变、低对比平光"
-                  "（这四样在双色调 + 半调下会糊成一团）；不要多个并列主体或重复主体；"
+                  "（这四样塞进版式会糊成一团）；不要多个并列主体或重复主体；"
                   "不要结构变形、过曝、裁切主体")
     else:
         composition = _composition_text(slot.get("variant") or "", zh=False)
         colour = (f"primary {primary}, secondary {secondary}, paper {paper}; "
                   f"{mood['色彩'][1]}. Keep to 1-3 colour families. It ends up as two "
-                  f"inks, so it must read by TONAL RANGE, not by hue")
+                  f"families; it must read by TONAL RANGE, not by hue "
+                  f"(the image goes into the deck as-is, so stay inside the palette)")
         style = (f"documentary photography; {mood['风格'][1]}; it must hold on large "
-                 f"tonal masses and strong shapes (the only things that survive a "
-                 f"duotone)")
+                 f"tonal masses and strong shapes (fine texture and thin lines do "
+                 f"not survive being placed in a slide)")
         text = ("No text, letters or numbers inside the image, and do NOT draw this "
                 "page's information into it (no titles, bullet text, numbers, flow "
                 "diagrams or UI screenshots) — the layout composes the page's "
@@ -521,7 +524,7 @@ def _field_values(slot: dict, brief: dict, lang: str) -> list[tuple[str, str]]:
             text += f" (this page's caption is \u300c{caption}\u300d \u2014 it is composed, " \
                     f"not drawn)"
         limits = ("Avoid: thin lines, fine mesh or woven texture, subtle gradients, "
-                  "low-contrast flat light (all four mud up under duotone + halftone); "
+                  "low-contrast flat light (all four mud up once in the slide); "
                   "multiple competing or duplicated subjects; structural distortion, "
                   "blown highlights, a cropped-off subject")
 
@@ -688,7 +691,7 @@ def write_brief_md(brief: dict, out_path: str) -> str:
             f"{'；' + s['measured'] if s['measured'] else ''}",
             f"- **用途**：配图（版式 `{s['layout'] or 'content-image'}`）"
             f"{'；说明文字「' + s['caption'] + '」由版面排，**别画进图里**' if s['caption'] else ''}",
-            "- **会被制版处理**：双色调 + 半调网点 + 不引入色板外的色相",
+            "- **色彩要落在色板内**：不引入色板外的色相（图片按原样进产物，不再做制版处理）",
             "",
             "**工具读得到的参考材料**（是**文字**，不是画面 —— 只帮你回忆这一页在讲什么；"
             "「主体 / 场景 / 细节」仍然要你填）",
@@ -724,7 +727,7 @@ def write_brief_md(brief: dict, out_path: str) -> str:
         "",
         "```bash",
         "python3 scripts/image_source.py --check your.spec.json    # 验尺寸与比例对不对",
-        "python3 scripts/deliver.py your.spec.json --pages 3      # 验它在版面里装得下",
+        "python3 scripts/check.py your.spec.json out.html          # 渲完再过校验门",
         "```",
         "",
         "尺寸不对不是「将就一下」的事：**被放大渲染的图一定糊**，而交付前那条提示"
@@ -795,7 +798,8 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--dir", default=None,
                     help="图片所在的目录（缺省：spec 所在目录）")
     ap.add_argument("--style", default=None, help="风格（缺省读 spec 的 deck.style）")
-    ap.add_argument("--tokens", default=os.path.join(HERE, "..", "dev-tools", "style-fixture", "swiss-grid", "style.json"))
+    ap.add_argument("--tokens", default=None,
+                    help="风格 tokens 路径（缺省按 spec 的 deck.style 解析）")
     # 色板名不写死：写死会在换风格 / 改色板名时**静默过期**——实测踩过两次
     # （plate.py 与这里都留着 riso 时代那个已经删掉的 'vivid'，于是默认路径直接崩）。
     ap.add_argument("--color-set", default=None, help="色板（缺省用该 token 的第一个）")

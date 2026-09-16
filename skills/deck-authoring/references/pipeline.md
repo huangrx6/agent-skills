@@ -6,13 +6,19 @@ PDF / PNG / MP4 / GIF。统一规定从原始材料到最终交付物的完整�
 "全局怎么串起来"；各模块细节在对应规则文件（§55 的映射表）。每节标落地状态：
 【✅ 已实现】【约定=规则在、机制未接】。
 
-> 两处架构口径（全文通用）：
+> 三处架构口径（全文通用）：
 > **① Resolved 层**：规范的 `resolved.deck.json` 在本仓库 = 渲染后的 DOM +
 > `measure.py` 实测矩形（浏览器即 Layout Resolver；语义层 spec 无坐标，几何层
 > 是活页面）——详见 layout-system.md 顶部注。
 > **② 脚本名**：规范要求最高层协议不绑脚本名（§48）；本仓库的 references 是
-> **实现伴生文档**，点名 `plan.py`/`render.py` 正是"规则↔实现"的对照表，这是
-> 落地文档的职责，不是违规。
+> **实现伴生文档**，点名 `render.py`/`deck.py`/`check.py` 正是"规则↔实现"的对照表，
+> 这是落地文档的职责，不是违规。
+> **③ v4 脚本面（24 → 14 个整文件）**：规划层 `plan.py`、决策层 `compile.py`
+> （并入 `deck.py`）、风格脚手架与契约 `style.py`、配色审计 `palette.py`、层级提示
+> `hierarchy.py`、容量试排 `fit.py`、交付编排 `deliver.py`、回归基准 `benchmark.py`、
+> 制版 `plate.py`、品牌摘要 `brand.py`（并入 `deck.py`）、贴图 PPTX `make_pptx.py`
+> （并入 `pptx_native.py --png-dir`）、手写 SVG 图表引擎 `chart.py`（改由 AntV G2）
+> 全部退役。规则与承诺照旧；文中出现这些脚本处一律改标"已退役"并写明现在由谁承担。
 
 ## 0. 最高原则
 
@@ -51,21 +57,24 @@ Page Message；Motion Engine 改变信息层级；Brand 覆盖整个 Style；Con
   → 不通过→Repair→回 ⑨ ／ 通过 → ⑬Deliver → ⑭ExportQA → Final Artifacts
 ```
 
-本仓库的站合并：①-⑤ = `plan.py --check`（三份 JSON 一次过检）；⑥ =
-`--to-spec`+`validate_spec`；⑦⑧ = `image_source --brief/--check`；⑨ =
-`compile.py`+`render.py`（**决策与绘制已分家**：compile 出 resolved.deck.json
-——职责是**合并作者声明 + 解析资产 + 留痕**：色板名/档位/布局/图形类型都是
-spec 或风格数据声明的（compile 一概不推断），它把品牌并入、assetId 解析成
-路径、算错位与时间轴，并把每条决策记进 trace；render_resolved 只画不想；
-`render(spec)` 仍是 compile→draw 一步到位，字节级不变）；⑩⑫ = `check.py`
+本仓库的站合并：①-⑤ = 作者/AI 自审（原 `plan.py --check` 的三份 JSON 过检 v4 随
+脚本退役，规则留在 §3-§9）；⑥ = `validate_spec.py`（字段集封闭；原 `plan.py --to-spec`
+的建桥也随脚本退役，spec 由作者写）；⑦⑧ = `image_source.py --brief/--check`；⑨ =
+`render.py`（**决策与绘制已分家**：内部调 `deck.py` 的 `compile_spec` 出
+resolved.deck.json——职责是**合并作者声明 + 解析资产 + 留痕**：色板名/档位/布局/
+图形类型都是 spec 或风格数据声明的（compile 一概不推断），它把品牌并入、assetId
+解析成路径、算错位与时间轴，并把每条决策记进 trace；`render_resolved` 只画不想。
+要单独拿中间产物：`render.py spec.json -o out.html --resolved resolved.deck.json
+--trace`；`render(spec)` 仍是一步到位，字节级不变）；⑩⑫ = `check.py`
 （Layout QA 与 Visual QA 都在实测 DOM 上做，因为 resolved 层就是 DOM）；
-⑬⑭ = `deliver.py` + 各导出的回读验证。
+⑬⑭ = 各导出脚本（pdf / pptx_native / shots / animate）+ 各导出自己的回读验证
+（原 `deliver.py` 的交付编排 v4 退役，交付改按 delivery-formats.md 手工逐条跑）。
 
 ## 2. 五类核心中间产物
 
 | 类 | 规范 | 本仓库 | 状态 |
 | --- | --- | --- | --- |
-| 2.1 Planning | content/storyline/pageplan.json | 同名三份（`plan.py --check`） | ✅ |
+| 2.1 Planning | content/storyline/pageplan.json | 同名三份（过检原由 `plan.py --check` 做，v4 退役） | 约定 |
 | 2.2 Slide DSL | deck.spec.json 无坐标 | 同名（`COORD_FIELDS` 判错） | ✅ |
 | 2.3 Asset Contracts | assets/requests/*.json + manifest | `image-brief.md`（结构化小节，人直接读） | ✅ 等价形 |
 | 2.4 Resolved Deck | resolved.deck.json | 渲染后 DOM + measure 实测 | ✅ 架构差异（顶部注①） |
@@ -78,8 +87,8 @@ spec 或风格数据声明的（compile 一概不推断），它把品牌并入�
 
 规划前必须有 Brief（purpose/audience/delivery/targetSlides/durationMinutes/
 desiredAction/desiredBelief）。最重要的是 **desiredAction**；推不出至少
-desiredBelief。落地：`plan.py --check` —— brief 给了却缺 desiredAction/
-desiredBelief = 阻塞；枚举封闭；缺席=提示（开口不静默）。
+desiredBelief。落地：原 `plan.py --check` 已退役——这条规则（brief 给了却缺
+desiredAction/desiredBelief = 阻塞；枚举封闭；缺席=提示）保留，改由作者/AI 自审。
 
 ## 4. Content Understanding【✅】
 
@@ -95,33 +104,36 @@ original / derived(inferred) / generated 三分；**generated 不得伪装为事
 ## 6. Core Thesis【✅】
 
 每 deck 唯一 Core Thesis：一句话可表达、支撑 desiredAction、可被 Evidence
-支撑、能统领全篇。**没有 Core Thesis = Content QA 阻塞**（`plan.py` 直接拦）。
+支撑、能统领全篇。**没有 Core Thesis = Content QA 阻塞**（原 `plan.py` 直接拦，
+v4 退役——规则保留，改由作者/AI 自审）。
 
 ## 7. Storyline【✅】
 
 让观众按什么顺序相信；从有限 Archetype 选（五个规范骨架 ⊂ 本仓库十个，
-多出 overview_detail/product/incident/tech_proposal/project_report；全表见
-plan.py:81 ARCHETYPES）；可组合最多两种主骨架。乱序=阻塞。
+多出 overview_detail/product/incident/tech_proposal/project_report；全表原在
+`plan.py:81` 的 ARCHETYPES，v4 随脚本退役）；可组合最多两种主骨架。乱序=阻塞
+（原由 `plan.py` 判，现人审）。
 
 ## 8. Page Planning【✅】
 
 每页明确 purpose/message/claim/evidence/semanticRelation/visualRequirement/
 contentBudget（由 message_ref+页型+数据承载）；**一页只允许一个主要
-Takeaway，多事实必须支撑同一个**。页无 message = to_spec 报错。
+Takeaway，多事实必须支撑同一个**。页无 message 原由 `plan.py --to-spec` 报错，
+v4 随脚本退役——规则保留为内容层要求（§9）。
 
 ## 9. Content QA Gate【✅】
 
 Slide DSL 之前必须过：Thesis/Evidence Coverage/Unsupported Claim/Narrative
 Gap/Redundancy/Audience Fit/One Takeaway/Traceability/Density Risk/Relevance
-（可判定项 `plan.py --check`，其余人工）。**JSON 合法 ≠ 内容优秀——Schema
-Validation（validate_spec）与 Semantic QA（plan.py）必须分开**，本仓库物理上
-就是两个程序。
+（可判定项原由 `plan.py --check` 做，v4 随脚本退役，改人工）。**JSON 合法 ≠ 内容
+优秀——Schema Validation 与 Semantic QA 必须分开**：本仓库物理上只剩
+`validate_spec.py` 这一个程序，Semantic QA 由人/AI 自审。
 
 ## 10. QA 等级（四级）【✅ 等价映射】
 
 ERROR=阻塞（退出≠0：数据冲突/悬空引用/缺素材/越界/重叠/导出打不开）；
 WARNING+SUGGESTION=提示流（过密/logo 缺 inverse/重复布局/低清图/0 图建议）；
-INFO（记录系统决策）= manifest 承担元素级事实 + `compile --trace` 的 Resolver
+INFO（记录系统决策）= manifest 承担元素级事实 + `render.py --trace` 的 Resolver
 决策（§26 第一版）；其余 Resolver（时间轴/图表）的决策日志未系统化【约定】。
 每门都有 errors/warnings（§52）。
 
@@ -180,16 +192,16 @@ approved→system 链）；**Renderer 不得临时换字体**。
 
 ## 19. Chart Resolver【✅】
 
-输入 图形类型（`chart`，spec 必写的八类之一，`declared_type` 不再推断）/
-Intent（可选语义标注）/Data/Message/Emphasis/Style/Theme → Resolved Chart
-Spec（本仓库 = 手写确定性 SVG，DSL 边界可换引擎：AntV/ECharts/原生 PPT
-图表——pptx_native 已是第二种执行器）。**总链路不绑定具体技术实现** ✓。
+输入 图形类型（`chart`，spec 必写的八类之一）/ Intent（可选语义标注）/Data/
+Message/Emphasis/Style/Theme → Resolved Chart Spec（本仓库 = AntV G2 的 chart
+spec，`render.chart_g2_spec` 产出，vendor 锁版本内联、animation 关死保确定性；
+pptx_native 的原生图表是第二种执行器）。**总链路不绑定具体技术实现** ✓。
 
 ## 20. Diagram Resolver【部分 ✅】
 
 独立于 Chart；页面 Layout 只管 Container，内部自算 Node/Edge。落地：timeline
-容器宽从网格算、节点自管；独立 diagram 引擎未建（页型表故意没有 architecture，
-映射过去是死路——见 planning.md 未做清单）。
+容器宽从网格算、节点自管；独立 diagram 引擎未建（页型表原也没有 architecture，
+该表 v4 随 plan.py 退役；映射过去是死路——见 planning.md 未做清单）。
 
 ## 21. Layout Resolver【✅】
 
@@ -201,8 +213,8 @@ Typography/Assets → Resolved Geometry（grid.py + render 分支 + CSS）。
 
 生成 2~4 个合法版面候选（规范原词 Variant，本仓库 spec 侧统一叫 `layout`）
 → 批量测量 → Hard Check → Score → 选最佳。未实现（阶段 3）；**v3 起脚本
-不选版式** —— `layout` 由作者声明（§11），`fit.py` 只剩容量试排：量的是
-"装不装得下"，不评审美、不给推荐。
+不选版式** —— `layout` 由作者声明（§11）。容量试排（原 `fit.py`）v4 也整文件
+退役："装不装得下"现在由 `measure.py` 实测（越界/裁切）在 `check.py` 里定死。
 
 ## 23. Geometry Single Source of Truth【✅】
 
@@ -221,15 +233,17 @@ Effect Registry/Motion Creativity → Resolved Timeline（`timeline()` + 编排�
 
 系统核心：语义 DSL 编译为可直接渲染的 Resolved Deck，含 resolver decisions/
 fallback decisions/warnings/geometry/theme/typography/assets/charts/motion。
-本仓库 = `compile.py` 把语义 spec 编译成 `resolved.deck.json`（v1：内容与决策
-合并的自足层——`resolved = read_json(...); html = render(resolved)`），再由
-`render_resolved` 直渲；**决策 trace 已系统化**（§26 第一版）。
+本仓库 = `deck.py` 的 `compile_spec` 把语义 spec 编译成 `resolved.deck.json`
+（v1：内容与决策合并的自足层——`resolved = read_json(...); html = render(resolved)`），
+再由 `render_resolved` 直渲。`compile.py` 的独立 CLI v4 退役：render 入口内置编译，
+要中间产物用 `render.py … --resolved resolved.deck.json`；**决策 trace 已系统化**
+（§26 第一版）。
 
 ## 26. Decision Trace【约定】
 
 每个 Resolver 的关键决策可追踪（`{"decision":"split_40_60","reason":[…]}`
 式）。现状：决策理由写在代码注释与各规则文档（"为什么这样设计"人可查）；
-第一版已落：`compile --trace` 输出每条决策与理由（品牌并入 / colorSet /
+第一版已落：`render.py --trace` 输出每条决策与理由（品牌并入 / colorSet /
 assetId→路径 / **作者声明的**档位与布局 / logo 选版）；消费者是人和 check
 门禁（条目多且未声明 bulletTier 时在门禁处再响一声）。
 
@@ -237,8 +251,8 @@ assetId→路径 / **作者声明的**档位与布局 / logo 选版）；消费�
 
 Resolved 后先做：Hard = bounds/overlap/text overflow/min font/logo collision/
 image distortion/chart clipping/required region missing；Soft = grid/hierarchy/
-whitespace/balance/density/repetition/focal clarity。`check.py`（硬，阻塞）+
-`hierarchy.py`（软，提示）。
+whitespace/balance/density/repetition/focal clarity。`check.py`（硬，阻塞；软项并入
+其提示流）。原 `hierarchy.py` 的层级三条（文本预算/焦点/密度）v4 随脚本退役。
 
 ## 28. Renderer【✅】
 
@@ -274,14 +288,15 @@ render → check 循环每轮秒级；转了几轮还在报同一错 = 停下来
 
 ## 33. Deliver【✅】
 
-只在 Content QA ✓ + Asset QA ✓ + Layout/Visual QA ✓ 后执行——`deliver.py`
-在 `check.py` 失败时**直接中止**："把一份已知有问题的 deck 做成五种格式只是
-把问题复制五份"。
+只在 Content QA ✓ + Asset QA ✓ + Layout/Visual QA ✓ 后执行。原 `deliver.py` 在
+`check.py` 失败时**直接中止**（"把一份已知有问题的 deck 做成五种格式只是把问题
+复制五份"）；该编排脚本 v4 退役，这条承诺落到交付步骤本身：Hard 失败不得导出
+（§58），交付按 delivery-formats.md 手工逐条跑，任一步退出码非零即停。
 
 ## 34. Export Targets【✅】
 
 HTML / PDF / PPTX / PNG / MP4 / GIF 六格式；各格式不同 Exporter
-（pdf.py / pptx_native.py / animate.py / deliver.py）但**同一 resolved**
+（pdf.py / pptx_native.py / shots.py / animate.py）但**同一 resolved**
 （同一份 HTML / 同一份 spec+tokens）。
 
 ## 35. Export QA【✅】
@@ -298,8 +313,8 @@ HTML；自动播放→MP4/GIF；归档→PNG。对照表在 delivery-formats.md�
 
 ## 37. Decision Freeze Gates【✅ 四门齐】
 
-Gate A Content Freeze = `plan.py --check` 全绿；Gate B Asset Freeze =
-`--check` 验图 + brand 加载通过；Gate C Design Freeze = `check.py` 全绿
+Gate A Content Freeze = 作者/AI 自审（原 `plan.py --check` 全绿，v4 退役）；
+Gate B Asset Freeze = `--check` 验图 + brand 加载通过；Gate C Design Freeze = `check.py` 全绿
 （硬约束零错）；Gate D Delivery Freeze = 导出回读通过。上游门不过，下游
 不开工（§1 的站序即门序）。
 
@@ -335,10 +350,12 @@ same input + same version + same seed = same resolved output（时间轴两次�
 ## 43. Fallback Strategy【✅】
 
 Font：exact → approved（严格 A 级库）→ system safe；Image：契约缺失=阻塞
-（不静默换）+ 占位图给 brief 阶段；Chart：SVG 手写即主路径（无外部引擎可退）；
-Motion：高级 preset → 基础 fadeRise → 静态满态；Layout：spec 不写 `layout`
-就套该版式的缺省结构布局（写了自造名 = 缺省结构 + `data-layout`，排法由
-skin.css 写）。websockets 缺失 → 说清代价降级，不静默变慢。
+（不静默换）+ 占位图给 brief 阶段；Chart：AntV G2 内联 vendor 即主路径（无第二
+引擎可退；vendor 读不到 render 直接报错，页面里 G2 缺失/渲染失败 →
+`data-chart-error`，由 check 实测的 chartReady 拦）；Motion：高级 preset →
+基础 fadeRise → 静态满态；Layout：spec 不写 `layout` 就套该版式的缺省结构布局
+（写了自造名 = 缺省结构 + `data-layout`，排法由 skin.css 写）。websockets 缺失
+→ 说清代价降级，不静默变慢。
 
 ## 44. Fallback 不能静默【✅】
 
@@ -360,19 +377,21 @@ Chart Data=spec data（渲染只读）；Build Manifest=内嵌 manifest。
 ## 47. Closed Schema【✅】
 
 核心协议字段集封闭，未知字段=ERROR：`validate_spec`（spec）、`BRAND_FIELDS`
-（品牌）、plan.py 的枚举集（brief/页型/source_type/骨架）。**避免 LLM 发明
-字段** ✓。
+（品牌）；原 `plan.py` 的枚举集（brief/页型/source_type/骨架）v4 随脚本退役。
+**避免 LLM 发明字段** ✓。
 
 ## 48. Tooling 与规则分离【✅ 见顶部注②】
 
-规则定义 Content QA/Asset Resolver/Layout Resolver/Renderer；实现叫 plan.py/
-image_source.py/render.py。脚本名属于实现层——本仓库文档点名脚本是"规则↔
-实现对照"的落地文档职责，协议本身（本篇的规则句）不依赖脚本名。
+规则定义 Content QA/Asset Resolver/Layout Resolver/Renderer；实现叫
+`validate_spec.py`/`image_source.py`/`render.py`/`check.py`。脚本名属于实现层——
+本仓库文档点名脚本是"规则↔实现对照"的落地文档职责，协议本身（本篇的规则句）
+不依赖脚本名。
 
 ## 49. Registry 思路【部分 ✅】
 
 Style Registry=styles/ 目录；Font Registry=fonts/catalog.json（126 款）；
-Chart Type Registry=chart.py 类型表；Effect 面小无需 Registry（animation §5）。
+Chart Type 由 spec 的 `chart` 字段封闭八类（原 `chart.py` 类型表 v4 退役，判据在
+`validate_spec.py`）；Effect 面小无需 Registry（animation §5）。
 **禁止业务逻辑硬编码数量** ✓（版式数/骨架数都在表里，代码只遍历）。
 
 ## 50. 反 AI-Slop 总规则【✅ 分层落地】
@@ -388,15 +407,15 @@ Chart Type Registry=chart.py 类型表；Effect 面小无需 Registry（animatio
 
 | 层 | AI 负责 | 程序负责 |
 | --- | --- | --- |
-| Brief | 理解目的与受众 | Schema（plan.py 拦） |
-| Content | 提炼与推理 | 引用校验、来源三分 |
-| Storyline | 选择叙事 | 骨架表 / 配额 |
-| Page Plan | 页面意图 | 合法页型 / 复杂度 |
-| Slide DSL | 语义结构 | 封闭 Schema |
-| Color | 选色板（显式具名 colorSet） | OKLCH 数学 / 角色推导 / 对比度审计 |
+| Brief | 理解目的与受众 | 原 `plan.py` 拦 Schema，v4 退役（人/AI 自审） |
+| Content | 提炼与推理 | 原 `plan.py` 的引用校验、来源三分，v4 退役 |
+| Storyline | 选择叙事 | 原 `plan.py` 的骨架表 / 配额，v4 退役 |
+| Page Plan | 页面意图 | 原 `plan.py` 的合法页型 / 复杂度，v4 退役 |
+| Slide DSL | 语义结构 | 封闭 Schema（`validate_spec.py`） |
+| Color | 选色板（显式具名 colorSet） | 色板名解析（`render.resolve_color_set`）/ 对比度门禁（`ink.py` + `check.py` ①） |
 | Typography | 字体意图 / 档位声明（titleTier·bulletTier） | 字体文件 / 档值 / 档名拼错当场报 |
 | Image | 需求 / Prompt 填空 | 插槽实测 / 解析 / 验收 |
-| Chart | 图形类型（chart 八类）/ Intent / Message | 编码 / SVG / 类型与数据校验 |
+| Chart | 图形类型（chart 八类）/ Intent / Message | 编码（AntV G2）/ 类型与数据校验 |
 | Diagram | 关系意图 | 节点布局 / 连接 |
 | Layout | 布局声明（layout，自由字符串） | Geometry（grid）/ 词表验收 |
 | Motion | Intent / Creativity | Timeline / Frame |
@@ -405,28 +424,29 @@ Chart Type Registry=chart.py 类型表；Effect 面小无需 Registry（animatio
 
 ## 52. 五道 QA 门【✅】
 
-Gate1 Content（plan --check）/ Gate2 Asset（--check）/ Gate3 Layout（check.py
-硬约束）/ Gate4 Visual（check.py 实测+抽帧）/ Gate5 Export（回读）。每门有
-errors（阻塞清单）+ warnings（提示流）；score 未建【约定】；info 由 manifest
-承担一部分。
+Gate1 Content（作者/AI 自审，原 plan --check 已退役）/ Gate2 Asset（--check）/
+Gate3 Layout（check.py 硬约束）/ Gate4 Visual（check.py 实测+抽帧）/ Gate5 Export
+（回读）。每门有 errors（阻塞清单）+ warnings（提示流）；score 未建【约定】；info
+由 manifest 承担一部分。
 
-## 53. Benchmark【✅ 已落地（benchmark.py）】
+## 53. Benchmark【已退役（v4）】
 
-固定基线集 = demo + stress（21 页：长中文/长英文/中英混排/Chart-heavy/
-Image-heavy/全部版式）+ chart-intents（Chart Resolver v2 展示：composition
->5 条 / progress 温度计 / distribution 时间桶）。`benchmark.py` 一次跑全
-集、指标落盘、`--compare` 对基线（计数类指标变多即回归，退出非零）。
-缺：Table-heavy/Diagram-heavy 版式（版式本身未建，建了才进基线）、
-五类真实场景语料。
+固定基线集仍在仓库（测试夹具，不在本 skill 目录内）：demo + stress
+（21 页：长中文/长英文/中英混排/Chart-heavy/Image-heavy/全部版式）+
+chart-intents（八类图形的展示面）。原 `benchmark.py`
+（一次跑全集、指标落盘、`--compare` 对基线）v4 整文件退役——现在没有回归
+基准脚本，跑这三份夹具靠手工（render + check）看。缺：Table-heavy/
+Diagram-heavy 版式（版式本身未建，建了才进基线）、五类真实场景语料。
 
-## 54. Benchmark 指标【✅ 已落地（数值化）】
+## 54. Benchmark 指标【已退役（v4）】
 
-benchmark.py 逐 fixture 记录（全实测）：check_problems（check.py:542 的 check()
-只返回阻塞清单，没有 notes 指标）、script_errors、
+原 `benchmark.py` 逐 fixture 记录的指标（全实测）：check_problems
+（`check.py` 的 `check()` 只返回阻塞清单，没有 notes 指标）、script_errors、
 render_ms（机器相关仅参考）、字节可复现/编译确定性（§41）、逐页密度分布、
 focal/budget issues、unique_kinds/max_consecutive（版式/布局多样性 /
-repetition rate）。不采的（诚实留白）：repair iterations（Repair 引擎
-未建）、export 回读（测试套件盖着，慢不进常规基线）、human rating。
+repetition rate）。指标定义随 `benchmark.py` 退役，需要时照这份清单重写脚本；
+留白项：repair iterations（Repair 引擎未建）、export 回读（测试套件盖着，慢
+不进常规基线）、human rating。
 
 ## 55. 最高层目录 ↔ 本仓库映射
 
@@ -476,26 +496,26 @@ Repair 保证质量，Export QA 保证最终交付。本仓库的兑现度见各
 
 | 站 | 产物 | 跑什么 | **阻塞** | 提示 |
 | --- | --- | --- | --- | --- |
-| ①-③ 规划 | 三份 JSON | `plan.py --check` | 见 content-intelligence 落点表 | 推断当事实讲 / 空话无数字 / 同一句话两遍 |
-| ④ DSL | deck.spec.json | `--to-spec` + `validate_spec` | 封闭字段 / 页无 message / 图表缺类型或数据 / 图页无图 / colorSet 没具名 | 字体回退 / 没封面 |
+| ①-③ 规划 | 三份 JSON | 作者/AI 自审（原 `plan.py --check`，v4 退役） | 见 content-intelligence 落点表 | 推断当事实讲 / 空话无数字 / 同一句话两遍 |
+| ④ DSL | deck.spec.json | `validate_spec.py` | 封闭字段 / 缺必填字段 / 图表缺类型或数据 / 图页无图 / colorSet 没具名 | 字体回退 / 没封面 |
 | ⑤⑥ 图像 | brief + 真图 | `image_source --brief/--check` | 缺图 / 宽度 / 比例 / 重复 | 零插槽建议 |
-| ⑦⑧ 渲染+QA | deck.html | `render.py` + `check.py` | 越界 / 重叠 / 溢出 / 对比度 / 全页图 | 密度 / 焦点 / 预算 / 对齐 / 0 图 |
-| ⑨ 交付 | 六格式 | `deliver.py` 等 | 规格/校验不过中止 · PDF 或原生 PPTX 导出失败 · PDF 像素差超容忍 | 接收方须知 |
+| ⑦⑧ 渲染+QA | deck.html | `render.py` + `check.py` | 越界 / 重叠 / 溢出 / 对比度 / 全页图 / 图表就绪 | 字体回退 / 对齐 / 档位 / 布局轮换 |
+| ⑨ 交付 | 六格式 | `pdf.py` / `pptx_native.py` / `shots.py` / `animate.py` | 规格/校验不过中止 · PDF 或原生 PPTX 导出失败 | 接收方须知 |
 
 > ⑨ 没有"嵌入超限"这道门：唯一嵌入上限在 `fonts.py embed()` 单独内联时
-> （fonts.py:474-493），交付链不调它；失败条件即 deliver.py 的 failures 计入点
-> （:307 规格、:315 校验、:324 PDF 导出、:340 原生导出、:373 像素差超容忍）。
+> （fonts.py:474），交付链不调它；原 `deliver.py` 把失败点记在规格/校验/PDF
+> 导出/原生导出/像素差超容忍五处（:307/:315/:324/:340/:373），该编排脚本 v4
+> 已退役——现在手工逐步跑，任一步退出码非零即停。
 
 ```bash
 S=skills/deck-authoring/scripts
-python3 $S/plan.py --check content.json storyline.json pageplan.json
-python3 $S/plan.py --to-spec pageplan.json content.json -o deck.spec.json
+# ①-③ 规划由作者/AI 写三份 JSON（原 plan.py --check 已退役，无脚本）
 python3 $S/validate_spec.py deck.spec.json
 python3 $S/image_source.py --brief deck.spec.json   # 人出图后：
 python3 $S/image_source.py --check deck.spec.json
-python3 $S/render.py deck.spec.json -o deck.html
+python3 $S/render.py deck.spec.json -o deck.html    # 加 --resolved / --trace 出中间产物
 python3 $S/check.py deck.spec.json deck.html
-python3 $S/pdf.py deck.html -o deck.pdf             # / pptx_native / animate
+python3 $S/pdf.py deck.html -o deck.pdf             # / shots.py / pptx_native.py / animate.py
 ```
 
 **反悔成本**：改 spec 标题 30 秒；过 ④ 后每步翻倍——内容决定压在 ④ 前，

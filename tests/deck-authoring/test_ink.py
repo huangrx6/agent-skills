@@ -24,8 +24,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时读的是
 # `skills/<skill>/` 那棵树，测试放在里面会被顺手读进去）。
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
+# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
+# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
+os.environ.setdefault("DECK_STYLES",
+                      os.path.join(FIXTURES_DIR, "styles"))
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "dev-tools", "style-fixture", "swiss-grid", "style.json")
+TOKENS = os.path.join(FIXTURES_DIR, "styles", "swiss-grid", "style.json")
 
 
 def _load(name: str, path: str):

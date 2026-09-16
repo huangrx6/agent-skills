@@ -28,8 +28,9 @@ Content（说什么）→ Style（怎么表达）→ Brand（是谁）→ Asset�
 | Asset | 本 deck 真正用的图片/截图/插图文件 | 决定品牌规范、决定风格 | spec 同目录的图文件 |
 
 **核心原则**：Brand 定义"是谁"，Style 定义"怎么表达"，Content 定义"讲什么"，
-Asset 定义"最终拿什么文件来画"。Theme Resolver ≈ `brand.py` 的
-`merge_color_sets/merge_fonts`；Asset Resolver ≈ `image_source.py --check`。
+Asset 定义"最终拿什么文件来画"。Theme Resolver ≈ `deck.py` 的
+`merge_color_sets` / `merge_fonts`（原 `brand.py` + `compile.py` 已合并进 deck.py）；
+Asset Resolver ≈ `image_source.py --check`。
 
 ## 2. 冲突处理总原则【✅】
 
@@ -50,7 +51,7 @@ Hard Constraint > Semantic Requirement > Style Grammar > Creative Preference：
 `assets/product|screenshots|official`、`fonts/` 子目录按需自建）。品牌层可以
 不存在：`deck.brand` 不写就全走 Style + Color + Typography + Asset Rules。
 
-> ⚠️ **`example` 是演示品牌（ACME），不是素材库**：它只该出现在 dev-tools 的
+> ⚠️ **`example` 是演示品牌（ACME），不是素材库**：它只该出现在测试夹具的
 > demo/stress 里。demo 是 SKILL.md 让人抄的模板 —— 抄完不删 `deck.brand` 就把
 > ACME logo 带进了真实交付。`check.py` 现在会对 `brand: example` 出声提醒
 > （删这行，或建 `brands/<你的品牌>/`）。
@@ -95,8 +96,8 @@ Identity/Accent，Style 保留表达力，推荐默认）/ subtle（只在 Logo 
 
 locked=true 的 HEX 必须被真实使用（Logo 关联/关键 Accent/识别线/重点数字），
 不得修改；locked=false 可在 OKLCH 派生（Hue 保持，Lightness ±3~15%，Chroma
-±5~25%）。未实现：当前同名即覆盖、无锁定语义；需要时先过 `palette.py --audit`
-的对比度检查再手工合。
+±5~25%）。未实现：当前同名即覆盖、无锁定语义；需要时先过 `ink.py` 的对比度检查
+（`ink.py <style.json>`，任一色板不达标退出码 1）再手工合。
 
 ## 8. 品牌色与渐变【约定】
 
@@ -409,7 +410,7 @@ mkdir -p brands/acme
 cp 你的logo.svg brands/acme/logo.svg
 cp 你的反白logo.svg brands/acme/logo-inverse.svg
 $EDITOR brands/acme/brand.json     # 照 §4 的形状写
-python3 scripts/brand.py acme                # 看摘要：logo 认到没、色板加了几套
+python3 scripts/deck.py acme                 # 看摘要：logo 认到没、色板加了几套
 ```
 
 然后在 spec 的 `deck` 里加一行 `"brand": "acme"`，跑五道门（`pipeline.md`）。

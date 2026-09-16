@@ -107,11 +107,11 @@ def check(tokens: dict) -> int:
 
 
 def main(argv: list[str]) -> int:
-    # 默认路径跟其它脚本一致（指向仓库那份 token）—— 原来写死的 "design-tokens.json"
-    # 是原型期的文件名，在这个仓库里不存在，不传参数会直接 traceback。
-    path = argv[1] if len(argv) > 1 else os.path.join(
-        HERE, "..", "dev-tools", "style-fixture", "swiss-grid", "style.json")
-    return check(deckio.read_json(path))
+    # 风格 token 必须显式给（夹具已删，没有默认路径）—— 通常是
+    # `<deck 项目>/styles/<名>/style.json`。
+    if len(argv) <= 1:
+        raise SystemExit("✗ 要给风格 token 路径：ink.py styles/<名>/style.json")
+    return check(deckio.read_json(argv[1]))
 
 
 if __name__ == "__main__":

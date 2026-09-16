@@ -39,9 +39,19 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
+# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
+# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
+os.environ.setdefault("DECK_STYLES",
+                      os.path.join(FIXTURES_DIR, "styles"))
+
+# 夹具第一套风格（tests/fixtures/styles 下；风格不再有内置解析根）
+FIXTURE_STYLE = os.path.join(FIXTURES_DIR, "styles", "swiss-grid")
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "dev-tools", "style-fixture", "swiss-grid", "style.json")
-DEMO = os.path.join(SKILL, "dev-tools", "demo.spec.json")
+TOKENS = os.path.join(FIXTURES_DIR, "styles", "swiss-grid", "style.json")
+DEMO = os.path.join(FIXTURES_DIR, "demo.spec.json")
 
 CHART_SLIDE = {
     "type": "chart", "title": "占比", "chart": "bar",
@@ -63,6 +73,7 @@ def _load(name: str, path: str):
 
 render = _load("_deck_test_render", os.path.join(SCRIPTS, "render.py"))
 check = _load("_deck_test_check", os.path.join(SCRIPTS, "check.py"))
+measure = _load("_deck_test_measure", os.path.join(SCRIPTS, "measure.py"))
 
 
 def _stub_image(directory: str) -> None:
@@ -87,7 +98,7 @@ class TestCheckMutations(unittest.TestCase):
     def setUpClass(cls) -> None:
         with open(DEMO, encoding="utf-8") as fh:
             cls.demo = json.load(fh)
-        cls.style = render.load_style()          # {"name", "tokens", "skin"}
+        cls.style = render.load_style(FIXTURE_STYLE)          # {"name", "tokens", "skin"}
         cls.tokens = cls.style["tokens"]
         cls.chart_spec = copy.deepcopy(cls.demo)
         cls.chart_spec["deck"]["slides"].append(copy.deepcopy(CHART_SLIDE))
@@ -177,7 +188,7 @@ class TestCheckMutations(unittest.TestCase):
         billboard（自带装饰）已随 styles/ 删除，改为给夹具注入同款 accent-block
         token —— 驱动同一分支，与哪套风格自带装饰无关。
         """
-        style = render.load_style("swiss-grid")
+        style = render.load_style(FIXTURE_STYLE)
         style = dict(style, tokens=dict(style["tokens"], decor={
             "kind": "accent-block", "types": ["title"], "zones": ["tr", "br"],
             "sizes": [400]}))
@@ -196,6 +207,23 @@ class TestCheckMutations(unittest.TestCase):
         self._assert_reports(problems, "未知装饰 zone", "④ 装饰不压文字")
 
     # ── ④ 柱高成比例 ──────────────────────────────────────────────────────
+
+    def test_real_chart_page_reports_ready(self) -> None:
+        """**实测**：真产物跑一遍浏览器，G2 必须真渲染出来（chartReady == ready）。
+
+        为什么这条必须是真浏览器而不是合成 measured：v4 踩过一次 —— 初始化脚本里
+        留了 `renderer:'svg'`，而这份 UMD bundle 只带 canvas 渲染器，G2 在运行时抛
+        registerPlugin；当时 chartReady 也没接到 `[data-m]` 元素上，**闸门静默失效**，
+        只有人肉开浏览器才看得出来。这条用例把两件事一起钉住：字段要接到、
+        且真浏览器里必须 ready。
+        """
+        measured = measure.measure(self.chart_path)
+        rows = [e for e in measured.get("elements", [])
+                if e.get("chartReady") is not None]
+        self.assertTrue(rows, "没有任何元素报 chartReady —— 探测没接到 [data-m] 上")
+        bad = [(e.get("id"), e.get("chartReady")) for e in rows
+               if e.get("chartReady") != "ready"]
+        self.assertEqual(bad, [], f"G2 没渲染成功：{bad}")
 
     def test_chart_g2_ready_is_required(self) -> None:
         """变异：把 G2 容器标成渲染失败 → check 必须报出来。

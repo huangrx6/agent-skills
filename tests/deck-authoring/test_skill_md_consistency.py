@@ -31,9 +31,19 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
+# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
+# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
+os.environ.setdefault("DECK_STYLES",
+                      os.path.join(FIXTURES_DIR, "styles"))
+
+# 夹具第一套风格（tests/fixtures/styles 下；风格不再有内置解析根）
+FIXTURE_STYLE = os.path.join(FIXTURES_DIR, "styles", "swiss-grid")
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "dev-tools", "style-fixture", "swiss-grid", "style.json")
-STYLES = os.path.join(SKILL, "dev-tools", "style-fixture")
+TOKENS = os.path.join(FIXTURES_DIR, "styles", "swiss-grid", "style.json")
+STYLES = os.path.join(FIXTURES_DIR, "styles")
 SKILL_MD = os.path.join(SKILL, "SKILL.md")
 
 # 「| `type` | 用途 | 风险点 |」——只取版式名与用途两列；装饰那一列删了，
@@ -86,7 +96,7 @@ class TestSkillMdMatchesRender(unittest.TestCase):
     def setUpClass(cls) -> None:
         with open(SKILL_MD, encoding="utf-8") as fh:
             cls.skill_md = fh.read()
-        cls.style = render.load_style()
+        cls.style = render.load_style(FIXTURE_STYLE)
         cls.tokens = cls.style["tokens"]
         # 色板名从风格里取（不写死）：写死过 "vivid"，默认风格一换就变成
         # “用例还是绿的，但测的不是它要测的东西”。
@@ -98,7 +108,7 @@ class TestSkillMdMatchesRender(unittest.TestCase):
         return found
 
     def _render_each(self, kinds: list[str], style: dict | None = None) -> dict[str, str]:
-        chosen = style if style is not None else render.load_style()
+        chosen = style if style is not None else render.load_style(FIXTURE_STYLE)
         # 色板名每种风格各自一套，从**这份风格**里取（不能拿别人的 colorSet 去渲）
         deck = {"colorSet": next(iter(chosen["tokens"]["colorSets"])), "seed": 7,
                 "title": "探针", "slides": [PROBE_SLIDES[k] for k in kinds]}
@@ -146,7 +156,9 @@ class TestSkillMdMatchesRender(unittest.TestCase):
         默认风格一换它就开始因为 colorSet 而报错 —— 用例还是绿的，
         但测的已经不是“版式被拒”了。
         """
-        bad = {"deck": {"colorSet": self.color_set, "seed": 1, "title": "x",
+        # v4：deck.style 必填 —— 这份合成 spec 也要写上，否则报的会是"缺风格"
+        bad = {"deck": {"style": "swiss-grid", "colorSet": self.color_set, "seed": 1,
+                        "title": "x",
                         "slides": [{"type": "not-a-real-type", "title": "x"}]}}
         with self.assertRaises(SystemExit) as caught:
             render.render(bad)

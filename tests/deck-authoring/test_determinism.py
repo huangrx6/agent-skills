@@ -26,9 +26,19 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
+# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
+# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
+os.environ.setdefault("DECK_STYLES",
+                      os.path.join(FIXTURES_DIR, "styles"))
+
+# 夹具第一套风格（tests/fixtures/styles 下；风格不再有内置解析根）
+FIXTURE_STYLE = os.path.join(FIXTURES_DIR, "styles", "swiss-grid")
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(SKILL, "dev-tools", "style-fixture", "swiss-grid", "style.json")
-DEMO = os.path.join(SKILL, "dev-tools", "demo.spec.json")
+TOKENS = os.path.join(FIXTURES_DIR, "styles", "swiss-grid", "style.json")
+DEMO = os.path.join(FIXTURES_DIR, "demo.spec.json")
 
 
 def _load(name: str, path: str):
@@ -48,7 +58,7 @@ check = _load("_deck_test_check", os.path.join(SCRIPTS, "check.py"))
 class TestDeterminism(unittest.TestCase):
     def setUp(self) -> None:
         self.spec = json.load(open(DEMO, encoding="utf-8"))
-        self.style = render.load_style()      # {"name", "tokens", "skin"}
+        self.style = render.load_style(FIXTURE_STYLE)      # {"name", "tokens", "skin"}
         with open(DEMO, encoding="utf-8") as fh:
             self.spec = json.load(fh)
 
@@ -72,7 +82,7 @@ class TestDeterminism(unittest.TestCase):
         所以要测的是**机制还活着**，而不是“每个风格都必须抖”—— 明确给一份
         带非零区间的 token 去驱它。
         """
-        style = dict(render.load_style(), tokens=copy.deepcopy(self.style["tokens"]))
+        style = dict(render.load_style(FIXTURE_STYLE), tokens=copy.deepcopy(self.style["tokens"]))
         style["tokens"]["misregistration"]["offsetRangeX"] = [3, 7]
         style["tokens"]["misregistration"]["offsetRangeY"] = [3, 7]
         style["tokens"]["texture"]["grainOpacity"] = [0.08, 0.15]

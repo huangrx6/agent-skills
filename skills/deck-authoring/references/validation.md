@@ -91,7 +91,7 @@
 **会报的情况**：读到的 `dx/dy/rot` 不在 token 区间内 → 内部不一致，报告里写明
 "这是脚本内部不一致"而不是"这是内容问题"。
 
-## ⑤ 装饰不压文字 + 图表成比例 + 图表区无错位
+## ⑤ 装饰不压文字 + 图表就绪/数据形状 + 图表区无错位
 
 **判据 A（装饰不压文字）**：墨块（`data-zone="tr|br|tl|bl"`）必须落在
 **安全区**（SLIDE_W / SLIDE_H 的右下两个角的"溢出"位置），
@@ -101,14 +101,16 @@
 `render.py` 现在只生成 `tr` / `br`（右侧两角），所以 `tl` / `bl` 一旦出现就是
 脚本或 spec 错乱。
 
-**判据 B（图表柱高成比例）**：柱高两两之间必须与数据成比例，**且基准取数据
-最大那一条**。
+**判据 B（图表就绪 + 数据形状）——v4 换判据，不是拆门**：不再查"柱高与数据
+成比例"。那条门是为旧的手写 SVG 渲染器设的（自己算柱高才需自己复核）；v4 起
+几何由 AntV G2 的编码算，脚本再量它的像素等于用手去量尺子。换成的两件事：
 
-为什么不按图形最高那根当基准：被篡改的那根一旦成为最高，它自己就被跳过、
-而无辜的柱子被报 —— 实测过 ✗。
-
-为什么不用对峰值归一：一旦有一根被改高，峰值基准就跟着错，六根全报
-—— 那种输出等于没说清是谁错了。两两比例与基准无关，只会指向真的那一根。
+- **G2 真渲染出来了**（只能实测）：`measure.py` 给图表容器多记一个 `chartReady`
+  字段（`ready` / `pending` / `error:<原因>`，measure.py:170）。产物静态 HTML 里
+  只有容器与 spec，判断不出来 —— 所以这条必须真浏览器量。`check.py` 的 ④
+  （check.py:603 起）拿它判：`error` 即阻塞（G2 缺失或渲染失败，那一页是空的）。
+- **数据形状对**：`label` 非空（空标签 → 轴上缺一个标签）、`value` 是数字。
+  数据本身错才是真错。
 
 **判据 C（图表区无错位）**：图表容器（`<div class="chartwrap">`）
 内不许出现错位叠印元素。riso 只允许做容器与背景 —— 错位会毁掉柱与刻度的可读性。
@@ -123,10 +125,11 @@ v3 把审美决策交给作者声明，脚本退到验收器：下面这几道�
 - **colorSet 必填具名**：`deck.colorSet` 缺失或写 `"auto"` → `MISSING_COLOR_SET`；
   名字不在该风格 token 的 `colorSets` 里 → `BAD_COLOR_SET`。v3 的配色方向不再由
   语义（`mood`）推导，直接写色板名。（`render.resolve_color_set` 同样拦：缺失 /
-  `auto` 直接 SystemExit —— compile / render 两道入口都进不去。）
+  `auto` 直接 SystemExit —— `deck.compile_spec` / render 两道入口都进不去。）
 - **图表类型必填且封闭**：chart 页缺 `chart` → `MISSING_CHART_TYPE`；不在八类
   （bar/bar-horizontal/line/area/bar-stacked/donut/scatter/combo）→
-  `UNKNOWN_CHART_TYPE`（`chart.declared_type` 同样 SystemExit —— 见 `charts.md`）。
+  `UNKNOWN_CHART_TYPE`（`render.chart_declared_type`（render.py:785）同样
+  SystemExit，再交给 `render.chart_g2_spec` 出 G2 spec —— 见 `charts.md`）。
 - **layout 是自由值，但 `auto` 拦**：`layout` 必须是非空字符串（非字符串/空 →
   `BAD_LAYOUT`）；写 `"auto"` → `BAD_LAYOUT`（实测选布局已退役）。自造布局名
   合法 —— 渲染套缺省结构 + `data-layout` 钩子，由 skin.css 排。

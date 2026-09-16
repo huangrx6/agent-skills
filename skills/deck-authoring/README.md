@@ -1,36 +1,37 @@
 # deck-authoring — 把结构化内容渲成能讲的 deck
 
-把一份 `deck-spec.json` 渲成演示 deck，**风格从 `styles/` 选**（一种风格 = 一个目录），
+把一份 `deck-spec.json` 渲成演示 deck，**风格自建**（一种风格 = `styles/<名>/` 一个目录，无内置），
 交付 HTML（可演讲）/ 矢量 PDF / 可编辑 PPTX / 每页 PNG。
 
 ## 这是什么 / 不是什么
 
-- 这是「**内容只管写，版面与颜色脚本算**」的 skill —— 字号、折行、对比度、
-  条目密集页的字号自适应、四种风格的适配，全部由脚本管。
-- 它**不是**单一风格的：`styles/` 下现在有 4 套（黑底剧场 / 瑞士栅格 / 大字报 /
-  笔记本），加一套 = 拷一个目录改 token 与 CSS，不改任何 .py。
+- 这是「**内容只管写，版面与颜色脚本算**」的 skill —— 字号、折行、对比度全部由脚本算
+  （字号档由你在 spec 里声明），风格适配不改任何 .py。
+- 它**不是**单一风格的：**内置风格已整体移除**（风格是每份 deck 的表达层），风格按 deck 项目
+  自建（`styles/<名>/`），加一套 = 拷一个目录改 token 与 CSS，不改任何 .py。
 - 它**不是**只能出死图的：HTML 自带走演示态（键盘翻页 / 缩放 / 页码），
   而且能用 `pptx_native.py` 出**字能改**的 PPTX。
-- 它**不是**通用图表工具 —— 数据图表只支持柱状图，且风格处理只作用于容器，
-  柱与刻度保持干净（错位会毁掉可读性）。
-- 它**不是**「换个 css 滤镜」—— duotone + 半调是「重新制版」，不是「加滤镜」。
+- 它**不是**通用图表工具 —— 数据图表八类，几何由 **AntV G2** 算（vendor 锁版本内联），
+  风格处理只作用于容器，柱与刻度保持干净（错位会毁掉可读性）。
+- 它**不是**「换个 css 滤镜」—— 图片按原样进产物（制版后处理 `plate.py` 已退役），
+  版画质地在**出图提示词**里要，不在交付链里加。
 
 ## 跑法（最快路径）
 
 ```bash
 cd skills/deck-authoring/
-python3 scripts/validate_spec.py dev-tools/demo.spec.json           # 1) 规格（字段集封闭）
-python3 scripts/ink.py styles/swiss-grid/style.json                # 2) 墨色门禁
-python3 scripts/plate.py --sample -o sample-treated.png             # 3) 造演示图
-python3 scripts/render.py dev-tools/demo.spec.json -o out.html      # 4) 出 HTML
+python3 scripts/validate_spec.py your.spec.json                     # 1) 规格（字段集封闭）
+python3 scripts/ink.py styles/<你的风格>/style.json                  # 2) 墨色门禁（对比度）
+python3 scripts/image_source.py --prompt "现场照片占位" -o sample-treated.png
+                                                                    # 3) 造占位图（几何色块拼贴）
+python3 scripts/render.py your.spec.json -o out.html                # 4) 出 HTML
 python3 scripts/measure.py out.html                                 # 5) 实测（真浏览器）
-python3 scripts/check.py dev-tools/demo.spec.json out.html          # 6) 校验
+python3 scripts/check.py your.spec.json out.html                    # 6) 校验
 python3 scripts/pdf.py out.html -o deck.pdf                         # 7) 矢量 PDF
 python3 scripts/shots.py out.html --out-dir pages/ --count 6        # 8) 截图（要 Chrome）
-python3 scripts/make_pptx.py --png-dir pages/ -o deck.pptx          # 9) 出 PPTX（贴图，观感 100%）
+python3 scripts/pptx_native.py --png-dir pages/ -o deck.pptx        # 9) 出 PPTX（贴图，观感 100%）
 python3 scripts/pptx_native.py out.html -o deck-editable.pptx       # 10) 出 PPTX（原生，能改字）
 python3 scripts/animate.py out.html -o deck.mp4                     # 11) 出视频（另有 GIF）
-python3 scripts/brand.py                                             # 12) 看有哪些品牌
 ```
 
 第 11 步不需要 ffmpeg：取帧走 Chrome DevTools Protocol（一次启动截几百帧，比一帧一个
@@ -38,45 +39,41 @@ python3 scripts/brand.py                                             # 12) 看�
 抽几帧看看再编：`--stills 0,1.5,22.4,32.3`。运动设计与什么时候该用视频，见
 `references/animation.md`。
 
-设计期还有两件工具（不在流水线上）：
+设计期工具现在只剩这两个（都不在流水线上）：
 
 ```bash
-python3 scripts/style.py                       # 八套风格 + 契约状态
-python3 scripts/style.py --sheet -o s.png      # 所有风格 × 同一份 demo → 一张图
-python3 scripts/style.py --sheet -o m.png --spec dev-tools/stress.spec.json --pages 9,14
-                                               # 矩阵：某份 deck 的第 9/14 页在**全部风格**下
-python3 scripts/style.py swiss-grid            # 一套风格的摘要
+python3 scripts/render.py your.spec.json -o out.html --resolved resolved.deck.json --trace
+                                               # 决策留痕：每条 阶段 / 决定 / 理由
+python3 scripts/grid.py --json                 # 版面几何唯一来源（12 列 / 间距令牌）
 ```
 
-`--sheet` 是「先出三个方向让人选」那个流程的实物依据 —— 选风格要的是**画面**，
-不是对照表。风格本身怎么加见 `references/style-architecture.md`。
+`style.py`（列风格 / 契约体检 / 联系表 `--sheet`）与 `fit.py`（试排）已随 v4 退役：
 
-写内容时用的：
+- **选风格要的是画面，不是对照表** —— 按「跑法」渲几版并排看即可（三方向流程见
+  `SKILL.md`）；风格本身怎么加见 `references/style-architecture.md`。
+- **「这页装不装得下」改成写完就渲、渲完就量**：`check.py` 的实测门会点名越界的元素
+  （原 `fit.py` 是把候选版式与各条目数档位摆进同一份产物渲一次、量一次）。内容怎么组织
+  （一页一个观点、版式选择、观众距离）见 `references/content-intelligence.md`。
 
-```bash
-python3 scripts/fit.py --from-spec your.spec.json --slide 3   # 试排：这页哪种版式装得下
-python3 scripts/fit.py --json '{"title":"结论","bullets":["…","…"]}'
-```
-
-它把候选版式与各条目数档位摆进同一份产物渲一次、量一次，报出**实测**的溢出量与
-内容占位 —— 省掉"写完 → 报溢出 → 改了再跑"那几轮。内容怎么组织（一页一个观点、
-版式选择、观众距离）见 `references/content-intelligence.md`（内容智能 / 内容规划系统）。
-
-第 3 步是给 demo 的图文页造图：`demo.spec.json` 的 `image` 是个占位文件名，
-不先生成它就是一张裂图。该产物**不入库**（见「已知限制」第 7 条）。
+第 3 步是给 demo 的图文页造一张**占位图**（走 `--prompt` + `-o`，几何色块拼贴）：
+`demo.spec.json` 的 `image` 是个占位文件名，不先生成它就是一张裂图。要换成真照片就走
+下面的 `--brief` 契约。该产物**不入库**（见「已知限制」第 7 条）。
 
 **要换成真照片**（推荐路径，三条路里最正经的一条）：
 
 ```bash
-python3 scripts/image_source.py --brief dev-tools/demo.spec.json   # → 图片提示词契约
-#   契约里逐张给了：文件名 / 实测尺寸 / 比例 / 透明通道 / 会被制版怎么处理 /
-#   可粘贴的中英提示词 / 负面清单。拿去出图，按文件名存到产物同目录。
-python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸与比例
+python3 scripts/image_source.py --brief your.spec.json             # → 图片提示词契约
+#   契约里逐张给了：文件名 / 实测尺寸 / 比例 / 透明通道 / 色彩约束（不引入色板外的色相）/ 可粘贴的
+#   中英提示词 / 负面清单。拿去出图，按文件名存到产物同目录。
+python3 scripts/image_source.py --check your.spec.json             # 验尺寸与比例
 ```
 
 分工是**脚本写契约 → 人出图 → 脚本验收**：脚本知道每张图进哪个槽位、那个槽位实测
-多少像素、会被双色调+半调怎么处理；而"出一张好看的图"这件事，人拿自己顺手的模型
-做得比脚本调一个陌生 API 好。`--brief` 会顺便放占位图，所以流水线不会因为等图停住。
+多少像素、该套色板是哪几个颜色；而"出一张好看的图"这件事，人拿自己顺手的模型做得比
+脚本调一个陌生 API 好。彩照**不直接塞进 image 字段**，也不做制版后处理（`plate.py`
+已退役，图片按原样进产物）—— 版画质地在提示词里要到位；等图期间用占位图（`--prompt`
+
+- `-o`，几何色块拼贴）顶住，流水线不会因为等图停住。
 
 提示词按**固定字段顺序**给，顺序就是优先级：
 
@@ -98,7 +95,8 @@ python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸�
 **「主体 / 场景 / 细节」留空给人填**
 （写作 `〈…〉`）—— 工具只看得见 spec 里的文字，读不到你脑子里的画面，就不该替你编。
 脚本填的是它真知道的部分：构图来自实测槽位与版式（图独立成栏、文字在旁边），
-色彩来自该风格的色板，光线与风格来自气质档，限制来自制版管线。
+色彩来自该风格的色板，光线与风格来自气质档，限制来自这条出图管线的色彩约束
+（不引入色板外的色相）。
 尺寸 / 比例 / 数量**不写进提示词**（生图 API 有独立参数，写重了会打架），单列在
 「参数」栏。字段分工、优先级裁决与踩过的坑见 `references/images.md`。
 
@@ -108,35 +106,37 @@ python3 scripts/image_source.py --check dev-tools/demo.spec.json   # 验尺寸�
 python3 -m unittest discover -s tests/deck-authoring -v     # 224 条，约 3 分钟（负载敏感）（空闲时）
 ```
 
-耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时约 2.5 分钟，
-    同时在跑视频编码之类的大活时会涨到 5 分钟以上（实测 138s → 330s）。其中约 30 秒是
-    **压测回归**（每套风格 × 真实形状的 deck 各开一次 Chrome）。改了风格或渲染层就跑全量；
-    只改文档可以只跑相关的那个文件。
+耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时两三分钟，
+    同时在跑视频编码之类的大活时会明显变长（实测从 138s 涨到过 330s）。改了风格或渲染层
+    就跑全量；只改文档可以只跑相关的那个文件。
 
-钉住二十项不变量：同 spec + 同种子字节一致（带随机区间的风格；确定性风格本就与 seed 无关）、
-色板门禁 + 两墨乘叠印的数学、校验的变异验证（每项都造违规样例）、半调墨覆盖率随灰度单调、
-缓存命中后仍过色板三角不变量、外壳行为（真开浏览器按键翻页 + letterbox 缩放比贴边不溢）、
-PDF 是矢量且页数/页尺寸对、可编辑 PPTX 的**字是真字**且坐标是页内坐标、
-字体提示不报废话、**每种风格的装饰落点与它声明的 `decor.types` 一致**、SKILL.md 的版式表与
-`render.py` 实测行为一致、规格字段集真的封闭（坐标/字号/色值必须被指名报出）、
+钉住这些不变量：同 spec + 同种子字节一致（带随机区间的风格；反向也测 —— 改 seed 必须
+真的变）、色板门禁 + 两墨乘叠印的数学、校验的变异验证（每项都造违规样例，验它真有牙）、
+规格字段集真的封闭（坐标/字号/色值必须被指名报出，未知键不许静默放过）、
+外壳行为（真开浏览器按键翻页 + letterbox 缩放比贴边不溢）、
+PDF 是矢量且页数 / 页尺寸对（含"故意删掉 `@page` 必须被拦"）、
+可编辑 PPTX 的**字是真字**且坐标是页内坐标、字体提示不报废话、
+字体库（清单 / 映射 / `--installed` 不许假阳性 / `.otf` 与 `.ttf` 的格式优先级）、
+网格数学（列宽 97.33 的精度、7+5 必须正好铺满 1432、间距令牌的关系规则）、
+图片契约与验收（契约字段要说清、`--check` 不许顺手造占位图作弊）、
+资产管线（manifest 契约 + assetId 只是语义引用，路径只在 resolved 里）、
 **同一个 t 两次独立浏览器会话取到的帧逐字节一致**（且不同 t 必须真的不同 —— 否则上一条
 会假绿）、渲染路径上没混进 CSS `transition`、
+**每种风格的装饰落点与它声明的 `decor.types` 一致**（遍历的是**目录**不是写死的名单 ——
+写死名单让四套新风格逃过检查过一次）、SKILL.md 的版式表与 `render.py` 实测行为一致、
 **品牌资产**（优先级：品牌赢色板/字体/logo、风格赢版面；logo 内嵌且清单里给的是
 技能相对路径；`cover+end` 指的是 end 版式那页而不是数组最后一页；logo 压文字会挡）、
-**试排**（"装得下"与"半页空"是两个判据，混成一个就会把稀疏页判成装不下 —— 真踩过）、
-**风格契约**（字号档 / 运动参数 / 色板门槛 / 装饰声明，逐项造违规样例验它有牙；
-遍历的是**目录**不是写死的名单 —— 写死名单让四套新风格逃过检查过一次）、
-**压测**（每套风格 × 真实形状的 deck 过 check：7 条密页 / 5+5 两栏 / 6 节点时间线 /
-6 柱图表 / 带图注的图文页 / 18 字长标题 / 收尾页）、
 **原生 PPTX 的三个交付级偏差**（`<a:ea>` 东亚字体 / 标题字重不写死 / 原生图表的
-数值与网格线 —— 三条都只在"把 PPTX 转成图看"时才露出来）、
-**交付演练工具**（逐像素差对"一样/不一样"都要给对答案；"只打印第 N 页"要真的只出一页
-且页码保持原样 —— 后者错了会让对比图说谎，而差异只有 0.3% 不会报警）。
+数值与网格线 —— 三条都只在"把 PPTX 转成图看"时才露出来）。
+
+随脚本一起退役的用例（不再有）：半调墨覆盖率随灰度单调、缓存命中后仍过色板三角不变量、
+试排"装得下"与"半页空"、风格契约体检、交付演练工具的逐像素差 —— 对应的是 `plate.py` /
+`fit.py` / `style.py` / `deliver.py` 的能力，删脚本时一并删了。
 
 ## 依赖
 
 - Python ≥ 3.10（用了 `from __future__ import annotations` + importlib 动态加载同目录脚本）
-- `Pillow`（duotone + 半调）
+- `Pillow`（截图拼装 / 几何色块拼贴 / GIF）
 - `python-pptx`（PPTX 拼装）
 - macOS 上 `shots.py` 需要 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`
 - **导出视频不需要 ffmpeg / gifsicle / ImageMagick**：用系统已有的三件 —— Chrome（取帧）、
@@ -149,25 +149,27 @@ PDF 是矢量且页数/页尺寸对、可编辑 PPTX 的**字是真字**且坐�
 渲染链之上是四层规划，**越靠近渲染 AI 自由度越低**：内容理解（中）→ Storyline（中）
 → Page Planner（低~中）→ Slide DSL（很低，封闭字段集）→ 渲染（0）。
 
+**规划层脚本（`plan.py`）已退役** —— 它的四个入口（叙事骨架 / 页型映射 / 规划检查 /
+到 spec 的桥）全没了，规划从"脚本跑一遍"变回"作者写、`validate_spec.py` 验字段集"：
+
 ```bash
-python3 scripts/plan.py --archetypes       # 十个叙事骨架（问题→方案 / SCR / 复盘 / …）
-python3 scripts/plan.py --page-types       # 页型 → 版式的确定性映射
-python3 scripts/plan.py --check content.json storyline.json pageplan.json
-python3 scripts/plan.py --to-spec pageplan.json content.json -o deck.spec.json
+python3 scripts/validate_spec.py your.spec.json     # 规划层现在只有这一道机器验
 ```
 
-会失败的硬规矩：**缺 coreThesis**（一份 deck 必须有一句统领论断）、**brief 缺
+下面这些硬规矩**没有变**，只是不再由脚本喊出来（原 `--check` 的规矩，逐条保留）：
+
+**缺 coreThesis**（一份 deck 必须有一句统领论断）、**brief 缺
 desiredAction/desiredBelief**、**悬空引用**（message 的证据 / claim 的 derivedFrom
 指向不存在的 fact）、**事实与推断不分**
-（source_type 必须是 original/inferred/generated；高重要性结论只靠推断支撑会开口）、
+（source_type 必须是 original/inferred/generated；高重要性结论只靠推断支撑要自己警觉）、
 **骨架乱序**（先讲方案再讲问题不是自由是错）、**配额漂移**（sections 页数之和 ≠
 target_slide_count —— "15 页做成 28 页"就是这条漏的）、**复杂度爆表不拆页**
 （字符/节点/图表/图/层级加权 ≥0.70 必须标 split）、**页没有 message**（不知道自己
 在讲什么的页没法排版）。
 
-`--to-spec` 产出的 spec **必须过 validate_spec**（有测试钉死）—— 规划层产出的东西
-渲染器吃不下 = 全白写。分工、Schema 与还没做的部分（文档抽取、候选打分、架构图页型）
-见 `references/planning.md`。
+`--to-spec` 那个桥也没了 —— 规划产物现在是**手写的 spec**，同样**必须过 validate_spec**
+（有测试钉死）—— 规划层产出的东西渲染器吃不下 = 全白写。分工、Schema 与规划层没做的
+部分（文档抽取、候选打分、架构图页型）见 `references/planning.md`。
 
 ## 字体
 
@@ -219,24 +221,26 @@ OFL 唯一要记住的：**再分发字体文件本身**时要带上版权声明
 
 **Style 存结构，不存 HEX**：`colorSets` 里是四个角色（primary / secondary /
 background / text），`colorStructure` 里是结构（色相关系 / 颜色数量 / 明度 / 饱和度 /
-冷暖 / 强调策略 / 创意等级…），其余九个角色由 `palette.py` **推导**。手写会漂，推导可测。
+冷暖 / 强调策略 / 创意等级…）—— 这些是**作者声明**的。渲染期由脚本推导的只有文字色
+（`ink.text_color`）与叠印墨（`overprint(primary, secondary)`）。
 
-```bash
-python3 scripts/palette.py --audit --topic "AI 大模型架构"   # 审配色 + 按主题判俗套
-python3 scripts/palette.py --novelty swiss-grid blue        # 一个色板的 novelty 与**依据**
-python3 scripts/palette.py --directions swiss-grid blue     # Safe / Creative / Experimental
-python3 scripts/palette.py --roles swiss-grid blue          # 13 个角色的推导结果
-```
+**配色审计（`palette.py --audit/--novelty/--directions/--roles`）已整体退役**：不再有脚本
+替你选色或给三方向；画质门槛改由 `ink.py <style.json>`（对比度，不达标退 1）与
+`check.py`（实测门）验。
 
-用 **OKLCH** 而不是 HSL，因为 HSL 的 L 与感知明度不成正比（提亮之后对比度反而会掉，
-而对比度在这里是硬门槛）。二次变体范围按规范：色相 ±10~30°、彩度 ±5~20%、明度 ±3~12%，
-**中性色不旋色相**（C≈0 时旋了是空操作，实测会产出重复色）。
+原 `palette.py` 在 **OKLCH** 里推导（不用 HSL：HSL 的 L 与感知明度不成正比，提亮之后
+对比度反而会掉，而对比度在这里是硬门槛）—— 这条结论仍然成立，只是现在由人执行：改色板时
+**用感知均匀的空间调明度**，别拿 HSL 的 L 当明度。
 
-**俗套会被指出，而且说清是哪一条**（`tech_blue_purple_cyan` / `corporate_blue_white` /
-`premium_black_gold`…）。实测**本仓库 8 套风格里 5 套的某个色板正落在名单上**
-（历史内置期实测：`swiss-grid/blue` 同时命中前两条、`terminal/cyan`、
-`billboard/electric` 等 5 套 —— 现按同一判据对自建风格提示）—— 所以它是**按主题条件的提示**而不是
-阻塞（规范原文是"不得**自动**绑定"，不是"这个色不许用"）。
+随之退役的还有它那套“二次变体”生成规则（色相 ±10~30°、彩度 ±5~20%、明度 ±3~12%，
+**中性色不旋色相** —— C≈0 时旋了是空操作，实测会产出重复色）—— 规则保留作手调依据：
+要在一个色板上多一套近亲色板，就按这个范围改，别另外发明。
+
+**俗套提醒**（`tech_blue_purple_cyan` / `corporate_blue_white` / `premium_black_gold`…）
+随 `palette.py` 一起退役、不再自动出现 —— 名单与判据留在 `references/color.md` 供自查。
+它本来就只是**按主题条件的提示**而不是阻塞（规范原文是"不得**自动**绑定"，不是"这个色
+不许用"）：历史内置期实测本仓库 8 套风格里 5 套的某个色板落在名单上（`swiss-grid/blue`
+同时命中前两条、`terminal/cyan`、`billboard/electric`…）。
 
 配色规范里**大部分讲的是生成过程**（怎么想），代码只能负责结构与校验。哪些是代码强制、
 哪些是流程判断、哪些**还没实现**（渐变渲染、玻璃拟态、强调色占比实测），
@@ -260,34 +264,34 @@ python3 scripts/grid.py --json     # 机读（跨度、区域、令牌）
 - **关系规则**：组距 ≥ 1.5 × 条目距（Gestalt 接近性），`grid.py` 自检
 - **对齐**：锚点（标题/栏题/图/图表）左缘必须吸附列 —— `check.py` 提示。
   改前左缘是 7 个任意值，改后全部落在列上（84/448/812/933/1176 = 边距+第4/7/8/10列）
-- **阶梯**：4 套风格曾有 subtitle == bullet（同级碰撞 = 没有层级），已修；
-  `style.py --check` 把同级碰撞与倒挂判错
+- **阶梯**：4 套风格曾有 subtitle == bullet（同级碰撞 = 没有层级），已修（内置期）；
+  判它的 `style.py --check` 已退役 —— 同级碰撞 / 倒挂不再有脚本门，靠作者自查
 
 ## 布局与信息层级
 
 **我们的布局不是模板系统，也不是约束系统** —— 是**固定画布 + 7 种手写版式 + 真浏览器
-实测校验 + 试排**。画布 1600×900、`PAD 84/132`、正文带 132→824 是几何常量的唯一来源。
+实测校验**。画布 1600×900、`PAD 84/132`、正文带 132→824 是几何常量的唯一来源。
 
 **规范里最核心的那条原则（"不要让 LLM 决定 x=327，程序负责精确布局"）从第一版就是
 那样做的**：spec 里根本没有 x/y —— `validate_spec.py` 把 `x`/`y`/`dx`/`dy`/`rot`/
 `width`/`height` 直接判错。所以那是**加法**，不是重构。
 
-新加的 `hierarchy.py` 只做三件事，**全是提示级**（阈值取决于语境：封面就该空、
-看板就该满）：
+`hierarchy.py`（信息层级提示：文本预算 / 视觉焦点 / 内容密度）**已退役** —— 那三条阈值
+取决于语境（封面就该空、看板就该满），做成门会把第一份正常的 deck 挡住；而**装不装得下**
+这件事已由 `measure.py` 实测的越界 / 裁切两道定死。**规矩本身保留**，现在靠作者自查：
 
-- **文本预算** —— 封面标题 ≤12 字、内页标题 ≤24、单条 ≤60…；超了不是只说"超了"，
-  而是把**修复顺序**写进报错：删字 → 拆信息 → 换版式 → 拆页 → **最后才允许缩字号**
-  （规范第 22 条。本仓库的 `bullet_tier()` 是"缩字号第一"，这条提示是为了在它之前
-  把话说完）
-- **视觉焦点** —— 给每个元素算视觉权重（文字用**墨迹宽** `textW` × 高度，不是整栏宽
-  —— 实测标题的 `w` 是 1432px 而墨迹只占一小块），要求第一名领先第二名 ≥25%，
-  且达首名 60% 权重的元素不超过 3 个（规范第 8 条）。实测我们的版式稳定领先 **90%+**
+- **文本预算**（规范第 22 条）—— 封面标题 ≤12 字、内页标题 ≤24、单条 ≤60…；超了就按
+  这个顺序修：删字 → 拆信息 → 换版式 → 拆页 → **最后才允许缩字号**（字号档由你声明，
+  没有按条数自动升降）
+- **视觉焦点**（规范第 8 条）—— 要求第一名领先第二名 ≥25%，且达首名 60% 权重的元素不超
+  过 3 个（实测我们的版式稳定领先 **90%+**）
 - **内容密度** —— 占正文带的百分比，按 Minimal 35~50% / Normal 45~65% /
   Information 55~75% / Dashboard 65~82% 分档
 
-**硬约束与软约束是分开的**（规范第 21 条）：越界 / 重叠 / 文字溢出 / 图被放大 →
-`check.py` **阻塞**；焦点 / 密度 / 预算 / 对齐 / 平衡 → **提示**。混淆的后果是第一份
-正常的 deck 就被挡住，然后所有人开始忽略检查。
+**硬约束与软约束是分开的**（规范第 21 条）：越界 / 裁切 / 对比度 / 图片没加载 / 装饰压文字 /
+logo 压文字 / 一张图盖满整页 / 图表没渲染出来 → `check.py` **阻塞**；字体回退 / 网格对齐 /
+图被放大 / 布局轮换 / 品牌与形状 → **提示**。混淆的后果是第一份正常的 deck 就被挡住，
+然后所有人开始忽略检查。
 
 五块（布局 / 层级 / 留白 / 图形 / 图表）的现状、该借谁的规则（Fluent 2、Figma Auto
 Layout、Design Tokens、**IBCS + ISO 24896**、AntV）、缺什么、以及**分四步的路线图**
@@ -296,22 +300,28 @@ Layout、Design Tokens、**IBCS + ISO 24896**、AntV）、缺什么、以及**�
 ## 已知限制
 
 1. **贴图版 PPTX 改不了字**：要能改字就走 `pptx_native.py`（原生 shapes）。两者取舍见 `references/delivery-formats.md`。
-2. **图表八类**（`chart.py`）：bar / bar-horizontal / line / area / bar-stacked /
-   donut / scatter / combo。AI 只写 DSL（intent / message / emphasis / annotations），
-   图形类型按**意图树**确定性地映射，不随便选；**muted + 1 accent**（给了 emphasis
-   才启用）；**结论先行**（`message` 当大标题，`title` 降为数据集名小标签）；
+2. **图表八类（AntV G2 渲染，vendor 锁版本内联进产物、动画关死保确定性）**：bar /
+   bar-horizontal / line / area / bar-stacked / donut / scatter / combo。spec 仍**必须显式写**
+   `chart`（推断已退役）；`intent` / `message` / `emphasis`（muted + 1 accent）/ `annotations`
+   是语义标注，其中 `message` 当大标题、`title` 降为数据集名小标签（结论先行）；
    不画图例/坐标轴数字/网格线（既定风格）。PPT 层按类型映射原生图表（环图/散点
-   各有坑，见 `references/charts.md`）。柱高/条宽与数据成比例由 `check.py` 独立复核。
+   各有坑，见 `references/charts.md`）。`check.py` 的图表门换了判据：不再查"柱高与数据
+   成比例"（几何由 G2 算），改查 (a) **G2 真渲染出来了**（`measure.py` 实测 `chartReady`：
+   `ready` / `pending` / `error`，静态 HTML 判断不出来）与 (b) **数据形状**（`label` 非空、
+   `value` 是数字）。
 3. **错位只用在标题 / 时间点**：其他地方用错位会毁可读性（方案第 2 层）。
 4. **生图不由脚本做**：推荐路径是 `--brief` 写提示词契约、人出图、`--check` 验收
    （见上）。另有色块拼贴（它本身就是版画式拼贴）与 `--provider-cmd`（有 API 的人用）。
    不配 provider 就永远不会调生图模型 —— 这是设计不是疏漏，见 `references/images.md`。
-5. **缓存命中不等于可信**：缓存里的图也会过"只在色板三角形内"的不变量，
-   塞彩图会被拒绝并丢弃重做。
+5. **缓存命中不等于可信**：`image_source.py` 命中缓存后仍会过"只在色板三角形内"那道判据，
+   不合规就丢弃重做。但这道判据对**真实照片**已不成立（照片本就有千百种颜色，v4 随
+   `plate.py` 退役，相关用例也删了）—— 它现在只兜住占位 / 拼贴那条路；真照片的色彩
+   约束改由 `--brief` 的提示词承担。
 6. **同 spec + 同种子 = 字节级一致**：用 random.Random(seed, parts) 派生错位 / 颗粒，
    不是全局 random。如果改了 seed 输出没变，多半是 spec 里没把 seed 传进去。
-7. **demo 的图文页要先造图**：`dev-tools/demo.spec.json` 的 `image` 是占位文件名，
-   按「跑法」跑一遍才有图。产物是本地文件，不进仓库（仓库只收文本 + 两个 SVG 图标）。
+7. **图文页要先造占位图**：spec 里 `image` 写的是占位文件名时，
+   按「跑法」第 3 步跑一遍才有图（`--prompt` + `-o` 出几何色块拼贴）。产物是本地文件，
+   不进仓库（仓库只收文本 + 两个 SVG 图标）。
 8. **IO 收在 `deckio.py`（一个刻意留的例外）**：读 / 写 / 数字解析全走那里。例外是
    `validate_spec.py` —— 它的职责就是用退出码 2 报「输入有问题」，所以要自己分辨
    「读不到」和「不是合法 JSON」（两者给用户的信息不一样），合并了反而变差。
@@ -322,45 +332,31 @@ Layout、Design Tokens、**IBCS + ISO 24896**、AntV）、缺什么、以及**�
 skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是这棵树的这部分
 ├── SKILL.md                 # 给模型看的触发条件 + 流程
 ├── README.md                # 给"想跑一下"的人看的
-├── scripts/                 # 流水线十七件（另有 1 个 Swift 编码器）
+├── scripts/                 # 流水线十四件（另有 1 个 Swift 编码器 + 1 个 vendor）
 │   ├── validate_spec.py     # 输入层校验：字段集封闭（坐标/字号/色值直接判失败）
-│   ├── ink.py               # 墨色推导 + 三色板门禁（唯一消费者）
-│   ├── plate.py             # 图片 → duotone + 半调（制版）
-│   ├── image_source.py      # 提示词契约(--brief) / 验收(--check) / 生图 / 色块拼贴
+│   ├── ink.py               # 墨色推导 + 三色板对比度门禁（不达标退 1）
+│   ├── image_source.py      # 提示词契约(--brief) / 验收(--check) / 生图(--provider-cmd) / 色块拼贴
 │   ├── fonts.py             # 字体库：清单(--list) / 取字体(--fetch) / 映射(--map) / 内嵌
-│   ├── palette.py           # 配色：OKLCH / 结构实测(--audit) / novelty / 三方向 / 角色
-│   ├── hierarchy.py         # 信息层级：文本预算 / 视觉焦点 / 内容密度（全是提示级）
 │   ├── grid.py              # 网格与间距：12 列 / 令牌 ramp / 关系规则（几何唯一来源）
-│   ├── chart.py             # 图表引擎：意图树 / 八类 SVG / muted+accent / 标注
-│   ├── plan.py              # 规划层：内容理解 / 叙事骨架 / 页型 / 到 spec 的桥
-│   ├── compile.py           # 决策层：spec → resolved.deck.json（色板/档位/时间轴 + trace）
-│   ├── benchmark.py         # 固定基线（§53）：三 fixture 指标落盘 + --compare 回归对比
-│   │                          （brief / coreThesis / claims / 空话 / 重复也在这查）
-│   ├── brand.py             # 品牌资产：logo 内嵌 / 色板与字体合并 / SVG 栅格化
-│   ├── fit.py               # 试排：给定一页内容，实测哪些版式装得下（真渲真量）
-│   ├── style.py             # 风格层：列表 / 契约体检 / 摘要 / 联系表（八套拼一张图）
-│   ├── deliver.py           # 交付演练：整条链跑一遍 + 画面与逐像素比对
-│   ├── render.py            # deck-spec.json → HTML（语义骨架 + 风格 skin + 演示壳 + 运动引擎）
-│   ├── measure.py           # 实测层：真浏览器量真盒子（不估算）
-│   ├── check.py             # 校验：越界/裁切/对比度/图表/图片/报错
+│   ├── deck.py              # 决策层：品牌资产并入 + spec → resolved（色板/档位 + trace）
+│   ├── render.py            # deck-spec.json → HTML（语义骨架 + skin + 演示壳 + 运动引擎 + 内联 G2）
+│   ├── measure.py           # 实测层：真浏览器量真盒子（不估算；图表报 chartReady）
+│   ├── check.py             # 校验：越界/裁切/对比度/图表就绪/图片/报错
 │   ├── pdf.py               # HTML → 矢量 PDF（并验页数/页尺寸/位图/字体）
 │   ├── shots.py             # HTML → PNG（系统 Chrome 截图）
-│   ├── make_pptx.py         # PNG → PPTX（贴图版）
-│   ├── pptx_native.py       # HTML → PPTX（原生 shapes，字能改）
+│   ├── pptx_native.py       # PPTX：HTML → 原生 shapes（能改字）/ --png-dir → 贴图版
 │   ├── animate.py           # HTML → MP4 / GIF（逐帧 seek 录制，可复现）
 │   ├── h264_encode.swift    # 帧序列 → H.264（AVFoundation，无需 ffmpeg）
+│   ├── vendor/              # g2-5.2.10.min.js（版本锁死，渲染时内联进产物）
 │   └── deckio.py            # IO 收口（try/except 不散落）
-├── styles/                   # 用户自建风格（**无内置**）：一种风格 = 一个目录
+├── styles/                   # 用户自建风格（**无内置**，可选目录、不随仓库分发）：一风格一目录
 │                             #   （style.json token + skin.css 视觉层），不碰 .py；
 │                             #   历史八套已整体移除，参数表留在文档里作自建参考
 ├── brands/                   # 品牌资产：一个品牌 = 一个目录，不碰 .py
 │   └── example/              #   示例品牌（logo 正版 + 反白版 + 署名）
-├── dev-tools/
-│   ├── demo.spec.json       # 一份能跑的样例（已引用 example 品牌）
-│   ├── stress.spec.json     # **压测**用：21 页真实形状（长标题/密页/疏页/全部版式）
-│   └── style-fixture/
-│       └── swiss-grid/      # 开发/测试夹具风格（demo、stress、测试套件走它；
-│                             #   不是交付物，自建风格时可拷改）
+# 注意：没有 dev-tools/ —— 曾经的 demo/stress 样例与两份"可拷的参考风格"已随 v4 移除。
+# 可拷贝的模板必然变成默认答案（用户实测："无论换什么主题，产物永远一个样式"）。
+# 内容样例与测试用风格现在只活在 tests/deck-authoring/fixtures/ 下，不随 skill 发布。
 ├── evals/evals.json         # 行为评估用例
 └── references/
     ├── pipeline.md             # **总编排协议 0-59 全文**：链路/五门/失效/可复现/交付
@@ -370,29 +366,28 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
     ├── animation.md            # 运动规则 0-42 全文落地、按角色 preset、确定性、导出
     ├── brand-assets.md         # 品牌与资产协议（v2.0）：四层、优先级链、v2 对照表
     ├── content-intelligence.md  # 内容智能与规划系统（v3.0）：Brief / 论断 / 一页一 Takeaway
-    ├── planning.md             # 规划层模块：schema、骨架表、复杂度、到 spec 的桥
+    ├── planning.md             # 规划层规则：schema、骨架表、复杂度（`plan.py` 已退役，规则改由作者执行）
     ├── layout-system.md        # 布局规则 0-87 全文落地：网格/令牌/层级/约束/路线图
-    ├── charts.md               # 图表引擎：意图树、八类、弱化强调、消息先行
-    ├── color.md                # OKLCH 结构/novelty/三方向/auto 派生（省 colorSet）
+    ├── charts.md               # 图表：八类、弱化强调、消息先行（几何由 G2 算）
+    ├── color.md                # OKLCH 结构、配色规范里哪些是代码强制 / 流程判断（`palette.py` 已退役）
     ├── fonts.md                # 126 字体库、风格映射、严格 A 级、用户缓存
     └── images.md               # 图像契约：AI 出合同、人出图、--check 验收
 tests/deck-authoring/           # 测试住在仓库顶层（不在 skill 目录里）
-├── test_ink.py
-├── test_determinism.py
-├── test_check_mutations.py
-├── test_halftone_monotonic.py
-├── test_cache_invariant.py
-├── test_skill_md_consistency.py
 ├── test_validate_spec.py
+├── test_ink.py
+├── test_grid.py
+├── test_check_mutations.py
+├── test_determinism.py
 ├── test_shell.py
 ├── test_pdf.py
 ├── test_pptx_native.py
-├── test_font_advisory.py
 ├── test_animation.py
-├── test_brand.py
-├── test_fit.py
-├── test_style.py
-└── test_deliver.py
+├── test_fonts.py
+├── test_font_advisory.py
+├── test_image_brief.py
+├── test_cache_invariant.py
+├── test_asset.py
+└── test_skill_md_consistency.py
 ```
 
 测试**刻意不放在 skill 目录里** —— AI 调用 skill 时读的是 `skills/deck-authoring/`

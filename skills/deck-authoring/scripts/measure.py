@@ -167,10 +167,15 @@ PROBE_JS = r"""
         // 图表就绪（v4）：G2 在浏览器里现渲染 —— 容器里有没有 canvas/svg、
         // 有没有报错，**只有真浏览器知道**。静态读 HTML 判断不出来（产物里
         // 只有容器与 spec），所以 readiness 由这里实测并写进结果。
-        chartReady: el.hasAttribute('data-g2')
-          ? (el.getAttribute('data-chart-error') ? 'error:' + el.getAttribute('data-chart-error')
-             : (el.querySelector('canvas,svg') ? 'ready' : 'pending'))
-          : null
+        // 图表就绪（v4）：G2 在浏览器里现渲染，容器是 **.g2 子元素**（挂在
+        // chartwrap 上，而 chartwrap 才是带 data-m 的那个）—— 所以在子元素上找。
+        // 静态读 HTML 判断不出来（产物里只有容器与 spec），只有真浏览器知道。
+        chartReady: (function (g2) {
+          if (!g2) return null;
+          var err = g2.getAttribute('data-chart-error');
+          if (err) return 'error:' + err;
+          return g2.querySelector('canvas,svg') ? 'ready' : 'pending';
+        })(el.querySelector('.g2[data-g2]'))
       });
       // 只统计**自己直接渲染文字**的元素。
       //
