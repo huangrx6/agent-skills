@@ -339,7 +339,7 @@ same input + same version + same seed = same resolved output（时间轴两次�
 ## 43. Fallback Strategy【✅】
 
 Font：exact → approved（严格 A 级库）→ system safe；Image：契约缺失=阻塞
-（不静默换）+ 占位图给 brief 阶段；Chart：AntV G2 内联 vendor 即主路径（无第二
+（不静默换）+ `--brief` 给提示词合同（**不产图**）；Chart：AntV G2 内联 vendor 即主路径（无第二
 引擎可退；vendor 读不到 render 直接报错，页面里 G2 缺失/渲染失败 →
 `data-chart-error`，由 check 实测的 chartReady 拦）；Motion：高级 preset →
 基础 fadeRise → 静态满态；Layout：spec 不写 `layout` 就套该版式的缺省结构布局

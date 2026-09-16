@@ -48,7 +48,6 @@ def _load_sibling(name: str):
     return module
 
 
-ink = _load_sibling("ink")
 deckio = _load_sibling("deckio")   # IO 收口：本来就是本仓库的规矩，这个文件是最后一个没跟上的
 
 CACHE_DIR_VAR = "AGENT_SKILLS_CACHE_DIR"
@@ -67,10 +66,11 @@ def cache_key(prompt: str, colors: dict, size: tuple[int, int]) -> str:
 
 
 def collage(seed: int, colors: dict, size: tuple[int, int]) -> Image.Image:
-    """几何色块拼贴（确定性）：圆 / 半圆 / 条纹 的专色组合。
+    """一把**量尺寸的尺子**：几何色块拼贴，尺寸对、确定性（同一 seed 同一张）。
 
-    它本身就得是**有版式的**（方案 §5.2 原话：不能用无风格的灰色占位图）——
-    哪怕是兜底图，也要看得出是这个 deck 的图，而不是“图待补”。
+    它只活在临时目录里（见 `_slot_geometry`），用途只有一个 —— 让 `.imgwrap`
+    按目标比例撑开，从而量到槽位真实的几何。**它不是这个 deck 的资产**，
+    也不出现在产物目录里：交付图一律是人拿 `--brief` 的提示词出的。
     """
     w, h = size
     image = Image.new("L", size, 255)
@@ -89,58 +89,6 @@ def collage(seed: int, colors: dict, size: tuple[int, int]) -> Image.Image:
         else:
             draw.rectangle([x, y, x + radius, y + max(6, radius // 6)], fill=tone)
     return image.convert("RGB")
-
-
-def _rgb(h: str) -> tuple[int, int, int]:
-    """HEX → RGB 三元组。"""
-    h = h.lstrip("#")
-    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-
-
-def _in_triangle(point: tuple[int, int, int], a, b, c, tol: float = 1e-6) -> bool:
-    """点是否落在三角形内 —— **三维**重心坐标，不是二维投影。
-
-    拿 x/y 两个坐标做二维叉积是错的：三角形长在 RGB 三维空间里，投影出去会把
-    "空间内但在 R–G 平面外"的点误判成越界（实测 3 个紫色 ✗）。正确做法：
-    解 p = a + u(b−a) + v(c−a)，要求 u, v ≥ 0、u+v ≤ 1 且残差≈0。
-    整数化容差是明文的：逐通道 int() 取整会让"恰在边界上"的点落到界外一丝
-    （实测 v ≈ −0.002 的紫色点）—— 残差那一关仍然卡着颜色真的跑偏的情况。
-    """
-    v1 = [b[i] - a[i] for i in range(3)]
-    v2 = [c[i] - a[i] for i in range(3)]
-    w = [point[i] - a[i] for i in range(3)]
-    vv1, vv2 = sum(x * x for x in v1), sum(x * x for x in v2)
-    v12 = sum(v1[i] * v2[i] for i in range(3))
-    wv1 = sum(w[i] * v1[i] for i in range(3))
-    wv2 = sum(w[i] * v2[i] for i in range(3))
-    det = vv1 * vv2 - v12 * v12
-    if abs(det) < 1e-9:
-        return False
-    u = (wv1 * vv2 - wv2 * v12) / det
-    v = (vv1 * wv2 - v12 * wv1) / det
-    residual = [w[i] - u * v1[i] - v * v2[i] for i in range(3)]
-    if max(abs(x) for x in residual) > 1.5:
-        return False
-    return (u >= -0.01) and (v >= -0.01) and (u + v <= 1.01)
-
-
-def in_palette(image: Image.Image, colors: dict, tol: float = 0.01) -> list[tuple[int, int, int]]:
-    """不变量：图里任何颜色都必须落在「主色 / 叠印墨 / 纸色」三角形内。"""
-    tri = (_rgb(colors["primary"]),
-           _rgb(ink.overprint(colors["primary"], colors["secondary"])),
-           _rgb(colors["background"]))
-    entries = image.getcolors(maxcolors=1 << 20) or []
-    stray: list[tuple[int, int, int]] = []
-    for entry in entries:
-        # getcolors 的第二项在类型上是 `int | tuple[int, ...]`（"L" 图给 int，RGB 给元组）。
-        # 显式收窄并构造三元组，不用 `c for _, c in ...` —— 后者留下 int 分支。
-        color = entry[1]
-        if not isinstance(color, tuple) or len(color) != 3:
-            continue
-        rgb = (color[0], color[1], color[2])
-        if not _in_triangle(rgb, *tri, tol=tol):
-            stray.append(rgb)
-    return stray
 
 
 def _provider_argv(template: str, prompt: str, out: str) -> list[str]:
@@ -163,35 +111,32 @@ def resolve(prompt: str, colors: dict, size: tuple[int, int], out: str,
     deckio.ensure_dir(cache_dir())
     path = os.path.join(cache_dir(), f"{cache_key(prompt, colors, size)}.png")
     if os.path.isfile(path):
+        # 缓存命中即可信：key 里已经含 prompt + 色板 + 尺寸，同一把 key 就是同一张图。
+        # 照片本来就有千百种颜色，拿"只在色板三角形内"去量它只会把好图判死
+        # （v4 删掉制版后处理时这道判据就该一起删）—— 色彩约束由 --brief 的提示词承担。
         cached = Image.open(path).convert("RGB")
-        stray = in_palette(cached, colors)
-        if not stray:
-            cached.save(out)
-            print(f"✓ 命中缓存（{os.path.basename(path)}）→ {out}")
-            return "cache"
-        print(f"✗ 缓存里的图不合规范（{len(stray)} 种颜色在色板三角之外，例 {stray[:2]}）"
-              f" —— 丢弃并重新走一遍，不拿不合规的图凑数")
-    source = None
-    if provider_cmd:
-        try:
-            subprocess.run(_provider_argv(provider_cmd, prompt, path), check=True)
-            source = "generated"
-        except subprocess.CalledProcessError as exc:
-            print(f"✗ 生图失败（{exc.returncode}）→ 降级为几何色块拼贴")
-    else:
-        print("· 未配置生图（--provider-cmd）→ 用几何色块拼贴（它本身就是版画式的拼贴，不是灰占位图）")
+        cached.save(out)
+        print(f"✓ 命中缓存（{os.path.basename(path)}）→ {out}")
+        return "cache"
+    if not provider_cmd:
+        raise SystemExit(
+            "✗ 没有生图命令（--provider-cmd），也没有 --brief。\n"
+            "  这个工具不自己画图。拿 `--brief` 出提示词 → 用你自己的模型出图 →\n"
+            "  存到 spec 同目录（或 --dir 指的目录）→ `--check` 验一遍。\n"
+            "  有生图 API：--prompt '…' -o out.png --provider-cmd '你的命令 --prompt {prompt} --out {out}'")
+    try:
+        subprocess.run(_provider_argv(provider_cmd, prompt, path), check=True)
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit(f"✗ 生图失败（返回码 {exc.returncode}）—— 没有降级产物："
+                         f"图只从你的模型来，脚本不兜底")
     # 没有制版处理这一层（双色调 / 半调网点都不做）—— 图片按原样使用。
-    # 提示词里那条"会被制版处理"的说明随之改成"色彩要落在色板里"（见 _brief 文案）。
     # 想要版画质感就在出图提示词里要（`--brief` 的构图/负空间字段），而不是
     # 在交付链里做一道后处理：后处理会让"check 说合规、交付图却不一样"。
-    if source is None:
-        image = collage(abs(hash(cache_key(prompt, colors, size))) % (10 ** 6), colors, size)
-    else:
-        image = Image.open(path).convert("RGB")
+    image = Image.open(path).convert("RGB")
     image.save(path)
     image.save(out)
-    print(f"✓ 已写出 {out}（来源：{source or '几何色块拼贴'}，已缓存为 {os.path.basename(path)}）")
-    return source or "collage"
+    print(f"✓ 已写出 {out}（来源：{provider_cmd.split()[0]}，已缓存为 {os.path.basename(path)}）")
+    return "generated"
 
 
 
@@ -219,19 +164,20 @@ BRIEF_SCALE = 2
 BRIEF_ASPECT = (3, 2)
 
 
-def _slot_geometry(spec_path: str, style: str | None, out_dir: str,
-                   place: bool = True) -> tuple[dict, str]:
+def _slot_geometry(spec_path: str, style: str | None) -> tuple[dict, str]:
     """渲一次、量一次，拿到**每个图片槽位的真实几何**。
 
-    为什么非要量：槽位的宽是布局定的（`.imgwrap{width:640px}`），**高取决于图的
+    为什么非要量：槽位的宽是布局定的（`.imgwrap` 那一列），**高取决于图的
     比例** —— 图还没出的时候，只有真渲一遍才知道那个槽位有多高、装不装得下。
-    先给一张占位图（比例就是 brief 推荐的那个），量出来的就是真值。
+    先放一把"尺子"（比例就是 brief 推荐的那个），量出来的就是真值。
     这也是"不估算"原则用在写提示词上：给模型的尺寸数字必须是实测的。
 
-    ⚠️ **`place=True` 会往 out_dir 里写占位图** —— 这是有副作用的。所以
-    **`--check` 绝不能走这条路**：检查把它该验的东西自己造出来，就永远验不出
-    "图还没出"（实测踩过：删掉图之后 `--check` 照样报"符合契约"）。
-    检查只需要"文件名 + 契约里的尺寸/比例"，不需要测量 —— 它不该渲染任何东西。
+    **尺子只活在临时目录里**（只有本次渲染用的 spec 副本指向它）—— 产物目录里的
+    图永远只有人出的那一份。写进产物目录就等于把一张脚本拼的图混进交付（实测踩过：
+    `--brief` 跑完，图片目录里躺着几张拼贴，没人替换它们就跟着交付了）。
+    **`--check` 也不走这条路**：检查把它该验的东西自己造出来，就永远验不出
+    "图还没出"（实测踩过：删掉图之后 `--check` 照样报"符合契约"）——
+    检查只需要"文件名 + 契约里的尺寸/比例"，不该渲染任何东西。
     """
     render_mod = _load_sibling("render")
     measure_mod = _load_sibling("measure")
@@ -242,20 +188,22 @@ def _slot_geometry(spec_path: str, style: str | None, out_dir: str,
     color_set = deck.get("colorSet") or next(iter(tokens["colorSets"]), "")
     colors = tokens["colorSets"].get(color_set) or next(iter(tokens["colorSets"].values()))
 
-    # 占位图（按推荐比例）——放好之后这次测量才量得到槽位高度
+    # 尺子（按推荐比例）+ 探针 HTML 都进临时目录，产物目录一个字节都不写
     slots = [s for s in deck.get("slides", []) if s.get("image")]
     if not slots:
         return ({}, style_name)
     width = 640 * BRIEF_SCALE
     height = round(width * BRIEF_ASPECT[1] / BRIEF_ASPECT[0])
-    for slide in slots:
-        target = os.path.join(out_dir, str(slide["image"]))
-        if not os.path.isfile(target):
-            collage(7, colors, (width, height)).save(target)
-
-    html_path = os.path.join(out_dir, "_brief-probe.html")
-    deckio.write_text(html_path, render_mod.render(spec))
-    measured = measure_mod.measure(html_path)
+    # 原路径先抄下来：探针副本要用尺子替掉 image，而契约里必须还是**用户那个路径**
+    original = {i: str(s.get("image", "")) for i, s in enumerate(spec["deck"]["slides"], 1)}
+    with tempfile.TemporaryDirectory(prefix="deck-brief-") as probe_dir:
+        collage(7, colors, (width, height)).save(os.path.join(probe_dir, "ruler.png"))
+        for slide in spec["deck"]["slides"]:
+            if slide.get("image"):
+                slide["image"] = "ruler.png"   # 只改这份探针副本，不动用户那份 spec
+        html_path = os.path.join(probe_dir, "probe.html")
+        deckio.write_text(html_path, render_mod.render(spec))
+        measured = measure_mod.measure(html_path)
     info: dict = {"style": style_name, "colors": colors, "slides": {}}
     for i, slide in enumerate(spec["deck"]["slides"], 1):
         if not slide.get("image"):
@@ -265,7 +213,7 @@ def _slot_geometry(spec_path: str, style: str | None, out_dir: str,
         info["slides"][i] = {
             "title": slide.get("title", ""),
             "bullets": slide.get("bullets", []),
-            "file": str(slide["image"]),
+            "file": original.get(i, str(slide.get("image", ""))),
             "box": box[0] if box else None,
             # 说明文字与版式类型：提示词的「文字」那一栏要用它们说清
             # "画面里不要有字，字由版面排"——这比笼统的负面词有用。
@@ -319,10 +267,11 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None,
     """产出提示词契约（人读的 markdown + 机读的 JSON 一起给；后者写进
     contract_dir/assets/requests/，md 由 main() 调 write_brief_md 写）。
 
-    `out_dir` = **图片在哪**（占位图落这儿）；`contract_dir` = **合同在哪**
+    `out_dir` = **图片在哪**（人出的图存这儿；`--check` 也只看这里）；
+    `contract_dir` = **合同在哪**
     （缺省同 out_dir）。分开是因为 `--dir` 的本意只是前者 —— 实测踩过：一份
     17 页 deck 的提示词合同被 `--dir` 一起搬进 /tmp，用户拿不到那份要他执行的东西。"""
-    info, style_name = _slot_geometry(spec_path, style, out_dir)
+    info, style_name = _slot_geometry(spec_path, style)
     if not info:
         # 不直接失败：先说清"你这份 spec 一张图都没有"，再指出哪几页可能该有 ——
         # 工具按版式只能猜到这一步，要不要加由内容定。
@@ -888,14 +837,14 @@ def _temp_dir_note(path: str) -> str | None:
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(
-        description="图片来源三条路：**写契约给人出图（--brief）** / 调生图命令 / 几何色块拼贴")
-    # 三条路各自的入口：
-    #   --brief 推荐（人出图）· --check 验人交付的图 · 其余是"先跑起来"的占位
+        description="图片来源两条路：**写契约给人出图（--brief，默认）** / 调你的生图命令（--provider-cmd）")
+    # 两条路各自的入口：
+    #   --brief 推荐（人出图）· --check 验人交付的图 · --prompt+--provider-cmd 给有 API 的人
     ap.add_argument("--brief", default=None, metavar="SPEC",
                     help="从这份 spec 生成**图片提示词契约**（人拿它去出图）")
     ap.add_argument("--check", default=None, metavar="SPEC",
                     help="验人交付的图：在不在 / 够不够大 / 比例对不对")
-    ap.add_argument("--prompt", default=None, help="（占位路径）出图用的提示词")
+    ap.add_argument("--prompt", default=None, help="出图用的提示词（配合 --provider-cmd）")
     ap.add_argument("-o", "--out", default=None, help="输出文件（--brief 缺省写 spec 同目录）")
     ap.add_argument("--dir", default=None,
                     help="**图片**所在的目录（缺省：spec 所在目录）—— 只管图片："
@@ -909,7 +858,8 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--size", default="640x400")
     ap.add_argument("--json", action="store_true", help="--brief 时额外输出机读 JSON")
     ap.add_argument("--provider-cmd", default=None,
-                    help="可选的生图命令，用 {prompt} 与 {out} 占位；不填就用色块拼贴")
+                    help="生图命令，用 {prompt} 与 {out} 占位；不给就拒绝："
+                         "脚本不自己画图，改用 --brief 拿提示词")
     args = ap.parse_args(argv[1:])
 
     if args.brief:
@@ -952,7 +902,7 @@ def main(argv: list[str]) -> int:
         return 0
 
     if not args.prompt or not args.out:
-        raise SystemExit("✗ 要么给 --brief/--check（推荐），要么给 --prompt 与 -o（占位路径）")
+        raise SystemExit("✗ 要么给 --brief/--check（推荐），要么给 --prompt 与 -o（需要 --provider-cmd）")
     tokens = deckio.read_json(args.tokens)
     color_set = args.color_set or next(iter(tokens["colorSets"]), None)
     if color_set not in tokens["colorSets"]:

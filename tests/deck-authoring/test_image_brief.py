@@ -26,6 +26,8 @@ import sys
 import tempfile
 import unittest
 
+from PIL import Image
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 # 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
@@ -423,14 +425,37 @@ class TestCheck(unittest.TestCase):
         self.assertEqual(len(problems), 1, problems)
 
 
-class TestPlaceholderPath(unittest.TestCase):
-    def test_brief_generates_placeholders_so_the_deck_still_renders(self) -> None:
-        """契约阶段会放占位图 —— 这是有意的：出图要时间，而流水线不该因此停住。"""
+class TestNoImagesWritten(unittest.TestCase):
+    """`--brief` **不往产物目录写任何图** —— 量槽位的尺子只活在临时目录里。
+
+    写进产物目录就等于把一张脚本拼的图混进交付（实测踩过：`--brief` 跑完，图片
+    目录里躺着几张拼贴，没人替换它们就跟着交付了）。图只能来自人拿提示词出的那一份。
+    """
+
+    def test_brief_writes_no_image_into_the_deck_dir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             brief = image_source.build_brief(STRESS, tmp)
-            for s in brief["slots"]:
-                self.assertTrue(os.path.isfile(os.path.join(tmp, s["file"])),
-                                f"没放占位图：{s['file']}")
+            stray = sorted(f for f in os.listdir(tmp) if f.endswith(".png"))
+            self.assertEqual(stray, [], f"产物目录里出现了脚本写的图：{stray}")
+            # 尺子进临时目录≠不量：几何仍是**实测**的，不是估算的
+            self.assertGreater(brief["target_px"][1], 0)
+            for slot in brief["slots"]:
+                self.assertTrue(slot["file"].endswith(".png"),
+                                "契约里的文件名必须还是用户那个路径（不能被尺子顶掉）")
+                self.assertNotIn("ruler", slot["file"])
+
+    def test_existing_image_is_untouched(self) -> None:
+        """已经放好的图不许被覆盖 —— 那是人的成果。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            brief = image_source.build_brief(STRESS, tmp)
+            path = os.path.join(tmp, brief["slots"][0]["file"])
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            Image.new("RGB", (8, 8), (200, 30, 30)).save(path)
+            with open(path, "rb") as fh:
+                before = fh.read()
+            image_source.build_brief(STRESS, tmp)
+            with open(path, "rb") as fh:
+                self.assertEqual(fh.read(), before, "已有的图被脚本覆盖了")
 
 
 
@@ -622,8 +647,9 @@ class TestContractLocation(unittest.TestCase):
             self.assertFalse(os.path.exists(os.path.join(img_dir, "image-brief.md")))
             self.assertTrue(os.path.isdir(os.path.join(spec_dir, "assets", "requests")),
                             "机读 requests 与合同同根")
-            self.assertTrue(any(f.endswith(".png") for f in os.listdir(img_dir)),
-                            "占位图按 --dir 落（图片在哪由它说）")
+            self.assertEqual([f for f in os.listdir(img_dir) if f.endswith(".png")], [],
+                             "脚本不往图片目录写任何东西（图是人出的，--dir 只说明存哪儿）")
+            self.assertIn(img_dir, buf.getvalue(), "要告诉人出完图存到哪")
             self.assertIn("临时目录", buf.getvalue(),
                           "deck 建在临时目录里要开口说一声")
 

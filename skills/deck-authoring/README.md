@@ -22,8 +22,8 @@
 cd skills/deck-authoring/
 python3 scripts/validate_spec.py your.spec.json                     # 1) 规格（字段集封闭）
 python3 scripts/ink.py styles/<你的风格>/style.json                  # 2) 墨色门禁（对比度）
-python3 scripts/image_source.py --prompt "现场照片占位" -o sample-treated.png
-                                                                    # 3) 造占位图（几何色块拼贴）
+python3 scripts/image_source.py --brief your.spec.json               # 3) 图片提示词契约 → image-brief.md
+#   拿着提示词去出图，按契约里的文件名存到 spec 同目录（这一步是人做的：脚本不产图）
 python3 scripts/render.py your.spec.json -o out.html                # 4) 出 HTML
 python3 scripts/render.py your.spec.json -o out.html --repair       #    （溢出时：降档→复检≤4轮）
 python3 scripts/render.py your.spec.json -o out.html --candidates   #    （未声明布局：候选并测出表）
@@ -57,11 +57,11 @@ python3 scripts/grid.py --json                 # 版面几何唯一来源（12 �
   （原 `fit.py` 是把候选版式与各条目数档位摆进同一份产物渲一次、量一次）。内容怎么组织
   （一页一个观点、版式选择、观众距离）见 `references/content-intelligence.md`。
 
-第 3 步是给 demo 的图文页造一张**占位图**（走 `--prompt` + `-o`，几何色块拼贴）：
-`demo.spec.json` 的 `image` 是个占位文件名，不先生成它就是一张裂图。要换成真照片就走
-下面的 `--brief` 契约。该产物**不入库**（见「已知限制」第 7 条）。
+第 3 步不产图，它产的是**提示词契约**：图文页 `image` 指向的文件要由人拿提示词去出，
+没出之前那页就是一张裂图（`check` 的「图片加载」门会点名）。出完存到 spec 同目录，
+`--check` 验尺寸与比例。
 
-**要换成真照片**（推荐路径，三条路里最正经的一条）：
+**图片（默认路径：脚本写契约，人出图）**：
 
 ```bash
 python3 scripts/image_source.py --brief your.spec.json             # → 图片提示词契约
@@ -72,10 +72,12 @@ python3 scripts/image_source.py --check your.spec.json             # 验尺寸�
 
 分工是**脚本写契约 → 人出图 → 脚本验收**：脚本知道每张图进哪个槽位、那个槽位实测
 多少像素、该套色板是哪几个颜色；而"出一张好看的图"这件事，人拿自己顺手的模型做得比
-脚本调一个陌生 API 好。彩照**不直接塞进 image 字段**，也不做制版后处理（没有这一层，图片按原样进产物）
-—— 版画质地在提示词里要到位；等图期间用占位图（`--prompt`
+脚本调一个陌生 API 好。图**不直接塞进 image 字段**，也不做制版后处理（没有这一层，
+图片按原样进产物）—— 版画质地在提示词里要到位。
 
-- `-o`，几何色块拼贴）顶住，流水线不会因为等图停住。
+**脚本不产图，一张也不产**：`--brief` 量槽位用的那块"尺子"只活在临时目录里。图出得慢
+就让那一页先裂着（`check` 点名），也别塞一张脚本拼的东西占位 —— 占位图最可能的结局
+就是跟着交付出去。
 
 提示词按**固定字段顺序**给，顺序就是优先级：
 
@@ -105,7 +107,7 @@ python3 scripts/image_source.py --check your.spec.json             # 验尺寸�
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 389 条，约 4 分钟（负载敏感）（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 392 条，约 4 分钟（负载敏感）（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时两三分钟，
@@ -120,7 +122,7 @@ PDF 是矢量且页数 / 页尺寸对（含"故意删掉 `@page` 必须被拦"�
 可编辑 PPTX 的**字是真字**且坐标是页内坐标、字体提示不报废话、
 字体库（清单 / 映射 / `--installed` 不许假阳性 / `.otf` 与 `.ttf` 的格式优先级）、
 网格数学（列宽 97.33 的精度、7+5 必须正好铺满 1432、间距令牌的关系规则）、
-图片契约与验收（契约字段要说清、`--check` 不许顺手造占位图作弊）、
+图片契约与验收（契约字段要说清、`--check` 不许自己造图作弊）、
 资产管线（manifest 契约 + assetId 只是语义引用，路径只在 resolved 里）、
 **同一个 t 两次独立浏览器会话取到的帧逐字节一致**（且不同 t 必须真的不同 —— 否则上一条
 会假绿）、渲染路径上没混进 CSS `transition`、
@@ -138,7 +140,7 @@ PDF 是矢量且页数 / 页尺寸对（含"故意删掉 `@page` 必须被拦"�
 ## 依赖
 
 - Python ≥ 3.10（用了 `from __future__ import annotations` + importlib 动态加载同目录脚本）
-- `Pillow`（截图拼装 / 几何色块拼贴 / GIF）
+- `Pillow`（截图拼装 / GIF / `--brief` 量槽位的那块尺子）
 - `python-pptx`（PPTX 拼装）
 - macOS 上 `shots.py` 需要 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`
 - **导出视频不需要 ffmpeg / gifsicle / ImageMagick**：用系统已有的三件 —— Chrome（取帧）、
@@ -308,12 +310,12 @@ Layout、Design Tokens、**IBCS + ISO 24896**、AntV）、缺什么、以及**�
    `ready` / `pending` / `error`，静态 HTML 判断不出来）与 (b) **数据形状**（`label` 非空、
    `value` 是数字）。
 3. **错位只用在标题 / 时间点**：其他地方用错位会毁可读性（方案第 2 层）。
-4. **生图不由脚本做**：推荐路径是 `--brief` 写提示词契约、人出图、`--check` 验收
-   （见上）。另有色块拼贴（它本身就是版画式拼贴）与 `--provider-cmd`（有 API 的人用）。
-   不配 provider 就永远不会调生图模型 —— 这是设计不是疏漏，见 `references/images.md`。
-5. **缓存命中不等于可信**：`image_source.py` 命中缓存后仍会过“只在色板三角形内”那道判据，
-   不合规就丢弃重做。但这道判据只对**占位 / 拼贴**那类生成图成立 —— 照片本就有千百种
-   颜色；真照片的色彩约束由 `--brief` 的提示词承担。
+4. **生图不由脚本做**：默认路径是 `--brief` 写提示词契约、人出图、`--check` 验收（见上）；
+   `--provider-cmd` 给有 API 的人。没配 provider 就直接拒绍 —— 脚本不产图，也没有降级产物
+   （见 `references/images.md`：量槽位的尺子只活在临时目录里，不落进 deck）。
+5. **缓存命中即可信**：cache key 含 prompt + 色板 + 尺寸，命中就直接复用、不再调 provider
+   （否则等于付第二次钱买同一张图）。真照片有千百种颜色，色彩约束由 `--brief` 的提示词
+   承担 —— 没有"只在色板三角形内"那道判据。
 6. **同 spec + 同种子 = 字节级一致**：用 random.Random(seed, parts) 派生错位 / 颗粒，
    不是全局 random。如果改了 seed 输出没变，多半是 spec 里没把 seed 传进去。
 7. **图文页要先造占位图**：spec 里 `image` 写的是占位文件名时，
@@ -333,7 +335,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── layout/              # 布局层包：几何模型(Rect/安全盒) + 碰撞政策(分组/距离表/豁免)
 │   ├── validate_spec.py     # 输入层校验：字段集封闭（坐标/字号/色值直接判失败）
 │   ├── ink.py               # 墨色推导 + 三色板对比度门禁（不达标退 1）
-│   ├── image_source.py      # 提示词契约(--brief) / 验收(--check) / 生图(--provider-cmd) / 色块拼贴
+│   ├── image_source.py      # 提示词契约(--brief) / 验收(--check) / 生图(--provider-cmd)
 │   ├── fonts.py             # 字体库：清单(--list) / 取字体(--fetch) / 映射(--map) / 内嵌
 │   ├── grid.py              # 网格与间距：12 列 / 令牌 ramp / 关系规则（几何唯一来源）
 │   ├── deck.py              # 决策层：品牌资产并入 + spec → resolved（色板/档位 + trace）

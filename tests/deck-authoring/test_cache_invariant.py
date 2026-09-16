@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
-"""image_source.py 缓存不变量：**缓存命中不等于可信**。
+"""image_source.py 的缓存不变量：**命中即可信，且不重跑 provider**。
 
 ## 为什么这条是不变量
 
-缓存里的东西也可能不合规 —— 上一次留下的、或者被别的路径塞进去的。
-如果命中就直接拷贝，那张不合规的图就会静默流进 deck，视觉上立刻露馅。
-
-所以 `resolve()` 命中缓存后**仍然**要过"只在色板三角形内"这条不变量：
-不合规就丢弃并重新走一遍，绝不拿不合规的图凑数。
+`cache_key` 里含 **prompt + 色板 + 尺寸** —— 同一把 key 就是同一张图。所以命中缓存
+就该直接复用：缓存里的东西是我们自己上一步写进去的，而重新走一遍意味着**再花一次
+生图的钱买同一张图**（用户在 `--provider-cmd` 上配的是真 API）。
 
 判据（必须机器可判，不能靠"看起来对"）：
-- 塞一张紫图（色板三角形外）到缓存位置
-- 跑 resolve()
-- 缓存文件必须被**替换**（不是原样拷贝）
-- 产物必须**在三角形内**
+
+- 先把一张图塞进缓存位置，再 `resolve()`，同时给一个**会留下痕迹的 provider 命令**
+- provider 命令**必须没被执行**（痕迹文件不存在）
+- 产物必须与缓存里那张**逐字节相同**
+
+## 这里删掉过一条判据
+
+原先还有"缓存图必须落在色板三角形内"这道门（不合规就丢弃重做）。它量的是
+`plate.py` 时代的双色调制版产物 —— v4 删掉制版、图片按原样使用之后，真照片
+**本来就有千百种颜色**，这道门只会把好图判死（实测：provider 出的图永远"不合规"，
+于是每次都重调 API，缓存形同不存在）。色彩约束改由 `--brief` 的提示词承担，
+见 `references/images.md`。
 
 跑法：
     python3 -m unittest discover -s tests -v
@@ -48,8 +54,7 @@ TOKENS = os.path.join(FIXTURES_DIR, "styles", "swiss-grid", "style.json")
 
 CACHE_ENV = "AGENT_SKILLS_CACHE_DIR"
 SIZE = (320, 200)
-# 色板三角形（主色 #FF48B0 / 叠印墨 / 纸色 #F5EFDD）之外的明显异色
-STRAY_RGB = (180, 0, 200)
+CACHED_RGB = (255, 72, 176)
 
 
 def _load(name: str, path: str):
@@ -67,17 +72,11 @@ from PIL import Image  # noqa: E402
 
 
 class TestCacheInvariant(unittest.TestCase):
-    """说明（v4）：原先这里还有两条"缓存图必须落在色板三角形里"的用例 ——
-    它们测的是 **plate.py 的双色调 + 半调制版后处理**（那张图会被压成两墨色，
-    所以能用三角形判定）。v4 删掉 plate.py：图片按原样使用，色板三角形判据
-    对真实照片不再适用（照片本来就有千百种颜色）。出图阶段的色彩约束改由
-    提示词 + `--brief` 的构图字段承担，见 references/images.md。
-    """
     def setUp(self) -> None:
         with open(TOKENS, encoding="utf-8") as fh:
             tokens = json.load(fh)
-        # 取哪套色板不重要，只要是**真存在的一套**：这些用例测的是缓存与色板三角
-        # 不变量，与风格无关。写死某个名字就会在换默认风格时挂掉（已经挂过一次）。
+        # 取哪套色板不重要，只要是**真存在的一套**：这些用例测的是缓存与 key，
+        # 与风格无关。写死某个名字就会在换默认风格时挂掉（已经挂过一次）。
         self.colors = next(iter(tokens["colorSets"].values()))
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
@@ -93,15 +92,45 @@ class TestCacheInvariant(unittest.TestCase):
         else:
             os.environ[CACHE_ENV] = self._previous
 
-    def _seed_cache_with_stray_image(self, prompt: str) -> str:
+    def _seed_cache(self, prompt: str) -> str:
         key = image_source.cache_key(prompt, self.colors, SIZE)
         path = os.path.join(self.cache, f"{key}.png")
-        Image.new("RGB", SIZE, STRAY_RGB).save(path)
+        Image.new("RGB", SIZE, CACHED_RGB).save(path)
         return path
 
-    def test_palette_detector_actually_flags_a_stray_color(self) -> None:
-        """先证明检测器真的会红 —— 否则上一条"没报"可能只是检测器失灵。"""
-        stray = Image.new("RGB", SIZE, STRAY_RGB)
-        self.assertTrue(image_source.in_palette(stray, self.colors),
-                        "检测器对明显异色没反应 —— 上一条用例的保证是假的")
+    def test_cache_hit_reuses_the_image_without_calling_the_provider(self) -> None:
+        """命中缓存 = 同一把 key = 同一张图，不该再花一次生图的钱。"""
+        marker = os.path.join(self._tmp.name, "provider-was-called")
+        cached = self._seed_cache("同一个 prompt")
+        out = os.path.join(self._tmp.name, "out.png")
+        source = image_source.resolve("同一个 prompt", self.colors, SIZE, out,
+                                      provider_cmd=f"touch {marker}")
+        self.assertEqual(source, "cache")
+        self.assertFalse(os.path.exists(marker),
+                         "命中缓存还去调了 provider —— 那是付第二次钱买同一张图")
+        with open(cached, "rb") as fh:
+            seeded = fh.read()
+        with open(out, "rb") as fh:
+            self.assertEqual(fh.read(), seeded, "命中缓存应当直接复用那张图")
 
+    def test_cache_key_separates_prompt_palette_and_size(self) -> None:
+        """三个输入里改任何一个，都必须换一把 key —— 否则会拿到别人的图。"""
+        other_palette = dict(self.colors)
+        other_palette["primary"] = "#00FF00"
+        keys = {
+            image_source.cache_key("A", self.colors, SIZE),
+            image_source.cache_key("B", self.colors, SIZE),
+            image_source.cache_key("A", other_palette, SIZE),
+            image_source.cache_key("A", self.colors, (640, 400)),
+        }
+        self.assertEqual(len(keys), 4, f"key 没把输入分开：{keys}")
+
+    def test_cache_key_is_stable_for_the_same_inputs(self) -> None:
+        """同输入同 key（跨进程也要一致：key 由内容算，不掺进程盐）。"""
+        first = image_source.cache_key("A", self.colors, SIZE)
+        second = image_source.cache_key("A", dict(self.colors), SIZE)
+        self.assertEqual(first, second)
+
+
+if __name__ == "__main__":
+    unittest.main()
