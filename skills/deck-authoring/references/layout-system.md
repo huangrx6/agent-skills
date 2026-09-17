@@ -215,7 +215,7 @@ Page Type=页面语义类型，Layout Family=空间组织方式（comparison 页
 
 ## 15. Layout Family【✅ 第一片已落地（content-image）】
 
-规范至少支持 single/split/stack/grid/hero/editorial/overlay/timeline/diagram/
+规范至少支持 single/split/stack/grid/hero/editorial/overlay/timeline/
 chart/table/dashboard/full-bleed。现状：7 种 slide type（title/content-text/
 content-image/two-column/timeline/chart/end）+ 自建风格。**content-image 率先
 成为显式家族**：`layout` 字段进 spec（作者声明的自由字符串）；two-column
@@ -460,7 +460,8 @@ Chart Container 负责 chart box/title box/标注区/标签安全区；**Chart E
 
 页面布局只负责 Diagram Container，内部 node/edge/connector/间距由引擎自管，
 **页面网格不强行控制每个节点**。落地：timeline 容器宽从网格算，节点内部排布
-自管；独立 diagram 引擎未建（无架构图版式——页型表里就没有它）。
+自管。**不建 diagram 版式引擎**：架构 / 流程在这里是**一张出图**（`evidence_image`
++ 提示词），页面只负责给它一块图槽 —— 页型表里本来就没有它。
 
 ## 34. Table Constraints【约定】
 
@@ -655,8 +656,8 @@ Cover 允许 hero/大量留白/非对称/full-bleed/overlap/editorial 构图；�
 ## 64. Architecture Layout【约定】
 
 优先 layered/hub-spoke/左到右/matrix/cluster，页面布局优先给 Diagram 足够
-面积。**渲染器没有架构图版式**：映射过去是死路（页型表里也没有它；等 diagram 引擎，
-见 planning.md 的未做清单）。
+面积。**渲染器没有架构图版式，也不打算有**：架构图在这里是一张**出图**
+（`evidence_image` + 提示词），页面只负责给它一块 `content-image` 的图槽。
 
 ## 65. Chart Layout【✅】
 

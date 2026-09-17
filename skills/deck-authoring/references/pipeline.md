@@ -190,8 +190,8 @@ pptx_native 的原生图表是第二种执行器）。**总链路不绑定具体
 ## 20. Diagram Resolver【部分 ✅】
 
 独立于 Chart；页面 Layout 只管 Container，内部自算 Node/Edge。落地：timeline
-容器宽从网格算、节点自管；独立 diagram 引擎未建（页型表原也没有 architecture，
-映射过去是死路——见 planning.md 的未做清单）。
+容器宽从网格算、节点自管；**不建 diagram 引擎** —— 架构 / 流程是出图
+（`evidence_image` + 提示词），页面只负责给它一块图槽。
 
 ## 21. Layout Resolver【✅】
 
@@ -439,7 +439,7 @@ repetition rate）。这份清单就是指标定义：要有基线，照它写�
 规范 22 份 rules/ ↔ 本仓库 references/（协议即"全文落地"系列）：
 00_orchestration=本篇；01_content+02_storyline=content-intelligence+planning；
 03_brand=brand-assets；04_style=style-architecture；05_color=color；
-06_typography=fonts；07_image=images；08_chart=charts；09_diagram=约定（§20）；
+06_typography=fonts；07_image=images；08_chart=charts；09_diagram=images（结构图即出图，无独立引擎）；
 10_shape_icon=阶段 4；11_table=约定；12_motion=animation；13_slide_dsl=
 validation+style-architecture；14_component=约定；15_layout=layout-system；
 16_quality+17_repair=validation+各篇 Repair 节；18_accessibility=约定；

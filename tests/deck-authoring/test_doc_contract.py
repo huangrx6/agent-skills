@@ -89,8 +89,8 @@ class TestRolesDoc(unittest.TestCase):
             self.assertIn("visual", spec, f"{role} 缺 visual（推荐主视觉档）")
             self.assertTrue(spec["visual"], f"{role} 的 visual 不能为空")
             for tier in spec["visual"]:
-                self.assertIn(tier, ("none", "data", "evidence_image", "diagram"),
-                              f"{role} 的 visual 档 {tier!r} 不是四档之一")
+                self.assertIn(tier, ("none", "data", "evidence_image"),
+                              f"{role} 的 visual 档 {tier!r} 不是三档之一")
 
 
 if __name__ == "__main__":

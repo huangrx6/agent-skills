@@ -136,30 +136,30 @@ Agent，产出的东西渲染器吃不下，就全白写。
 **角色 → 页型是查表**（下表）：AI 判**角色**（这一页在干什么），角色决定
 能用的**页型**（结构），再按页型写 `visual.kind`（四档见 images.md）。
 
-<!-- roles:start（这张表由 scripts/layout/roles.py 生成 —— 改角色请改那里；表与脚本的一致性由一条机械校验逐字比对）-->
+<!-- roles:start -->
 | 角色（spec 的 `role`） | 页型（结构） | 主视觉档 | 什么时候用它 |
 | --- | --- | --- | --- |
 | `cover` | title | `none` | 第一页；标题 + 副题 + 一句定位 |
 | `transition` | title | `none` | 换章；只给章节名 |
 | `statement` | content-text / title | `none` | 一个判断，字少、字大 |
 | `breakdown` | content-text / two-column | `none` | 把后面要讲的东西列成几块 |
-| `evidence` | content-text / content-image | `none` / `evidence_image` / `diagram` | 给人读的页；有截图/材料就配图 |
+| `evidence` | content-text / content-image | `none` / `evidence_image` | 给人读的页；有截图/材料就配图 |
 | `metric` | chart / content-text | `data` / `none` | 数字是主角；能画图就画图 |
 | `trend` | chart / timeline | `data` / `none` | 随时间变化；折线或横向时间线 |
 | `composition` | chart | `data` | 构成与份额 |
-| `comparison` | two-column / chart / content-image | `none` / `data` / `evidence_image` / `diagram` | 两边对照；两栏、对比图或文图 |
-| `process` | timeline / content-image | `none` / `evidence_image` / `diagram` | 有几步、有先后 |
+| `comparison` | two-column / chart / content-image | `none` / `data` / `evidence_image` | 两边对照；两栏、对比图或文图 |
+| `process` | timeline / content-image | `none` / `evidence_image` | 有几步、有先后 |
 | `capabilities` | two-column / content-text | `none` | 几项对等的能力/模块 |
-| `architecture` | content-image | `evidence_image` / `diagram` | 层与层的关系；结构图（excalidraw / draw.io） |
-| `flow` | content-image | `evidence_image` / `diagram` | 节点与连线；结构图 |
-| `topology` | content-image | `evidence_image` / `diagram` | 多节点的连接关系；结构图 |
-| `hero_visual` | content-image | `evidence_image` / `diagram` | 一张图承担这一页的主要信息 |
-| `context_image` | content-image | `evidence_image` / `diagram` | 图说明背景，文字仍是主角 |
+| `architecture` | content-image | `evidence_image` | 层与层的关系；结构图（excalidraw / draw.io） |
+| `flow` | content-image | `evidence_image` | 节点与连线；结构图 |
+| `topology` | content-image | `evidence_image` | 多节点的连接关系；结构图 |
+| `hero_visual` | content-image | `evidence_image` | 一张图承担这一页的主要信息 |
+| `context_image` | content-image | `evidence_image` | 图说明背景，文字仍是主角 |
 | `risks` | content-text / two-column | `none` | 可能出问题的地方 |
 | `actions` | content-text / two-column | `none` | 读完要干什么 |
 | `result` | content-text / chart | `none` / `data` | 把结论收成一句或几个数 |
 | `observation` | content-text / two-column | `none` | 判断与看法 |
-| `team` | content-image / content-text | `evidence_image` / `diagram` / `none` | 谁在做 |
+| `team` | content-image / content-text | `evidence_image` / `none` | 谁在做 |
 | `closing` | end | `none` | 最后一页 |
 <!-- roles:end -->
 

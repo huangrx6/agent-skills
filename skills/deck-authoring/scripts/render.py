@@ -470,12 +470,12 @@ html,body{margin:0;background:var(--viewer)}
    生图工具出成 1:1 / 4:3 / 2:1 是常态（提示词按不住比例，各家默认都不同）——
    只写 width 的话高度会跟着图片比例走：1:1 撑出页底（实测溢出 109px）、
    2:1 留出一个空洞。现在高度由槽位比例定，多出来的部分按内容类型处理：
-     · 照片 / 插画 / 截图 → cover（按中心裁切，主体居中几乎无损）
-     · 结构图 / 流程图     → contain（留边不裁 —— 图里每一笔都是信息）
-   皮肤的 .imgwrap 想改槽位比例就直接覆盖 aspect-ratio。 */
+     · 照片 / 插画 / 截图 → 一律 cover（按中心裁切）
+     · 提示词里因此写死两件事：主体收在中间、画面里不要有文字
+   皮肤想让图留边不裁（"每一笔都是信息"那种结构图）就覆盖
+   `.imgwrap img{object-fit:contain}`；想改槽位比例就覆盖 aspect-ratio。 */
 .imgwrap img{width:100%;display:block;aspect-ratio:var(--img-ratio,3/2);
   object-fit:cover}
-.imgwrap[data-fit="contain"] img{object-fit:contain}
 .cols{display:flex;gap:var(--sp-item)}
 .col{flex:1;min-width:0}
 /* two-column 变体：lean-left 左栏 7 栅（825.33px=span(7)），右栏由 flex:1 补齐
@@ -1515,15 +1515,14 @@ def render_resolved(resolved: dict) -> str:
             # （variant 已在 titleblock 之前判定 —— hero 不立独立标题块。）
             main_html = (f'<div class="main"><ul class="bullets" '
                          f'style="--s-bullet:{bsize}px">{items}</ul></div>')
-            # 结构图不裁：图里每一笔都是信息（照片则按中心裁切）；
-            # 比例由 spec 的 visual.ratio 给（未声明则壳缺省 3:2）。
+            # 比例由 spec 的 visual.ratio 给（未声明则壳缺省 3:2）—— 出图提示词里写的就是
+            # 这个比例，所以图按槽位铺满即可（裁切看不出来）。
             visual = slide.get("visual") if isinstance(slide.get("visual"), dict) else {}
-            vkind = visual.get("kind")
-            fit_attr = ' data-fit="contain"' if vkind == "diagram" else ""
             ratio = visual.get("ratio")
+            style_attr = ""
             if isinstance(ratio, str) and ratio.count(":") == 1:
-                fit_attr += f' style="--img-ratio:{ratio.replace(":", "/")}"'
-            img_html = (f'<figure class="imgwrap" {img_attrs}{fit_attr}>'
+                style_attr = f' style="--img-ratio:{ratio.replace(":", "/")}"'
+            img_html = (f'<figure class="imgwrap" {img_attrs}{style_attr}>'
                         f'<img src="{html.escape(src)}" alt="">{cap}</figure>')
             if layout == "visual-left":       # 图先文后
                 # 类名 = layout 名（皮肤按名字就能选到，不用猜）；`v-left` 是历史短名，

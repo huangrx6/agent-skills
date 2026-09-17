@@ -347,14 +347,6 @@ class TestImageSlotRatio(unittest.TestCase):
                       "高度必须由槽位定（缺省 3:2，可由 visual.ratio 覆盖）")
         self.assertIn("object-fit:cover", html, "照片：按中心裁切")
 
-    def test_diagram_is_letterboxed_not_cropped(self) -> None:
-        fig = re.search(r'<figure class="imgwrap"[^>]*>', self._page("diagram"))
-        assert fig is not None
-        self.assertIn('data-fit="contain"', fig.group(0),
-                      "结构图不能裁 —— 图里每一笔都是信息")
-        fig2 = re.search(r'<figure class="imgwrap"[^>]*>', self._page("evidence_image"))
-        assert fig2 is not None
-        self.assertNotIn("data-fit", fig2.group(0))
 
 
 
@@ -504,7 +496,7 @@ class TestHeroHeight(unittest.TestCase):
     def _hero(self, bullets: list, caption: bool = False) -> str:
         slide = {"type": "content-image", "layout": "hero", "title": "页",
                  "image": "x.png", "bullets": bullets,
-                 "visual": {"kind": "diagram"}}
+                 "visual": {"kind": "evidence_image"}}
         if caption:
             slide["caption"] = "图注"
         spec = {"deck": {"style": "swiss-grid", "colorSet": "blue", "seed": 1,

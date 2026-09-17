@@ -115,19 +115,38 @@ def find_binary(explicit: str | None) -> str | None:
     return None
 
 
+def _px(value, name: str) -> int:
+    """像素尺寸输入校验（与"未知 kind 不 fallback"同一条规矩：看不懂就报错）。"""
+    try:
+        got = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} 要是整数像素（{value!r}）：{exc}") from None
+    if got <= 0:
+        raise ValueError(f"{name} 要大于 0，收到 {value!r}")
+    return got
+
+
 def build_command(binary: str, source: str, out: str, fmt: str, scale: float,
                   transparent: bool = False, crop: bool = False,
                   no_sandbox: bool = False, border: float | None = None,
-                  embed: bool = False, size: str = "diagram") -> list[str]:
+                  embed: bool = False, size: str = "diagram",
+                  width: int | None = None, height: int | None = None) -> list[str]:
     """拼官方导出命令。**纯函数**，方便测试（不依赖机器上有没有 draw.io）。
 
     参数语义照 `draw.io --help`（31.4.5）：`-x` 导出、`-f` 格式、`-o` 输出、
     `-s` 倍率、`-t` 透明、`-b` 留白、`-e` 嵌入图、`--crop` **只对 PDF**、
     `--size` 是 diagram（默认，按内容裁切）/ page（整页）。
+    `--width/--height` 是官方开关（原文：fits … into the specified width/height,
+    preserves aspect ratio）—— 实测给单边时那一边**精确等于**给定值，两边都给就是
+    “装进这个框”（绑定轴精确、另一边更小，不会补底色到满框）。
     """
     cmd = [binary, "-x", "-f", fmt, "-o", out, "-s", f"{scale:g}"]
     if size != "diagram":                 # diagram 是官方默认值，不用写
         cmd += ["--size", size]
+    if width is not None:
+        cmd += ["--width", str(_px(width, "width"))]
+    if height is not None:
+        cmd += ["--height", str(_px(height, "height"))]
     if transparent:
         cmd.append("-t")
     if border is not None:
@@ -141,6 +160,35 @@ def build_command(binary: str, source: str, out: str, fmt: str, scale: float,
         cmd.append("--no-sandbox")
     cmd.append(source)
     return cmd
+
+
+def _image_size(path: str) -> tuple[int, int] | None:
+    """PNG 从 IHDR 读、JPG 从 SOF 段读 —— 回执里的尺寸要是**量出来的**。"""
+    try:
+        with open(path, "rb") as fh:
+            data = fh.read(65536)
+    except OSError:
+        return None
+    if data[:8] == b"\x89PNG\r\n\x1a\n" and data[12:16] == b"IHDR":
+        return (int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big"))
+    if data[:2] != b"\xff\xd8":                       # JPG
+        return None
+    i = 2
+    while i + 9 < len(data):
+        if data[i] != 0xFF:
+            i += 1
+            continue
+        marker = data[i + 1]
+        if marker in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7,
+                      0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):
+            h = int.from_bytes(data[i + 5:i + 7], "big")
+            w = int.from_bytes(data[i + 7:i + 9], "big")
+            return (w, h)
+        if marker in (0xD8, 0xD9) or 0xD0 <= marker <= 0xD7:
+            i += 2
+            continue
+        i += 2 + int.from_bytes(data[i + 2:i + 4], "big")
+    return None
 
 
 def _declares_background(source: str) -> str | None:
@@ -162,9 +210,34 @@ def _declares_background(source: str) -> str | None:
 
 def export(source: str, out: str, fmt: str = "png", scale: float = 2.0,
            transparent: bool = False, crop: bool = False, no_sandbox: bool = False,
-           binary: str | None = None, border: float | None = None,
-           embed: bool = False, size: str = "diagram") -> dict:
-    """跑一次官方导出。结果一律进回执，不抛业务异常。"""
+           binary: str | None = None, border: float | None = DEFAULT_BORDER,
+           embed: bool = False, size: str = "diagram",
+           width: int | None = None, height: int | None = None,
+           aspect: str | None = None) -> dict:
+    """跑一次官方导出。结果一律进回执，不抛业务异常。
+
+    width/height = 官方 `--width/--height`（实测：单边精确、两边=装进这个框）；
+    aspect 在这里**故意不支持** —— 官方只有均匀的 `-b`，理由见下面的报错文本。
+    border 默认与命令行一致（DEFAULT_BORDER）—— 库调用不该比命令行更容易出贴边图；
+    真不要留白就显式传 `border=0`。
+    """
+    if aspect:
+        # 实测（2026-09-17，31.4.5）：官方只有**均匀**的 `-b`，而均匀加白只会把比例
+        # 往 1:1 推。所以“固定比例”在本后端要么做不到，要么只能靠裁切（会丢内容）。
+        # 与其偷偷给个对不上的结果，不如说清楚并给出能做的那条路。
+        return {"ok": False, "stage": "input",
+                "message": f"draw.io 官方命令行没有比例开关（只有均匀留白 -b，"
+                           f"均匀加白会把比例推向 1:1，推不到指定比例）—— "
+                           f"要固定比例请走 Excalidraw 那条路："
+                           f"dev-tools/export_excalidraw.py x.excalidraw --aspect {aspect}；"
+                           f"在 draw.io 上只能固定一边：--width 或 --height"}
+    try:
+        if width is not None:
+            width = _px(width, "width")
+        if height is not None:
+            height = _px(height, "height")
+    except ValueError as exc:
+        return {"ok": False, "stage": "input", "message": str(exc)}
     if fmt not in FORMATS:
         return {"ok": False, "stage": "input",
                 "message": f"不支持的格式 {fmt!r}；可选：{'/'.join(FORMATS)}"}
@@ -200,7 +273,7 @@ def export(source: str, out: str, fmt: str = "png", scale: float = 2.0,
                            "不装也行：在 app.diagrams.net 打开这个 .drawio，"
                            "File → Export as 手动导出（references/drawio-backend.md 第五节）。"}
     cmd = build_command(exe, source, out, fmt, scale, transparent, crop,
-                        no_sandbox, border, embed, size)
+                        no_sandbox, border, embed, size, width, height)
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT_S)
     except subprocess.TimeoutExpired:
@@ -217,6 +290,17 @@ def export(source: str, out: str, fmt: str = "png", scale: float = 2.0,
     receipt = {"ok": True, "binary": exe, "format": fmt,
                "out": os.path.abspath(out),
                "engine": "draw.io desktop --export (官方命令行导出)"}
+    if fmt in ("png", "jpg"):
+        size_now = _image_size(out)      # 尺寸以**产物里量到的**为准
+        if size_now:
+            receipt["size"] = {"width": size_now[0], "height": size_now[1]}
+            # 官方语义是“装进这个框”：单边精确、两边时绑定轴精确 —— 对不上就说出来
+            for axis, want in (("width", width), ("height", height)):
+                got = size_now[0] if axis == "width" else size_now[1]
+                if want is not None and abs(got - want) > 1:
+                    receipt["note"] = (receipt.get("note", "") +
+                                       (" " if receipt.get("note") else "") +
+                                       f"--{axis} {want} 实际出的是 {got}px")
     if transparent and declared:
         # 不静默：你以为是透明图，其实里面还有一块底色
         receipt["note"] = (f"文件里写了显式底色 {declared}（emit 时刻意的），"
@@ -241,6 +325,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--size", choices=D.MODE_CHOICES if False else SIZE_MODES,
                     default="diagram",
                     help="diagram（默认，按内容裁切）/ page（整页）")
+    ap.add_argument("--width", help="最终宽度（像素；官方：fits into width，保留比例）")
+    ap.add_argument("--height", help="最终高度（像素；同上）")
+    ap.add_argument("--aspect", help="画布比例（如 16:9）—— draw.io 后端**不支持**，见报错里的原因")
     ap.add_argument("--crop", action="store_true",
                     help="裁到图大小 —— **只对 PDF 有效**（官方说明）；图片默认就按内容裁")
     ap.add_argument("--no-sandbox", action="store_true",
@@ -253,7 +340,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     receipt = export(args.source, args.out, fmt=fmt, scale=args.scale,
                      transparent=args.transparent, crop=args.crop,
                      no_sandbox=args.no_sandbox, binary=args.binary,
-                     border=args.border, embed=args.embed, size=args.size)
+                     border=args.border, embed=args.embed, size=args.size,
+                     width=args.width, height=args.height, aspect=args.aspect)
     if args.json:
         print(json.dumps(receipt, ensure_ascii=False, indent=2))
     if not receipt["ok"]:

@@ -89,7 +89,22 @@ JSON 也看不出问题，只有官方渲染器才暴露出来。
 
 ```sh
 python3 dev-tools/export_excalidraw.py x.excalidraw -o x.png --svg x.svg --scale 2
+python3 dev-tools/export_excalidraw.py x.excalidraw -o x.png --width 1600 --height 900
+python3 dev-tools/export_excalidraw.py x.excalidraw -o x.png --aspect 16:9
 ```
+
+**固定宽高 / 固定比例**（都是实测出来的语义，不是猜的）：
+
+| 想要 | 怎么写 | 实测行为 |
+| --- | --- | --- |
+| 固定宽高 | `--width 1600 --height 900` | 出图**精确** 1600×900。内容**容纳缩放**（不拉伸）、居中，不足的边补背景色 |
+| 只固定一边 | `--width 1600` | 另一边按内容比例跟上（1600×949）—— 官方语义 |
+| 固定比例 | `--aspect 16:9`（可配 `--width`/`--height`） | 画布往"比例不够"的那一轴**只加白**：实测内容保持原大小（容纳系数 = 1）、多出来的地方是底色 |
+
+两条路的关键差异（实测）：**PNG 认 `config.width/height`，SVG 忽略它** —— 所以
+`export_excalidraw.py` 里 SVG 那条是 Python 端改根节点（`width`/`height`/`viewBox` +
+背景板 rect），改不动就报错而不是给你一张比例不对的图。回执里的尺寸是**从产物里量出来的**
+（PNG 读 IHDR），不是我们自报的数。
 
 **自研预览**：`dev-tools/preview.py` 画的是我们**自己的布局模型**（与 `layout.py`
 同源），所以它**在构造上**看不见"渲染器与我们的模型不一致"这类问题，尤其是上面

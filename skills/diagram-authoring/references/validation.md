@@ -618,6 +618,17 @@ Excalidraw 会把容器撑高，布局随之偏移 —— 间隙保证也就不�
   **PNG 默认 0（贴边）、SVG 默认 10** —— 不显式传就会贴着边框。
 - `@excalidraw/utils` 0.1.4 起**只发 ESM、无 UMD**，且签名是 `{ data, config }`
   两段式（传错就是 `Cannot read properties of undefined (reading 'elements')`）。
+- **画布（固定宽高/比例）**：`config.width/height` **PNG 认、SVG 不认**（实测：
+  给 SVG 传 400×400 出的还是自然尺寸）。PNG 的语义是"内容**容纳缩放**、居中、
+  不足补背景色"—— 实测 400×400 + `padding:32` 对 200×100 的内容 → 内容 340×172
+  居中，边距 30（内容被缩放到"画布 − 2×padding"里）；`scale` 是**乘**在宽高上的
+  （400×400 + `scale:2` → 800×800）。所以 `--aspect 16:9` 这种请求在比例模式下
+  实测容纳系数正好是 1 —— 内容保持原大小、多出来的地方是底色（"只加白，不裁不拉"）。
+  SVG 那条得在 Python 端改根节点（`width`/`height`/`viewBox` + 背景板），改不动就报错。
+- **draw.io 的 `--width/--height`**：官方原生（"fits … preserves aspect ratio"）。
+  实测单边**精确**（1600 → 1600×925），两边都给是"**装进这个框**"
+  （1600×900 → 1559×900，绑定轴精确、另一边更小、不补底色）。`--aspect` 在这条路上
+  **做不到**：官方只有均匀 `-b`，而均匀加白只把比例推向 1:1 —— 工具直接拒绝并指路。
 
 **四、验证手段升级：** 新增 `dev-tools/export_excalidraw.py` —— 用**官方**
 `@excalidraw/utils` 的 `exportToBlob`/`exportToSvg` 在无头 Chrome 里出 PNG/SVG。

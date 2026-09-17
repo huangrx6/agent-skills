@@ -226,14 +226,15 @@ Page Planner 再映射（comparison → chart / two-column）。
 
 ## 31. Visual Requirement（落进 spec 就是 `visual`）
 
-每页写 `{"visual": {"kind": "none|evidence_image|diagram|data", "ratio": "3:2",
-"intent": "...", "note": "..."}}` —— **要图（`evidence_image`/`diagram`）时 `ratio` 必填**：
+每页写 `{"visual": {"kind": "none|evidence_image|data", "ratio": "3:2",
+"intent": "...", "note": "..."}}` —— **要图（`evidence_image`）与要图表（`data`）时 `ratio` 必填**：
 比例要明确写出来（`"3:2"` / `"4:3"` / `"1:1"` / `"16:9"`），槽位高度按它算，出图的人按它出
-—— 这四档就是流水线能交付的四种载体，也是 spec 里唯一承认的形状
+—— 这三档就是流水线能交付的三种载体，也是 spec 里唯一承认的形状
 （`validate_spec.py` 拦未知档与自相矛盾；`check.py` 点出没决定的页）。
 
 语义层可以想得更细（data / evidence_image / process / hierarchy / comparison /
-architecture / mood），但落到 spec 只有上面四档：结构与流程归 `diagram`，图表归 `data`，
+architecture / mood），但落到 spec 只有上面三档：**除了图表，凡是图都归 `evidence_image`**
+（照片、插画，以及结构图 / 流程图 —— 它们同样出图，只是提示词不同与比例不同），
 氛围归风格（`colorSet` / `decor` / 字体），**不单独设档** —— 多出来的档没有谁能交付它。
 
 ## 32. 什么时候必须有视觉

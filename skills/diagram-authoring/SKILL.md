@@ -173,6 +173,7 @@ Excalidraw 会自己重排文字这个限制、drawio 的形状映射与导出�
 ```sh
 python3 dev-tools/preview.py x.excalidraw out.png                        # 自研预览（需 PIL）
 python3 dev-tools/export_excalidraw.py x.excalidraw -o x.png --scale 2   # 官方导出（需 Chrome）
+#   要固定宽高或比例：--width 1600 --height 900 / --aspect 16:9（内容只缩不拉、不裁，补底色）
 ```
 
 官方导出走 Excalidraw 自己的 `exportToBlob` / `exportToSvg`，出的是真实渲染器画的图；

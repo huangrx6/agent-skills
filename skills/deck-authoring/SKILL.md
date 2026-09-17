@@ -84,14 +84,14 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
    - PNG 截图：`python3 scripts/shots.py out.html --out-dir pages/ --count N`
    - PPTX：观感 100% 用 `pptx_native.py --png-dir pages/ -o deck.pptx`；**对方要改字**用 `pptx_native.py out.html -o deck.pptx`（原生 shapes，字是真字）
    - 视频：`python3 scripts/animate.py out.html -o deck.mp4`（GIF：`-o deck.gif --width 960`，无需 ffmpeg；何时别用见 `references/animation.md`）。
-5. **素材**：逐页决定这页靠什么立住，写进 spec 的 `visual` 四档 —— 纯文字 `{"kind":"none"}`
-   （不必配图，但必须**决定过**）｜图表 `{"kind":"data"}`（chart 版式）｜结构图/流程图/拓扑/
-   架构 `{"kind":"diagram"}`（**excalidraw.com** 或 **draw.io** 画好导出 PNG 放进 deck 项目）｜
-   **图不由脚本手画**（SVG / PIL / 画布都不行 —— 图里出现卡片、分栏、页标题，那它本来就该是一页 spec）｜
-   两者的 `ratio` **必填**（如 `"3:2"` / `"1:1"`）—— 比例写下来才算定，槽位按它定高｜
-   照片/插画/主视觉 `{"kind":"evidence_image"}`（`--brief` 出**提示词** → 你出图 → 放回目录 →
-   `--check`）。`image` 只填文件名；**不用 SVG 手搓插图与流程图**（一眼假）—— SVG 只做风格的
-   装饰与几何。真实素材优先，细节见 `references/images.md`。
+5. **素材**：逐页决定这页靠什么立住，写进 spec 的 `visual` 三档 —— 纯文字 `{"kind":"none"}`
+   （不必配图，但必须**决定过**）｜图表 `{"kind":"data"}`（chart 版式）｜
+   照片/插画/主视觉/**结构图与流程图** `{"kind":"evidence_image"}`（`--brief` 出**提示词** →
+   你出图 → 放回目录 → `--check`）。
+   `evidence_image` 与 `data` 的 `ratio` **必填**（如 `"3:2"` / `"1:1"`）—— 比例写下来才算定，
+   槽位按它定高。**图不由脚本手画，也不在别的工具里手画**：结构图/流程图同样出图 —— 图生
+   模型按得住比例，手画很难控（画多大、导多宽都不好定）。`image` 只填文件名；SVG 只做
+   风格的装饰与几何。真实素材优先，细节见 `references/images.md`。
 
 ## 版式
 

@@ -76,8 +76,8 @@ class TestPageWiring(unittest.TestCase):
         self.assertIn("exportToBlob", page)
         self.assertIn("exportToSvg", page)
         self.assertIn("data: data", page, "0.1.5 是 { data, config } 两段式")
-        self.assertIn("config: { mimeType: \"image/png\", scale: __SCALE__, padding: __PADDING__ }",
-                      page, "PNG 的留白在 config.padding（实测：appState.exportPadding 被忽略）")
+        self.assertIn('var pngConfig = { mimeType: "image/png", scale: SCALE, padding: PAD }',
+                      page, "PNG 的倍率与留白都在 config（实测：appState 那两个都被忽略）")
         self.assertIn("exportScale = __SCALE__", page,
                       "SVG 的倍率在 appState.exportScale（实测）")
         self.assertIn("config: { padding: __PADDING__ }", page, "SVG 的留白也在 config.padding")
@@ -171,6 +171,108 @@ class TestBrowserDetection(unittest.TestCase):
         """探测失败只是"返回 None"，不能把调用方炸掉。"""
         got = X.find_browser(None)
         self.assertTrue(got is None or isinstance(got, str))
+
+
+class TestCanvasBox(unittest.TestCase):
+    """固定宽高 / 固定比例 —— 用户要的"导出图能控制宽高比，或者固定宽高"。
+
+    几何本身在页面里算（元素在那儿，实测 `getCommonBounds` 可用）；这里守的是
+    输入校验、SVG 画布手术、以及回执里的尺寸要是**量出来的**。
+    """
+
+    def test_aspect_parsing(self):
+        self.assertAlmostEqual(16 / 9, X.parse_aspect("16:9"))
+        self.assertAlmostEqual(4 / 3, X.parse_aspect(" 4 : 3 "))
+        self.assertAlmostEqual(1.0, X.parse_aspect("1:1"))
+        self.assertAlmostEqual(2.35, X.parse_aspect("2.35:1"))
+        self.assertIsNone(X.parse_aspect(None), "没给就不设画布")
+        self.assertIsNone(X.parse_aspect(""))
+
+    def test_aspect_refuses_what_it_cannot_read(self):
+        """看不懂就报错，不猜（同"未知 kind 不 fallback"）。"""
+        for bad in ("16", "16/9", "16:9:1", "a:b", "16:0", "0:9", "-1:1", "1000:1"):
+            with self.assertRaises(ValueError, msg=f"{bad!r} 应该被拒绝"):
+                X.parse_aspect(bad)
+
+    def test_box_validation(self):
+        got = X.parse_box("1600", "900", "16:9")
+        self.assertEqual({"width": 1600, "height": 900, "ratio": 16 / 9}, got)
+        self.assertTrue(X.box_is_requested(got))
+        self.assertFalse(X.box_is_requested(X.parse_box(None, None, None)),
+                         "什么都没要就不该动画布")
+        for bad in (("0", None), ("-5", None), ("abc", None), (None, "0")):
+            with self.assertRaises(ValueError, msg=f"{bad} 应该被拒绝"):
+                X.parse_box(bad[0], bad[1], None)
+
+    def test_png_size_is_measured_from_the_file(self):
+        """回执里的尺寸必须从产物里量 —— 自报一个算出来的数就是自欺。"""
+        import struct
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "x.png")
+            head = (b"\x89PNG\r\n\x1a\n" + struct.pack(">I", 13) + b"IHDR"
+                    + struct.pack(">II", 1600, 900) + b"\x08\x06\x00\x00\x00")
+            with open(path, "wb") as fh:
+                fh.write(head)
+            self.assertEqual((1600, 900), X._png_size(path))
+        with tempfile.TemporaryDirectory() as td:
+            other = os.path.join(td, "y.bin")
+            with open(other, "wb") as fh:
+                fh.write(b"not a png")
+            self.assertIsNone(X._png_size(other), "不是 PNG 就当量不到，不瞎猜")
+            self.assertIsNone(X._png_size(os.path.join(td, "不存在.png")))
+
+    def test_page_wiring_for_the_box(self):
+        """页面那几行是唯一接口：宽高要进 PNG 的 config（官方就认那个）。"""
+        page = X._inject_scene(X.PAGE_TEMPLATE, SCENE, 2, 32,
+                               {"width": 1600, "height": 900, "ratio": None})
+        self.assertIn("config: pngConfig", page)
+        self.assertIn("pngConfig.width = bw / SCALE", page)
+        self.assertIn("utils.getCommonBounds", page, "几何得拿官方 API 量")
+        self.assertIn('"width": 1600', page, "box 要注入到页面里")
+        # 没要画布时也得给页面一个合法的空对象（不能留占位符）
+        plain = X._inject_scene(X.PAGE_TEMPLATE, SCENE, 2, 32)
+        self.assertNotIn("__BOX__", plain)
+
+    def test_svg_canvas_is_patched(self):
+        """官方 SVG **忽略** config.width/height（实测）—— 画布只能自己改。"""
+        svg = ('<svg version="1.1" viewBox="0 0 264 164" width="264" height="164">'
+               '<metadata/><rect x="0" y="0" width="264" height="164" fill="#FBFAF2"/>'
+               '</svg>')
+        out = X.patch_svg_canvas(svg, {"width": 400.0, "height": 400.0,
+                                       "box_units_w": 400.0, "box_units_h": 400.0,
+                                       "center": [110.0, 70.0], "fit": 1.0})
+        self.assertIn('width="400"', out)
+        self.assertIn('height="400"', out)
+        self.assertIn('viewBox="-90 -130 400 400"', out, "按内容中心居中")
+        # 背景板要跟着长大，否则扩出来的地方是透明的，和 PNG 那条路对不上
+        self.assertIn('<rect x="-90" y="-130" width="400" height="400" fill="#FBFAF2"/>', out)
+
+    def test_svg_patch_refuses_a_structure_it_cannot_read(self):
+        """官方包换了 SVG 结构 → 宁可报错，也不要默默给一张比例不对的图。"""
+        for broken in ('<svg viewBox="0 0 10 10"/>',
+                       '<svg width="10" height="10"><rect/></svg>'):
+            with self.assertRaises(ValueError, msg=broken):
+                X.patch_svg_canvas(broken, {"width": 4, "height": 4, "box_units_w": 4,
+                                            "box_units_h": 4, "center": [5, 5], "fit": 1})
+
+    def test_svg_patch_refuses_non_numeric_geometry(self):
+        svg = ('<svg viewBox="0 0 264 164" width="264" height="164">'
+               '<rect x="0" y="0" width="264" height="164" fill="#fff"/></svg>')
+        with self.assertRaises(ValueError):
+            X.patch_svg_canvas(svg, {"width": "四百", "height": 400, "box_units_w": 400,
+                                     "box_units_h": 400, "center": [1, 1], "fit": 1})
+
+    def test_bad_canvas_input_goes_into_a_receipt(self):
+        """坏输入在开浏览器之前就该被拦住，且走回执而不是抛异常。"""
+        with tempfile.TemporaryDirectory() as td:
+            scene_path = os.path.join(td, "s.excalidraw")
+            with open(scene_path, "w", encoding="utf-8") as fh:
+                json.dump(SCENE, fh)
+            for kw in ({"aspect": "16/9"}, {"width": "0"}, {"width": "宽"},
+                       {"scale": 0}):
+                got = X.export(scene_path, None, None, **kw)
+                self.assertFalse(got["ok"], kw)
+                self.assertEqual("input", got["stage"], kw)
 
 
 if __name__ == "__main__":

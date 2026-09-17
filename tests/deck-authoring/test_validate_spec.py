@@ -247,7 +247,7 @@ class TestVisualCarrier(unittest.TestCase):
     def _codes(self, slide: dict) -> set[str]:
         return {i["code"] for i in vs.validate(self._spec(slide), None).errors}
 
-    def test_four_kinds_are_accepted(self) -> None:
+    def test_three_kinds_are_accepted(self) -> None:
         slides = [
             {"type": "content-text", "title": "t", "bullets": ["a"],
              "visual": {"kind": "none", "note": "三条结论靠文字立住"}},
@@ -256,8 +256,6 @@ class TestVisualCarrier(unittest.TestCase):
              "visual": {"kind": "data", "intent": "对比"}},
             {"type": "content-image", "title": "t", "image": "a.png",
              "visual": {"kind": "evidence_image"}},
-            {"type": "content-image", "title": "t", "image": "a.png",
-             "visual": {"kind": "diagram"}},
         ]
         for slide in slides:
             codes = self._codes(slide)
@@ -269,8 +267,6 @@ class TestVisualCarrier(unittest.TestCase):
         cases = [
             ({"type": "content-text", "title": "t", "bullets": ["a"],
               "visual": {"kind": "evidence_image"}}, "BAD_VISUAL"),
-            ({"type": "content-text", "title": "t", "bullets": ["a"],
-              "visual": {"kind": "diagram"}}, "BAD_VISUAL"),
             ({"type": "content-text", "title": "t", "bullets": ["a"],
               "visual": {"kind": "data"}}, "BAD_VISUAL"),
             ({"type": "content-image", "title": "t", "image": "a.png",
@@ -370,7 +366,6 @@ class TestVisualRatio(unittest.TestCase):
 
     def test_ratio_is_required_when_an_image_is_declared(self) -> None:
         self.assertIn("MISSING_RATIO", self._codes({"kind": "evidence_image"}))
-        self.assertIn("MISSING_RATIO", self._codes({"kind": "diagram"}))
 
     def test_common_ratios_are_accepted(self) -> None:
         for ratio in ("3:2", "4:3", "1:1", "16:9", "2:1"):

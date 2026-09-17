@@ -167,6 +167,7 @@ python3 dev-tools/export_drawio.py x.drawio -o x.png --scale 2      # PNG 1778×
 python3 dev-tools/export_drawio.py x.drawio -o x.svg --format svg   # 矢量
 python3 dev-tools/export_drawio.py x.drawio -o x.pdf --format pdf --crop
 python3 dev-tools/export_drawio.py x.drawio -o x.png --border 48 --embed
+python3 dev-tools/export_drawio.py x.drawio -o x.png --width 1600        # 固定宽（官方原生）
 ```
 
 实测出来的四条事实（都按 `draw.io --help` 的官方说明核对过）：
@@ -176,6 +177,8 @@ python3 dev-tools/export_drawio.py x.drawio -o x.png --border 48 --embed
 | 出图正确 | 标题 / 节点 / 带标签箭头 / 圆柱 / 卡片的粗体与项目符号全部正常，`-s 2` 真的按 2 倍出 |
 | **`--crop` 只对 PDF 有效** | 官方原话是 "crops PDF to diagram size"。图片的裁切默认就是按内容来（`--size diagram`），对 PNG 传 `--crop` 是**静默无效**（实测：产物与不加时**字节完全相同**）。工具遇到这种组合直接报错 |
 | **`-t` 透明常常看不出效果** | `-t` 本身有效（SVG 里确实成了 `background: transparent`），但**去不掉图里那块底色** —— 我们 emit 时刻意写了 `background="…"`（不写底色导出不稳定）。工具会在回执里提示这件事 |
+| **`--width/--height` 是官方开关** | 官方原话 "fits … into the specified width/height, **preserves aspect ratio**"。实测（scale 2）：只给宽度 → **精确等于**给定值（1600 → 1600×925）；只给高度 → 精确；**两边都给 = 装进这个框** —— 绑定轴精确、另一边更小（1600×900 → 1559×900），**不会**补底色到满框。工具把量到的尺寸与要求不一致时写进回执（不静默给你一张对不上的图） |
+| **`--aspect` 在这里做不到** | 官方只有**均匀**的 `-b`，而均匀加白只会把比例推向 1:1（实测 1644×950 的内容想变 16:9 需要"只加高"）。工具直接拒绝并指路：固定比例走 `export_excalidraw.py --aspect`，或在这条路上固定一边 |
 | **`-b N` 每边只加 0.75×N** | 实测 16→12、32→24、64→48（72dpi/96dpi 换算）。工具的 `--border` 已经替用户换算过，写 48 就是每边 48 图内单位 |
 | **`-b` 官方分得不均，看最紧的一边** | 总量对（每轴 +2B 图内单位），落地是左/上 ≈1.31×B、右/下 ≈0.69×B（实测 `--border 16/32/64` 的右/下只有 11.5/22/43.5）。所以工具默认 **48** —— 最紧一边 ≈33 图内单位，比图内节点自己的内边距（22~24）还松一点 |
 

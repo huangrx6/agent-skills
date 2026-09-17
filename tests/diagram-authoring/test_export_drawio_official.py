@@ -128,6 +128,101 @@ class TestDefaultBorder(unittest.TestCase):
                          "命令行里的 -b 应当是对默认留白换算后的值")
 
 
+class TestFixedSize(unittest.TestCase):
+    """固定宽高：官方 `--width/--height` 原生支持（实测：单边精确、两边=装进框）。
+
+    `--aspect` 在这个后端**故意拒绝** —— 官方只有均匀的 -b，均匀加白只能把比例
+    推向 1:1。与其给个对不上的数，不如说清楚并指路。
+    """
+
+    def test_width_height_go_on_the_command_line(self):
+        cmd = D.build_command("/x/draw.io", "in.drawio", "out.png", "png", 2.0,
+                              width=1600, height=900)
+        self.assertEqual("1600", cmd[cmd.index("--width") + 1])
+        self.assertEqual("900", cmd[cmd.index("--height") + 1])
+
+    def test_only_the_given_side_is_written(self):
+        """只给一边就只传一边 —— 另一边由官方按内容比例算。"""
+        cmd = D.build_command("/x/draw.io", "in.drawio", "out.png", "png", 2.0,
+                              width=1600)
+        self.assertIn("--width", cmd)
+        self.assertNotIn("--height", cmd)
+
+    def test_bad_sizes_are_refused_not_guessed(self):
+        with tempfile.TemporaryDirectory() as td:
+            src = os.path.join(td, "x.drawio")
+            with open(src, "w", encoding="utf-8") as fh:
+                fh.write("<mxfile/>")
+            for kw in ({"width": 0}, {"width": -3}, {"width": "宽"},
+                       {"height": "0"}, {"aspect": "16:9"}, {"aspect": "16/9"}):
+                got = D.export(src, os.path.join(td, "x.png"), fmt="png", **kw)
+                self.assertFalse(got["ok"], kw)
+                self.assertEqual("input", got["stage"], kw)
+
+    def test_aspect_refusal_explains_the_reason_and_the_way_out(self):
+        with tempfile.TemporaryDirectory() as td:
+            src = os.path.join(td, "x.drawio")
+            with open(src, "w", encoding="utf-8") as fh:
+                fh.write("<mxfile/>")
+            got = D.export(src, os.path.join(td, "x.png"), fmt="png", aspect="16:9")
+        self.assertFalse(got["ok"])
+        self.assertIn("均匀", got["message"], "要说清为什么做不到")
+        self.assertIn("export_excalidraw.py", got["message"], "要给能走的那条路")
+
+    def test_library_default_border_matches_the_cli(self):
+        """库调用不该比命令行更容易出贴边图（默认留白只有一处来源）。"""
+        import inspect
+        self.assertEqual(D.DEFAULT_BORDER,
+                         inspect.signature(D.export).parameters["border"].default)
+
+    def test_image_size_is_measured_from_the_file(self):
+        import struct
+        with tempfile.TemporaryDirectory() as td:
+            png = os.path.join(td, "x.png")
+            with open(png, "wb") as fh:
+                fh.write(b"\x89PNG\r\n\x1a\n" + struct.pack(">I", 13) + b"IHDR"
+                         + struct.pack(">II", 1559, 900) + b"\x08\x06\x00\x00\x00")
+            self.assertEqual((1559, 900), D._image_size(png))
+            jpg = os.path.join(td, "x.jpg")
+            with open(jpg, "wb") as fh:
+                fh.write(b"\xff\xd8\xff\xc0" + struct.pack(">H", 17) + b"\x08"
+                         + struct.pack(">HH", 725, 1280) + b"\x03")
+            self.assertEqual((1280, 725), D._image_size(jpg))
+            junk = os.path.join(td, "x.bin")
+            with open(junk, "wb") as fh:
+                fh.write(b"???")
+            self.assertIsNone(D._image_size(junk))
+
+    def test_requested_size_that_the_official_did_not_honour_is_reported(self):
+        """实测：`--width X --height Y` 是“装进这个框”，绑定轴精确、另一边更小。
+
+        用户看到的是“我要 1600×900，出来 1559×900” —— 这种事必须进回执。
+        """
+        import struct
+        from types import SimpleNamespace
+
+        with tempfile.TemporaryDirectory() as td:
+            src = os.path.join(td, "x.drawio")
+            with open(src, "w", encoding="utf-8") as fh:
+                fh.write("<mxfile/>")
+            out = os.path.join(td, "x.png")
+
+            def fake_run(cmd, **kwargs):
+                with open(out, "wb") as fh:
+                    fh.write(b"\x89PNG\r\n\x1a\n" + struct.pack(">I", 13) + b"IHDR"
+                             + struct.pack(">II", 1559, 900) + b"\x08\x06\x00\x00\x00")
+                return SimpleNamespace(returncode=0, stdout="exported", stderr="")
+
+            real_run = D.subprocess.run
+            setattr(D.subprocess, "run", fake_run)
+            self.addCleanup(setattr, D.subprocess, "run", real_run)
+            got = D.export(src, out, fmt="png", binary=sys.executable,
+                           width=1600, height=900)
+        self.assertTrue(got["ok"], got.get("message"))
+        self.assertEqual({"width": 1559, "height": 900}, got["size"])
+        self.assertIn("--width 1600", got.get("note", ""), "差的那一边要说出来")
+
+
 class TestReceipts(unittest.TestCase):
     """失败一律进回执；没装 draw.io 时必须说清"环境不具备"而不是别的。"""
 

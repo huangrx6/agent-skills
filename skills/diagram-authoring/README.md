@@ -89,8 +89,8 @@ $ python3 scripts/emit_drawio.py ../../tests/diagram-authoring/fixtures/specs/01
 | 挑主题方向 | `direction_preview.py` | **用户没指定风格时**出图前跑它，5 个方向并排给人挑 |
 | 在官网接着画 | `open_excalidraw_com.py x.excalidraw` | 起一个只服务单文件、只允许 excalidraw.com 的本地服务，用 `#url=` 导入官网画布（已实测：23 个元素全进画布、可直接接着改） |
 | 目视复核（自研预览） | `dev-tools/preview.py x.excalidraw out.png` | **需要 PIL**；画的是我们自己的布局模型，看不见渲染器差异 |
-| 真实渲染（官方导出） | `dev-tools/export_excalidraw.py x.excalidraw -o x.png --svg x.svg --scale 2` | **需要 Chrome**；走 Excalidraw 官方 `exportToBlob`/`exportToSvg`，出的是**渲染器自己画**的 PNG/SVG |
-| drawio 导出（官方 CLI） | `dev-tools/export_drawio.py x.drawio -o x.png --scale 2 [--border 48] [--embed]` | **需要 draw.io 桌面版**；**已实测**（31.4.5，macOS）：PNG/SVG/PDF 都对。默认留白 48 图内单位（官方默认 0 会贴边，且官方把 border 分得不均）；`--crop` 只对 PDF 有效、`-t` 被文件自带的底色挡住 —— 这几种"看着成功其实没生效"的组合会被工具**明确报出**，不静默 |
+| 真实渲染（官方导出） | `dev-tools/export_excalidraw.py x.excalidraw -o x.png --svg x.svg --scale 2 [--width 1600 --height 900 \| --aspect 16:9]` | **需要 Chrome**；走 Excalidraw 官方 `exportToBlob`/`exportToSvg`，出的是**渲染器自己画**的 PNG/SVG。**可固定宽高或比例**：内容只缩不拉、不裁，不足的边补底色（实测 `config.width/height` 官方原生支持） |
+| drawio 导出（官方 CLI） | `dev-tools/export_drawio.py x.drawio -o x.png --scale 2 [--border 48] [--embed] [--width 1600]` | **需要 draw.io 桌面版**；**已实测**（31.4.5，macOS）：PNG/SVG/PDF 都对。默认留白 48 图内单位（官方默认 0 会贴边，且官方把 border 分得不均）；**可固定一边**（`--width`/`--height`，官方原生）；`--aspect` 在这条路上做不到（官方只有均匀留白会推比例），工具明确拒绝并指路；`--crop` 只对 PDF 有效、`-t` 被文件自带的底色挡住 —— 这些"看着成功其实没生效"的组合会被工具**明确报出**，不静默 |
 
 **两个后端怎么选**：要标准图元（云/K8s/UML/BPMN/泳道）或要导出 PNG/PDF/SVG → draw.io；
 其余（默认）→ Excalidraw。拿不准就问「给谁看、要不要导出成图片」。细节见

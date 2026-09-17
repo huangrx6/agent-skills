@@ -51,11 +51,11 @@ CHART_TYPES = ("bar", "bar-horizontal", "line", "area", "bar-stacked",
 ROLES = ("cover", "transition", "statement", "breakdown", "evidence", "metric", "trend", "composition",
          "comparison", "process", "capabilities", "architecture", "flow", "topology", "hero_visual", "context_image",
          "risks", "actions", "result", "observation", "team", "closing")
-VISUAL_KINDS = ("none", "evidence_image", "diagram", "data")
+VISUAL_KINDS = ("none", "evidence_image", "data")
 VISUAL_KEYS = {"kind", "intent", "note", "ratio"}
 # 比例的合理区间（宽/高）。超出就是写错了（把像素当比例、或写了 1:0 这种）。
 RATIO_RANGE = (0.4, 2.6)
-VISUAL_IMAGE_KINDS = ("evidence_image", "diagram")
+VISUAL_IMAGE_KINDS = ("evidence_image",)
 
 # `notes`（讲稿）**每一种版式都能写** —— 它是给人看的，不影响排版：
 # 它不发任何元素（所以不进清单、不进测量），只随产物走一份 JSON，由演示台读。

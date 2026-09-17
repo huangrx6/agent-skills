@@ -273,7 +273,7 @@ styles/<name>/
 | `.bullets`、`.bullets.small`（卡片与 hero 里的列表） | 条目列表，标记由 `.bullets li::before` 画 |
 | `.col` / `.colTitle` | 双栏的一栏 / 栏标题 |
 | `.tl`、`.tl .label`、`.tl .note` | 时间线 / 节点标题 / 节点说明 |
-| `.imgwrap`（`data-fit` 为 `contain` 或 `cover`）/ `.chartwrap` | 图槽 / 图表槽 |
+| `.imgwrap`（图槽；皮肤可覆盖 `object-fit` 与 `aspect-ratio`）/ `.chartwrap` | 图槽 / 图表槽 |
 | `.chartcap` / `.foot` / `.band` | 图注 / 页脚 / 栏顶色条 |
 | 风格专属零件（`.grain`、`.halftone`…） | 自己加的，自己负责 |
 
