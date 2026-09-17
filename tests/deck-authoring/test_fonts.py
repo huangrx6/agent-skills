@@ -29,10 +29,10 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
-# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
-# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+# 测试自有夹具：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（每份 deck 长得一样）。
 FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
-# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 夹具当"额外风格根"：工具链不内置任何风格（可拷贝的模板必然变成
 # 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
 os.environ.setdefault("DECK_STYLES",
                       os.path.join(FIXTURES_DIR, "styles"))
@@ -63,8 +63,8 @@ class TestCatalog(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.cat = json.loads(open(os.path.join(SKILL, "fonts", "catalog.json"),
-                                  encoding="utf-8").read())
+        with open(os.path.join(SKILL, "fonts", "catalog.json"), encoding="utf-8") as fh:
+            cls.cat = json.load(fh)
         cls.fonts = cls.cat["fonts"]
 
     def test_126_fonts_in_six_categories(self) -> None:
@@ -110,14 +110,13 @@ class TestMapping(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.map = json.loads(open(os.path.join(SKILL, "fonts", "mapping.json"),
-                                  encoding="utf-8").read())
+        with open(os.path.join(SKILL, "fonts", "mapping.json"), encoding="utf-8") as fh:
+            cls.map = json.load(fh)
         cls.names = [f["name"] for f in fonts.catalog()]
 
     def test_a_only_covers_every_personality(self) -> None:
         """A 档子表必须覆盖全部字感性格 —— 缺一个，"没有 license"的用户就在那个
-        性格上无路可走。（v5：styles 层从风格名改成字感性格，按名查的表实测
-        变成了菜单。）"""
+        性格上无路可走（styles 层按字感性格查；按风格名查会变成一份菜单）。"""
         self.assertEqual(set(self.map["a_only"]["styles"]),
                          set(self.map["styles"]))
 
@@ -228,9 +227,9 @@ class TestFaceCss(unittest.TestCase):
     def test_emits_for_the_real_family_name_too(self) -> None:
         """手写 style.json 的人很自然会写字体自己的字族名，不是清单名。
 
-        **回归**：第一版只查拉丁记号，于是写中文清单名（`霞鹜文楷`）的用法全落空 ——
-        而且归一化只留 `[a-z0-9]`，中文名归一化后是空串，永远匹配不上。
-        实测：display 用得意黑、body 用霞鹜文楷的风格，只注入了前者。
+        两个坑都要挡住：只查拉丁记号会漏掉中文清单名（`霞鹜文楷`）；而归一化
+        只留 `[a-z0-9]` 时，中文名归一化后是空串 —— 永远匹配不上
+        （display 用得意黑、body 用霞鹜文楷的风格就只注入了前者）。
         """
         entry = self._local_entry()
         path = fonts._local_path_for(entry)
@@ -279,7 +278,8 @@ class TestRenderIntegration(unittest.TestCase):
         shutil.copytree(os.path.join(FIXTURES_DIR, "styles", "swiss-grid"), self.style_dir)
         self.addCleanup(shutil.rmtree, self.style_dir, True)
         path = os.path.join(self.style_dir, "style.json")
-        payload = json.loads(open(path, encoding="utf-8").read())
+        with open(path, encoding="utf-8") as fh:
+            payload = json.load(fh)
         payload["label"] = "字体接线测试"
         payload["fonts"]["display"] = f"{self.font_name}, sans-serif"
         with open(path, "w", encoding="utf-8") as fh:
@@ -311,18 +311,18 @@ class TestFreeOnly(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.cat = json.loads(open(os.path.join(SKILL, "fonts", "catalog.json"),
-                                  encoding="utf-8").read())
-        cls.map = json.loads(open(os.path.join(SKILL, "fonts", "mapping.json"),
-                                  encoding="utf-8").read())
+        with open(os.path.join(SKILL, "fonts", "catalog.json"), encoding="utf-8") as fh:
+            cls.cat = json.load(fh)
+        with open(os.path.join(SKILL, "fonts", "mapping.json"), encoding="utf-8") as fh:
+            cls.map = json.load(fh)
         cls.license = {f["name"]: f["license"] for f in cls.cat["fonts"]}
 
     def test_tier_a_is_strict_not_prefix(self) -> None:
-        """**回归**：`"A/B"` 在选 A 时不算通过。
+        """`"A/B"` 在选 A 时不算通过。
 
-        原先写的是 `license.startswith(tier)` —— 于是 `A/B` 一路放过去。而 B 意味着
-        署名 / 地区 / 禁商标 / **禁嵌入**等限制；把字体嵌进交付物属于再分发，
-        对没有 license 的人来说含糊等于不能用。
+        B 意味着署名 / 地区 / 禁商标 / **禁嵌入**等限制；把字体嵌进交付物属于
+        再分发，对没有 license 的人来说含糊等于不能用。所以判据是**整串允许**，
+        不是前缀匹配（前缀匹配会把 `A/B` 一路放过去）。
         """
         self.assertFalse(fonts.tier_matches("A/B", "A"))
         self.assertFalse(fonts.tier_matches("B", "A"))
@@ -366,7 +366,6 @@ class TestFreeOnly(unittest.TestCase):
 
     def test_a_only_does_not_reuse_the_questionable_picks(self) -> None:
         """主映射里那些 B / A/B 的推荐，不许原样出现在纯 A 方案里。"""
-        risky = {n for n, code in self.license.items() if code != "A"}
         for style, roles in self.map["a_only"]["styles"].items():
             for role, pick in roles.items():
                 for cand in pick.split("/"):
@@ -407,9 +406,10 @@ class TestFontCacheLocation(unittest.TestCase):
             os.environ["DECK_FONT_DIR"] = self._saved
 
     def test_env_var_wins(self) -> None:
-        os.environ["DECK_FONT_DIR"] = "/tmp/somewhere-fonts"
-        self.assertEqual(fonts.cache_dir(), "/tmp/somewhere-fonts")
-        self.assertEqual(fonts.cache_dir(temp=True), "/tmp/somewhere-fonts")
+        fake = os.path.join(tempfile.gettempdir(), "somewhere-fonts")
+        os.environ["DECK_FONT_DIR"] = fake
+        self.assertEqual(fonts.cache_dir(), fake)
+        self.assertEqual(fonts.cache_dir(temp=True), fake)
 
     def test_default_is_user_level_not_skill(self) -> None:
         d = fonts.cache_dir()
@@ -418,17 +418,15 @@ class TestFontCacheLocation(unittest.TestCase):
         self.assertIn(".config", d)
 
     def test_temp_stays_outside_the_skill_too(self) -> None:
-        import tempfile
-
         d = fonts.cache_dir(temp=True)
         self.assertTrue(d.startswith(tempfile.gettempdir()), d)
         self.assertNotIn(SKILL, d)
 
     def test_write_target_is_never_the_skill_dir(self) -> None:
-        """**回归**：`--fetch` 不许往 skill 目录写。
+        """`--fetch` 不许往 skill 目录写。
 
-        第一版就是写 `fonts/ttf/` —— 于是 skill 目录里长出 43MB 二进制。现在
-        那个旧目录只当**只读兜底**（已经下过的人不用重下）。
+        缓存落**用户级**目录（`fonts.cache_dir()`）；skill 里的 `fonts/ttf/` 只当
+        **只读兜底** —— 已经下过的人不用重下。往 skill 写就是往发布物里塞二进制。
         """
         for temp in (False, True):
             with self.subTest(temp=temp):
@@ -441,19 +439,19 @@ class TestFontCacheLocation(unittest.TestCase):
 
 
 class TestStylesUseFreeArtFonts(unittest.TestCase):
-    """8 套风格的字栈必须真的以**纯 A** 艺术字打头（用户要求"按纯 A"）。
+    """夹具风格的字栈必须真的以**纯 A** 艺术字打头。
 
-    而且**没下载字体时的行为与从前一致** —— 艺术字后面跟着原来的系统栈，
-    所以不下载的人观感不变。这两件事都要成立。
+    而且**没下载字体时观感不变** —— 艺术字后面跟着系统栈，不下载也能用。
+    这两件事都要成立。
     """
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.map = json.loads(open(os.path.join(SKILL, "fonts", "mapping.json"),
-                                  encoding="utf-8").read())
-        cls.license = {f["name"]: f["license"]
-                       for f in json.loads(open(os.path.join(SKILL, "fonts", "catalog.json"),
-                                                encoding="utf-8").read())["fonts"]}
+        with open(os.path.join(SKILL, "fonts", "mapping.json"), encoding="utf-8") as fh:
+            cls.map = json.load(fh)
+        with open(os.path.join(SKILL, "fonts", "catalog.json"), encoding="utf-8") as fh:
+            catalog = json.load(fh)
+        cls.license = {f["name"]: f["license"] for f in catalog["fonts"]}
         cls.cat_fonts = list(cls.license)
 
     def _styles(self):
@@ -479,8 +477,8 @@ class TestStylesUseFreeArtFonts(unittest.TestCase):
                                      f"{style}.{slot} 打头的是 {head!r}"
                                      f"（{owner['license']}）")
 
-    def test_the_original_system_stack_is_still_there(self) -> None:
-        """不下载字体时的观感必须与从前一致 —— 所以系统栈不能被艺术字顶掉。"""
+    def test_the_system_stack_is_still_there(self) -> None:
+        """不下载字体时的观感靠系统栈 —— 所以艺术字不能把回退顶掉。"""
         for style in self._styles():
             for slot in ("display", "body"):
                 stack = self._stack(style, slot)
@@ -495,21 +493,22 @@ class TestStylesUseFreeArtFonts(unittest.TestCase):
                         f"{style}.{slot} 末尾没有系统回退：{stack}")
 
     def test_no_duplicate_entries_in_a_stack(self) -> None:
-        """**回归**：迁移脚本给 terminal 加前缀时留下了 `Menlo, Menlo` ——
-        因为幂等判断只看第一项。重复项无害但说明脚本是盲写的。"""
+        """字栈里不许有重复项（`Menlo, Menlo` 那种）。
+
+        重复项本身无害，但它说明“加前缀”那一步没做幂等判断（只看第一项）——
+        这一次侥幸无害，下一次同样的盲写就可能把真字体顶掉。
+        """
         for style in self._styles():
             for slot in ("display", "body"):
                 stack = self._stack(style, slot)
                 with self.subTest(style=style, slot=slot):
                     self.assertEqual(len(stack), len(set(stack)), f"有重复：{stack}")
 
-    def test_terminal_stays_monospaced(self) -> None:
-        """**回归**：terminal 的整套立论是**等宽**，而迁移脚本一度把
-        `霞鹜文楷`（比例字体！）塞到了 `Menlo` 前面 —— 列对齐会立刻散掉。
+    def test_mono_personality_stays_monospaced(self) -> None:
+        """`mono-engineering` 这套字栈的立论是**等宽** —— 列对齐靠它。
 
-        正确的前缀是**等宽变体** `LXGW WenKai Mono`。内置风格已删、映射表也已从
-        风格名改成**字感性格**，这套等宽字栈现在挂在 `mono-engineering` 性格下，
-        守护跟着搬过去继续。
+        所以前缀必须是等宽变体 `LXGW WenKai Mono`，不能是比例字体 `霞鹜文楷`：
+        混进比例字体，等宽栏会立刻散掉。
         """
         row = self.map["styles"]["mono-engineering"]["roles"]
         for slot in ("display", "body"):

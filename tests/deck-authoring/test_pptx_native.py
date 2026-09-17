@@ -33,10 +33,10 @@ import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
-# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
-# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+# 测试自有夹具：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（每份 deck 长得一样）。
 FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
-# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 夹具当"额外风格根"：工具链不内置任何风格（可拷贝的模板必然变成
 # 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
 os.environ.setdefault("DECK_STYLES",
                       os.path.join(FIXTURES_DIR, "styles"))
@@ -100,8 +100,8 @@ def _chart_xmls(pptx_path: str) -> dict[str, str]:
 def _style_names() -> list[str]:
     """所有风格 —— **读目录，不写死名单**。
 
-    写死名单的代价是实测过的：加了四套新风格之后，那份写死的名单让它们全部逃过了
-    运动 / 装饰 / 版式表三条检查 —— 而测试是绿的。目录才是唯一事实来源。
+    写死的名单会让新加的风格**整批逃过**运动 / 装饰 / 版式表这些检查，
+    而测试仍然是绿的。目录才是唯一事实来源。
     """
     return sorted(d for d in os.listdir(STYLES) if os.path.isdir(os.path.join(STYLES, d)))
 
@@ -220,9 +220,8 @@ class TestPptxNative(unittest.TestCase):
         XML 里 `<a:pattFill>` 光秃秃，渲染出来是个空圈（实测踩过）。若哪天有风格
         重新用上 halftone-circle，这条会把它拉回来。
         """
-        # 内置风格已删（styles/ 移除），夹具 swiss 不声明装饰 —— 前提改为
-        # **构造**声明装饰的风格：这条守的是"declared ⊆ DECOR_SHAPES"的映射
-        # 完整性，不依赖哪套具体风格恰好用了装饰。
+        # 夹具风格不声明装饰 —— 所以**构造**一份声明了的：这条守的是
+        # "declared ⊆ DECOR_SHAPES" 的映射完整性，不依赖哪套具体风格恰好用了装饰。
         declared = set()
         for name in _style_names():
             spec = self.render.load_style(name)["tokens"].get("decor") or {}
@@ -265,9 +264,8 @@ class TestPptxNative(unittest.TestCase):
     def test_halftone_decor_exports_with_a_real_pattern(self) -> None:
         """网点圆（halftone-circle）导出时 `<a:pattFill>` **必须带 prst**。
 
-        现在没有发布的风格用网点圆（risograph 那套已删），所以这条得**自己造一份**
-        token 去驱那个分支 —— 不然它就是个空跑的用例，而空跑的用例比没有更糟：
-        它让人以为有人看着。
+        发布物里的风格不声明网点圆，所以这条得**自己造一份** token 去驱那个分支 ——
+        不然它就是个空跑的用例，而空跑的用例比没有更糟：它让人以为有人看着。
 
         为什么盯这一条：python-pptx 的属性名写错（`pattern_type` 而不是 `pattern`）
         会被当成普通属性默默吞掉，XML 里 `<a:pattFill>` 光秃秃没有 prst，

@@ -3,17 +3,12 @@
 
 ## 为什么这条要写成测试
 
-我第一版 SKILL.md 的版式表把 `chart` 的「装饰墨块」写成 ✗，而 render.py 里
-`chart` 是**在**加墨块的那一组的：
+表格是**给模型看的规格** —— 它写错，模型拿到的就是错的版式语义。七行里错一行，
+肉眼扫过去发现不了；而"装饰落在哪几种版式上"这件事本来是**风格**的属性
+（token 的 `decor.types`），写进文档很容易变成一个过期的前提。
 
-    if kind in ("title", "content-text", "end", "chart"):
-        out.append(halftone(tokens, seed, i))
-
-七行里错一行，肉眼扫过去发现不了 —— 而模型读 SKILL.md 得到的是错的版式语义
-（会以为图表页不该有页角墨块）。表格是**给模型看的规格**，它写错就是规格错。
-
-所以这里把「装饰墨块」那一列**钉在实测行为上**：逐版式渲染一页，看产物里
-到底有没有 `data-zone=`。文档与代码任何一边漂了，这条就红。
+所以这里把表**钉在实测行为上**：逐版式渲染一页，看产物里到底有没有 `data-zone=`，
+再把布局列与渲染器的能力清单逐字比对。文档与代码任何一边漂了，这条就红。
 
 跑法：
     python3 -m unittest discover -s tests -v
@@ -30,10 +25,10 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
-# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
-# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+# 测试自有夹具：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（每份 deck 长得一样）。
 FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
-# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 夹具当"额外风格根"：工具链不内置任何风格（可拷贝的模板必然变成
 # 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
 os.environ.setdefault("DECK_STYLES",
                       os.path.join(FIXTURES_DIR, "styles"))
@@ -93,8 +88,8 @@ SECTION = re.compile(r'<section class="slide"[^>]*>(.*?)</section>', re.S)
 def _style_names() -> list[str]:
     """所有风格 —— **读目录，不写死名单**。
 
-    写死名单的代价是实测过的：加了四套新风格之后，那份写死的名单让它们全部逃过了
-    运动 / 装饰 / 版式表三条检查 —— 而测试是绿的。目录才是唯一事实来源。
+    写死的名单会让新加的风格**整批逃过**运动 / 装饰 / 版式表这些检查，
+    而测试仍然是绿的。目录才是唯一事实来源。
     """
     return sorted(d for d in os.listdir(STYLES) if os.path.isdir(os.path.join(STYLES, d)))
 
@@ -193,11 +188,11 @@ class TestSkillMdMatchesRender(unittest.TestCase):
     def test_unknown_slide_type_is_rejected(self) -> None:
         """版式集是封闭的 —— 未知 type 必须被拒，而不是静默渲成空白页。
 
-        ⚠️ colorSet 要用**当前默认风格里真实存在**的名字：以前写死 "vivid"，
+        ⚠️ colorSet 要用**当前默认风格里真实存在**的名字：写死一个色板名，
         默认风格一换它就开始因为 colorSet 而报错 —— 用例还是绿的，
         但测的已经不是“版式被拒”了。
         """
-        # v4：deck.style 必填 —— 这份合成 spec 也要写上，否则报的会是"缺风格"
+        # deck.style 必填 —— 这份合成 spec 也要写上，否则报的会是"缺风格"
         bad = {"deck": {"style": "swiss-grid", "colorSet": self.color_set, "seed": 1,
                         "title": "x",
                         "slides": [{"type": "not-a-real-type", "title": "x"}]}}

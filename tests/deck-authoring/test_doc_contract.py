@@ -86,7 +86,7 @@ class TestRolesDoc(unittest.TestCase):
                          "表里的角色名与顺序都要跟注册表一致（顺序也是信息）")
 
     def test_visual_column_comes_from_the_registry(self) -> None:
-        """主视觉档以前只写在文档里 —— 现在它也在注册表里，两边必须同源。"""
+        """主视觉档在注册表里（`roles.py`），文档那一列必须与它同源。"""
         for role, spec in self.roles.ROLES.items():
             self.assertIn("visual", spec, f"{role} 缺 visual（推荐主视觉档）")
             self.assertTrue(spec["visual"], f"{role} 的 visual 不能为空")

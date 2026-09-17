@@ -23,10 +23,10 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
-# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
-# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+# 测试自有夹具：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（每份 deck 长得一样）。
 FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
-# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 夹具当"额外风格根"：工具链不内置任何风格（可拷贝的模板必然变成
 # 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
 os.environ.setdefault("DECK_STYLES",
                       os.path.join(FIXTURES_DIR, "styles"))
@@ -128,7 +128,8 @@ class TestSpacingTokens(unittest.TestCase):
         self.assertEqual(vars_["--sp-item"], f"{grid.SEMANTIC['item']}px")
 
     def test_render_injects_the_vars(self) -> None:
-        spec = json.loads(open(DEMO, encoding="utf-8").read())
+        with open(DEMO, encoding="utf-8") as fh:
+            spec = json.load(fh)
         html = render.render(spec)
         for key in ("--sp-item", "--sp-group", "--sp-section"):
             self.assertIn(key, html, f"产物里没有 {key} —— 令牌没接上")
@@ -142,7 +143,7 @@ class TestSpacingTokens(unittest.TestCase):
 
         for m in re.finditer(r"(?:gap|margin[^:{]*|padding[^:{]*):([^;}]+)", render.SHELL_CSS):
             value = m.group(1)
-            if "var(--sp-" in value or "0" == value.strip():
+            if "var(--sp-" in value or value.strip() == "0":
                 continue
             # 允许非间距用途的 margin（居中 auto、定位 top/bottom）
             if "auto" in value or "calc" in value:
@@ -197,7 +198,8 @@ class TestTypeLadder(unittest.TestCase):
         cls._tmp = tempfile.TemporaryDirectory()
         cls.addClassCleanup(cls._tmp.cleanup)
         cls.html = os.path.join(cls._tmp.name, "demo.html")
-        spec = json.loads(open(DEMO, encoding="utf-8").read())
+        with open(DEMO, encoding="utf-8") as fh:
+            spec = json.load(fh)
         cls.measured_render = render.render(spec)
         with open(cls.html, "w", encoding="utf-8") as fh:
             fh.write(cls.measured_render)

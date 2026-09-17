@@ -7,9 +7,9 @@
 1. **契约要说得清楚**（文件名 / 尺寸 / 比例 / 透明通道 / 会被怎么处理 / 可粘贴的
    中英提示词），而且**会说错的地方不能有**：同一张图用在多页时要合并而不是列三遍
    （否则人会出三张互相覆盖）；提示词里不能出现"给文字留压字空间"（我们的版式里
-   文字在**独立一栏**，不压在图上 —— 第一版就这么写错了）。
+   文字在**独立一栏**，不压在图上）。
 2. **验收要有牙，而且不能自己作弊**：`--check` 一旦顺手把占位图造出来，
-   就永远验不出"图还没出"（实测踩过：删掉图之后它照样报"符合契约"）。
+   就永远验不出"图还没出"（删掉图之后它会照样报"符合契约"）。
 
 跑法：
     python3 -m unittest discover -s tests -v
@@ -30,10 +30,10 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
-# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
-# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+# 测试自有夹具：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（每份 deck 长得一样）。
 FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
-# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 夹具当"额外风格根"：工具链不内置任何风格（可拷贝的模板必然变成
 # 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
 os.environ.setdefault("DECK_STYLES",
                       os.path.join(FIXTURES_DIR, "styles"))
@@ -91,8 +91,8 @@ class TestBrief(unittest.TestCase):
     def test_one_entry_per_filename_not_per_page(self) -> None:
         """同一个文件名用在多页 → **合并成一条**。
 
-        第一版按页列：压测 deck 里 `sample-treated.png` 用在第 11/12/18 页，
-        于是契约里出现三遍 —— 人会出三张、互相覆盖（实测）。
+        按页列会让它出现三遍（压测 deck 里 `sample-treated.png` 就用在三页）——
+        人会出三张、互相覆盖。
         """
         names = [s["file"] for s in self.brief["slots"]]
         self.assertEqual(len(names), len(set(names)), f"有重复文件名：{names}")
@@ -154,8 +154,8 @@ class TestBrief(unittest.TestCase):
     def test_api_params_are_not_written_into_the_prompt(self) -> None:
         """**回归**：尺寸 / 比例 / 数量不能出现在提示词正文里。
 
-        生图 API 有独立参数，prompt 里再写一遍只会在冲突时给出随机结果。
-        第一版就把 `3:2` 与 `1280x853px` 写进了正文。
+        生图 API 有独立参数，prompt 里再写一遍只会在冲突时给出随机结果
+        （`3:2` 与 `1280x853px` 属于参数栏，不进正文）。
         """
         for lang in ("zh", "en"):
             with self.subTest(lang=lang):
@@ -201,7 +201,8 @@ class TestBrief(unittest.TestCase):
     def test_prompt_does_not_tell_the_model_to_leave_room_for_overlay(self) -> None:
         """**不能**说"给文字留压字空间"：我们的版式里文字是独立一栏，不压在图上。
 
-        第一版写错了：模型会交一张主体偏到一边、空掉半张的图。
+        这么写模型会交一张主体偏到一边、空掉半张的图 —— 留白该为版式服务，
+        不是为"压字"服务。
         """
         self.assertNotIn("压文字", self.md)
         self.assertIn("SEPARATE column", self.md)
@@ -212,17 +213,17 @@ class TestBrief(unittest.TestCase):
         block = self._prompt_block("zh")
         limits = block.split("【限制】")[1]
         self.assertIn("细线", limits)
-        # v4：制版后处理已退役 —— 限制项改成"进版式会糊"这条管线事实
+        # 限制项是"进版式会糊"这条管线事实（不是"不要加网点"那种制版话术）
         self.assertIn("糊成一团", limits)
         for generic in ("水印", "额外人物", "畸形手指"):
             self.assertNotIn(generic, limits)
 
     def test_tool_does_not_invent_the_subject(self) -> None:
-        """**回归**：主体 / 场景 / 细节留空给人填 —— 工具**不许**自己编。
+        """主体 / 场景 / 细节留空给人填 —— 工具**不许**自己编。
 
-        规则是"用户未提供且会影响事实准确性的内容，不得擅自补充"。第一版把该页标题
-        拼成"内容草稿"塞进了提示词，而条目往往在讲这份 deck 的叙事
-        （"原始照片降噪后重新制版"），不是在讲画面里该有什么。
+        规则是"用户未提供且会影响事实准确性的内容，不得擅自补充"。标题与条目讲的是
+        这份 deck 的叙事（"原始照片降噪后重新制版"），不是画面里该有什么 ——
+        拼进提示词只会让模型去画一串字。
         """
         for lang in ("zh", "en"):
             for field in ("主体", "场景", "细节"):
@@ -350,8 +351,6 @@ class TestCheck(unittest.TestCase):
         self.name = next(s["image"] for s in spec["deck"]["slides"] if s.get("image"))
 
     def _write(self, w: int, h: int) -> None:
-        from PIL import Image   # noqa: PLC0415
-
         Image.new("RGB", (w, h), (180, 90, 60)).save(os.path.join(self.dir, self.name))
 
     def test_missing_image_is_reported(self) -> None:
@@ -360,10 +359,10 @@ class TestCheck(unittest.TestCase):
         self.assertTrue(any("还没出图" in p for p in problems), problems)
 
     def test_check_does_not_create_the_image_it_verifies(self) -> None:
-        """**回归**：`--check` 绝不能顺手造占位图。
+        """`--check` 绝不能顺手造占位图。
 
-        第一版它先调了 `_slot_geometry()`（那个函数会造占位图），于是删掉图之后
-        照样报"符合契约" —— 检查把它该验的东西自己造了出来，永远验不出"还没出图"。
+        检查只该看"文件名 + 契约里的尺寸/比例"这一层事实：一旦它先把该验的东西
+        自己造出来，就永远验不出"还没出图"（删掉图之后照样报"符合契约"）。
         """
         target = os.path.join(self.dir, self.name)
         self.assertFalse(os.path.isfile(target))
@@ -381,7 +380,8 @@ class TestCheck(unittest.TestCase):
     def test_svg_slots_are_read_from_viewbox(self) -> None:
         """SVG 是矢量：尺寸读 viewBox，且不做"放大=糊"那条。
 
-        实测踩过：用户的 4 张结构图是 SVG，`Image.open` 直接抛 —— 检查器整个崩掉。
+        为什么不能直接 `Image.open`：结构图常是 SVG，PIL 对它直接抛 ——
+        把整个检查器带走（一个不合格式的文件不该让门本身倒掉）。
         """
         with tempfile.TemporaryDirectory() as tmp:
             svg = os.path.join(tmp, "diagram.svg")

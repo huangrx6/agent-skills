@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.util
 import json
 import os
@@ -30,12 +31,14 @@ import sys
 import tempfile
 import unittest
 
+from PIL import Image
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
-# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
-# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+# 测试自有夹具：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（每份 deck 长得一样）。
 FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
-# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 夹具当"额外风格根"：工具链不内置任何风格（可拷贝的模板必然变成
 # 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
 os.environ.setdefault("DECK_STYLES",
                       os.path.join(FIXTURES_DIR, "styles"))
@@ -49,8 +52,8 @@ STYLES = os.path.join(FIXTURES_DIR, "styles")
 def _style_paths() -> list[str]:
     """所有风格 —— **读目录，不写死名单**。
 
-    写死名单的代价是实测过的：加了四套新风格之后，那份写死的名单让它们全部逃过了
-    运动 / 装饰 / 版式表三条检查 —— 而测试是绿的。目录才是唯一事实来源。
+    写死的名单会让新加的风格**整批逃过**运动 / 装饰 / 版式表这些检查，
+    而测试仍然是绿的。目录才是唯一事实来源。
     """
     return sorted(os.path.join(STYLES, d) for d in os.listdir(STYLES)
                   if os.path.isdir(os.path.join(STYLES, d)))
@@ -73,6 +76,12 @@ render = _load("_deck_test_render_anim", os.path.join(SCRIPTS, "render.py"))
 animate = _load("_deck_test_animate", os.path.join(SCRIPTS, "animate.py"))
 
 
+def _digest(path: str) -> str:
+    """帧文件的 sha256 —— 逐字节比“同一 t 两次取到的帧是否相同”。"""
+    with open(path, "rb") as fh:
+        return hashlib.sha256(fh.read()).hexdigest()
+
+
 class TestTimeline(unittest.TestCase):
     """时间轴在 Python 里算 —— 所以它的数学是可测的（JS 只负责“给定 t 画成什么样”）。"""
 
@@ -93,7 +102,8 @@ class TestTimeline(unittest.TestCase):
         """每页都要有，且首尾相接 —— 中间留缝就是“空画面”，观众会以为卡了。"""
         spans = render.timeline(self.spec["deck"], self.tokens)
         self.assertEqual(len(spans), len(self.spec["deck"]["slides"]), "有页没拿到时间片")
-        for prev, nxt in zip(spans, spans[1:]):
+        # 相邻两页：故意错开一位，所以 strict 必须是 False
+        for prev, nxt in zip(spans, spans[1:], strict=False):
             self.assertAlmostEqual(
                 prev["start"] + prev["enter"] + prev["hold"], nxt["start"], places=3,
                 msg=f"第 {prev['slide']} 页与第 {nxt['slide']} 页之间有空隙")
@@ -299,9 +309,7 @@ class TestFramesAreReproducible(unittest.TestCase):
             d = os.path.join(self._tmp.name, f"r{round_no}")
             os.makedirs(d, exist_ok=True)
             frames = animate._capture(self.html, d, times, 1.0, False)
-            import hashlib   # noqa: PLC0415
-
-            digs.append([hashlib.sha256(open(p, "rb").read()).hexdigest() for p in frames])
+            digs.append([_digest(p) for p in frames])
         for i, t in enumerate(times):
             self.assertEqual(
                 digs[0][i], digs[1][i],
@@ -312,15 +320,11 @@ class TestFramesAreReproducible(unittest.TestCase):
         d = os.path.join(self._tmp.name, "diff")
         os.makedirs(d, exist_ok=True)
         frames = animate._capture(self.html, d, [0.05, 1.6], 1.0, False)
-        import hashlib   # noqa: PLC0415
-
-        a, b = (hashlib.sha256(open(p, "rb").read()).hexdigest() for p in frames)
+        a, b = (_digest(p) for p in frames)
         self.assertNotEqual(a, b, "入场前与入场后的帧一样 —— 动画没生效")
 
     def test_frame_size_is_exactly_one_slide(self) -> None:
         """取帧必须是精确的 1600×900（×DPR）—— 不然视频里会带上下页的边。"""
-        from PIL import Image   # noqa: PLC0415
-
         d = os.path.join(self._tmp.name, "size")
         os.makedirs(d, exist_ok=True)
         frames = animate._capture(self.html, d, [1.6], 1.0, False)

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """风格 / 品牌的解析根：**deck 项目 = spec 所在目录**，cwd 只是兜底。
 
-为什么单独一个文件：两条解析链（`render.style_roots` / `deck.brand_roots`）原先
-只认 `os.getcwd()`，于是"从别的目录跑同一个 spec"找不到它自己带的风格与品牌 ——
-更糟的是报错文案指着"deck 项目的 styles/<名>/"，而代码根本没看那里。
+为什么单独一个文件：两条解析链（`render.style_roots` / `deck.brand_roots`）"认**项目目录**"
+这条必须被钉住 —— 只认 `os.getcwd()` 时，"从别的目录跑同一个 spec"会找不到
+它自己带的风格与品牌，而报错文案还指着"deck 项目的 styles/<名>/"。
 
 这里把不变量钉死（四条）：
 

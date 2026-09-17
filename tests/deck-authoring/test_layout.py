@@ -176,7 +176,6 @@ class TestChartContract(unittest.TestCase):
         return out
 
     def test_chart_typography_is_token_driven_and_caption_keeps_its_role(self):
-        import base64  # noqa: F401  (惯例：产物里清单是 JSON，探针才用 base64)
         import re
         import tempfile
 
@@ -549,9 +548,8 @@ class TestCandidateCLI(unittest.TestCase):
         """`--pick` = “自动采用最优”。
 
         `assignments` 的值是**按总分排好的候选名列表**（对比页要按序展示）——
-        所以采纳的是第 0 个。曾经把整个列表塞进 `layout`，于是要到渲染层才被
-        拦下（“layout 要是字符串，得到 list”）：文档里写着可用的开关，
-        一敲就炸。这里同时钉“取首位”与“是字符串”两件事。
+        所以采纳的是第 0 个。把整个列表塞进 `layout` 会一路走到渲染层才被拦下
+        （“layout 要是字符串，得到 list”）；这里同时钉“取首位”与“是字符串”。
         """
         import subprocess
         import tempfile

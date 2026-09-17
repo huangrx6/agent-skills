@@ -13,13 +13,11 @@
 - provider 命令**必须没被执行**（痕迹文件不存在）
 - 产物必须与缓存里那张**逐字节相同**
 
-## 这里删掉过一条判据
+## 为什么这里没有"色板三角形"判据
 
-原先还有"缓存图必须落在色板三角形内"这道门（不合规就丢弃重做）。它量的是
-`plate.py` 时代的双色调制版产物 —— v4 删掉制版、图片按原样使用之后，真照片
-**本来就有千百种颜色**，这道门只会把好图判死（实测：provider 出的图永远"不合规"，
-于是每次都重调 API，缓存形同不存在）。色彩约束改由 `--brief` 的提示词承担，
-见 `references/images.md`。
+色彩约束由 `--brief` 的提示词承担（见 `references/images.md`），不在缓存层判定：
+真照片**本来就有千百种颜色**，拿"必须落在色板三角形里"当门只会把好图判死。
+缓存命中即可信（key 已含 prompt + 色板 + 尺寸）。
 
 跑法：
     python3 -m unittest discover -s tests -v
@@ -40,10 +38,10 @@ logging.getLogger("PIL").setLevel(logging.ERROR)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
-# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
-# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+# 测试自有夹具：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（每份 deck 长得一样）。
 FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
-# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 夹具当"额外风格根"：工具链不内置任何风格（可拷贝的模板必然变成
 # 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
 os.environ.setdefault("DECK_STYLES",
                       os.path.join(FIXTURES_DIR, "styles"))

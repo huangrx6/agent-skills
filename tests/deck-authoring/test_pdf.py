@@ -21,24 +21,23 @@ import importlib.util
 import io
 import json
 import os
+import re
 import sys
 import tempfile
-import re
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
-# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
-# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+# 测试自有夹具：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（每份 deck 长得一样）。
 FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
-# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 夹具当"额外风格根"：工具链不内置任何风格（可拷贝的模板必然变成
 # 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
 os.environ.setdefault("DECK_STYLES",
                       os.path.join(FIXTURES_DIR, "styles"))
 os.environ.setdefault("DECK_BRANDS",
                       os.path.join(FIXTURES_DIR, "brands"))
 SCRIPTS = os.path.join(SKILL, "scripts")
-TOKENS = os.path.join(FIXTURES_DIR, "styles", "swiss-grid", "style.json")
 DEMO = os.path.join(FIXTURES_DIR, "demo.spec.json")
 
 PAGE_RULE = "@page{size:1600px 900px;margin:0}"
@@ -61,8 +60,6 @@ class TestPdfExport(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.pdf = _load("deck_pdf", os.path.join(SCRIPTS, "pdf.py"))
         cls.render = _load("deck_render_pdf", os.path.join(SCRIPTS, "render.py"))
-        with open(TOKENS, encoding="utf-8") as fh:
-            tokens = json.load(fh)
         with open(DEMO, encoding="utf-8") as fh:
             spec = json.load(fh)
         cls.slides = len(spec["deck"]["slides"])

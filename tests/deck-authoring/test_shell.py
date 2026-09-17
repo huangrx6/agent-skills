@@ -43,10 +43,10 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
-# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
-# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+# 测试自有夹具：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（每份 deck 长得一样）。
 FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
-# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 夹具当"额外风格根"：工具链不内置任何风格（可拷贝的模板必然变成
 # 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
 os.environ.setdefault("DECK_STYLES",
                       os.path.join(FIXTURES_DIR, "styles"))
@@ -322,9 +322,9 @@ class TestMarkdownNote(unittest.TestCase):
 class TestImageSlotRatio(unittest.TestCase):
     """**槽位定比例**，图片自身比例只管裁切/留边。
 
-    实测背景：生图工具出成 1:1 / 4:3 / 2:1 是常态（提示词按不住比例）。以前壳只写
-    `width:100%`，高度跟着图片走 —— 1:1 撑出页底（实测溢出 109px）、2:1 留空洞，
-    于是人被逼着重出图。现在高度由槽位比例定，多出来的按 `visual.kind` 处理。
+    生图工具出成 1:1 / 4:3 / 2:1 是常态（提示词按不住比例）。高度若跟着图片走，
+    1:1 就撑出页底、2:1 就留空洞，人会**被迫重出图**。所以高度由**槽位比例**定，
+    多出来的按 `visual.kind` 处理。
     """
 
     @classmethod
@@ -448,8 +448,9 @@ class TestStructureVariants(unittest.TestCase):
 class TestStyleLocationNote(unittest.TestCase):
     """风格的位置要开口说：**风格随 deck 项目交付**。
 
-    实测事故：一份 17 页 deck 的风格目录放在 /tmp，被清掉后 spec 里的 deck.style
-    成了死链，整套版式再也复现不出来。这条提示就是那次事故的产物。
+    风格目录放 /tmp 就随时会没：被清掉之后 spec 里的 deck.style 成了死链，
+    整套版式再也复现不出来 —— 所以要开口，而且要指出该挪什么（挪风格还是
+    挪 spec，情形不同）。
     """
 
     @classmethod
@@ -457,7 +458,9 @@ class TestStyleLocationNote(unittest.TestCase):
         cls.render = _load("deck_render_styleloc", os.path.join(SCRIPTS, "render.py"))
 
     def test_temp_style_is_flagged(self) -> None:
-        note = self.render.style_location_note("/tmp/some-style", "/tmp/deck.spec.json")
+        tmp = tempfile.gettempdir()   # 用真的临时根：判据就是拿它比的
+        note = self.render.style_location_note(os.path.join(tmp, "some-style"),
+                                               os.path.join(tmp, "deck.spec.json"))
         self.assertIsNotNone(note)
         self.assertIn("临时目录", note or "")
         self.assertIn("项目目录", note or "")
@@ -466,7 +469,8 @@ class TestStyleLocationNote(unittest.TestCase):
         """要挪的东西不同，说法就不同：spec 在 /tmp 时不能劝"把风格挪到 spec 旁边"。"""
         D = os.path.dirname(SCRIPTS)          # 非临时目录
         note = self.render.style_location_note(
-            os.path.join(D, "styles"), "/tmp/some/deck.spec.json")
+            os.path.join(D, "styles"),
+            os.path.join(tempfile.gettempdir(), "some", "deck.spec.json"))
         self.assertIn("spec 在临时目录", note or "")
 
     def test_style_outside_the_deck_project_is_flagged(self) -> None:
@@ -531,7 +535,7 @@ class TestHeroHeight(unittest.TestCase):
         """hero 流里的图注是顶层元素（拿不到 figure 成员豁免），必须用够的 token。
 
         --sp-inner(16) < 安全盒要求的 28（body 下 16 + caption 上 12）——
-        以前就是它导致每张 hero 页都报"太近"。
+        用 `--sp-inner` 就不够：每张 hero 页都会报"太近"。
         """
         html = self._hero(["一"], caption=True)
         self.assertIn(".herofig + .chartcap, .hero-bullets + .chartcap", html)

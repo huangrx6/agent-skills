@@ -39,10 +39,10 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
-# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
-# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+# 测试自有夹具：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（每份 deck 长得一样）。
 FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
-# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 夹具当"额外风格根"：工具链不内置任何风格（可拷贝的模板必然变成
 # 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
 os.environ.setdefault("DECK_STYLES",
                       os.path.join(FIXTURES_DIR, "styles"))
@@ -211,13 +211,14 @@ class TestCheckMutations(unittest.TestCase):
     # ── ④ 柱高成比例 ──────────────────────────────────────────────────────
 
     def test_real_chart_page_reports_ready(self) -> None:
-        """**实测**：真产物跑一遍浏览器，G2 必须真渲染出来（chartReady == ready）。
+        """真产物跑一遍浏览器，G2 必须真渲染出来（chartReady == ready）。
 
-        为什么这条必须是真浏览器而不是合成 measured：v4 踩过一次 —— 初始化脚本里
-        留了 `renderer:'svg'`，而这份 UMD bundle 只带 canvas 渲染器，G2 在运行时抛
-        registerPlugin；当时 chartReady 也没接到 `[data-m]` 元素上，**闸门静默失效**，
-        只有人肉开浏览器才看得出来。这条用例把两件事一起钉住：字段要接到、
-        且真浏览器里必须 ready。
+        为什么必须真浏览器而不是合成 measured：渲染失败会在两处同时出现 ——
+        初始化脚本指定的 `renderer` 与这份 UMD bundle 实际带的渲染器不一致
+        （bundle 只带 canvas 渲染器，写 `svg` 就运行时抛 registerPlugin），
+        而且 chartReady 若没接到 `[data-m]` 元素上，**闸门会静默失效**：
+        静态 HTML 里只有容器与 spec，判断不出渲染没渲染。
+        这条用例把两件事一起钉住：字段要接到、且真浏览器里必须 ready。
         """
         measured = measure.measure(self.chart_path)
         rows = [e for e in measured.get("elements", [])
@@ -230,9 +231,8 @@ class TestCheckMutations(unittest.TestCase):
     def test_chart_g2_ready_is_required(self) -> None:
         """变异：把 G2 容器标成渲染失败 → check 必须报出来。
 
-        v4 换掉的是**判据**而不是牙口：手写 SVG 时代查"柱高与数据成比例"，
-        现在几何由 G2 算，查的是"G2 真渲染出来了"（实测 chartReady 字段，
-        静态 HTML 里只有容器与 spec，判断不出来）。
+        判据是"G2 真渲染出来了"（实测 chartReady 字段），不是"画出来的几何
+        服从数据"：几何由 G2 算，而静态 HTML 里只有容器与 spec，后者量不到。
         """
         chart_no = len(self.chart_spec["deck"]["slides"])
         measured = {"elements": [

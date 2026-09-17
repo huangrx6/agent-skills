@@ -26,10 +26,10 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
-# 测试自有夹具（v4）：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
-# 可拷贝的模板必然变成默认答案（用户实测：每份 deck 长得一样）。
+# 测试自有夹具：风格与内容样本都放在 tests/ 下，**不随 skill 发布** ——
+# 可拷贝的模板必然变成默认答案（每份 deck 长得一样）。
 FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
-# 夹具当"额外风格根"：v4 起工具链不内置任何风格（可拷贝的模板必然变成
+# 夹具当"额外风格根"：工具链不内置任何风格（可拷贝的模板必然变成
 # 默认答案）。脚本各持一份模块副本，所以走环境变量而不是改常量。
 os.environ.setdefault("DECK_STYLES",
                       os.path.join(FIXTURES_DIR, "styles"))
@@ -71,7 +71,7 @@ def _spec(slides=None) -> dict:
     # 一个与本意无关的错。
     with open(TOKENS, encoding="utf-8") as fh:
         color_set = next(iter(json.load(fh)["colorSets"]))
-    # v4：deck.style 必填（工具链不内置任何风格）—— 合成 spec 也要写它
+    # deck.style 必填（工具链不内置任何风格）—— 合成 spec 也要写它
     return {"deck": {"style": "swiss-grid", "colorSet": color_set, "seed": 7,
                      "title": "t",
                      "slides": copy.deepcopy(slides or VALID_SLIDES)}}
@@ -389,7 +389,7 @@ if __name__ == "__main__":
 
 
 class TestLayoutField(unittest.TestCase):
-    """v3：layout 是**自由字符串**（结构布局是渲染器能力，其余交给 skin）。"""
+    """`layout` 是**自由字符串**（结构布局是渲染器能力，其余交给 skin）。"""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -423,7 +423,7 @@ class TestLayoutField(unittest.TestCase):
         self.assertNotIn("BAD_LAYOUT", codes, "自造布局名被当成错误拦住了")
 
     def test_auto_is_rejected(self) -> None:
-        """auto（实测选布局）已随 fit --recommend 一起退役。"""
+        """auto 不被接受：布局由 spec 作者声明，没有"实测选布局"这条路。"""
         codes = self._codes(_spec([self._slide("content-image", "auto")]))
         self.assertIn("BAD_LAYOUT", codes)
 
@@ -442,7 +442,7 @@ class TestLayoutField(unittest.TestCase):
 
 
 class TestColorSetRequired(unittest.TestCase):
-    """v3：colorSet 必填具名（auto/mood 的语义决策链已退役）。"""
+    """colorSet 必填具名（写 auto/mood 一律判失败）。"""
 
     @classmethod
     def setUpClass(cls) -> None:
