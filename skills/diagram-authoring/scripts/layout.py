@@ -2561,8 +2561,8 @@ def _align_spine(placed: dict, edges: list, direction: str) -> int:
             if target is None or abs(target - centre(nid)) < 1.0:
                 continue
             # 记下这次要动的对象（含可能被推开的分支）—— 动完复核整层，不行就整体回滚。
-            # 第一版只检查了“被推的那个”与**当时**的位置，nid 还没过去 —— 于是推完
-            # 再挪过去就叠在一起了（实测：四对节点间隙 0px，整张图判红）。
+            # 只查"被推的那个"的旧位置不够：推完再把 nid 挪过去仍会叠上
+            # （实测四对节点间隙 0px）—— 所以动完要整层复核、不行就回滚。
             touched: dict[str, "Placed"] = {}
             if sibling_gap(nid, target) < NODE_CLEARANCE:
                 # 会挤到邻居。但这个邻居**本来就是分支** —— 主线归位时把它往外推一次
@@ -3173,7 +3173,7 @@ def layout(spec: dict, boxes: dict[str, Box],
         """
         hit = sum(len(nodes_hit_by_polyline(e["points"], table, {e["from"], e["to"]}))
                   for e in routed_edges)
-        # 「穿自己」和「贴边滑」以前**不在判据里**，所以拉直版把它们带出来也没人管：
+        # 「穿自己」和「贴边滑」也在判据里（拉直后的路径会带出这两类）：
         # 02-flow 就是这样 —— 一条边从源的底边出去却往上走，整条线穿过自己的盒子
         # （图上就是线从框里冒出来），入口还贴着上边框滑进去（用户说"会和边框融合"）。
         # 这两项现在参与挑版，和斜段一样属于"结构上不该出现"。
@@ -3452,10 +3452,8 @@ def region_label_lines(label: str, width: float) -> tuple[list[str], float]:
 def region_boxes(spec: dict, placed: dict, boxes: dict) -> list[dict]:
     """把 `groups` 变成**看得见的区域**：成员节点的并集 + 留白 + 标题带。
 
-    这以前是空的 —— `groups` 只被校验、没有任何视觉效果，文档里也如实写着
-    以前"既没有分组框，也没有分组标签"。用户拿 Excalidraw 手画的参考图来问
-    "需要用区域表示的可以这样做"，那是**一整片浅色交叉网格 + 顶部标题**，
-    图上立刻就有了色块 —— 而我们的图一直只有单个节点在承担颜色，95% 是中性色。
+    区域是图上**唯一的整片颜色**：节点受颜色预算限制（单点关注），
+    "哪里是一块"由区域表达 —— 一整片浅色交叉网格 + 顶部标题，压在节点下面。
 
     用**成员节点自己的包围盒**算（不是虚线节点那种内部东西），所以区域一定
     框得住它画的每一个节点。标题带留在顶边以上，区域标题因此不会压到任何节点。
