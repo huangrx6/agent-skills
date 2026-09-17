@@ -23,7 +23,8 @@ cd skills/deck-authoring/
 python3 scripts/validate_spec.py your.spec.json                     # 1) 规格（字段集封闭）
 python3 scripts/ink.py styles/<你的风格>/style.json                  # 2) 墨色门禁（对比度）
 python3 scripts/image_source.py --brief your.spec.json               # 3) 图片提示词契约 → image-brief.md
-#   拿着提示词去出图，按契约里的文件名存到 spec 同目录（这一步是人做的：脚本不产图）
+#   拿着提示词去出图（或配好后端走 `--generate`），按契约里的文件名存到 spec 同目录
+#   （脚本不手画图：画面一律来自模型或人）
 python3 scripts/render.py your.spec.json -o out.html                # 4) 出 HTML
 python3 scripts/render.py your.spec.json -o out.html --repair       #    （溢出时：降档→复检≤4轮）
 python3 scripts/render.py your.spec.json -o out.html --candidates   #    （未声明布局：候选并测出表）
@@ -70,12 +71,23 @@ python3 scripts/image_source.py --brief your.spec.json             # → 图片�
 python3 scripts/image_source.py --check your.spec.json             # 验尺寸与比例
 ```
 
-分工是**脚本写契约 → 人出图 → 脚本验收**：脚本知道每张图进哪个槽位、那个槽位实测
-多少像素、该套色板是哪几个颜色；而"出一张好看的图"这件事，人拿自己顺手的模型做得比
-脚本调一个陌生 API 好。图**不直接塞进 image 字段**，也不做制版后处理（没有这一层，
-图片按原样进产物）—— 版画质地在提示词里要到位。
+**配了生图后端就不用出手拿提示词去贴**：把 `assets/requests/<文件名>.json` 的 `prompt`
+里 `〈…〉`（中文模板）/ `<…>`（英文模板）换成内容，然后
+`python3 scripts/image_source.py --generate your.spec.json` —— 逐槽位出图。后端按优先级：
+`--provider-cmd '你的命令 --prompt {prompt} --out {out}'` → 内置 MiniMax（`MINIMAX_API_KEY`
+或 `MINIMAX_CN_API_KEY`；可选 `MINIMAX_API_HOST`、`MINIMAX_IMAGE_MODEL`，只读环境变量、
+密钥不落盘）。**没配就一步都不跑**：直接说清手动出图往哪个目录存、或者该设哪个变量，
+不产降级图；提示词里还有占位符也停下（花钱买一张模板画没意义）；目标文件已在、或同一
+提示词上次已出过，就跳过 / 命中缓存，不重复付费。`--generate` 只读契约、只写图 ——
+不重算槽位，也不会把人填好的提示词覆盖回模板。细节见 `references/images.md`。
 
-**脚本不产图，一张也不产**：`--brief` 量槽位用的那块"尺子"只活在临时目录里。图出得慢
+分工是**脚本写契约 → 出图（人或配好的后端）→ 脚本验收**：脚本知道每张图进哪个槽位、
+那个槽位实测多少像素、该套色板是哪几个颜色；而"出一张好看的图"这件事，人拿自己顺手的
+模型做，往往比脚本去调一个固定 API 好 —— 所以直连是**配好了才走**的方便路，不是默认。
+图**不直接塞进 image 字段**，也不做制版后处理（没有这一层，图片按原样进产物）——
+版画质地在提示词里要到位。
+
+**脚本不手画图，一张也不画**：`--brief` 量槽位用的那块"尺子"只活在临时目录里。图出得慢
 就让那一页先裂着（`check` 点名），也别塞一张脚本拼的东西占位 —— 占位图最可能的结局
 就是跟着交付出去。
 
@@ -107,7 +119,7 @@ python3 scripts/image_source.py --check your.spec.json             # 验尺寸�
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests/deck-authoring -v     # 406 条，约 8 分钟（负载敏感）（空闲时）
+python3 -m unittest discover -s tests/deck-authoring -v     # 424 条，约 8 分钟（负载敏感）（空闲时）
 ```
 
 耗时说明：几乎全是**真浏览器**的开销，所以对机器负载很敏感 —— 空闲时两三分钟，
@@ -309,8 +321,9 @@ Layout、Design Tokens、**IBCS + ISO 24896**、AntV），以及本仓库做到�
    `ready` / `pending` / `error`，静态 HTML 判断不出来）与 (b) **数据形状**（`label` 非空、
    `value` 是数字）。
 3. **错位只用在标题 / 时间点**：其他地方用错位会毁可读性（方案第 2 层）。
-4. **生图不由脚本做**：默认路径是 `--brief` 写提示词契约、人出图、`--check` 验收（见上）；
-   `--provider-cmd` 给有 API 的人。没配 provider 就直接拒绍 —— 脚本不产图，也没有降级产物
+4. **生图不由脚本画**：默认路径是 `--brief` 写提示词契约、出图、`--check` 验收（见上）；
+   配了后端（`--provider-cmd`，或 `MINIMAX_API_KEY` / `MINIMAX_CN_API_KEY`）可以
+   `--generate` 直接出；都没配就拒绝—— 脚本不手画图，也没有降级产物
    （见 `references/images.md`：量槽位的尺子只活在临时目录里，不落进 deck）。
 5. **缓存命中即可信**：cache key 含 prompt + 色板 + 尺寸，命中就直接复用、不再调 provider
    （否则等于付第二次钱买同一张图）。真照片有千百种颜色，色彩约束由 `--brief` 的提示词
@@ -334,7 +347,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │   ├── layout/              # 布局层包：几何模型(Rect/安全盒) + 碰撞政策(分组/距离表/豁免)
 │   ├── validate_spec.py     # 输入层校验：字段集封闭（坐标/字号/色值直接判失败）
 │   ├── ink.py               # 墨色推导 + 三色板对比度门禁（不达标退 1）
-│   ├── image_source.py      # 提示词契约(--brief) / 验收(--check) / 生图(--provider-cmd)
+│   ├── image_source.py      # 提示词契约(--brief) / 验收(--check) / 生图(--generate)
 │   ├── fonts.py             # 字体库：清单(--list) / 取字体(--fetch) / 映射(--map) / 内嵌
 │   ├── grid.py              # 网格与间距：12 列 / 令牌 ramp / 关系规则（几何唯一来源）
 │   ├── deck.py              # 决策层：品牌资产并入 + spec → resolved（色板/档位 + trace）
@@ -371,7 +384,7 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
     ├── charts.md               # 图表：八类、弱化强调、消息先行（几何由 G2 算）
     ├── color.md                # OKLCH 结构、配色规范里哪些是代码强制 / 流程判断
     ├── fonts.md                # 126 字体库、风格映射、严格 A 级、用户缓存
-    └── images.md               # 图像契约：AI 出合同、人出图、--check 验收
+    └── images.md               # 图像契约：写合同 → 出图（人或配好后端）→ --check 验收
 tests/deck-authoring/           # 测试住在仓库顶层（不在 skill 目录里）
 ├── test_validate_spec.py
 ├── test_ink.py

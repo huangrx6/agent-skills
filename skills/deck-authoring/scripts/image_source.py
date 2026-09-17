@@ -1,29 +1,35 @@
 #!/usr/bin/env python3
-"""图片来源：prompt 缓存 → 生图（可选，未配置则跳过）→ **几何色块拼贴**。
+"""图片：**先把提示词写成契约，再用它出图**。
 
-为什么默认是色块而不是生图：生图是全流程最慢、最贵、最容易失败的一环（方案第 5 层自己
-写的），而方案第一条原则是"视觉效果优先用 CSS/SVG 原生能力，不靠生图模型硬画"。
-所以几何色块拼贴在这里是**一等公民**，生图只是一个可选来源 —— 而且两件事必须做到：
+三条路径，同一条提示词：
 
-1. **降级要说出来**：静默换成色块，用的人会以为图是模型画的 ✗
-2. **缓存里的东西也要合规范**：缓存命中不等于可信 —— 上一次留下的可能根本不合规，
-   所以命中后仍然要过"只在色板三角形内"这条不变量（实测能抓到：往里塞一张彩图就红）
+1. `--brief` → 契约（`image-brief.md` + `assets/requests/*.json`）—— 不花钱；
+2. `--generate` → 按契约逐槽位出图。**配了就直连**：给了 `--provider-cmd` 用你的命令，
+   没给但设了 `MINIMAX_API_KEY`（或 `MINIMAX_CN_API_KEY`）就用内置 MiniMax；
+   两边都没有就明确告诉你手动出图、放到哪个目录；
+3. `--check` → 验图：在不在 / 够不够大 / 比例合不合（比例只说明，不阴塞）。
 
-跑法：python3 image_source.py --prompt "team photo, poster" -o pic.png [--provider-cmd "…"]
+图只从**你的模型**来：这个脚本不画图（没有拼贴、没有占位图兜底），生图失败也不降级
+—— 否则交付里会混进一张没人认领的图。
 """
 from __future__ import annotations
 
 import argparse
+import glob
 import hashlib
 import importlib.util
+import io
 import json
+import math
 import os
-import re
-import tempfile
 import random
+import re
 import shlex
 import subprocess
 import sys
+import tempfile
+import urllib.error
+import urllib.request
 
 from PIL import Image, ImageDraw
 
@@ -57,7 +63,7 @@ def cache_dir() -> str:
     override = os.environ.get(CACHE_DIR_VAR, "").strip()
     if override:
         return os.path.abspath(os.path.expanduser(override))
-    return os.path.expanduser(os.path.join("~", ".cache", "agent-skills", "riso-deck"))
+    return os.path.expanduser(os.path.join("~", ".cache", "agent-skills", "deck-images"))
 
 
 def cache_key(prompt: str, colors: dict, size: tuple[int, int]) -> str:
@@ -106,8 +112,127 @@ def _provider_argv(template: str, prompt: str, out: str) -> list[str]:
     return [p.replace(sp, prompt).replace(so, out) for p in parts]
 
 
+# ── 生图后端：内置 MiniMax ────────────────────────────────────────────────
+# 接口事实（与本机 `minimax-mcp` 自己发的请求一致）：
+#   POST {host}/v1/image_generation
+#   Authorization: Bearer <key>
+#   {model, prompt, aspect_ratio, n, prompt_optimizer, response_format}
+#   → {"data": {"image_urls": [...]}}（另有 base_resp.status_code 报错用）
+# 只读环境变量，不写任何配置文件：密钥不落盘、不进仓库。
+MINIMAX_HOST_DEFAULT = "https://api.minimaxi.com"
+MINIMAX_MODEL_DEFAULT = "image-01"
+# 官方只认这八档；我们的比例是**实测槽位**算出来的，不一定正好命中 —— 所以取最近一档
+# （比例本来就不阻塞交付：渲染层按槽位裁切/留边，见 check_images 的说明）。
+MINIMAX_RATIOS = ((1, 1), (16, 9), (4, 3), (3, 2), (2, 3), (3, 4), (9, 16), (21, 9))
+MINIMAX_TIMEOUT = 180
+# 提示词里没填的空（见 FILL）：中文用 〈…〉、英文用 <…> —— 两种都要拦，
+# 否则"没填的模板"会原样发给模型（发出去就是花真钱买一张模板画）。
+PLACEHOLDER_RE = re.compile(r"〈[^〉]*〉|<[^<>]*>")
+
+
+def minimax_key() -> str | None:
+    """配了就用。两个名字都认：`MINIMAX_API_KEY` 是 MCP 自己用的，
+    `MINIMAX_CN_API_KEY` 是本机把它套进 MCP 时用的那个（同一把密钥）。"""
+    for name in ("MINIMAX_API_KEY", "MINIMAX_CN_API_KEY"):
+        value = os.environ.get(name)
+        if value:
+            return value
+    return None
+
+
+def _http_url(url: str) -> str:
+    """只允许 http/https。两个 URL 都不是我们能控制的东西 —— `MINIMAX_API_HOST` 来自
+    环境变量、图片 URL 来自远端响应 —— 不校验 scheme 的话，`file:` 这类会去读本机文件。
+    """
+    if not url.startswith(("http://", "https://")):
+        raise SystemExit(f"✗ 只接受 http/https 的 URL：{url[:80]}")
+    return url
+
+
+def minimax_ratio(aspect: float | None) -> str:
+    """槽位比例 → 官方八档里最近的一档（按对数距离，因为比例是乘性的）。"""
+    if not aspect or aspect <= 0:
+        aspect = BRIEF_ASPECT[0] / BRIEF_ASPECT[1]
+    best = min(MINIMAX_RATIOS,
+               key=lambda r: abs(math.log((r[0] / r[1]) / aspect)))
+    return f"{best[0]}:{best[1]}"
+
+
+def minimax_generate(prompt: str, aspect: float | None, out: str) -> None:
+    """调 MiniMax 出一张图，写成 `out`。失败直接抛（**没有降级产物**）。"""
+    key = minimax_key()
+    if not key:
+        raise SystemExit(
+            "✗ 没配 MiniMax 密钥 —— 不知道拿谁出图。\n"
+            "  要么给 --provider-cmd，要么设 MINIMAX_API_KEY（或 MINIMAX_CN_API_KEY）。")
+    host = (os.environ.get("MINIMAX_API_HOST") or MINIMAX_HOST_DEFAULT).rstrip("/")
+    model = os.environ.get("MINIMAX_IMAGE_MODEL") or MINIMAX_MODEL_DEFAULT
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "aspect_ratio": minimax_ratio(aspect),
+        "n": 1,
+        "prompt_optimizer": True,
+        "response_format": "url",
+    }
+    req = urllib.request.Request(  # noqa: S310 (scheme 已由 _http_url 校验)
+        _http_url(f"{host}/v1/image_generation"),
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={"Authorization": f"Bearer {key}",
+                 "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=MINIMAX_TIMEOUT) as resp:  # noqa: S310 (scheme 已校验)
+            body = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")[:200]
+        raise SystemExit(f"✗ MiniMax 生图失败（HTTP {exc.code}）：{detail}\n"
+                         f"  {_no_fallback_hint()}") from exc
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+        raise SystemExit(f"✗ MiniMax 生图失败（{exc}）：{host}\n"
+                         f"  {_no_fallback_hint()}") from exc
+    # MiniMax 的错误通常走 base_resp（HTTP 200 但业务码非 0，例如密钥错 2049）
+    base = body.get("base_resp") or {}
+    if base.get("status_code"):
+        raise SystemExit(f"✗ MiniMax 生图失败（{base.get('status_code')}）："
+                         f"{base.get('status_msg')}\n  {_no_fallback_hint()}")
+    urls = ((body.get("data") or {}).get("image_urls") or [])
+    if not urls:
+        raise SystemExit(f"✗ MiniMax 没返回图（响应里没有 data.image_urls）："
+                         f"{json.dumps(body)[:200]}\n  {_no_fallback_hint()}")
+    try:
+        with urllib.request.urlopen(_http_url(urls[0]), timeout=MINIMAX_TIMEOUT) as resp:  # noqa: S310
+            blob = resp.read()
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError) as exc:
+        raise SystemExit(f"✗ 图生成了但下载失败：{exc}\n  {_no_fallback_hint()}") from exc
+    # 先解一遍再落盘：写不出来的字节留在那里，下游只会说"图片没加载"
+    try:
+        with Image.open(io.BytesIO(blob)) as probe:
+            probe.verify()
+    except OSError as exc:
+        raise SystemExit(f"✗ 下回来的不是能解码的图（{exc}）\n  {_no_fallback_hint()}") from exc
+    deckio.ensure_dir(os.path.dirname(os.path.abspath(out)) or ".")
+    try:
+        with open(out, "wb") as fh:
+            fh.write(blob)
+    except OSError as exc:
+        raise SystemExit(f"✗ 写不了 {out}：{exc}") from exc
+    print(f"✓ MiniMax 出图（{payload['aspect_ratio']}）")
+
+
+def _no_fallback_hint() -> str:
+    """生图失败时固定给的那句：不兜底，但告诉你下一步走哪条路。"""
+    return ("没有降级产物：图只从你的模型来。手动出的路：按 image-brief.md 的提示词"
+            "出图 → 存到 spec 同目录 → image_source.py --check <spec>")
+
+
 def resolve(prompt: str, colors: dict, size: tuple[int, int], out: str,
-            provider_cmd: str | None = None) -> str:
+            provider_cmd: str | None = None, aspect: float | None = None) -> str:
+    """拿到一张图写到 `out`，返回来源（`cache` / `generated`）。
+
+    三条路，按优先级：缓存 → `--provider-cmd`（你的命令）→ 内置 MiniMax（配了密钥时）。
+    都没有就**拒绝**并说清手动怎么走 —— 这个工具不自己画图，也没有降级产物：
+    一张脚本拼的图混进交付，比交付里缺一张图更坏（没人认领它）。
+    """
     deckio.ensure_dir(cache_dir())
     path = os.path.join(cache_dir(), f"{cache_key(prompt, colors, size)}.png")
     if os.path.isfile(path):
@@ -118,39 +243,44 @@ def resolve(prompt: str, colors: dict, size: tuple[int, int], out: str,
         cached.save(out)
         print(f"✓ 命中缓存（{os.path.basename(path)}）→ {out}")
         return "cache"
-    if not provider_cmd:
+    if provider_cmd:
+        try:
+            subprocess.run(_provider_argv(provider_cmd, prompt, path), check=True)
+        except subprocess.CalledProcessError as exc:
+            raise SystemExit(f"✗ 生图失败（返回码 {exc.returncode}）—— 没有降级产物："
+                             f"图只从你的模型来，脚本不兜底") from exc
+    elif minimax_key():
+        # 配了就直连：密钥在环境变量里（不落盘、不进仓库）
+        minimax_generate(prompt, aspect, path)
+    else:
         raise SystemExit(
-            "✗ 没有生图命令（--provider-cmd），也没有 --brief。\n"
-            "  这个工具不自己画图。拿 `--brief` 出提示词 → 用你自己的模型出图 →\n"
-            "  存到 spec 同目录（或 --dir 指的目录）→ `--check` 验一遍。\n"
-            "  有生图 API：--prompt '…' -o out.png --provider-cmd '你的命令 --prompt {prompt} --out {out}'")
-    try:
-        subprocess.run(_provider_argv(provider_cmd, prompt, path), check=True)
-    except subprocess.CalledProcessError as exc:
-        raise SystemExit(f"✗ 生图失败（返回码 {exc.returncode}）—— 没有降级产物："
-                         f"图只从你的模型来，脚本不兜底")
+            "✗ 没配生图后端，这一步出不了图。两条路：\n"
+            "  1. 手动：拿 `--brief` 的提示词出图 → 存到 spec 同目录 → `--check` 验一遍；\n"
+            "  2. 直连：--provider-cmd '你的命令 --prompt {prompt} --out {out}'，"
+            "或设 MINIMAX_API_KEY / MINIMAX_CN_API_KEY 用内置 MiniMax。")
     # 没有制版处理这一层（双色调 / 半调网点都不做）—— 图片按原样使用。
     # 想要版画质感就在出图提示词里要（`--brief` 的构图/负空间字段），而不是
     # 在交付链里做一道后处理：后处理会让"check 说合规、交付图却不一样"。
     image = Image.open(path).convert("RGB")
     image.save(path)
     image.save(out)
-    print(f"✓ 已写出 {out}（来源：{provider_cmd.split()[0]}，已缓存为 {os.path.basename(path)}）")
+    print(f"✓ 已写出 {out}（来源：{_provider_label(provider_cmd)}，已缓存为 "
+          f"{os.path.basename(path)}）")
     return "generated"
 
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 取图策略之三：**写清契约，交给人去生成**
+# 取图策略：**写清契约，再由人（或配好的后端）出图**
 #
-# 为什么把它做成推荐路径：脚本擅长的是"知道每张图放进哪个槽位、那个槽位实测多少
-# 像素、它会被制版管线怎么处理"—— 这些模型不会自己知道。而"出一张好看的图"这件事，
-# 人在自己顺手的模型里做得比脚本去调一个陌生的 API 好。所以分工是：
+# 为什么契约放在第一位：脚本擅长的不是画图，是"知道每张图放进哪个槽位、那个槽位实测
+# 多少像素、它会被版式怎么裁"—— 这些模型不会自己知道。所以主路径是：
 #
-#     **脚本写契约与提示词 → 人出图 → 脚本再验一遍**
+#     **脚本写契约与提示词 → 出图（人或配好的后端）→ 脚本再验一遍**
 #
-# 与另两条策略（provider-cmd / 几何色块拼贴）并列，不是替代关系：
-# provider-cmd 给有 API 的人，拼贴给"先跑起来看看"，brief 给真做设计的人。
+# 出图的两条路（`--generate`）：`--provider-cmd` 给有生图命令的人；没给就用内置
+# MiniMax（配了 MINIMAX_API_KEY / MINIMAX_CN_API_KEY 时）。都没配时**不装作能做**：
+# 说清手动路径与要放的目录，而不是产一张脚本拼的图混进交付。
 # ═══════════════════════════════════════════════════════════════════════════
 
 # 图片槽位的目标倍率：2x。与 shots.py 的 --force-device-scale-factor=2 同一个理由 ——
@@ -187,8 +317,7 @@ def _slot_geometry(spec_path: str, style: str | None) -> tuple[dict, str]:
     project_dir = os.path.dirname(os.path.abspath(spec_path))
     style_name = style or deck.get("style")
     tokens = render_mod.load_style(style_name, project_dir)["tokens"]
-    color_set = deck.get("colorSet") or next(iter(tokens["colorSets"]), "")
-    colors = tokens["colorSets"].get(color_set) or next(iter(tokens["colorSets"].values()))
+    colors = _pick_colors(deck, tokens)
 
     # 尺子（按推荐比例）+ 探针 HTML 都进临时目录，产物目录一个字节都不写
     slots = [s for s in deck.get("slides", []) if s.get("image")]
@@ -258,6 +387,16 @@ def suggest_image_slots(spec_path: str) -> list[str]:
                        f"用整幅色块或换版式（这一条是版式的限制，不是没要图）")
             break
     return out
+
+
+def _pick_colors(deck: dict, tokens: dict) -> dict:
+    """spec 指定的色板（缺省第一套）。
+
+    单独抽出来是因为缓存 key 含色板：`--brief` 与 `--generate` 必须算出**同一把**
+    key，否则同一张图会被重复付费生成一遍。
+    """
+    color_set = deck.get("colorSet") or next(iter(tokens["colorSets"]), "")
+    return tokens["colorSets"].get(color_set) or next(iter(tokens["colorSets"].values()))
 
 
 def _aspect_box(w: int, h: int) -> str:
@@ -813,6 +952,80 @@ def check_images(spec_path: str, out_dir: str, style: str | None = None,
                 f"只要主体不贴边、画面里没有文字，裁切看不出来")
     return (1 if problems else 0, problems, notes)
 
+def _provider_label(provider_cmd: str | None) -> str:
+    """说清这一轮**拿谁**出图 —— 生图是花钱的一步，用哪个后端要写明白。"""
+    if provider_cmd:
+        return "你的命令（--provider-cmd）"
+    if minimax_key():
+        model = os.environ.get("MINIMAX_IMAGE_MODEL") or MINIMAX_MODEL_DEFAULT
+        return f"内置 MiniMax（{model}）"
+    return "没配"
+
+
+def generate_images(spec_path: str, out_dir: str, style: str | None = None,
+                    provider_cmd: str | None = None,
+                    contract_dir: str | None = None) -> tuple[int, list[str], list[str]]:
+    """按契约里**填好的**提示词逐槽位出图。返回 `(退出码, 已出, 说明)`。
+
+    提示词从 `assets/requests/<文件名>.json` 的 `prompt` 读 —— 那是契约，也是人
+    填完的版本。**这一步只读契约、只写图**：不重新生成模板（那会把填好的内容
+    覆盖回占位符），也不重新渲一遍量一遍（契约里的 `aspect` 就是实测槽位比例）。
+
+    “还没填”不是错误而是**阻塞**：把模板（或带 〈…〉/<…> 的文本）发给模型，
+    只会得到一张模板画，钱是真花了。所以报错要指明**填哪个文件**。
+
+    没配后端时**动手前一次说清两条路**（手动 / 直连），不在循环里每张抛一次。
+    已存在的文件不覆盖（可能是人手出的好图，也可能是上次已付过费的图）——
+    要重出就把它删掉。
+    """
+    if not provider_cmd and not minimax_key():
+        contract = os.path.join(contract_dir or out_dir, "image-brief.md")
+        raise SystemExit(
+            f"✗ 没配生图后端，一步都没跑。两条路：\n"
+            f"  1. 手动：按 {contract} 的提示词出图 → 存到 {out_dir}/<契约里的文件名>"
+            f" → `--check` 验一遍；\n"
+            f"  2. 直连：--provider-cmd '你的命令 --prompt {{prompt}} --out {{out}}'，"
+            f"或设 MINIMAX_API_KEY / MINIMAX_CN_API_KEY（内置 MiniMax，"
+            f"{MINIMAX_MODEL_DEFAULT}）")
+    req_dir = os.path.join(contract_dir or os.path.dirname(os.path.abspath(spec_path)),
+                           "assets", "requests")
+    reqs = sorted(glob.glob(os.path.join(req_dir, "*.json")))
+    if not reqs:
+        raise SystemExit(f"✗ {req_dir} 里没有契约 —— 先跑 `--brief "
+                         f"{os.path.basename(spec_path)}` 生成契约与提示词")
+    # 与 --brief 同一把缓存 key（色板 + 尺寸都取同一套），重跑不重复付费
+    spec_deck = deckio.read_json(spec_path).get("deck", {})
+    tokens = _load_sibling("render").load_style(
+        style or spec_deck.get("style"),
+        os.path.dirname(os.path.abspath(spec_path)))["tokens"]
+    colors = _pick_colors(spec_deck, tokens)
+    width = 640 * BRIEF_SCALE
+    size = (width, round(width * BRIEF_ASPECT[1] / BRIEF_ASPECT[0]))
+    print(f"· {_provider_label(provider_cmd)}：{len(reqs)} 个槽位 · 每槽 1 张")
+    done: list[str] = []
+    blocked: list[str] = []
+    notes: list[str] = []
+    for req_path in reqs:
+        name = os.path.basename(req_path)[: -len(".json")]
+        target = os.path.join(out_dir, name)
+        if os.path.isfile(target):
+            notes.append(f"{name}：已存在，跳过（要重出就删掉它）")
+            continue
+        request = deckio.read_json(req_path)
+        prompt = str(request.get("prompt") or "").strip()
+        blanks = PLACEHOLDER_RE.findall(prompt)
+        if not prompt or blanks:
+            blocked.append(
+                f"{name}：提示词还没填（{blanks[0] if blanks else '空'}）—— 把 "
+                f"{os.path.relpath(req_path)} 的 prompt 里 〈…〉/ <…> 换成内容")
+            continue
+        aspect = request.get("aspect")
+        how = resolve(prompt, colors, size, target, provider_cmd,
+                      aspect=aspect if isinstance(aspect, (int, float)) else None)
+        done.append(f"{name}（{how} → {minimax_ratio(aspect)}）")
+    return (1 if blocked else 0, done, notes + blocked)
+
+
 def _parse_size(raw: str) -> tuple[int, int]:
     """`WxH` → (w, h)。格式不对要说清楚哪里不对，不甩生成器报错。"""
     parts = raw.lower().split("x")
@@ -840,9 +1053,14 @@ def _temp_dir_note(path: str) -> str | None:
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(
-        description="图片来源两条路：**写契约给人出图（--brief，默认）** / 调你的生图命令（--provider-cmd）")
+        description="图片来源：写契约→出图（人，或配好的后端走 --generate）；"
+                    "脚本不手画图，也没有降级产物")
     # 两条路各自的入口：
     #   --brief 推荐（人出图）· --check 验人交付的图 · --prompt+--provider-cmd 给有 API 的人
+    ap.add_argument("--generate", default=None, metavar="SPEC",
+                    help="按契约里的提示词出图（**要花钱**，只有显式给这个参数才会调）："
+                         "给了 --provider-cmd 用它；否则用内置 MiniMax（需 "
+                         "MINIMAX_API_KEY / MINIMAX_CN_API_KEY）；都没配就说清手动怎么走")
     ap.add_argument("--brief", default=None, metavar="SPEC",
                     help="从这份 spec 生成**图片提示词契约**（人拿它去出图）")
     ap.add_argument("--check", default=None, metavar="SPEC",
@@ -861,8 +1079,8 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--size", default="640x400")
     ap.add_argument("--json", action="store_true", help="--brief 时额外输出机读 JSON")
     ap.add_argument("--provider-cmd", default=None,
-                    help="生图命令，用 {prompt} 与 {out} 占位；不给就拒绝："
-                         "脚本不自己画图，改用 --brief 拿提示词")
+                    help="生图命令，用 {prompt} 与 {out} 占位（不过 shell）；"
+                         "不给就用内置 MiniMax（配了密钥时），都没配就拒绝")
     args = ap.parse_args(argv[1:])
 
     if args.brief:
@@ -887,6 +1105,22 @@ def main(argv: list[str]) -> int:
             print(json.dumps(brief, ensure_ascii=False, indent=2))
         return 0
 
+    if args.generate:
+        # 与 --brief 同一套口径：图片在 `--dir` 或 spec 同目录；契约始终在 spec 同目录
+        spec_dir = os.path.dirname(os.path.abspath(args.generate))
+        out_dir = args.dir or spec_dir
+        code, done, notes = generate_images(args.generate, out_dir, args.style,
+                                           provider_cmd=args.provider_cmd,
+                                           contract_dir=spec_dir)
+        for line in done:
+            print(f"  ✓ {line}")
+        for line in notes:
+            print(f"  · {line}")
+        if done:
+            print(f"\n✓ 出了 {len(done)} 张 → {out_dir}")
+            print(f"  验一遍：image_source.py --check {args.generate}")
+        return code
+
     if args.check:
         out_dir = args.dir or os.path.dirname(os.path.abspath(args.check))
         code, problems, notes = check_images(args.check, out_dir, args.style)
@@ -905,7 +1139,8 @@ def main(argv: list[str]) -> int:
         return 0
 
     if not args.prompt or not args.out:
-        raise SystemExit("✗ 要么给 --brief/--check（推荐），要么给 --prompt 与 -o（需要 --provider-cmd）")
+        raise SystemExit("✗ 要么给 --brief/--generate/--check（推荐），"
+                         "要么给 --prompt 与 -o")
     tokens = deckio.read_json(args.tokens)
     color_set = args.color_set or next(iter(tokens["colorSets"]), None)
     if color_set not in tokens["colorSets"]:

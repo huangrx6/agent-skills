@@ -227,7 +227,7 @@ Page Planner 再映射（comparison → chart / two-column）。
 ## 31. Visual Requirement（落进 spec 就是 `visual`）
 
 Page Planner 必须给每页**决定一个视觉载体**，写进 spec 的 `visual`：`none`（纯文字立得住）/ 
-`evidence_image`（照片、插画、结构图、流程图 —— 都由人拿提示词出图）/ `data`（图表）。
+`evidence_image`（照片、插画、结构图、流程图 —— 都由人（或配好的后端）拿提示词出图）/ `data`（图表）。
 要图与要图表时 `ratio` 必填（`"3:2"` / `"4:3"` / `"1:1"` / `"16:9"`）—— 比例写下来才算定，
 槽位高度按它算。**档位的语义、谁做、落到哪见 `images.md`**；`validate_spec.py` 拦未知档与
 自相矛盾，`check.py` 点出没决定的页。

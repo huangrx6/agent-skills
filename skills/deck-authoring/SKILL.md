@@ -87,7 +87,8 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
 5. **素材**：逐页决定这页靠什么立住，写进 spec 的 `visual` 三档 —— 纯文字 `{"kind":"none"}`
    （不必配图，但必须**决定过**）｜图表 `{"kind":"data"}`（chart 版式）｜
    照片/插画/主视觉/**结构图与流程图** `{"kind":"evidence_image"}`（`--brief` 出**提示词** →
-   你出图 → 放回目录 → `--check`）。
+    出图 → 放回目录 → `--check`；配了生图后端（`--provider-cmd`、或 `MINIMAX_API_KEY` /
+    `MINIMAX_CN_API_KEY`）就能直接 `--generate`，没配就把提示词交给用户去出）。
    `evidence_image` 与 `data` 的 `ratio` **必填**（如 `"3:2"` / `"1:1"`）—— 比例写下来才算定，
    槽位按它定高。**图不由脚本手画，也不在别的工具里手画**：结构图/流程图同样出图 —— 图生
    模型按得住比例，手画很难控（画多大、导多宽都不好定）。`image` 只填文件名；SVG 只做

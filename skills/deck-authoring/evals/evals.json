@@ -86,10 +86,19 @@
     {
       "id": 10,
       "prompt": "这份 deck 每一页看起来都差不多，能不能换换排法？",
-      "expected_output": "这是**布局轮换**问题，当前工具直接支持：`render.py your.spec.json -o out.html --candidates` 会按页给出多个结构候选（同内容不同结构）并渲一张带选择面板的对比页；在页面上挑完点「复制选择」得到 picks JSON，再用 `--picks picks.json` 回写（或用 `--pick` 直接采用最优）。也可以逐页显式写 `layout`（`content-image`：`visual-right`（缺省）/ `visual-left` / `even` / `hero`；`two-column`：`even` / `lean-left` / `lean-right`），或写一个表外的结构名（如 `poster-split`）由 `skin.css` 自己排。判据：**每页同构图是反 slop 第一条** —— 同型页连排要换布局换节奏。改完重跑 `check.py`（换布局后越界 / 碰撞要重新实测）。",
+      "expected_output": "这是**布局轮换**问题，当前工具直接支持：`render.py your.spec.json -o out.html --candidates` 会按页给出多个结构候选（同内容不同结构）并渲一张带选择面板的对比页；在页面上挑完点「复制选择」得到 picks JSON，再用 `--picks picks.json` 回写（或用 `--pick` 直接采用最优）。也可以逐页显式写 `layout`（`content-image`：`visual-right`（缺省）/ `visual-left` / `even` / `visual-wide` / `hero`；`two-column`：`even` / `lean-left` / `lean-right` / `lean-hard-left` / `lean-hard-right`），或写一个表外的结构名（如 `poster-split`）由 `skin.css` 自己排。判据：**每页同构图是反 slop 第一条** —— 同型页连排要换布局换节奏。改完重跑 `check.py`（换布局后越界 / 碰撞要重新实测）。",
       "files": [
         "SKILL.md",
         "references/layout-system.md"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "图我自己出太慢了，我配了 MiniMax 的 key，你能直接生成吗？",
+      "expected_output": "可以，但**只有显式调 `--generate` 才会出图**（这一步花钱，不做任何自动触发）：先用 `image_source.py --brief your.spec.json` 拿契约（每槽位一份 `assets/requests/<文件名>.json`），把 `prompt` 里的 `〈…〉`（英文模板是 `<…>`）换成内容，再 `image_source.py --generate your.spec.json` 逐槽位出图，最后 `--check` 照旧验一遍（不问谁画的）。后端优先级：`--provider-cmd` → 内置 MiniMax（`MINIMAX_API_KEY` 或 `MINIMAX_CN_API_KEY`，可选 `MINIMAX_API_HOST` / `MINIMAX_IMAGE_MODEL`）。**没配就一步都不跑**，直接说清手动出图存哪个目录、或该设哪个变量 —— 不产降级图；提示词里还有占位符也停下（不许花钱买一张模板画）；目标文件已在、或同一提示词上次已出过则跳过 / 命中缓存，不重复付费。比例取官方八档里最近的一档；比例不齐不阻塞交付（版式按槽位裁切或留边）。",
+      "files": [
+        "references/images.md",
+        "SKILL.md"
       ]
     }
   ]

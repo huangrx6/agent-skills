@@ -496,7 +496,7 @@ Repair 保证质量，Export QA 保证最终交付。本仓库**已接机的范�
 S=skills/deck-authoring/scripts
 # ①-③ 规划由作者/AI 写三份 JSON（无脚本校验）
 python3 $S/validate_spec.py deck.spec.json
-python3 $S/image_source.py --brief deck.spec.json   # 人出图后：
+python3 $S/image_source.py --brief deck.spec.json   # 出图（人，或配好后端走 --generate）后：
 python3 $S/image_source.py --check deck.spec.json
 python3 $S/render.py deck.spec.json -o deck.html    # 加 --resolved / --trace 出中间产物
 python3 $S/check.py deck.spec.json deck.html
