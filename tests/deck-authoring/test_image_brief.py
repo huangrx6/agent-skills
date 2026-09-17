@@ -377,6 +377,24 @@ class TestCheck(unittest.TestCase):
         self.assertTrue(any("400px 宽" in p for p in problems), problems)
         self.assertTrue(any("1280px" in p for p in problems), problems)
 
+    def test_a_tiny_shortfall_is_a_note_not_a_blocker(self) -> None:
+        """“出小了”那条门的容差：生图服务每个比例给的是**固定像素**，未必正好够 1280。
+
+        实测形状：官方 MiniMax 的 3:2 就是 1248×832（少 2.5%）。这种图判成“会糊”
+        会把整条链卡在一张本来能用的图上 —— 而门该拦的是“拿缩略图当大图”。
+        """
+        self._write(1248, 832)
+        code, problems, notes = image_source.check_images(self.spec, self.dir)
+        self.assertEqual(code, 0, problems)
+        self.assertTrue(any("1248px 宽" in n for n in notes), notes)
+
+    def test_the_tolerance_does_not_swallow_a_real_shortfall(self) -> None:
+        """反面对照：容差不是把门拆了 —— 差得多仍然是阻塞项。"""
+        self.assertEqual(image_source.SIZE_TOLERANCE, 0.05)
+        self._write(int(1280 * (1 - image_source.SIZE_TOLERANCE)) - 1, 704)
+        code, problems, _notes = image_source.check_images(self.spec, self.dir)
+        self.assertEqual(code, 1, problems)
+
     def test_svg_slots_are_read_from_viewbox(self) -> None:
         """SVG 是矢量：尺寸读 viewBox，且不做"放大=糊"那条。
 

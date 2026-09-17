@@ -287,6 +287,12 @@ def resolve(prompt: str, colors: dict, size: tuple[int, int], out: str,
 # 投影与打印都不糊。1x 在屏幕上勉强够，投到大屏就是糊的。
 BRIEF_SCALE = 2
 
+# 宽度差这么一点点不算问题。为什么要有这个容差：生图服务每个比例给的是**固定像素**，
+# 未必正好够我们要的宽度 —— 官方 MiniMax 的 3:2 是 1248×832，比 1280 少 2.5%；
+# 而把这种本来能用的图判成"会糊"，整条链就卡在一张没毛病的图上。
+# 差得多的（> 5%）仍然是阻塞项：那道门的本意是"别拿缩略图当大图"。
+SIZE_TOLERANCE = 0.05
+
 # 推荐的画面比例（照片类槽位）。选 3:2 而不是 16:9 或 1:1：
 #   · `.imgwrap` 宽 640px，旁边是 820px 的文字栏 —— 太宽会让图显得像背景条
 #   · 高度要能塞进正文带（页脚之上），1:1 的 640px 高会顶到页脚
@@ -938,10 +944,15 @@ def check_images(spec_path: str, out_dir: str, style: str | None = None,
         if path.lower().endswith(".svg"):
             notes.append(f"第 {page} 页：`{name}` 是**矢量图**（SVG）—— 不做放大检查"
                          f"（放多大都不糊）；比例按 viewBox {w}×{h} 算")
-        elif w < want_w:
+        elif w < want_w * (1 - SIZE_TOLERANCE):
             problems.append(
                 f"第 {page} 页：`{name}` 只有 {w}px 宽，契约要 {want_w}px —— "
                 f"放进版面会被放大渲染（会糊）")
+        elif w < want_w:
+            notes.append(
+                f"第 {page} 页：`{name}` {w}px 宽，比契约的 {want_w}px 少 "
+                f"{(1 - w / want_w) * 100:.1f}% —— 会轻微放大，肉眼看不出来。"
+                f"服务商每个比例给的是固定像素，这不算出小了")
         ratio_want = want_ratio.get(name, BRIEF_ASPECT[0] / BRIEF_ASPECT[1])
         ratio_got = w / h
         if abs(ratio_got - ratio_want) > 0.12:
