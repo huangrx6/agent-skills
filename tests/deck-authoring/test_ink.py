@@ -14,7 +14,10 @@
 
 from __future__ import annotations
 
+import contextlib
+import copy
 import importlib.util
+import io
 import json
 import os
 import sys
@@ -105,6 +108,39 @@ class TestInkGate(unittest.TestCase):
         for color in ("#FF48B0", "#00A8E8", "#F5EFDD", "#000000", "#FFFFFF"):
             with self.subTest(color=color):
                 self.assertAlmostEqual(ink.contrast(color, color), 1.0, places=12)
+
+
+class TestGateOutputMatchesTheVerdict(unittest.TestCase):
+    """门的输出是给人看的 —— 它写"门槛 X"就必须真的按 X 判。
+
+    `contrast.minLarge` / `largeTextPx` 只备着、不参与判定（见 validation.md ①）：
+    输出若把大字档写成"门槛 3.0"，用户就会照它调色，而实际判据是"整副一刀 4.5"。
+    两条一起钉：**把它改成离谱值，判定不变**（证明确实没用它），
+    且**输出里必须当场说明它不检查**（证明确实说清了）。
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        with open(TOKENS, encoding="utf-8") as fh:
+            cls.tokens = json.load(fh)
+
+    def _run(self, tokens: dict) -> tuple[int, str]:
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = ink.check(tokens)
+        return code, buf.getvalue()
+
+    def test_min_large_never_changes_the_verdict(self) -> None:
+        base_code, base_out = self._run(copy.deepcopy(self.tokens))
+        wild = copy.deepcopy(self.tokens)
+        wild["contrast"]["minLarge"] = 99.0     # 高到任何色板都过不了
+        wild["contrast"]["largeTextPx"] = 1     # 让每个字都算"大字"
+        code, out = self._run(wild)
+        self.assertEqual(code, base_code,
+                         "改 minLarge 竟然改变了判定 —— 说明它在当门槛用")
+        self.assertIn("不检查", out, "输出必须标出大字档不生效，否则用户会照它调色")
+        self.assertIn(str(self.tokens["contrast"]["minBody"]), base_out,
+                      "输出要点出真正在判的那个数")
 
 
 if __name__ == "__main__":
