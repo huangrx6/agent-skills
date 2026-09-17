@@ -68,25 +68,32 @@ deckio = _load_sibling("deckio")   # IO 收口：参数写错要报清楚，不�
 # 每份 deck 长得一样（用户实测："无论换什么主题，产物永远一个样式"）——
 # 一个可拷贝的模板必然会变成默认答案。风格按规则现写，形状见
 # references/style-architecture.md。
-def style_roots() -> tuple[str, ...]:
+def style_roots(project_dir: str | None = None) -> tuple[str, ...]:
     """风格解析根（**每次调用时算**，不是 import 时冻结）。
 
     顺序即优先级：
       1. 环境变量 DECK_STYLES 指的根（`:` 分隔）—— 测试夹具、预览草稿、
          或风格放在 deck 项目之外时的显式入口；
-      2. <当前目录>/styles —— 风格跟着 deck 项目走（工具链只写这里）；
-      3. skill 的 styles/ —— 用户显式托管的全局风格（工具链永不写入）。
+      2. `<project_dir>/styles` —— deck 项目（**= spec 所在目录**）；
+      3. <当前目录>/styles —— 没拿到 spec 路径时的兜底（列风格、测试）；
+      4. skill 的 styles/ —— 用户显式托管的全局风格（工具链永不写入）。
 
     为什么是函数而不是常量：常量会在 import 时把 cwd 冻住 —— 调用方（尤其测试）
     之后改 cwd 或设环境变量都无效，于是"为什么找不到风格"变成谜。
+
+    为什么必须有 project_dir 这一档：deck 项目就是 spec 所在目录（交付单元），
+    从别的 cwd 跑同一个 spec 必须找到同一套风格 —— 只看 cwd 的话，报错文案
+    指着"deck 项目的 styles/<名>/"，而代码根本没看那里。
     """
     roots: list[str] = []
     extra = os.environ.get("DECK_STYLES")
     if extra:
         roots.extend(p for p in extra.split(os.pathsep) if p)
+    if project_dir:
+        roots.append(os.path.join(project_dir, "styles"))
     roots.append(os.path.join(os.getcwd(), "styles"))
     roots.append(os.path.join(HERE, "..", "styles"))
-    return tuple(roots)
+    return tuple(dict.fromkeys(roots))
 # content-image 的**结构布局**（渲染器能力 —— 像图表的八类图形，不是审美枚举）：
 #   visual-right = 文 7 栅 + 图 5 栅（缺省结构）
 #   visual-left  = 图先文后（镜像）
@@ -183,7 +190,7 @@ def _rng(seed, *parts) -> random.Random:
     return random.Random("|".join([str(seed)] + [str(p) for p in parts]))
 
 
-def style_names() -> list[str]:
+def style_names(project_dir: str | None = None) -> list[str]:
     """全部可用风格名（用户根在前，保持插入序去重）。
 
     只认**含 style.json 的目录**：styles/ 是用户目录，会攒实验草稿和无关
@@ -191,7 +198,7 @@ def style_names() -> list[str]:
     清单的目录是"还没成风格的文件夹"，不是坏风格，不该出现在任何列表里。
     """
     names: list[str] = []
-    for root in style_roots():
+    for root in style_roots(project_dir):
         for n in deckio.list_dirs(root):
             if n in names:
                 continue
@@ -201,7 +208,7 @@ def style_names() -> list[str]:
     return names
 
 
-def style_folder(name: str) -> str | None:
+def style_folder(name: str, project_dir: str | None = None) -> str | None:
     """风格目录路径（含 style.json 的第一个根）；找不到返回 None。
 
     `name` 也可以是**显式目录路径**（含 style.json）—— 三方向预览草稿在
@@ -209,7 +216,7 @@ def style_folder(name: str) -> str | None:
     """
     if os.path.isdir(name) and os.path.isfile(os.path.join(name, "style.json")):
         return os.path.abspath(name)
-    for root in style_roots():
+    for root in style_roots(project_dir):
         folder = os.path.join(root, name)
         if os.path.isfile(os.path.join(folder, "style.json")):
             return folder
@@ -260,7 +267,7 @@ def style_location_note(folder: str | None, spec_path: str) -> str | None:
     return None
 
 
-def load_style(name: str | None = None) -> dict:
+def load_style(name: str | None = None, project_dir: str | None = None) -> dict:
     """加载一个风格目录 → `{"name", "tokens", "skin"}`。
 
     `name` 既可以是**风格名**（在两根里找），也可以是**显式目录路径** ——
@@ -275,10 +282,10 @@ def load_style(name: str | None = None) -> dict:
             "spec 里写 \"style\": \"<名>\"；\n"
             "  style.json 的契约（顶层键 / 字号档 / 色板 / motion / 可选 effect）"
             "见 references/style-architecture.md。")
-    folder = style_folder(name)
+    folder = style_folder(name, project_dir)
     if folder is None:
         raise SystemExit(
-            f"✗ 没有风格 {name!r}（现有：{style_names()}）\n"
+            f"✗ 没有风格 {name!r}（现有：{style_names(project_dir)}）\n"
             f"  风格按规则现写：deck 项目的 styles/<名>/ 里放 style.json + skin.css"
             f"（形状见 references/style-architecture.md）。")
     tokens_path = os.path.join(folder, "style.json")
@@ -1373,7 +1380,8 @@ def resolve_asset(assets: dict | None, image_value: str) -> str | None:
 
 
 def render(deck_spec: dict, style: dict | None = None,
-           assets: dict | None = None) -> str:
+           assets: dict | None = None,
+           project_dir: str | None = None) -> str:
     """渲染。输入两种都认（第三代链路：`Slide DSL → compile → resolved → Renderer 只画`）：
 
     - 语义 spec：先经 `compile.compile_spec` 决策（风格/品牌合并、色板、字号档、
@@ -1387,7 +1395,8 @@ def render(deck_spec: dict, style: dict | None = None,
     if deck_mod.is_resolved(deck_spec):
         return render_resolved(deck_spec)
     return render_resolved(deck_mod.compile_spec(deck_spec, style,
-                                                       assets=assets))
+                                                       assets=assets,
+                                                       project_dir=project_dir))
 
 
 def render_resolved(resolved: dict) -> str:
@@ -1770,7 +1779,8 @@ def _load_layout():
 
 
 def _repair_loop(deck_spec: dict, style: dict, assets: dict | None,
-                 out_path: str, max_iter: int = 4) -> int:
+                 out_path: str, max_iter: int = 4,
+                 project_dir: str | None = None) -> int:
     """渲 → 实测 → 修复梯 → 再渲（≤ max_iter 轮）。
 
     每轮把当前产物写到 out_path（最后一轮即交付物）；补丁与诊断写
@@ -1783,7 +1793,8 @@ def _repair_loop(deck_spec: dict, style: dict, assets: dict | None,
     iterations = 0
     for i in range(max_iter):
         iterations = i + 1
-        resolved = deck_mod.compile_spec(deck_spec, style, assets=assets)
+        resolved = deck_mod.compile_spec(deck_spec, style, assets=assets,
+                                         project_dir=project_dir)
         deckio.write_text(out_path, render_resolved(resolved))
         measured = measure_mod.measure(out_path)
         issues = repair_mod.signals(measured)
@@ -1997,7 +2008,8 @@ def _apply_picks(deck_spec: dict, picks: dict) -> tuple[dict, list[str], list[st
 
 def _candidates_main(deck_spec: dict, style: dict, assets, out_path: str,
                      pick: bool, seed=None, picks_path: str | None = None,
-                     compare_path: str | None = None) -> int:
+                     compare_path: str | None = None,
+                     project_dir: str | None = None) -> int:
     """页级候选：每页 3 个**结构不同**的候选 + 1 个"当前/缺省"，整份 deck 联合择优。
 
     与旧版的区别（旧版逐页各挑各的最优）：
@@ -2038,7 +2050,8 @@ def _candidates_main(deck_spec: dict, style: dict, assets, out_path: str,
                 touched = True
         if not touched:
             break
-        html = render_resolved(deck_mod.compile_spec(trial, style, assets=assets))
+        html = render_resolved(deck_mod.compile_spec(trial, style, assets=assets,
+                                                     project_dir=project_dir))
         with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as tf:
             tf.write(html)
             trial_path = tf.name
@@ -2127,7 +2140,8 @@ def _candidates_main(deck_spec: dict, style: dict, assets, out_path: str,
     # 页码引用会失效（页数变了）—— 对比产物是**给人挑的**，不是交付物，
     # 所以只把原始页号写在面板里，产物内部不再依赖页码。
     compare_html = render_resolved(
-        deck_mod.compile_spec(compare_spec, style, assets=assets))
+        deck_mod.compile_spec(compare_spec, style, assets=assets,
+                              project_dir=project_dir))
     compare_html = compare_html.replace(
         "</body>", _cmp_panel_html(panel_plan, seed) + "</body>")
     deckio.write_text(compare_path, compare_html)
@@ -2147,7 +2161,8 @@ def _candidates_main(deck_spec: dict, style: dict, assets, out_path: str,
         picked_path = os.path.splitext(out_path)[0] + ".picked.spec.json"
         deckio.write_json(picked_path, picked)
         deckio.write_text(out_path, render_resolved(
-            deck_mod.compile_spec(picked, style, assets=assets)))
+            deck_mod.compile_spec(picked, style, assets=assets,
+                                  project_dir=project_dir)))
         print(f"✓ 已按选择渲染 {out_path}（{'、'.join(applied)}）")
         print(f"  采纳后的 spec：{picked_path}")
         return 0
@@ -2161,7 +2176,8 @@ def _candidates_main(deck_spec: dict, style: dict, assets, out_path: str,
         deckio.write_json(os.path.splitext(out_path)[0] + ".candidates.spec.json",
                           picked_spec)
         deckio.write_text(out_path, render_resolved(
-            deck_mod.compile_spec(picked_spec, style, assets=assets)))
+            deck_mod.compile_spec(picked_spec, style, assets=assets,
+                                  project_dir=project_dir)))
         where = "、".join(f"第 {i} 页 → {n}" for i, n in sorted(chosen.items()))
         print(f"✓ 已自动采用最优并渲染：{where}")
         return 0
@@ -2200,23 +2216,40 @@ def main(argv: list[str]) -> int:
                     help="候选择优的随机种子（缺省读 spec 的 deck.seed）——"
                          "同 seed 同输入必得同结果")
     args = ap.parse_args(argv[1:])
+    # 三种**早退模式**各自是独立产物，不是可以叠加的开关：同给多个时旧行为是
+    # 静默只跑第一个 —— 用户看到有输出，就以为两个都跑了（其实另一个从没执行）。
+    modes = [("--contract", bool(args.contract)),
+             ("--repair", bool(args.repair)),
+             ("--candidates/--pick/--picks",
+              bool(args.candidates or args.pick or args.picks))]
+    chosen = [flag for flag, on in modes if on]
+    if len(chosen) > 1:
+        raise SystemExit(
+            f"✗ {' 与 '.join(chosen)} 互斥，一次只能跑一个：\n"
+            f"  --contract 只算容量表 / --repair 渲完自动修 / "
+            f"--candidates 出候选对比页 —— 分三次跑。")
     deck_spec = deckio.read_json(args.spec)
     assets = load_assets(args.spec)      # assets/manifest.json（§12 管线入口）
+    # deck 项目 = spec 所在目录（SKILL.md）：风格与品牌都先看这里 ——
+    # 于是从任何 cwd 跑同一个 spec，找到的都是同一套。
+    spec_dir = os.path.dirname(os.path.abspath(args.spec))
     name = args.style or deck_spec["deck"].get("style")
-    style = load_style(name)
+    style = load_style(name, spec_dir)
     if args.contract:
         return _contract_main(deck_spec, style, args.json)
     if args.repair:
-        return _repair_loop(deck_spec, style, assets, args.out)
+        return _repair_loop(deck_spec, style, assets, args.out, project_dir=spec_dir)
     if args.candidates or args.pick or args.picks:
         return _candidates_main(deck_spec, style, assets, args.out, args.pick,
-                               seed=args.seed, picks_path=args.picks)
-    resolved = deck_mod.compile_spec(deck_spec, style, assets=assets)
+                               seed=args.seed, picks_path=args.picks,
+                               project_dir=spec_dir)
+    resolved = deck_mod.compile_spec(deck_spec, style, assets=assets,
+                                     project_dir=spec_dir)
     page = render_resolved(resolved)
     deckio.write_text(args.out, page)
     print(f"✓ 已写出 {args.out}（风格 {style['name']} / {len(page)} 字节 / "
           f"{len(deck_spec['deck']['slides'])} 页）")
-    loc_note = style_location_note(style_folder(name), args.spec)
+    loc_note = style_location_note(style_folder(name, spec_dir), args.spec)
     if loc_note:
         print(loc_note)
     if args.resolved:

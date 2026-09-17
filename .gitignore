@@ -30,13 +30,12 @@ dist/
 
 # subagent 探查报告（保留在工作区，不进 git 历史）
 file-only/
-# skill 打包产物（安装/分发用）。**曾被我误用 git add -A 扫进一次** —— 真要入库请用 git add -f
+# skill 打包产物（安装/分发用）。真要入库请用 git add -f
 skills/*.zip
 
-# deck-authoring 的 demo 产物（本地生成，不入库）。
-# 仓库只收文本 + assets/icons 下两个 SVG；见该 skill 的 README「跑法」。
+# deck-authoring 跑管线产生的二进制/图片（本地生成，不入库；仓库只收文本）。
 # 这条清单要**跟着产出物的种类长** —— 新加一种导出就得补一行，
-# 漏一行就是让一个几 MB 的二进制摸进公共仓库（`out.pdf` / 两种 pptx 就是这么漏的）。
+# 漏一行就是让一个几 MB 的二进制摸进公共仓库。
 skills/deck-authoring/sample-treated.png
 # 字体文件**不进仓库**：单款 CJK 字体 5–28MB，126 款就是 1–2GB。
 # 仓库只存清单（fonts/catalog.json）与映射表（fonts/mapping.json），

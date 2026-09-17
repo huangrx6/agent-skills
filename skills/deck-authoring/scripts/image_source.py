@@ -183,8 +183,10 @@ def _slot_geometry(spec_path: str, style: str | None) -> tuple[dict, str]:
     measure_mod = _load_sibling("measure")
     spec = deckio.read_json(spec_path)
     deck = spec.get("deck", {})
+    # 解析根与渲染层同一套：deck 项目 = spec 所在目录（不是 cwd）
+    project_dir = os.path.dirname(os.path.abspath(spec_path))
     style_name = style or deck.get("style")
-    tokens = render_mod.load_style(style_name)["tokens"]
+    tokens = render_mod.load_style(style_name, project_dir)["tokens"]
     color_set = deck.get("colorSet") or next(iter(tokens["colorSets"]), "")
     colors = tokens["colorSets"].get(color_set) or next(iter(tokens["colorSets"].values()))
 
@@ -202,7 +204,7 @@ def _slot_geometry(spec_path: str, style: str | None) -> tuple[dict, str]:
             if slide.get("image"):
                 slide["image"] = "ruler.png"   # 只改这份探针副本，不动用户那份 spec
         html_path = os.path.join(probe_dir, "probe.html")
-        deckio.write_text(html_path, render_mod.render(spec))
+        deckio.write_text(html_path, render_mod.render(spec, project_dir=project_dir))
         measured = measure_mod.measure(html_path)
     info: dict = {"style": style_name, "colors": colors, "slides": {}}
     for i, slide in enumerate(spec["deck"]["slides"], 1):
@@ -285,7 +287,8 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None,
         else:
             lines.append("  这份 spec 里也没有明显该加图的位置（页数少 / 都是短页）。")
         raise SystemExit("\n".join(lines))
-    tokens = _load_sibling("render").load_style(style_name)["tokens"]
+    tokens = _load_sibling("render").load_style(
+        style_name, os.path.dirname(os.path.abspath(spec_path)))["tokens"]
     label = tokens.get("label", style_name)
     temperature = tokens.get("temperature", "")
     reference = tokens.get("reference", "")
@@ -646,7 +649,7 @@ def write_brief_md(brief: dict, out_path: str) -> str:
         "",
     ]
     for s in brief["slots"]:
-        used = "、".join("第 %d 页" % p for p in s["pages"])
+        used = "、".join(f"第 {p} 页" for p in s["pages"])
         lines += [
             f"## {used} · {' / '.join(s['titles'])}",
             "",
@@ -828,7 +831,7 @@ def _temp_dir_note(path: str) -> str | None:
     """
     real = os.path.realpath(path).rstrip(os.sep) + os.sep
     temp_root = os.path.realpath(tempfile.gettempdir()).rstrip(os.sep) + os.sep
-    if real.startswith(temp_root) or real.startswith("/private/tmp/"):
+    if real.startswith((temp_root, "/private/tmp/")):
         return (f"⚠️ deck 项目在临时目录里：{path}\n"
                 f"   spec / 风格 / 素材 / 提示词合同都该在**项目目录**（随项目交付）——\n"
                 f"   临时目录重启即失，用户也就拿不到这份要他执行的提示词。")

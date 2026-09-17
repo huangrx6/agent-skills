@@ -42,7 +42,8 @@ def _load(name: str):
 
 def block(path: str, tag: str) -> str:
     """取 `<!-- <tag>:start … -->` 与 `<!-- <tag>:end -->` 之间的正文。"""
-    text = open(path, encoding="utf-8").read()
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
     hit = re.search(rf"<!-- {tag}:start[^>]*-->\n(.*?)\n<!-- {tag}:end -->",
                     text, re.S)
     if hit is None:
@@ -64,7 +65,8 @@ class TestRolesDoc(unittest.TestCase):
                          "改角色请改 roles.py，然后重新生成这一段")
 
     def test_markers_appear_exactly_once(self) -> None:
-        text = open(self.doc, encoding="utf-8").read()
+        with open(self.doc, encoding="utf-8") as fh:
+            text = fh.read()
         for tag in ("roles:start", "roles:end"):
             self.assertEqual(text.count(f"<!-- {tag}"), 1,
                              f"{tag} 标记该有且只有一个")
@@ -78,7 +80,7 @@ class TestRolesDoc(unittest.TestCase):
         return hit.group(1)
 
     def test_every_role_has_a_row(self) -> None:
-        rows = [l for l in block(self.doc, "roles").split("\n")[2:] if l.strip()]
+        rows = [line for line in block(self.doc, "roles").split("\n")[2:] if line.strip()]
         named = [self._row_role(row) for row in rows]
         self.assertEqual(named, list(self.roles.ROLES),
                          "表里的角色名与顺序都要跟注册表一致（顺序也是信息）")

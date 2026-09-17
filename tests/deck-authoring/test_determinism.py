@@ -59,7 +59,8 @@ check = _load("_deck_test_check", os.path.join(SCRIPTS, "check.py"))
 
 class TestDeterminism(unittest.TestCase):
     def setUp(self) -> None:
-        self.spec = json.load(open(DEMO, encoding="utf-8"))
+        with open(DEMO, encoding="utf-8") as fh:
+            self.spec = json.load(fh)
         self.style = render.load_style(FIXTURE_STYLE)      # {"name", "tokens", "skin"}
         with open(DEMO, encoding="utf-8") as fh:
             self.spec = json.load(fh)

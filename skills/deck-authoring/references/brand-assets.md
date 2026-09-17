@@ -48,8 +48,11 @@ Hard Constraint > Semantic Requirement > Style Grammar > Creative Preference：
 ## 3. 品牌层的正确职责
 
 品牌层只存"身份"和"不可丢失约束"。目录 `brands/<name>/`（logo + brand.json；
-`assets/product|screenshots|official`、`fonts/` 子目录按需自建）。品牌层可以
-不存在：`deck.brand` 不写就全走 Style + Color + Typography + Asset Rules。
+`assets/product|screenshots|official`、`fonts/` 子目录按需自建）。`brands/`
+本身按**同样的解析根**找（先 `<spec 所在目录>/brands/`，再 `<当前目录>/brands/`，
+再 skill 的 `brands/`，另有 `DECK_BRANDS` 可注入额外根）—— deck 项目 = spec 所在
+目录，从任何 cwd 跑同一个 spec 都命中同一套。品牌层可以不存在：`deck.brand` 不写
+就全走 Style + Color + Typography + Asset Rules。
 
 > ⚠️ **仓库里没有任何示例品牌**。纪律：**示例资产必然被当成可用资产**
 > （示例 logo 会被直接带进真实交付），所以不留任何示例。

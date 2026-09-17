@@ -195,7 +195,8 @@ class TestChartContract(unittest.TestCase):
                                  {"label": "乙", "value": 7}]}]}}
         with tempfile.TemporaryDirectory() as tmp:
             out = self._render(spec, tmp)
-            doc = open(out, encoding="utf-8").read()
+            with open(out, encoding="utf-8") as fh:
+                doc = fh.read()
 
         found = re.search(
             r'<script type="application/json" id="__deck_manifest">(.*?)</script>',
@@ -425,14 +426,15 @@ class TestRepairCLI(unittest.TestCase):
                 capture_output=True, text=True, timeout=300, env=env)
             # 声明页修不了 → 退出码 1（这是契约：不能假装修好了）
             self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
-            report = json.load(open(out + ".repair.json", encoding="utf-8"))
+            with open(out + ".repair.json", encoding="utf-8") as fh:
+                report = json.load(fh)
             fields = {(p["slide"], p["field"], p["to"]) for p in report["patches"]}
             self.assertIn((1, "bulletTier", "bulletSmall"), fields)
             self.assertNotIn((2, "bulletTier", "bulletSmall"), fields,
                              "作者声明过的页不许被改")
             self.assertTrue(any(d["slide"] == 2 for d in report["diagnostics"]))
-            repaired = json.load(
-                open(out.replace(".html", ".repaired.spec.json"), encoding="utf-8"))
+            with open(out.replace(".html", ".repaired.spec.json"), encoding="utf-8") as fh:
+                repaired = json.load(fh)
             self.assertEqual(repaired["deck"]["slides"][0]["bulletTier"],
                              "bulletSmall")
             # 声明页保持原样：repaired spec 里仍是作者声明的 bulletLarge

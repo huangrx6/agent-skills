@@ -954,7 +954,8 @@ def _check_font_fallback(measured: dict, tokens: dict | None = None) -> list[str
                        f"性格映射里挑一个本机可用的族，或自带字体文件走 @font-face")
     return out
 
-def _check_brand(measured: dict, deck: dict, tokens: dict) -> tuple[list[str], list[str]]:
+def _check_brand(measured: dict, deck: dict, tokens: dict,
+                 project_dir: str | None = None) -> tuple[list[str], list[str]]:
     """品牌资产：**logo 压文字（阻塞）** + 两条提示。
 
     为什么 logo 压文字要阻塞：它和“越出该页”是两回事 —— 两个盒子都在页内，
@@ -968,7 +969,7 @@ def _check_brand(measured: dict, deck: dict, tokens: dict) -> tuple[list[str], l
     name = deck.get("brand")
     if not name:
         return problems, notes
-    brand = deck_mod.load(name)
+    brand = deck_mod.load(name, project_dir)
     # 没有"演示品牌"提示：仓库里没有任何示例品牌可被误用
     # （那份 example/ACME 被真用进过交付，所以连示例一起删了）。
     els: list[dict] = measured.get("elements", [])
@@ -1318,25 +1319,28 @@ def _overlap(a: dict, b: dict) -> bool:
                 or a["y"] + a["h"] <= b["y"] or b["y"] + b["h"] <= a["y"])
 
 
-def style_tokens(spec: dict, override: dict | None = None) -> dict:
+def style_tokens(spec: dict, override: dict | None = None,
+                 project_dir: str | None = None) -> dict:
     """解析 deck 用哪个风格，取它的 token。
 
     token 不再由调用方“带进来”：风格已经写在 spec 的 `deck.style` 里了
-    （缺省 swiss-grid）。让校验层自己去读同一份，就不会出现“拿 A 风格的门槛
+    （必填，没有缺省风格）。让校验层自己去读同一份，就不会出现“拿 A 风格的门槛
     去量 B 风格的产物”——那是多风格之后新增的错配面。
+    project_dir：deck 项目目录（= spec 所在目录）—— 与渲染层同一套解析根。
     """
     if override is not None:
         return override
-    return render_mod.load_style(spec["deck"].get("style"))["tokens"]
+    return render_mod.load_style(spec["deck"].get("style"), project_dir)["tokens"]
 
 
 def check(spec: dict, html_path: str, tokens: dict | None = None,
-          measured: dict | None = None, contract: dict | None = None) -> list[str]:
+          measured: dict | None = None, contract: dict | None = None,
+          project_dir: str | None = None) -> list[str]:
     """跑全部阻塞检查，返回问题清单（空的 = 全过）。
 
     `tokens=None` 时按 spec 里的风格去加载 —— 调用方多数情况下不该手递 token。
     """
-    tokens = style_tokens(spec, tokens)
+    tokens = style_tokens(spec, tokens, project_dir)
     problems: list[str] = []
     page = deckio.read_text(html_path)      # 只读一次，校验与提示共用
     deck = spec["deck"]
@@ -1365,7 +1369,7 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     problems.extend(_check_layout(data))
     problems.extend(_check_measured_health(data))
     problems.extend(_check_full_page_image(data, deck))
-    brand_problems, _ = _check_brand(data, deck, tokens)
+    brand_problems, _ = _check_brand(data, deck, tokens, project_dir)
     problems.extend(brand_problems)
     # 空内容与品牌无关，但它和越界一样是“一页看着坏了”—— 所以也走阻塞
     problems.extend(_check_empty_content(deck))
@@ -1587,7 +1591,8 @@ def _visual_decision_notes(deck: dict) -> list[str]:
 
 
 def advisories(measured: dict, spec: dict | None = None,
-               tokens: dict | None = None, page: str | None = None) -> list[str]:
+               tokens: dict | None = None, page: str | None = None,
+               project_dir: str | None = None) -> list[str]:
     """**不阻塞**的提示。
 
     与 `check()` 的分工照仓库既有做法（同 `check_pointers.py` 的 broken / suspect）：
@@ -1603,7 +1608,7 @@ def advisories(measured: dict, spec: dict | None = None,
         notes.extend(_check_local_paths(page)[1])
     notes.extend(_check_grid_alignment(measured))
     if spec is not None and tokens is not None:
-        _, brand_notes = _check_brand(measured, spec.get("deck", {}), tokens)
+        _, brand_notes = _check_brand(measured, spec.get("deck", {}), tokens, project_dir)
         notes.extend(brand_notes)
         _, shape_notes = _check_deck_shape(measured, spec.get("deck", {}), tokens)
         notes.extend(shape_notes)
@@ -1635,19 +1640,21 @@ def main(argv: list[str]) -> int:
     tokens = deckio.read_json(args.tokens) if args.tokens else None
     measured = measure_mod.measure(args.html)      # 只量一次，校验与提示共用
     page = deckio.read_text(args.html)             # 产物文本（路径门/提示用）
-    tokens = style_tokens(spec, tokens)
+    spec_dir = os.path.dirname(os.path.abspath(args.spec))   # deck 项目 = spec 所在目录
+    tokens = style_tokens(spec, tokens, spec_dir)
     contract = deckio.read_json(args.resolved) if args.resolved else None
-    problems = check(spec, args.html, tokens, measured=measured, contract=contract)
+    problems = check(spec, args.html, tokens, measured=measured, contract=contract,
+                     project_dir=spec_dir)
     if problems:
         print(f"✗ {len(problems)} 个问题：")
         for p in problems:
             print("  ·", p)
-        for n in advisories(measured, spec, tokens, page):
+        for n in advisories(measured, spec, tokens, page, spec_dir):
             print("  ·", n)
         return 1
     print("✓ 校验全过（对比度 / 版面越界与裁切 / 错位区间 / 装饰不压文字 / "
-          "图表成比例 / 图表区无错位 / 图片加载 / 页面报错 / logo 不压文字）")
-    for n in advisories(measured, spec, tokens, page):
+          "图表成比例 / 图表区无错位 / 图片加载 / 页面报错 / logo 不压文字)")
+    for n in advisories(measured, spec, tokens, page, spec_dir):
         print("  ·", n)
     return 0
 

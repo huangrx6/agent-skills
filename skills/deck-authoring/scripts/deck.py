@@ -100,13 +100,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL_DIR = os.path.dirname(HERE)
 
 
-def brand_roots() -> tuple[str, ...]:
+def brand_roots(project_dir: str | None = None) -> tuple[str, ...]:
     """品牌解析根（顺序即优先级，**调用时求值**）：
 
       1. `DECK_BRANDS` 环境变量（`:` 分隔）—— 测试夹具，或品牌放在 deck
          项目之外时的显式入口；
-      2. `<当前目录>/brands` —— 品牌跟着 deck 项目走（随项目交付、可移植）；
-      3. skill 的 `brands/` —— 用户显式托管的全局品牌。
+      2. `<project_dir>/brands` —— deck 项目（**= spec 所在目录**）；
+      3. `<当前目录>/brands` —— 没拿到 spec 路径时的兜底（`brand.py` 列品牌）；
+      4. skill 的 `brands/` —— 用户显式托管的全局品牌。
 
     **没有示例品牌**：可拷贝的资产必然被直接当可用资产用进真实交付。
     品牌按 references/brand-assets.md 的契约现建；logo 由用户提供。
@@ -115,16 +116,18 @@ def brand_roots() -> tuple[str, ...]:
     extra = os.environ.get("DECK_BRANDS")
     if extra:
         roots.extend(p for p in extra.split(os.pathsep) if p)
+    if project_dir:
+        roots.append(os.path.join(project_dir, "brands"))
     roots.append(os.path.join(os.getcwd(), "brands"))
     roots.append(os.path.join(SKILL_DIR, "brands"))
-    return tuple(dict.fromkeys(roots))      # 去重：cwd 就是 skill 目录时两个根会重合
+    return tuple(dict.fromkeys(roots))      # 去重：cwd 就是项目目录时两根重叠
 
 
-def brand_dir(name: str) -> str | None:
+def brand_dir(name: str, project_dir: str | None = None) -> str | None:
     """品牌目录（含 brand.json 的第一个根）；找不到返回 None。"""
     if os.path.isdir(name) and os.path.isfile(os.path.join(name, "brand.json")):
         return os.path.abspath(name)
-    for root in brand_roots():
+    for root in brand_roots(project_dir):
         folder = os.path.join(root, name)
         if os.path.isfile(os.path.join(folder, "brand.json")):
             return folder
@@ -176,17 +179,17 @@ def is_dark_paper(hex_color: str) -> bool:
         return False
 
 
-def available() -> list[str]:
+def available(project_dir: str | None = None) -> list[str]:
     """有哪些品牌可用（列出候选，供报错时写清"可选项是什么"）。"""
     names: list[str] = []
-    for root in brand_roots():
+    for root in brand_roots(project_dir):
         for n in _deckio().list_dirs(root):
             if n not in names and os.path.isfile(os.path.join(root, n, "brand.json")):
                 names.append(n)
     return names
 
 
-def load(name: str) -> dict:
+def load(name: str, project_dir: str | None = None) -> dict:
     """读一个品牌。读不到**直接失败**并列出可选项 —— 静默降级成"没品牌"会让
     用户以为品牌生效了（色号没变、logo 没出），然后去别处找原因。
 
@@ -194,11 +197,11 @@ def load(name: str) -> dict:
     """
     if not name:
         return {}
-    folder = brand_dir(name)
+    folder = brand_dir(name, project_dir)
     if folder is None:
-        have = available()
+        have = available(project_dir)
         raise SystemExit(
-            f"✗ 找不到品牌 {name!r}（在 {list(brand_roots())} 里都没有）\n"
+            f"✗ 找不到品牌 {name!r}（在 {list(brand_roots(project_dir))} 里都没有）\n"
             f"  现有品牌：{have or '（一个都没有）'}\n"
             f"  新建一个：<deck 项目>/brands/{name}/brand.json（含 logo 文件）—— "
             f"字段见 references/brand-assets.md"
@@ -471,11 +474,13 @@ RESOLVED_KIND = "resolved.deck"
 
 
 def compile_spec(deck_spec: dict, style: dict | None = None,
-                 assets: dict | None = None) -> dict:
+                 assets: dict | None = None,
+                 project_dir: str | None = None) -> dict:
     """spec → resolved（决策层）。纯函数：同 spec + 同 seed（+ 同资产清单）恒等。
 
     档位 / 布局 / 配色 / 图形类型都是**作者声明**（spec 或风格数据），
     这里只做合并、解析与留痕 —— 不做自动推断与枚举选择。
+    project_dir：**deck 项目目录**（= spec 所在目录）—— 风格与品牌的解析根。
     assets：`render.load_assets` 的产物 —— assetId → "assets/<file>" 的映射
     只在这里发生（§14 Asset Resolver：manifest 即选择），页对象携带
     解析后的最终路径，渲染器不见 assetId。
@@ -488,8 +493,8 @@ def compile_spec(deck_spec: dict, style: dict | None = None,
 
     # ── Theme：风格（双根）→ 品牌合并 → colorSet ─────────────────────────
     resolved_style: dict = (style if style is not None
-                            else r.load_style(deck.get("style")))
-    brand = brand_mod.load(deck.get("brand"))
+                            else r.load_style(deck.get("style"), project_dir))
+    brand = brand_mod.load(deck.get("brand"), project_dir)
     if brand:
         trace.append({"stage": "theme", "decision": f"brand:{deck.get('brand')}",
                       "reason": [f"字体并入（{list(brand.get('fonts', {}))} 或整体替换）",

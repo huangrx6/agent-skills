@@ -6,13 +6,18 @@
 
 ## 风格从哪找：两根优先级（`DECK_STYLES` 可注入额外根）
 
-`render.py` 按顺序找风格（`style_roots()`，render.py:68 起，**调用时求值**），先命中先用：
+`render.py` 按顺序找风格（`style_roots()`，**调用时求值**），先命中先用：
 
 1. `DECK_STYLES` 环境变量（`:` 分隔）—— 风格放在 deck 项目之外时的显式入口
    （CI、/tmp 里的方向草稿）；
-2. `<当前目录>/styles/` —— 风格跟着 deck 项目走（随项目交付、可移植）；
-3. skill 自己的 `styles/` —— 用户**显式托管**的全局风格；**工具链永不写入**
+2. `<spec 所在目录>/styles/` —— **deck 项目**（随项目交付、可移植）；
+3. `<当前目录>/styles/` —— 没拿到 spec 路径时的兜底（列风格、测试）；
+4. skill 自己的 `styles/` —— 用户**显式托管**的全局风格；**工具链永不写入**
    （写它 = 变相内置，用户明令禁止过）。
+
+第 2 根不是可有可无：deck 项目就是 spec 所在目录，从任何 cwd 跑同一个 spec
+都必须命中同一套风格（只看 cwd 的话，报错文案指着"deck 项目的 styles/<名>/"，
+而代码根本没看那里）。
 
 **没有内置风格、没有默认风格**：`deck.style` 必填，缺了就
 `MISSING_STYLE` 并给指路报错。可拷贝的模板必然变成默认答案 ——
@@ -370,10 +375,10 @@ mkdir -p <deck项目>/styles/<名> && $EDITOR <deck项目>/styles/<名>/style.js
 {
   "deck": {
     "style":    "my-style",          // **必填**（缺 = `MISSING_STYLE`）——没有默认风格，
-                                      // 也不内置任何风格。风格名（两根顺序查找：
-                                      // <cwd>/styles → skill 的 styles/，另有 DECK_STYLES
-                                      // 环境变量可注入额外根）或**显式目录路径**（临时
-                                      // 草稿直接渲：--style /tmp/dir-a）
+                                      // 也不内置任何风格。风格名（查找顺序：
+                                      // <spec 所在目录>/styles → <cwd>/styles →
+                                      // skill 的 styles/，另有 DECK_STYLES 可注入额外根）
+                                      // 或**显式目录路径**（临时草稿直接渲：--style /tmp/dir-a）
     "colorSet": "blue",               // **必填具名**（auto/mood 一律判失败）——
                                       // 写名 = 该风格 token.colorSets 的键；缺失或写
                                       // "auto" → validate_spec 判 MISSING_COLOR_SET，

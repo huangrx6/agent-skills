@@ -25,8 +25,8 @@ import importlib.util
 import json
 import os
 import re
-import sys
 import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -114,8 +114,6 @@ class TestPptxNative(unittest.TestCase):
         cls.native = _load("deck_native", os.path.join(SCRIPTS, "pptx_native.py"))
         cls.measure = _load("deck_measure_native", os.path.join(SCRIPTS, "measure.py"))
         cls.render = _load("deck_render_native", os.path.join(SCRIPTS, "render.py"))
-        with open(TOKENS, encoding="utf-8") as fh:
-            tokens = json.load(fh)
         with open(DEMO, encoding="utf-8") as fh:
             demo = json.load(fh)
 
@@ -247,8 +245,9 @@ class TestPptxNative(unittest.TestCase):
         style = self.render.load_style(FIXTURE_STYLE)
         style = dict(style, tokens=dict(style["tokens"], decor={
             "kind": "accent-block", "types": ["title"], "zones": ["br"],
-            "sizes": [400]}))
-        deck = json.loads(json.dumps(json.load(open(DEMO, encoding="utf-8"))))
+             "sizes": [400]}))
+        with open(DEMO, encoding="utf-8") as fh:
+            deck = json.loads(json.dumps(json.load(fh)))
         deck["deck"]["style"] = "swiss-grid"
         deck["deck"]["colorSet"] = next(iter(style["tokens"]["colorSets"]))
         with tempfile.TemporaryDirectory() as td:
@@ -277,8 +276,9 @@ class TestPptxNative(unittest.TestCase):
         base = self.render.load_style(FIXTURE_STYLE)
         style = dict(base, tokens=copy.deepcopy(base["tokens"]))
         style["tokens"]["decor"] = {"kind": "halftone-circle", "types": ["title"],
-                                    "zones": ["br"], "sizes": [400]}
-        deck = json.loads(json.dumps(json.load(open(DEMO, encoding="utf-8"))))
+                                     "zones": ["br"], "sizes": [400]}
+        with open(DEMO, encoding="utf-8") as fh:
+            deck = json.loads(json.dumps(json.load(fh)))
         deck["deck"]["style"] = "swiss-grid"
         deck["deck"]["colorSet"] = next(iter(style["tokens"]["colorSets"]))
         with tempfile.TemporaryDirectory() as td:
@@ -427,7 +427,8 @@ class TestResolvedContract(unittest.TestCase):
              "-o", cls.html, "--resolved", cls.resolved],
             capture_output=True, text=True, timeout=300)
         assert proc.returncode == 0, proc.stdout + proc.stderr
-        contract = json.load(open(cls.resolved, encoding="utf-8"))
+        with open(cls.resolved, encoding="utf-8") as fh:
+            contract = json.load(fh)
         for key in ("vars", "geometry", "manifest", "baseDir"):
             assert key in contract, f"契约缺 {key}"
 
@@ -444,7 +445,7 @@ class TestResolvedContract(unittest.TestCase):
         from pptx import Presentation
         a, b = Presentation(out_html), Presentation(out_resolved)
         self.assertEqual(len(a.slides), len(b.slides))
-        for sa, sb in zip(a.slides, b.slides):
+        for sa, sb in zip(a.slides, b.slides, strict=True):
             ga = [(s.shape_type, round(s.left or 0), round(s.top or 0),
                    round(s.width or 0), round(s.height or 0)) for s in sa.shapes]
             gb = [(s.shape_type, round(s.left or 0), round(s.top or 0),
