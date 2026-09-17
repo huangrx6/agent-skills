@@ -40,6 +40,9 @@ def _load(path: str, name: str):
 
 
 health = _load(HEALTH, "_test_skill_health")
+# 上限（MAX_BODY_LINES）只有 validate_skill.py 一处定义；体检读它，用例也读它 ——
+# 两处写死必然漂（150→240 时就漂过一次：145/151 行的用例全体失真）。
+validator = _load(VALIDATOR, "_test_validate_skill_for_health")
 
 SKILL_MD = """---
 name: {name}
@@ -227,8 +230,9 @@ class TreeTest(RepoCase):
 
 class ReportTest(RepoCase):
     def test_分类汇总与正文超限(self):
-        self.make_skill("紧", body_lines=145)      # 余量 5 < 10
-        self.make_skill("超", body_lines=151)      # 余量 -1
+        limit = validator.MAX_BODY_LINES
+        self.make_skill("紧", body_lines=limit - 5)   # 余量 5 < 10
+        self.make_skill("超", body_lines=limit + 1)   # 余量 -1
         report = health.scan_repo(self.root)
         groups = health.summarize(report)
         self.assertIn("紧", groups["正文余量偏紧"])
