@@ -201,7 +201,7 @@ Agent，产出的东西渲染器吃不下，就全白写。
 - **页没有 message → 不要写**（一页不知道自己在讲什么，就没法排版）。
 
 ```bash
-python3 scripts/render.py deck.spec.json -o out.html --contract  # 每页能装多少（写前读）
+python3 scripts/render.py deck.spec.json --contract  # 每页能装多少（写前读）
 python3 scripts/validate_spec.py deck.spec.json     # 字段集封闭：未知键直接失败
 python3 scripts/check.py deck.spec.json out.html    # 产物实测门
 ```

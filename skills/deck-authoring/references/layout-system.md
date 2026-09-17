@@ -333,8 +333,8 @@ layout**、回到渲染缺省。坏键（非数字 / 页码越界）逐个报错
 ### 写前预算（`render --contract`）
 
 ```bash
-python3 scripts/render.py spec.json -o out.html --contract        # 人读
-python3 scripts/render.py spec.json -o out.html --contract --json  # 程序读
+python3 scripts/render.py spec.json --contract        # 人读
+python3 scripts/render.py spec.json --contract --json  # 程序读
 ```
 
 **先读预算再写字**。修复梯里"缩字号"排在第 13 位，而"装不下"最省事的动作就是

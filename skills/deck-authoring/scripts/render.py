@@ -2199,7 +2199,8 @@ def _candidates_main(deck_spec: dict, style: dict, assets, out_path: str,
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="deck-spec.json → HTML（可选：导出 resolved）")
     ap.add_argument("spec")
-    ap.add_argument("-o", "--out", required=True)
+    ap.add_argument("-o", "--out", default=None,
+                    help="产物路径（写文件的模式必填；--contract 只算不写，不用给）")
     ap.add_argument("--style", default=None,
                     help="风格目录名（缺省读 spec 的 deck.style；spec 必须写它）")
     ap.add_argument("--resolved", default=None, metavar="PATH",
@@ -2238,6 +2239,13 @@ def main(argv: list[str]) -> int:
             f"✗ {' 与 '.join(chosen)} 互斥，一次只能跑一个：\n"
             f"  --contract 只算容量表 / --repair 渲完自动修 / "
             f"--candidates 出候选对比页 —— 分三次跑。")
+    # `-o` 不是全局必填：`--contract` 只算表、不写文件。但其它模式缺它就做不下去 ——
+    # 在这里说清楚，而不是让它带着 None 一直走到写文件那一步。
+    if not args.contract and not args.out:
+        raise SystemExit(
+            "✗ 这个模式要写产物，得给 -o/--out：\n"
+            "  python3 scripts/render.py <spec> -o out.html\n"
+            "  （只有 --contract 是只读的，不用给 -o）")
     deck_spec = deckio.read_json(args.spec)
     assets = load_assets(args.spec)      # assets/manifest.json（§12 管线入口）
     # deck 项目 = spec 所在目录（SKILL.md）：风格与品牌都先看这里 ——

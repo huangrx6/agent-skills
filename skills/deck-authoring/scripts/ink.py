@@ -100,7 +100,12 @@ def check(tokens: dict) -> int:
         fringe = min(contrast(set_["primary"], paper), contrast(set_["secondary"], paper))
         print(f"{name:<8}{ink:<20}{text_ratio:>7.2f}  {'✓' if ok else '✗ 不达标':<6}"
               f"{fringe:>10.2f} {'（只能做墨层/装饰）':<12}")
-    print(f"\n门槛：正文 {limits['minBody']} / 大字（≥{limits['largeTextPx']}px）{limits['minLarge']}")
+    # 输出必须与判据一致：下面只按 `minBody` 判定，所以那行不能把 `minLarge` 写成
+    # "门槛"—— 用户会照它调色，而那颗数从不参与判定（大字档只备着，见
+    # references/validation.md 第 ① 条）。
+    print(f"\n门槛：正文 {limits['minBody']}（整副一刀，不分页不分角色）")
+    print(f"      大字档 {limits['minLarge']}（≥{limits['largeTextPx']}px）只是 token 里备着的数，"
+          f"**不检查**（本仓库不给大字开口子）")
     if failed:
         print(f"✗ 这些色板的文字色达不到正文门槛：{failed} —— 换色板，不要放宽门槛")
     return 1 if failed else 0

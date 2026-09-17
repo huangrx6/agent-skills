@@ -58,9 +58,9 @@
     "rule":       "每套色板必须含一个深墨 ..."  // 设计铁律
   },
   "contrast": {
-    "minBody":     4.5,                   // 正文最小对比度（WCAG AA）
-    "minLarge":     3.0,                  // 大字（≥ largeTextPx）最小对比度
-    "largeTextPx":  32
+    "minBody":     4.5,                   // 正文最小对比度（WCAG AA）—— **唯一判定依据**
+    "minLarge":     3.0,                  // 大字档阀值：**只备着，本仓库不检查**
+    "largeTextPx":  32                    // 同上：只为让 minLarge 可读，不参与判定
   },
   "type": {                              // 字号级数（px）—— 15 档全必填（render.py:116）
     // ⚠️ 这组数**只是形状**，不是推荐值。实测事故：拿 128/96/84/46/32 那组
