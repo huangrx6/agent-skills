@@ -138,7 +138,7 @@ HINTS = {
     "rotation": "同上 —— 旋转角由脚本派生。",
     "width": "尺寸由版式决定，规格里没有它。",
     "height": "同上 —— 尺寸由版式决定。",
-    "primary": "色值不在规格里：换色板请改 styles/swiss-grid/style.json 的 colorSets。",
+    "primary": "色值不在规格里：换色板请改 styles/<你的风格>/style.json 的 colorSets。",
     "secondary": "同上 —— 色值只在 token 里。",
     "background": "同上 —— 纸色只在 token 里。",
     "ink": "同上 —— 叠印墨是推导出来的，不是写进来的。",
@@ -289,8 +289,8 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
                                  f"改成 chart 版式（chart 字段写图形类型）")
                 elif vkind == "none" and kind == "content-image":
                     issues.error("BAD_VISUAL", vwhere,
-                                 f"content-image 版式声明 visual.kind=none —— "
-                                 f"这一页的版式就是图：给 image，或换成 content-text")
+                                 "content-image 版式声明 visual.kind=none —— "
+                                 "这一页的版式就是图：给 image，或换成 content-text")
                 # 要图 → **必须写清比例**。出图工具的默认比例各家不同（Midjourney 默认
                 # 1:1、SD 看 sampler、DALL·E 只认 prompt），不写下来就等于没定，
                 # 出回来再改成本高得多；槽位高度也按它算。

@@ -347,7 +347,7 @@ python3 scripts/render.py spec.json -o out.html --contract --json  # 程序读
 | 可用高度 | 正文带 `CONTENT_BOTTOM − CONTENT_TOP`（692px） |
 | 条目缩进 | 默认 80px（常见皮肤悬挂缩进的量级，再保守一档） |
 
-例（swiss-grid 的档位）：content-image 的 7 栅文字栏 → 条目 **≤ 8 条 × 23 字**；
+例（某套风格的档位）：content-image 的 7 栅文字栏 → 条目 **≤ 8 条 × 23 字**；
 `visual-wide`（4 栅）→ ≤ 8 条 × **11 字** —— 同一个内容换结构就装得下了，
 这正是"先换结构、别先压字号"的依据。
 

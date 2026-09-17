@@ -40,7 +40,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 def _load_sibling(name: str):
     """动态加载同目录脚本（`scripts/` 不是包，同级 import 在静态层面无法解析）。
 
-    写法和本目录其他脚本一致（细节与那行的理由见 `plate.py`）。
+    写法和本目录其他脚本一致。
     """
     path = os.path.join(HERE, f"{name}.py")
     mod_spec = importlib.util.spec_from_file_location(f"_deck_{name}", path)

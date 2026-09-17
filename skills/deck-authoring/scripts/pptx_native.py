@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
-"""out.html → **可编辑** PPTX（原生 shapes，字是真字）。
+"""HTML / 每页 PNG → PPTX。两条路都在这一个脚本里：
 
-## 它和 `make_pptx.py` 的分工
+| 模式 | 怎么跑 | 每页内容 | 改字 | 观感 |
+| --- | --- | --- | --- | --- |
+| 贴图 | `--png-dir pages/` | 一张 2x 截图 | 改不了（回改 spec 重出） | 100%（错位 / 颗粒 / 网点全在） |
+| 原生 | `out.html`（或 `--resolved`） | 原生文本框 / 形状 / 图表 | **能改** | 打折（见下） |
 
-| | `make_pptx.py`（贴图） | `pptx_native.py`（本脚本） |
-| --- | --- | --- |
-| 每页内容 | 一张 2x 截图 | 原生文本框 / 形状 / 图表 |
-| 改字 | 改不了，回改 spec 重出 | **能改** |
-| riso 观感 | 100%（套色错位、颗粒、网点全在） | 打折（见下） |
-| 体积（6 页实测） | 10.1MB | 0.03MB |
-
-两条路**不能兼得** —— 这是孔版视觉的本质代价，不是偷懒。要改字就接受外观打折，
+两条路**不能兼得** —— 这是「观感 100%」的本质代价，不是偷懒。要改字就接受外观打折，
 要外观就接受改不了字。要"外观对且不能改"还有 PDF（矢量，0.65MB）。
 
 ## 为什么这个 skill 能出原生 shapes（而通用 HTML→PPTX 工具很勉强）
@@ -47,7 +43,6 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
-import json
 import os
 import re
 import sys
@@ -68,7 +63,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 def _load_sibling(name: str):
     """动态加载同目录脚本（`scripts/` 不是包，同级 import 在静态层面无法解析）。
 
-    写法和本目录其他脚本一致（细节与那步的理由见 `plate.py`）。
+    写法和本目录其他脚本一致。
     """
     path = os.path.join(HERE, f"{name}.py")
     mod_spec = importlib.util.spec_from_file_location(f"_deck_{name}", path)
@@ -97,8 +92,8 @@ DECOR_SHAPES = {"accent-block", "halftone-circle"}
 SERIF_ROLES = {"title"}
 MONO_ROLES = {"subtitle", "bullet", "foot", "caption"}
 # 量不到字重时的兜底（老产物没有 fontWeight 字段）。
-# **正常路径不看它** —— 字重由实测决定，见 add_text：八套风格里有**两套**
-# （paper-ink / botanical-dark）的标题是 400 字重，写死 bold 就直接和设计相反了。
+# **正常路径不看它** —— 字重由实测决定，见 add_text：有的风格标题是 400 字重，
+# 写死 bold 就直接和设计相反了。
 BOLD_ROLES_FALLBACK = {"title"}
 BOLD_WEIGHT = 600
 
@@ -198,7 +193,7 @@ def set_east_asian_font(run, typeface: str) -> None:
     为什么这条对中文 deck 是要害：一份中文 deck 的字**绝大多数是 CJK**，
     而宿主软件（PowerPoint / WPS / LibreOffice）对 CJK 用的是 `<a:ea>` 指定的族；
     没写就由它自己挑 —— 实测：LibreOffice 渲出来是一个加粗的黑体，
-    而 paper-ink 的设计是宋体，等于导出把整个风格换掉了。
+    而有的风格指定的是宋体，等于导出把整个风格换掉了。
 
     OOXML 的 schema 规定 `<a:latin>` → `<a:ea>` → `<a:cs>` 的顺序，
     所以插在 latin 之后，不是直接 append（顺序错了 PowerPoint 会拒绝整个文件）。
@@ -243,7 +238,7 @@ def add_text(slide, el: dict, box: tuple[float, float, float, float],
     if ea_fam:
         set_east_asian_font(run, ea_fam)
     run.font.size = Pt(round((el.get("fontSize") or 24) * PX_TO_PT, 1))
-    # 字重**跟着实测走**，不按角色写死：paper-ink / botanical-dark 的标题是 400 字重，
+    # 字重**跟着实测走**，不按角色写死：有的风格标题是 400 字重，
     # 统一 bold 就等于把这两套风格的标题设计抹掉了（XML 里读出来是 b="1" ✗）。
     weight = el.get("fontWeight")
     run.font.bold = ((weight >= BOLD_WEIGHT) if isinstance(weight, (int, float))
@@ -436,7 +431,7 @@ def _build(vars_: dict, measured: dict, manifest: list, base_dir: str,
     # 显式列出而不是整包 update：整包会把 x/y/w/h 也塞进清单条目，之后再用
     # `rel_box()` 算相对坐标时，读的人分不清手上那个是文档坐标还是页内坐标。
     # 但**漏一个字段就是静默走兜底值** —— 实测就漏过 `fontWeight`：
-    # 于是 paper-ink / botanical-dark 那两套 400 字重的标题在 PPTX 里被强制加粗，
+    # 于是那些 400 字重的标题在 PPTX 里被强制加粗，
     # 而文件照生成、页数照样对，只有把 PPTX 打开看才发现。
     MERGE_MEASURED = {"color": "measuredColor", "fontWeight": "fontWeight"}
     for entry in manifest:

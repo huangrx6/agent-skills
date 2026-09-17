@@ -136,8 +136,8 @@ LOGO_ON = ("cover", "cover+end", "all", "none")
 RASTER_EXT = (".png", ".jpg", ".jpeg")
 
 # 纸面暗于这个相对亮度就当“深底”，改走反白条 logo。
-# 实测取值：本仓库的深底风格是 #000000（keynote-dark）与 #0A0A0A（billboard/ink），
-# 亮度 0.000 / 0.003；浅底最低的是 #F4F4F4（0.905）。0.45 把它们干净分开。
+# 判据取值：深底纸面亮度落在 0.000~0.003（纯黑 / 近黑），浅底最低 0.905（#F4F4F4）。
+# 0.45 把它们干净分开。
 DARK_PAPER_LUMINANCE = 0.45
 
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
@@ -235,7 +235,7 @@ def load(name: str) -> dict:
 def logo_file(brand: dict, paper: str) -> str:
     """选哪个 logo 文件：**深底上优先用反白版**。
 
-    这不是锦上添花 —— 抽帧看图当场撞到的：keynote-dark（纯黑底）上，
+    这不是锦上添花 —— 抽帧看图就能撞到：纯黑底那种深底上，
     专为白底设计的 logo 里的深色块**直接消失**，只剩一个白三角和几个字母。
     真实品牌手册里的 logo 从来都是成对的（正版 / 反白版），所以这就是品牌层
     该有的东西，而不是“以后再说”的优化。

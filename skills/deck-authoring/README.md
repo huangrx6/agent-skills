@@ -240,8 +240,7 @@ background / text），`colorStructure` 里是结构（色相关系 / 颜色数�
 **俗套提醒**（`tech_blue_purple_cyan` / `corporate_blue_white` / `premium_black_gold`…）
 不自动出现 —— 名单与判据在 `references/color.md`，由作者自查。
 它本来就只是**按主题条件的提示**而不是阻塞（规范原文是"不得**自动**绑定"，不是"这个色
-不许用"）：历史内置期实测本仓库 8 套风格里 5 套的某个色板落在名单上（`swiss-grid/blue`
-同时命中前两条、`terminal/cyan`、`billboard/electric`…）。
+不许用"）—— 这条按主题给提示，配完自查一遍即可。
 
 配色规范里**大部分讲的是生成过程**（怎么想），代码只能负责结构与校验。哪些是代码强制、
 哪些是流程判断、哪些**还没实现**（渐变渲染、玻璃拟态、强调色占比实测），

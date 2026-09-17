@@ -6,15 +6,14 @@
 
 两种来源都要支持（`text_color`）：
   - **派生**：两墨 multiply 的叠印色（叠印类风格用；原型实测那套主/副色各自当文字色
-    只有 2.35 / 2.68，乘起来才 9.55 —— 所以它不是“选”出来的）
+    都不达标，乘起来才够 —— 所以它不是“选”出来的）
   - **声明**：黑底白字、白底黑字这类风格直接写 `colorSets.*.text`（黑不是任何两色的乘积）
 
-跑法：python3 ink.py [styles/swiss-grid/style.json]   # 不传就用仓库那份；任一色板不达标退出码 1
+跑法：python3 ink.py styles/<你的风格>/style.json   # 任一色板不达标退出码 1
 """
 from __future__ import annotations
 
 import importlib.util
-import json
 import os
 import sys
 
@@ -48,7 +47,8 @@ def _rgb(h: str) -> tuple[int, int, int]:
 
 
 def _hex(rgb: tuple[int, int, int]) -> str:
-    return "#%02X%02X%02X" % rgb
+    r, g, b = rgb
+    return f"#{r:02X}{g:02X}{b:02X}"
 
 
 def overprint(primary: str, secondary: str) -> str:

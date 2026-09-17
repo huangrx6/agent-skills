@@ -114,7 +114,7 @@ FETCHABLE = [
     # (catalog 名, owner/repo, 资产名匹配, 授权)
     ("得意黑 Smiley Sans", "atelier-anchor/smiley-sans", r"smiley-sans.*\.zip$", "OFL-1.1"),
     ("霞鹜文楷", "lxgw/LxgwWenKai", r"LXGWWenKai-Regular\.ttf$", "OFL-1.1"),
-    # Mono 变体是 terminal 那套的中文等宽来源（中文名「霞鹜文楷等宽」）。
+    # Mono 变体是中文等宽风格的字源（中文名「霞鹜文楷等宽」）。
     # 它是同一个 catalog 条目的变体，所以这里另起一行 —— 名字用真实字族名，
     # 否则 _local_path_for 找不到它。
     ("LXGW WenKai Mono", "lxgw/LxgwWenKai", r"LXGWWenKaiMono-Regular\.ttf$", "OFL-1.1"),

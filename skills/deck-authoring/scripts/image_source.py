@@ -852,8 +852,8 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--style", default=None, help="风格（缺省读 spec 的 deck.style）")
     ap.add_argument("--tokens", default=None,
                     help="风格 tokens 路径（缺省按 spec 的 deck.style 解析）")
-    # 色板名不写死：写死会在换风格 / 改色板名时**静默过期**
-    # （plate.py 与这里都留着 riso 时代那个已经删掉的 'vivid'，于是默认路径直接崩）。
+    # 色板名不写死：写死会在换风格 / 改色板名时**静默过期**。
+    # 缺省取该 token 的第一套。
     ap.add_argument("--color-set", default=None, help="色板（缺省用该 token 的第一个）")
     ap.add_argument("--size", default="640x400")
     ap.add_argument("--json", action="store_true", help="--brief 时额外输出机读 JSON")
