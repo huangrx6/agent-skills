@@ -101,8 +101,8 @@ for s in a b c; do mkdir -p /tmp/dir-$s && $EDITOR /tmp/dir-$s/style.json /tmp/d
 | --- | --- | --- |
 | `title` | 封面 | —（副标题一行内） |
 | `content-text` | 全文页 | —（条目太多给提示，档位作者声明） |
-| `content-image` | 图文页 | 结构布局：`visual-right` 缺省 / `visual-left` 图先文后 / `even` 6+6 / `hero` 图为主角满幅+标题条 |
-| `two-column` | 双栏 | 结构布局：`even` 缺省 / `lean-left` 左栏宽 / `lean-right` 右栏宽 |
+| `content-image` | 图文页 | 结构布局：`visual-right` 缺省（文 7 栅 + 图 5 栅）/ `visual-left` 图先文后（镜像）/ `even` 6+6 / `visual-wide` 图 8 栅 / `hero` 图为主角满幅+标题条 |
+| `two-column` | 双栏 | 结构布局：`even` 缺省（6+6）/ `lean-left` 左 7 右 5 / `lean-right` 镜像 / `lean-hard-left` 左 8 右 4 / `lean-hard-right` 镜像 |
 | `timeline` | 时间线 | —（节点标签走数字档） |
 | `chart` | 图表 | 图形由 **`chart` 字段显式声明**（八类：bar/bar-horizontal/line/area/bar-stacked/donut/scatter/combo；HTML 路径由 **AntV G2** 画 —— vendor 锁版本内联、动画关死）；`intent` 是可选语义标注、不参与渲染 |
 | `end` | 收尾 | —（居中大字） |

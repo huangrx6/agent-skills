@@ -23,7 +23,6 @@
 from __future__ import annotations
 
 import importlib.util
-import json
 import os
 import re
 import sys
@@ -53,6 +52,13 @@ SKILL_MD = os.path.join(SKILL, "SKILL.md")
 # 拿一张写死的表去对只会对出一个错的前提。守契约的用例改成了
 # test_decoration_contract_is_honored（有装饰的风格只在它声明的那几种版式上放）。
 TABLE_ROW = re.compile(r"^\|\s*`([a-z][a-z-]*)`\s*\|([^|]*)\|[^|]*\|\s*$", re.M)
+
+# 「| `type` | 用途 | 布局… |」——拿第三列里的反引号词。**这一列必须列全**：
+# 模型是从这张表知道“有哪些结构可选”的，少一个名字 = 它不知道那个结构存在。
+# （`visual-wide` 与 `lean-hard-left/right` 就这么漏过 —— 而候选搜索天天在用它们。）
+LAYOUT_ROW = re.compile(
+    r"^\|\s*`(content-image|two-column)`\s*\|\s*[^|]*\|\s*([^|]*)\|\s*$", re.M)
+BACKTICKED = re.compile(r"`([a-z][a-z0-9-]*)`")
 
 # 每个版式一页的最小 spec —— 只为把那一页渲出来看有没有墨块
 PROBE_SLIDES = {
@@ -118,7 +124,9 @@ class TestSkillMdMatchesRender(unittest.TestCase):
         sections = SECTION.findall(html)
         self.assertEqual(len(sections), len(kinds),
                          f"渲染出的页数 {len(sections)} ≠ 版式数 {len(kinds)}")
-        return {k: ("✓" if "data-zone=" in s else "✗") for k, s in zip(kinds, sections)}
+        # 上面刚断言过两串等长 —— strict 只是把这个前提写死
+        return {k: ("✓" if "data-zone=" in s else "✗")
+                for k, s in zip(kinds, sections, strict=True)}
 
     def test_decoration_contract_is_honored(self) -> None:
         """装饰只在**风格自己声明的那几种版式**上出现。
@@ -150,6 +158,37 @@ class TestSkillMdMatchesRender(unittest.TestCase):
             documented, set(PROBE_SLIDES),
             f"文档版式集与实现集不同：只在文档 {documented - set(PROBE_SLIDES)}；"
             f"只在实现 {set(PROBE_SLIDES) - documented}")
+
+    def test_documented_layouts_match_the_renderer(self) -> None:
+        """SKILL.md 的「布局」列 = 渲染器的结构清单（两边逐字相等）。
+
+        为什么必须钉：这份表是给模型看的**规格**，而布局名就是它要写进 spec 的值。
+        实测漏过 —— 表里写了 4 个 content-image 结构、3 个 two-column 结构，
+        而 `render.IMAGE_LAYOUTS` / `TWO_COL_LAYOUTS` 各有 5 个：
+        `visual-wide`、`lean-hard-left/right` 在候选搜索里天在用，却从没进过文档。
+        少一个名字不等于“少个选项”：模型不知道它存在。
+        """
+        rows = {m.group(1): BACKTICKED.findall(m.group(2))
+                for m in LAYOUT_ROW.finditer(self.skill_md)}
+        self.assertTrue(rows, "SKILL.md 里没解析到布局列 —— 表头或格式变了")
+        for page_type, allowed in (("content-image", render.IMAGE_LAYOUTS),
+                                   ("two-column", render.TWO_COL_LAYOUTS)):
+            with self.subTest(page_type=page_type):
+                documented = set(rows.get(page_type, []))
+                self.assertEqual(
+                    documented, set(allowed),
+                    f"{page_type} 的布局列与渲染器漂了："
+                    f"只在文档 {sorted(documented - set(allowed))}；"
+                    f"只在实现 {sorted(set(allowed) - documented)}")
+
+    def test_documented_chart_types_cover_the_renderer(self) -> None:
+        """SKILL.md 必须点到每一个图形类型（少写一个 = 模型不知道它存在）。
+
+        这一列是散文（不拆表），所以钉"全都出现过"——它拦的是"加了类型却
+        忘了写文档"，而那正是会让模型永远不用它的错。
+        """
+        missing = [t for t in render.CHART_TYPES if t not in self.skill_md]
+        self.assertEqual(missing, [], f"SKILL.md 没提到这些图形类型：{missing}")
 
     def test_unknown_slide_type_is_rejected(self) -> None:
         """版式集是封闭的 —— 未知 type 必须被拒，而不是静默渲成空白页。

@@ -471,7 +471,7 @@ class TestColorSetRequired(unittest.TestCase):
 
 
 class TestChartTypeRequired(unittest.TestCase):
-    """v3：图表页必须显式声明图形类型（推断层退役）。"""
+    """图表页必须显式声明图形类型（没有推断层）。"""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -489,6 +489,19 @@ class TestChartTypeRequired(unittest.TestCase):
                                      "data": [{"label": "a", "value": 1}]})
                 self.assertNotIn("MISSING_CHART_TYPE", codes)
                 self.assertNotIn("UNKNOWN_CHART_TYPE", codes)
+
+    def test_chart_types_match_the_renderer(self) -> None:
+        """图形类型清单两处必须逐字一致（schema 一处、渲染器一处）。
+
+        两份是有意保留的：`validate_spec.py` 要零依赖（它在渲之前跑，不拉
+        渲染器），所以不能 import 渲染器常量。代价就是可能漂 ——
+        而漂的后果很安静：给渲染器加了第九类图，校验会先把它拦下，
+        报的还是“只认这几类”。所以用一条测试把两份钉在一起。
+        """
+        render_mod = _load("_deck_test_render_chart_types",
+                           os.path.join(SCRIPTS, "render.py"))
+        self.assertEqual(tuple(vs.CHART_TYPES), tuple(render_mod.CHART_TYPES),
+                         "validate_spec.CHART_TYPES 与 render.py 漂移了")
 
     def test_missing_type_is_blocked(self) -> None:
         codes = self._codes({"type": "chart", "title": "图",
