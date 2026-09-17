@@ -97,7 +97,7 @@ MONO_ROLES = {"subtitle", "bullet", "foot", "caption"}
 BOLD_ROLES_FALLBACK = {"title"}
 BOLD_WEIGHT = 600
 
-# 在浏览器里就是**单行不折**的（`.riso b{white-space:nowrap}`；`.foot` 是一行页码）。
+# 在浏览器里就是**单行不折**的（皮肤给 `.title` 声明 nowrap；`.foot` 是一行页码）。
 # PPT 里必须同样 nowrap：对方机器没有声明的字时会被替换，**替换字体一旦变宽就折行**，
 # 把下面的元素整片压掉（实渲出来就是这个样子 ✗）。浏览器里溢出而不是折行，这里也溢出。
 NOWRAP_ROLES = {"title", "foot"}

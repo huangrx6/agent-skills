@@ -11,7 +11,7 @@
 5. 错位区间   从**产物 HTML** 里读实际写进去的 --dx/--dy/--rot，比对 token 区间
 6. 装饰不压文字 墨块必须落在安全区，不与文字栏相交
 7. 图表就绪 数据形状对（label 非空 / value 是数字）+ G2 真渲染出来了（实测）
-8. 图表区无错位 图表容器（逐层配对地扫完整个容器）里不许出现 riso 错位元素
+8. 图表区无错位 图表容器（逐层配对地扫完整个容器）里不许出现 `misreg` 错位元素
 
 **提示**（`advisories()`，不阻塞）：字体回退 —— 启发式，衬线撞衬线会误报。
 
@@ -1423,8 +1423,9 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     # ④ 图表区无错位：**逐层配对**扫整个容器，不是扫到第一个 </div> 就停。
     for hit in re.finditer(r'<div class="chartwrap"', page):
         block = _div_subtree(page, hit.start())
-        if "riso" in block:
-            problems.append("图表容器里出现了错位叠印元素（riso 只允许做容器与背景，不能进图表区）")
+        if "misreg" in block:
+            problems.append("图表容器里出现了错位叠印元素（`misreg` 只允许做容器与背景，"
+                            "不能进图表区）")
 
     # ③ 错位区间：读产物里真正写进去的值（misregistration 是可选 effect ——
     # 没声明的风格 dx/dy/rot 全 0，区间无从对起，跳过不查）

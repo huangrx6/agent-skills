@@ -258,11 +258,11 @@ class TestCheckMutations(unittest.TestCase):
         problems = self._problems(spec, self.chart_html)
         self.assertTrue(any("label" in p for p in problems), problems)
 
-    def test_chart_riso_mutation_is_caught(self) -> None:
-        """变异：往真实的 chartwrap 容器里塞一个 riso 元素。"""
+    def test_chart_misreg_mutation_is_caught(self) -> None:
+        """变异：往真实的 chartwrap 容器里塞一个错位叠印元素（`.misreg`）。"""
         mutated, count = re.subn(
             r'(<div class="chartwrap"[^>]*>)',
-            r'\1<div class="riso"><b class="a">X</b></div>', self.chart_html, count=1)
+            r'\1<div class="rule misreg">X</div>', self.chart_html, count=1)
         self.assertEqual(count, 1, "产物里没找到 chartwrap —— render.py 改格式了")
         problems = self._problems(self.chart_spec, mutated)
         self._assert_reports(problems, "错位叠印", "④ 图表区无错位")
