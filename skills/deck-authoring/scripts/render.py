@@ -2171,15 +2171,25 @@ def _candidates_main(deck_spec: dict, style: dict, assets, out_path: str,
             print("✗ 没有可用候选，未改动")
             return 1
         picked_spec = copy.deepcopy(deck_spec)
-        for i, name in chosen.items():
-            picked_spec["deck"]["slides"][i - 1]["layout"] = name
+        applied_pick: list[str] = []
+        # `assignments` 的值是**按总分排好的候选名列表**（对比页要按序展示），
+        # 所以“自动采用最优”取第 0 个 —— 整个列表塞进 layout 要到渲染层才
+        # 被拦下（"layout 要是字符串"），那已经是产品级路径了。
+        for i, ranked in sorted(chosen.items()):
+            names = ranked if isinstance(ranked, list) else [ranked]
+            if not names:
+                continue
+            picked_spec["deck"]["slides"][i - 1]["layout"] = names[0]
+            applied_pick.append(f"第 {i} 页 → {names[0]}")
+        if not applied_pick:
+            print("✗ 没有可用候选，未改动")
+            return 1
         deckio.write_json(os.path.splitext(out_path)[0] + ".candidates.spec.json",
                           picked_spec)
         deckio.write_text(out_path, render_resolved(
             deck_mod.compile_spec(picked_spec, style, assets=assets,
                                   project_dir=project_dir)))
-        where = "、".join(f"第 {i} 页 → {n}" for i, n in sorted(chosen.items()))
-        print(f"✓ 已自动采用最优并渲染：{where}")
+        print(f"✓ 已自动采用最优并渲染：{'、'.join(applied_pick)}")
         return 0
     print("（未回写：在对比页上挑好，点「复制选择」存成 picks.json，再跑 "
           "--candidates --picks picks.json；或加 --pick 直接采用最优）")

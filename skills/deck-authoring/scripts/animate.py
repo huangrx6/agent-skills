@@ -393,6 +393,11 @@ def main(argv: list[str]) -> int:
                     help="只抽这几个时间点（逗号分隔的秒）存 PNG 不编码 —— "
                          "交付前用它抽第 0 帧/末帧/每个切点验一遍")
     args = ap.parse_args(argv[1:])
+    # 产物不存在就别启 Chrome：它会截出一张**自己的错误页**，逐帧录成一段
+    # “错误页视频”并报成功（下面的时间轴分支还可能因为有 <html>.spec.json
+    # 而根本不去读 HTML —— 那条路连“读不到”都不会触发）。
+    if not os.path.isfile(os.path.abspath(args.html)):
+        raise SystemExit(f"✗ 读不到产物：{os.path.abspath(args.html)}")
 
     is_gif = args.out.lower().endswith(".gif")
     width = args.width or (960 if is_gif else 1920)

@@ -545,6 +545,52 @@ class TestCandidateCLI(unittest.TestCase):
             self.assertEqual(picked["deck"]["slides"][0]["layout"], "even")
             self.assertNotIn("layout", picked["deck"]["slides"][1])
 
+    def test_pick_applies_the_top_candidate_per_page(self) -> None:
+        """`--pick` = “自动采用最优”。
+
+        `assignments` 的值是**按总分排好的候选名列表**（对比页要按序展示）——
+        所以采纳的是第 0 个。曾经把整个列表塞进 `layout`，于是要到渲染层才被
+        拦下（“layout 要是字符串，得到 list”）：文档里写着可用的开关，
+        一敲就炸。这里同时钉“取首位”与“是字符串”两件事。
+        """
+        import subprocess
+        import tempfile
+        scripts = os.path.join(SKILL, "scripts")
+        with tempfile.TemporaryDirectory() as tmp:
+            spec = {"deck": {
+                "style": "swiss-grid", "colorSet": "blue", "seed": 11,
+                "title": "自动择优",
+                "slides": [
+                    {"type": "content-image", "title": "图页",
+                     "bullets": ["一", "二", "三"], "image": "x.png",
+                     "visual": {"kind": "evidence_image"}},
+                    {"type": "two-column", "title": "双栏",
+                     "columns": [{"title": "左", "bullets": ["a", "b"]},
+                                 {"title": "右", "bullets": ["c", "d"]}]},
+                ]}}
+            spec_path = os.path.join(tmp, "deck.spec.json")
+            with open(spec_path, "w", encoding="utf-8") as fh:
+                json.dump(spec, fh, ensure_ascii=False)
+            out = os.path.join(tmp, "out.html")
+            proc = subprocess.run(
+                ["python3", os.path.join(scripts, "render.py"), spec_path,
+                 "-o", out, "--candidates", "--pick"],
+                capture_output=True, text=True, timeout=900, env=dict(os.environ))
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+            with open(os.path.join(tmp, "out.candidates.json"), encoding="utf-8") as fh:
+                report = json.load(fh)
+            with open(os.path.join(tmp, "out.candidates.spec.json"),
+                      encoding="utf-8") as fh:
+                picked = json.load(fh)
+            for page, ranked in report["assignments"].items():
+                if not ranked:
+                    continue
+                layout = picked["deck"]["slides"][int(page) - 1].get("layout")
+                self.assertIsInstance(layout, str,
+                                      f"第 {page} 页的 layout 必须是字符串，得到 {layout!r}")
+                self.assertEqual(layout, ranked[0],
+                                 f"第 {page} 页该采用列表首位")
+
 
 class TestContracts(unittest.TestCase):
     """页面契约（layout/contracts.py）：写前预算 —— 这一页能装多少。

@@ -18,6 +18,11 @@ GAP = 36          # 页间距，和 render.py 的 `.slide{margin-bottom}` 是同
 
 
 def shoot(html: str, out_dir: str, width: int, height: int, count: int) -> list[str]:
+    # 产物不存在就别启 Chrome：它会乐颠颠地截一张**自己的错误页**（深灰底），
+    # 而这里会把它切成 `page-01.png…` 并报“✓ 截出 N 页” —— 于是一整份
+    # “错误页 PPTX”静默进了交付（贴图版 pptx 只吃 pages/，看不出区别）。
+    if not os.path.isfile(os.path.abspath(html)):
+        raise SystemExit(f"✗ 读不到产物：{os.path.abspath(html)}")
     try:
         os.makedirs(out_dir, exist_ok=True)
     except OSError as exc:
