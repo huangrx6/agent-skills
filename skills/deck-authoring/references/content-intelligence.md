@@ -226,16 +226,15 @@ Page Planner 再映射（comparison → chart / two-column）。
 
 ## 31. Visual Requirement（落进 spec 就是 `visual`）
 
-每页写 `{"visual": {"kind": "none|evidence_image|data", "ratio": "3:2",
-"intent": "...", "note": "..."}}` —— **要图（`evidence_image`）与要图表（`data`）时 `ratio` 必填**：
-比例要明确写出来（`"3:2"` / `"4:3"` / `"1:1"` / `"16:9"`），槽位高度按它算，出图的人按它出
-—— 这三档就是流水线能交付的三种载体，也是 spec 里唯一承认的形状
-（`validate_spec.py` 拦未知档与自相矛盾；`check.py` 点出没决定的页）。
+Page Planner 必须给每页**决定一个视觉载体**，写进 spec 的 `visual`：`none`（纯文字立得住）/ 
+`evidence_image`（照片、插画、结构图、流程图 —— 都由人拿提示词出图）/ `data`（图表）。
+要图与要图表时 `ratio` 必填（`"3:2"` / `"4:3"` / `"1:1"` / `"16:9"`）—— 比例写下来才算定，
+槽位高度按它算。**档位的语义、谁做、落到哪见 `images.md`**；`validate_spec.py` 拦未知档与
+自相矛盾，`check.py` 点出没决定的页。
 
-语义层可以想得更细（data / evidence_image / process / hierarchy / comparison /
-architecture / mood），但落到 spec 只有上面三档：**除了图表，凡是图都归 `evidence_image`**
-（照片、插画，以及结构图 / 流程图 —— 它们同样出图，只是提示词不同与比例不同），
-氛围归风格（`colorSet` / `decor` / 字体），**不单独设档** —— 多出来的档没有谁能交付它。
+语义层可以想得更细（process / hierarchy / comparison / architecture / mood），但落到 spec
+只有这三档：**除了图表，凡是图都归 `evidence_image`**；氛围归风格（`colorSet` / `decor` /
+字体），**不单独设档** —— 多出来的档没有谁能交付它。
 
 ## 32. 什么时候必须有视觉
 
@@ -418,7 +417,7 @@ Color/比例/留白由 Image Pipeline 生成（`image_source.py --brief`）。
 
 Content 输出 data intent / message / metrics / comparison relation；图形类型
 （`chart`，八类）由 spec 显式声明（不由 intent 推断），Chart Engine
-负责编码、标注、强调（`render.py::chart_g2_spec`，AntV G2；图表动画 v4 关死）。
+负责编码、标注、强调（`render.py::chart_g2_spec`，AntV G2；图表内部不动）。
 
 ## 66. 与 Motion Engine 的接口
 

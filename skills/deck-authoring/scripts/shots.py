@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import argparse
-import glob
+import contextlib
 import os
 import subprocess
 import sys
@@ -14,27 +14,42 @@ import sys
 from PIL import Image
 
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-GAP = 36          # 页间距，和 render_deck.py 的 CSS 一致
+GAP = 36          # 页间距，和 render.py 的 `.slide{margin-bottom}` 是同一个数
 
 
 def shoot(html: str, out_dir: str, width: int, height: int, count: int) -> list[str]:
-    os.makedirs(out_dir, exist_ok=True)
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+    except OSError as exc:
+        raise SystemExit(f"✗ 建不了输出目录 {out_dir}：{exc}") from exc
     full = os.path.join(out_dir, "_full.png")
     total = height * count + GAP * (count - 1)
-    subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-                    "--force-device-scale-factor=2",      # 2x：投影/打印不糊
-                    f"--screenshot={full}", f"--window-size={width},{total}",
-                    f"file://{os.path.abspath(html)}"], check=True, capture_output=True)
-    image = Image.open(full)
-    out = []
-    for i in range(count):
-        top = i * (height + GAP) * 2                     # 2x 缩放后要乘 2
-        box = (0, top, width * 2, top + height * 2)
-        page = os.path.join(out_dir, f"page-{i + 1:02d}.png")
-        image.crop(box).save(page)
-        out.append(page)
-    os.remove(full)
-    return out
+    argv = [CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
+            "--force-device-scale-factor=2",           # 2x：投影/打印不模糊
+            f"--screenshot={full}", f"--window-size={width},{total}",
+            f"file://{os.path.abspath(html)}"]
+    try:
+        proc = subprocess.run(argv, check=False, capture_output=True)
+    except FileNotFoundError:
+        raise SystemExit(f"✗ 找不到 Chrome：{CHROME}（这一步要本机 Chrome）") from None
+    if proc.returncode != 0:
+        err = proc.stderr.decode("utf-8", "replace").strip()[:300]
+        raise SystemExit(f"✗ Chrome 截图失败（返回码 {proc.returncode}）：{err}")
+    try:
+        image = Image.open(full)
+        out = []
+        for i in range(count):
+            top = i * (height + GAP) * 2               # 2x 缩放后要乘 2
+            box = (0, top, width * 2, top + height * 2)
+            page = os.path.join(out_dir, f"page-{i + 1:02d}.png")
+            image.crop(box).save(page)
+            out.append(page)
+        return out
+    except OSError as exc:
+        raise SystemExit(f"✗ 裁页失败（{full} 不是可读的 PNG？）：{exc}") from exc
+    finally:
+        with contextlib.suppress(OSError):
+            os.remove(full)
 
 
 def main(argv: list[str]) -> int:

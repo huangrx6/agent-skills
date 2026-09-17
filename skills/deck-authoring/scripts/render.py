@@ -109,7 +109,7 @@ TWO_COL_LAYOUTS = ("even", "lean-left", "lean-right",
 # ── 版面几何：壳里那些数字的**唯一出处** ─────────────────────────────
 # `SHELL_CSS` 里的 `.pad{padding:132px 84px}` 与 `.footrow{bottom:52px}` 是这几个值；
 # check.py（判越界/死白）与 fit.py（试排）都读这里，不各自再拄一份。
-# 拿两份几何常量去对同一张图，只会对出一个错的前提（本仓库已经踩过一次）。
+# 拿两份几何常量去对同一张图，只会对出一个错的前提。
 grid_mod = _load_sibling("grid")   # 版面几何的唯一来源（网格 / 间距令牌 / 区域）
 
 SLIDE_W, SLIDE_H = grid_mod.SLIDE_W, grid_mod.SLIDE_H
@@ -237,7 +237,7 @@ def style_location_note(folder: str | None, spec_path: str) -> str | None:
 
     def is_temp(path: str) -> bool:
         real = os.path.realpath(path).rstrip(os.sep) + os.sep
-        return real.startswith(temp_root) or real.startswith("/private/tmp/")
+        return real.startswith((temp_root, "/private/tmp/"))
 
     in_spec = os.path.realpath(folder).rstrip(os.sep).startswith(
         os.path.realpath(spec_dir).rstrip(os.sep) + os.sep)
@@ -417,7 +417,7 @@ html,body{margin:0;background:var(--viewer)}
 .slide{position:relative;width:1600px;height:900px;background:var(--paper);
   overflow:hidden;margin:0 auto 36px;
   /* 页盒必须**永远**是 1600×900：border-box 下皮肤加边框/内边距都往内吃，
-     不会把盒子掉大。没有这句的后果实测过：皮肤给 .slide 加了 1px 上边框
+     不会把盒子掉大。少了这句，皮肤给 .slide 加 1px 上边框
      （一个极其自然的设计动作）→ 页盒 901px → 导 PDF 每页多溢出一张，
      17 页的 deck 变 34 页；HTML 屏上一点看不出来（overflow 剪掉）。 */
   box-sizing:border-box;
@@ -1095,7 +1095,8 @@ def _hex_mix(a: str, b: str, t: float) -> str:
     pa, pb = a.lstrip("#"), b.lstrip("#")
     ea = [int(pa[i:i + 2], 16) for i in (0, 2, 4)]
     eb = [int(pb[i:i + 2], 16) for i in (0, 2, 4)]
-    return "#" + "".join(f"{round(x + (y - x) * t):02X}" for x, y in zip(ea, eb))
+    return "#" + "".join(f"{round(x + (y - x) * t):02X}"
+                        for x, y in zip(ea, eb, strict=True))
 
 
 def chart_muted(primary: str, background: str) -> str:
@@ -1284,7 +1285,7 @@ G2_INIT_JS = """
       n.setAttribute('data-chart-error','bad-spec'); return; }
     try{
       // 不要传 renderer: 这份 UMD bundle 只带默认（canvas）渲染器 —— 传字符串
-      // 会在运行时抛 registerPlugin is not a function（实测踩过）。
+      // 会在运行时抛 registerPlugin is not a function。
       // devicePixelRatio 2：位图在两倍像素下渲染，进 PDF 时够锐。
       var chart=new G2.Chart({container:n, autoFit:true, devicePixelRatio:2,
                               animation:false, padding:'auto'});
@@ -1439,8 +1440,6 @@ def render_resolved(resolved: dict) -> str:
         # 档位与错位是 compile 的决策（带 trace），这里只读 —— 渲染器不“想”。
         t_tier = slide["tTier"]
         tsize = slide["tSize"]
-        # 两栏页永远是窄栏，不参与自适应（compile 已定，含理由）
-        b_tier = slide["bTier"]
         bsize = slide["bSize"]
         # 错位是**整页一个值**（真实孔版一张纸过一次滚筒）；按 seed 派生，
         # 在 compile 里算好，这里只读。
@@ -1604,13 +1603,16 @@ def render_resolved(resolved: dict) -> str:
                 nodes.append('<li><span class="dot"></span>'
                              f'<b {lab_attrs}>{html.escape(label)}</b>'
                              f'<em {note_attrs}>{html.escape(note)}</em></li>')
-            # 节点宽度由**网格**算，不写死：写死 300px 时 6 节点会到 1970px
+            # 节点宽度由**网格**算，不写死：固定 300px 在 6 节点时会到 1970px
             # （超出内容宽 538px，靠 flex 收缩硬扛 —— 那是"挤"的来源之一）。
             n_nodes = max(1, len(slide.get("nodes", [])))
             node_w = (grid_mod.CONTENT_W - (n_nodes - 1) * grid_mod.GUTTER) / n_nodes
-            out.append('<ol class="tl" style="--s-nodeLabel:%dpx;--s-nodeNote:%dpx;'
-                       '--tl-node:%.2fpx">%s</ol>'
-                       % (tier["nodeLabel"], tier["nodeNote"], node_w, "".join(nodes)))
+            node_label = tier["nodeLabel"]
+            node_note = tier["nodeNote"]
+            node_html = "".join(nodes)
+            out.append(f'<ol class="tl" style="--s-nodeLabel:{node_label:g}px;'
+                       f'--s-nodeNote:{node_note:g}px;--tl-node:{node_w:.2f}px">'
+                       f'{node_html}</ol>')
         elif kind == "end":
             out.append(f'<div class="end" style="--s-title:{tsize}px">{th}</div>')
         elif kind == "chart":
@@ -1622,7 +1624,7 @@ def render_resolved(resolved: dict) -> str:
                        f'style="--s-title:{tsize}px">{html.escape(headline)}</div>')
             if message and str(slide.get("title", "")).strip():
                 # ⚠️ 这里要用**原始标题文本**：th 是渲染好的 <h1> HTML，
-                # 直接塞会把整串标签转义后印在页上（实测踩过）。
+                # 直接塞会把整串标签转义后印在页上。
                 out.append(f'<div class="chartsrc">'
                            f'{html.escape(str(slide.get("title", "")))}</div>')
             # 图表把**数据本身**也带进清单：导出层要拿它建原生图表（数据可改），
@@ -2163,8 +2165,8 @@ def _candidates_main(deck_spec: dict, style: dict, assets, out_path: str,
         where = "、".join(f"第 {i} 页 → {n}" for i, n in sorted(chosen.items()))
         print(f"✓ 已自动采用最优并渲染：{where}")
         return 0
-    print(f"（未回写：在对比页上挑好，点「复制选择」存成 picks.json，再跑 "
-          f"--candidates --picks picks.json；或加 --pick 直接采用最优）")
+    print("（未回写：在对比页上挑好，点「复制选择」存成 picks.json，再跑 "
+          "--candidates --picks picks.json；或加 --pick 直接采用最优）")
     return 0
 
 

@@ -51,6 +51,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import contextlib
 import hashlib
 import importlib.util
 import json
@@ -220,7 +221,7 @@ PROBE_JS = r"""
       // 它的 font-family 只是 Chrome 给 CJK 的 UA 默认值（实测报了 'PingFang SC'，
       // 页面上根本没写这个族）。这类假提示会把人生生练成"忽略字体提示"。
       //
-      // 踩过两次：第一次是 figure 里只有 <img>（无 textContent，侥幸躲过）；
+      // 第一个坑是 figure 里只有 <img>（无 textContent，侥幸躲过）；
       // 加上 <figcaption> 之后 textContent 非空，八套风格全部报了同一条假提示。
       var ownText = '';
       for (var ni = 0; ni < el.childNodes.length; ni++) {
@@ -263,7 +264,7 @@ PROBE_JS = r"""
       });
     });
     // 每页版面**各自的盒子**。产物是竖向堆叠的多页，第 2 页的元素 y 本来就在 900 以下；
-    // 拿全局页面边界（1600×900）去比多页产物，会把后面每一页都误报成“越界”（实测踩过）。
+    // 拿全局页面边界（1600×900）去比多页产物，会把后面每一页都误报成“越界”。
     out.slides = [];
     document.querySelectorAll('section.slide').forEach(function (s) {
       var r = s.getBoundingClientRect();
@@ -345,7 +346,7 @@ def slide_content_span(measured: dict, slide_no: int) -> tuple[float, float] | N
     """一页里**内容**的竖向占位（相对该页左上角），返回 (顶, 底)；没内容返回 None。
 
     必须按**自己那页**归一化：产物是纵向堆叠的，`getBoundingClientRect()` 给的是
-    文档坐标（实测踩过：第 2 页之后的元素全都“越出 900px”）。探针把每页的 rect 也
+    文档坐标（第 2 页之后的元素全都“越出 900px”）。探针把每页的 rect 也
     带回来了，减一下就好。
 
     为什么单独一个函数：`fit.py`（试排）与 `check.py`（半页死白的提示）要用**同一个**
@@ -401,10 +402,8 @@ def measure(html_path: str, budget_ms: int = 2500, chrome: str = CHROME) -> dict
             capture_output=True, text=True)
         raw = _extract(proc.stdout)
     finally:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(probe_path)
-        except OSError:
-            pass
 
     # 合并：几何来自测量，角色/意图来自清单。
     for el in raw.get("elements", []):

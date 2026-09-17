@@ -102,7 +102,7 @@ python3 scripts/image_source.py --check your.spec.json             # 验尺寸�
 色彩来自该风格的色板，光线与风格来自气质档，限制来自这条出图管线的色彩约束
 （不引入色板外的色相）。
 尺寸 / 比例 / 数量**不写进提示词**（生图 API 有独立参数，写重了会打架），单列在
-「参数」栏。字段分工、优先级裁决与踩过的坑见 `references/images.md`。
+「参数」栏。字段分工、优先级裁决与易错点见 `references/images.md`。
 
 ## 测试
 
@@ -216,7 +216,7 @@ python3 scripts/fonts.py --map               # 8 套风格 × display/body/numer
 **完整的**纯 A 替代方案（8 套风格 × 三档，所以不会变成"有几套风格不能用"）。
 OFL 唯一要记住的：**再分发字体文件本身**时要带上版权声明与 License 文本；
 只拿它排版、或把字形子集嵌进 PDF，不受影响。
-四个实测踩过的坑（`.otf` 那份 Chrome 完全不嵌所以要优先 `.ttf`、`format()` 写错会**静默
+四个容易踩的坑（`.otf` 那份 Chrome 完全不嵌所以要优先 `.ttf`、`format()` 写错会**静默
 不用这款字**、字族真名与清单中文名不是一回事、短记号子串匹配必然误报）见
 `references/fonts.md`。
 
@@ -293,9 +293,9 @@ logo 压文字 / 一张图盖满整页 / 图表没渲染出来 → `check.py` **
 图被放大 / 布局轮换 / 品牌与形状 → **提示**。混淆的后果是第一份正常的 deck 就被挡住，
 然后所有人开始忽略检查。
 
-五块（布局 / 层级 / 留白 / 图形 / 图表）的现状、该借谁的规则（Fluent 2、Figma Auto
-Layout、Design Tokens、**IBCS + ISO 24896**、AntV）、缺什么、以及**分四步的路线图**
-（哪步是加法、哪步要动 8 套 skin、风险在哪）见 `references/layout-system.md`。
+五块（布局 / 层级 / 留白 / 图形 / 图表）的规则、该借谁的参考标准（Fluent 2、Figma Auto
+Layout、Design Tokens、**IBCS + ISO 24896**、AntV），以及本仓库做到哪一步，见
+`references/layout-system.md`（末尾有参考标准清单）。
 
 ## 已知限制
 
@@ -353,9 +353,9 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
 │                             #   （style.json token + skin.css 视觉层），不碰 .py；
 │                             #   历史八套已整体移除，参数表留在文档里作自建参考
 ├── brands/                   # 品牌资产：一个品牌 = 一个目录，不碰 .py
-│                             #   （**没有示例品牌** —— 示例资产会被直接当成可用资产，
-│                             #    实测把示例 logo 带进过真实交付。品牌由用户建：
-│                             #    brand.json + logo 文件，契约见 references/brand-assets.md）
+│                             #   （**没有示例品牌** —— 可拷贝的示例资产会被直接当成
+│                             #    可用资产用进真实交付。品牌由用户建：brand.json
+│                             #    + logo 文件，契约见 references/brand-assets.md）
 # 注意：styles/ 零内置、零示例 —— 风格按契约自建，磁盘上没有可找的样例
 #（可拷贝的模板必然变成默认答案）。
 ├── evals/evals.json         # 行为评估用例
@@ -364,11 +364,11 @@ skills/deck-authoring/          # 可消费面：AI 调用 skill 时读的就是
     ├── style-architecture.md    # 多风格 seam、字段集
     ├── validation.md            # 校验的口径（阻塞 vs 提示）
     ├── delivery-formats.md      # HTML / PDF / PNG / PPTX / MP4 的取舍
-    ├── animation.md            # 运动规则 0-42 全文落地、按角色 preset、确定性、导出
-    ├── brand-assets.md         # 品牌与资产协议（v2.0）：四层、优先级链、v2 对照表
-    ├── content-intelligence.md  # 内容智能与规划系统（v3.0）：Brief / 论断 / 一页一 Takeaway
+    ├── animation.md            # 运动规则 0-42、按角色 preset、确定性、导出
+    ├── brand-assets.md         # 品牌与资产协议：四层、品牌色/字体/logo、Asset Pipeline
+    ├── content-intelligence.md  # 内容智能与规划系统：Brief / 论断 / 一页一 Takeaway
     ├── planning.md             # 规划层规则：schema、骨架表、复杂度（规则由作者执行）
-    ├── layout-system.md        # 布局规则 0-87 全文落地：网格/令牌/层级/约束/路线图
+    ├── layout-system.md        # 布局规则 0-87：网格 / 令牌 / 层级 / 约束 / 参考标准
     ├── charts.md               # 图表：八类、弱化强调、消息先行（几何由 G2 算）
     ├── color.md                # OKLCH 结构、配色规范里哪些是代码强制 / 流程判断
     ├── fonts.md                # 126 字体库、风格映射、严格 A 级、用户缓存

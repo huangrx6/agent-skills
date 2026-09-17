@@ -375,7 +375,7 @@ def _check_layout(measured: dict) -> list[str]:
     乙・容器内裁切：元素自己会裁（overflow 不是 visible）且 scrollW/H > clientW/H。
 
     ⚠️ 比的是**该元素所在那一页**的盒子，不是全局 1600×900 —— 产物是竖向堆叠的多页，
-    第 2 页的元素 y 本来就在 900 以下；拿全局边界比会把后面每页都误报（实测踩过）。
+    第 2 页的元素 y 本来就在 900 以下；拿全局边界比会把后面每页都误报。
 
     注意：装饰墨块**故意**溢出到版面外（right:-60px），但它们没有 `data-m`、
     不进这份清单，所以不会误报。
@@ -414,7 +414,7 @@ def _check_layout(measured: dict) -> list[str]:
             pass
         # 容器内裁切：**只有元素自己会裁**（overflow 不是 visible）时才算数。
         # `.foot` 这种 overflow:visible 的，scrollHeight 比 clientHeight 大 2px 是
-        # 行高与字面度的正常差 —— 没被裁，报它就是误报（实测踩过）。
+        # 行高与字面度的正常差 —— 没被裁，报它就是误报。
         clips = el.get("overflow") not in (None, "visible")
         if clips and (el["scrollW"] - el["clientW"] > 1 or el["scrollH"] - el["clientH"] > 1):
             out.append(f"{mid}（{role}）内容被容器裁切："
@@ -605,7 +605,7 @@ def _check_measured_health(measured: dict) -> list[str]:
 
 # ── 字号体检的四条线 ────────────────────────────────────────────────
 # 依据是画布几何本身，不是审美偏好：1600×900，正文带 = 900−132(上边)−52(下边距)
-# −24(页脚) = 692px（grid.py）。四条线各自对应一类实测过的失败：
+# −24(页脚) = 692px（grid.py）。四条线各自对应一类失败：
 #
 #   TITLE_POSTER_PX —— 内页标题用了**封面尺度**。128/96 那种数是给一页一句话的
 #     封面/宣言页准备的；内页照抄它，每页都像标题页：读起来累、信息密度反而低。
@@ -998,7 +998,7 @@ def _check_brand(measured: dict, deck: dict, tokens: dict) -> tuple[list[str], l
     if deck_mod.is_dark_paper(paper) and not brand.get("logoInverse"):
         notes.append(
             f"品牌 {name!r} 只给了一个 logo，而这张纸是深底（{paper}）—— "
-            f"实测过：白底用的 logo 放到纯黑底上，深色那块会**直接消失**（只剩零星浅色）。"
+            "白底用的 logo 放到纯黑底上，深色那块会**直接消失**（只剩零星浅色）。"
             f"建议在 brand.json 里补 logoInverse（与正版形状一致、只换明暗）")
     # 图被放大渲染 → 糊。logo 与**内容图**都查：判据一样（渲染宽 > 原始宽 5%），
     # 只是 logo 是品牌资产、内容图是每页那几张。SVG 不参与（放大不糊，它报的是
@@ -1107,7 +1107,8 @@ def _content_budget_notes(deck: dict, tokens: dict | None) -> list[str]:
                     f" —— 先**改写标题**（短标题本来就是好标题）；要保留长句就换更宽的"
                     f"结构或拆页，别先压字号")
 
-        def _check_items(items, key, where_label) -> None:
+        def _check_items(items, key, where_label, i=i, layout_name=layout_name,
+                         b=b) -> None:
             spec = b.get(key)
             if not spec or not isinstance(items, list) or not items:
                 return

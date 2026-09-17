@@ -284,7 +284,7 @@ def add_decor(slide, d: dict, slides: list[dict], vars_: dict[str, str]) -> None
     shape.shadow.inherit = False             # add_shape 会带一套主题效果（阴影），清掉
     shape.fill.patterned()
     # ⚠️ 属性名是 `pattern`，不是 `pattern_type` —— 写错了不会报错，会被当成普通属性
-    # 默默吞掉，XML 里的 `<a:pattFill>` 就光秃秃没有 prst（实测踩过：渲染出来是个空圈）。
+    # 默默吞掉，XML 里的 `<a:pattFill>` 就光秃秃没有 prst（渲染出来是个空圈）。
     shape.fill.pattern = MSO_PATTERN.PERCENT_25
     shape.fill.fore_color.rgb = css_color(vars_["--accent"])
     shape.fill.back_color.rgb = css_color(vars_["--paper"])
@@ -296,7 +296,8 @@ def _mix(a: str, b: str, t: float) -> str:
         c = c.lstrip("#")
         return (int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16))
     ea, eb = chan(a), chan(b)
-    return "#" + "".join(f"{round(x + (y - x) * t):02X}" for x, y in zip(ea, eb))
+    return "#" + "".join(f"{round(x + (y - x) * t):02X}"
+                   for x, y in zip(ea, eb, strict=True))
 
 
 def _style_labels(labels, vars_: dict[str, str]) -> None:

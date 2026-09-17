@@ -51,7 +51,7 @@ MAPPING = os.path.join(SKILL, "fonts", "mapping.json")
 #
 # 为什么不在 skill 目录：skill 目录是**可分发的代码**，不该长出自下载的二进制。
 # 仓库里 h264 编码器早就是这个规矩（编译进 tempdir 按源码哈希命名），字体照同一个
-# 思路。旧的 `fonts/ttf/` 仍然**会被读**（已经下了的人不用重下），但**不再往里写**。
+# 思路。`fonts/ttf/` 仍会被读当兜底，但不再往里写。
 LEGACY_DIR = os.path.join(SKILL, "fonts", "ttf")
 CACHE_DIRNAME = "deck-authoring"
 
@@ -173,7 +173,7 @@ def owner_of(name: str) -> dict | None:
         if low and any(tok and tok in low for tok in _file_tokens(entry)):
             return entry
         # **中文名**：`_norm` 只留 [a-z0-9]，中文全被抹掉 —— 所以中文必须另走一路。
-        # 实测踩过：映射表写"汇文明朝体"（清单里是"汇文明朝体（修正版）"），
+        # 映射表写"汇文明朝体"（清单里是"汇文明朝体（修正版）"），
         # 只认拉丁记号时认不出来，而那一款明明是纯 A。
         cjk_low = _norm_cjk(name)
         if len(cjk_low) >= CJK_MIN:
@@ -194,7 +194,7 @@ def cache_dir(temp: bool = False) -> str:
     if env:
         return os.path.abspath(env)
     if temp:
-        import tempfile   # noqa: PLC0415
+        import tempfile  # noqa: PLC0415
 
         return os.path.join(tempfile.gettempdir(), CACHE_DIRNAME, "fonts")
     return os.path.join(os.path.expanduser("~"), ".config", CACHE_DIRNAME, "fonts")
@@ -235,7 +235,7 @@ def local_families() -> dict[str, str]:
 
     为什么不按文件名猜：catalog 里的"得意黑 Smiley Sans"和字体内部的 family
     （实测是 `Smiley Sans Oblique`）本来就不是同一个字符串。字形文件自己写着
-    真名，读它比猜它可靠 —— 我之前手写字体探测翻过车，就是栽在猜名字上。
+    真名，读它比猜它可靠 —— 猜名字不可靠。
     """
     families: dict[str, str] = {}
     for path in local_files():          # local_files() 给的是完整路径
@@ -249,7 +249,7 @@ def _font_families(path: str) -> list[str]:
 
     只读需要的两处，不引第三方库 —— 装 fontTools 只为一件事不值。
     """
-    import struct   # noqa: PLC0415
+    import struct  # noqa: PLC0415
 
     try:
         data = deckio.read_bytes(path)
@@ -440,7 +440,7 @@ def _unpack(path: str) -> list[str]:
     解到**这个 zip 所在目录**，不是写死的某个常量 —— 字体可能来自 `DECK_FONT_DIR`
     指定的任意位置。
     """
-    import zipfile   # noqa: PLC0415
+    import zipfile  # noqa: PLC0415
 
     if not path.lower().endswith(".zip"):
         return []
@@ -474,7 +474,7 @@ EMBED_LIMIT_MB = 40
 def embed(html_path: str, out_path: str) -> str:
     """把 `@font-face` 内联进 HTML（base64），让 HTML 单文件也能带字体。
 
-    实测过的必要性：`@font-face` 指本地文件在**本机**渲染没问题、PDF 也会内嵌，
+    为什么要内联：`@font-face` 指本地文件在**本机**渲染没问题、PDF 也会内嵌，
     但 HTML 换个目录 / 换台机器就断（和 `image` 字段的相对路径是同一个坑）。
     """
     src = deckio.read_text(html_path)

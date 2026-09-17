@@ -4,33 +4,36 @@
     {
       "id": 1,
       "prompt": "帮我做一份十页的产品复盘 deck，做成苹果发布会那种感觉。",
-      "expected_output": "**先说风格，再说内容。** 用户给了风格词（\"苹果发布会那种\"）也不豁免三方向门 —— 风格词收窄的是解释空间，不转移选择权：黑底巨字、大白底衬线都是合法诠释。所以先读 your.spec.json 摸字段集，然后用 `--style` 把同一份内容渲成 2~3 个方向（至少 `keynote-dark` 与 `swiss-grid` 各一版）真出图给他看，摆完**停下等选择**。选定后才写正式 deck-spec.json —— 每页只有 type + 内容（标题 / 条目 / 时间点 / 数据 / 图片），**不要**写坐标、字号、色值。填完跑 scripts/ink.py 看色板门禁 → scripts/render.py 出 HTML → scripts/check.py 过校验。所有门全过再交付；任何一项不过就报告问题，不要靠放宽阈值蒙混。",
+      "expected_output": "**先说风格与大纲，拿到点头再动手。** 用户给了风格词（\"苹果发布会那种\"）也不豁免确认门 —— 风格词收窄的是解释空间，不转移选择权（黑底巨字、大白底衬线都是合法诠释）。顺序：① 把**内容大纲 + 每页视觉载体**过一遍目（页序 / 每页一个观点 / 这页靠什么立住）；② 按四轴（骨架 / 字感 / 密度 / 色彩）**现写** 2~3 个方向 —— 风格是每份 deck 自建的，skill 里**没有内置风格也没有可拷的参考实现**，所以不能写 `--style keynote-dark` 这类名字；把风格放在**临时目录**里（`/tmp/dir-a/style.json` + `skin.css`），渲成图给用户并排看，标清每个方向的名字 / 为什么配它 / 适合什么场合，然后**停下等选择**；③ 选定后把它作为 deck 项目的 `styles/<名>/` 落地，再写 spec。spec 里每页只有 `type` + 内容（标题 / 条目 / 时间点 / 数据 / 图片）与 `visual`，**不要**写坐标、字号、色值。写完跑五道门：`validate_spec.py` → `ink.py styles/<名>/style.json` → `render.py` → `check.py`。所有门全过再交付（**含 HTML**）；任何一项不过就报告问题，不要靠放宽阈值蒙混。",
       "files": [
         "SKILL.md",
-        "references/style-architecture.md"
+        "references/style-architecture.md",
+        "references/planning.md"
       ]
     },
     {
       "id": 2,
       "prompt": "标题字号我想大一点，120px。",
-      "expected_output": "拒绝在 spec 层面改：字号、坐标、色值都不在 schema 里 —— 不存在，不是「不推荐填」。字号参与对比度分档（由 token.contrast.largeTextPx 判定），由 render.py 派生。允许的做法是改 style.json 的 fonts.display（字体族）或 contrast 阈值；不允许在 spec 里写 fontSize 字段。如果用户坚持要 120px 的视觉感受，那属于改渲染器行为，要在 references/style-architecture.md 里同步说明。",
-      "files": [
-        "references/style-architecture.md"
-      ]
-    },
-    {
-      "id": 3,
-      "prompt": "对比度 4.5 太严了，能不能降到 3.5 让更多色板能用？",
-      "expected_output": "**不调阈值**。4.5 是 WCAG AA 正文底线，3.0 是大字底线；降了等于让「荧光色当正文」那种事故合法化。正确做法：换色板 —— style.json 里 colorSets 新加一套，或改现有一整套让声明的文字色变深（ink.rule 已经写了「每套色板必须含一个深墨」）。跑 scripts/ink.py 自检。",
+      "expected_output": "拒绝在 spec 层面写 px：**字号不在 schema 里** —— 不存在，不是「不推荐填」；手写会被 `validate_spec.py` 判失败。字号是**风格的属性**（`style.json` 的 `type` 阶梯，逐档给 px），页级只能声明**档名**（`titleTier` / `bulletTier`，风格可用 `titleTiers` / `bulletDefault` 定缺省）。所以两条合法路径：① 换一档更大的名字；② 改风格的 `type` 里那一档的 px（并说明这会影响所有引用该档的页）。顺带提醒：内页标题用封面尺度（128/96 那种）会让每页都像标题页，判据见 `check.py` 的 `TITLE_POSTER_PX`。",
       "files": [
         "references/style-architecture.md",
         "references/validation.md"
       ]
     },
     {
+      "id": 3,
+      "prompt": "对比度 4.5 太严了，能不能降到 3.5 让更多色板能用？",
+      "expected_output": "**不调阈值**。4.5 是 WCAG AA 正文底线；降了等于让「荧光色当正文」那种事故合法化。正确做法是换色板：`style.json` 的 `colorSets` 新加一套，或改现有那套让派生的叠印墨变深（每套色板必须含一个深墨 —— 两墨都亮就压不深）。跑 `python3 scripts/ink.py styles/<名>/style.json` 自检：**任一色板不达标就退 1**，这就是墨色门禁。",
+      "files": [
+        "references/validation.md",
+        "references/style-architecture.md",
+        "references/color.md"
+      ]
+    },
+    {
       "id": 4,
       "prompt": "PPTX 里的字我等下发给你的时候现场改，你先做。",
-      "expected_output": "这个 skill 两种 pptx 都能出，所以不要把它说成二选一：make_pptx.py 是**贴图**（观感 100%，字改不了）；pptx_native.py 是**原生 shapes**（字是真字、图表是原生图表，但没有风格化的纹理与装饰）。正确做法是把两个都摆出来让对方选：要「一模一样」给贴图版或 PDF，要「能改字」给原生版。只有一种情况要说「不该用本 skill」：对方要的是**从零编辑的普通 PPT**（版式随内容重排），那本来就该用 PowerPoint。",
+      "expected_output": "这个 skill 两种 pptx 都能出，**不要把它说成二选一**：`pptx_native.py --png-dir pages/ -o deck.pptx` 是**贴图**（观感 100%，字改不了）；`pptx_native.py out.html -o deck.pptx` 是**原生 shapes**（字是真字、图表是原生图表，但错位 / 颗粒 / 网点做不出来）。要改字就走原生那条；更稳的观感走 PDF（矢量）或 HTML。把两条都摆出来让对方选。只有一种情况要说「不该用本 skill」：对方要的是**从零编辑的普通 PPT**（版式随内容重排），那本来就该用 PowerPoint。",
       "files": [
         "references/delivery-formats.md"
       ]
@@ -38,16 +41,56 @@
     {
       "id": 5,
       "prompt": "标题颜色我想用 #FF48B0（粉红），醒目一点。",
-      "expected_output": "拒绝：主 / 副色单独当文字色对比度天生不达标（vivid 实测 2.35 ✗）。文字色只能是 overprint(primary, secondary) —— 派生不手写。spec 里不允许写 color: '#xxxxxx'；只允许写 color: 'overprint'（不写也行）。如果用户要「醒目」，建议改大字号或加色块装饰（render.py 的装饰墨块只落在右侧上下两角），而不是改文字色。",
+      "expected_output": "拒绝：spec 里**不允许**写 `color: '#xxxxxx'`；`color` 只接受 `\"overprint\"`（不写也行，缺省就是它）。文字色只能是 `overprint(primary, secondary)` 派生出来的 —— 主 / 副色单独当文字色对比度天生不达标（它们的语义是墨层 / 色块 / 装饰，不是承载文字）。如果用户要「醒目」，建议改大字号档、或让风格在标题区放色块装饰，而不是改文字色。要改整体颜色就换 `colorSet` 或改那套色板，然后重跑 `ink.py`。",
       "files": [
-        "references/style-architecture.md"
+        "references/validation.md",
+        "references/color.md"
       ]
     },
     {
       "id": 6,
-      "prompt": "这个 deck 不要 riso 风，做个普通的现代简约风。",
-      "expected_output": "**不该触发本 skill** —— 它的 Do NOT 明确排除了「非 riso 视觉风格」。本 skill 的定位是「视觉做到极近真实孔版」，不是「通用 deck 生成器」。正确做法是指出本 skill 不适合，并给出替代方向（用 Keynote / PowerPoint 直接做）。若对方改口说「其实就是要 riso 风」，照常走本 skill 流程。",
-      "files": []
+      "prompt": "这个 deck 不要孔版风，做个普通的现代简约风。",
+      "expected_output": "**该用本 skill，而且这正是它的默认工作方式。** 风格零内置、按每份 deck 现写 —— 所以「不要孔版风」不是排除条件，而是**这就是要写出来的那个方向**。做法：按四轴取点（骨架＝网格化留白 / 字感＝中性无衬线 / 密度＝疏 / 色彩＝纸感单色或大色场），现写 2~3 个方向渲到临时目录出图给他选。**不要**去找一个叫「简约」的内置风格，也不要把见过的风格名当成菜单（任何清单都会被当成选项清单）。",
+      "files": [
+        "SKILL.md",
+        "references/style-architecture.md"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "这页的三个季度数字我想用柱状图，一眼看出涨幅。",
+      "expected_output": "把这一页写成 `type: chart`：图形由 **`chart` 字段显式声明**（八类：bar / bar-horizontal / line / area / bar-stacked / donut / scatter / combo），数据进 `data: [{label, value}]`，`visual` 写 `{\"kind\": \"data\", \"ratio\": \"3:2\", \"intent\": \"…\"}`（图表页的 ratio 也必填）。**不要写任何坐标或柱高** —— 几何由 AntV G2 算（vendor 锁版本内联、图表内部不动）。想强调某一条就写 `emphasis`；`message` 是可选的结论标题（写了就顶上去，图表的标题该是结论而不是数据集名 —— 没写 `message` 时 `check.py` 会提示）。别自己画 SVG 柱形，也别用 `chart` 之外的方式表达数据。",
+      "files": [
+        "references/charts.md",
+        "references/validation.md"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "配图我自己用 AI 出，你把要什么图告诉我就行。",
+      "expected_output": "走 `python3 scripts/image_source.py --brief your.spec.json`：它在 **spec 同目录**写两份东西 —— 人读的 `image-brief.md`（逐槽位：文件名 / 实测像素尺寸 / 槽位比例 / 中英提示词 / 负面清单）与机读的 `assets/requests/<槽位id>.json`。提示词里的比例与像素是**真渲一遍量出来的**，不是估的。**脚本不产图、也不手画**（量槽位用的尺子只在临时目录里）：用户拿着提示词出图，按文件名存回 spec 同目录，然后 `image_source.py --check your.spec.json` 验「在不在 / 够不够大 / 比例合不合」。spec 侧每页的 `visual` 要写清 `{\"kind\": \"evidence_image\", \"ratio\": \"3:2\"}`（纯文字页也要写 `{\"kind\": \"none\"}` —— 必须决定过）。",
+      "files": [
+        "references/images.md",
+        "SKILL.md"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "用我们公司的 logo 和品牌色，署名写 © 2026 某某科技。",
+      "expected_output": "品牌是**第三层**，一个字段接进来：让用户提供资产 → `brands/<name>/brand.json`（`logo` + `logoInverse`（反白版）+ `logoOn`（cover|cover+end|all|none）+ `footer` + 可选 `colorSets` / `fonts`）→ spec 的 `deck` 里加一行 `\"brand\": \"<name>\"`。契约要点：**仓库里没有示例品牌**（可拷的示例资产会被直接当成可用资产用进真实交付），资产必须由用户提供；缺 `logoInverse` 而纸是深底时 `check.py` 会提示（白底 logo 放黑底上会消失）；logo 放哪个角**不归品牌管**（那是构图，归风格）。品牌赢在「是谁」，风格赢在「怎么表达」—— 品牌色不覆盖整套风格色板，最终颜色由解析器融合。",
+      "files": [
+        "references/brand-assets.md",
+        "SKILL.md"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "这份 deck 每一页看起来都差不多，能不能换换排法？",
+      "expected_output": "这是**布局轮换**问题，当前工具直接支持：`render.py your.spec.json -o out.html --candidates` 会按页给出多个结构候选（同内容不同结构）并渲一张带选择面板的对比页；在页面上挑完点「复制选择」得到 picks JSON，再用 `--picks picks.json` 回写（或用 `--pick` 直接采用最优）。也可以逐页显式写 `layout`（`content-image`：`visual-right`（缺省）/ `visual-left` / `even` / `hero`；`two-column`：`even` / `lean-left` / `lean-right`），或写一个表外的结构名（如 `poster-split`）由 `skin.css` 自己排。判据：**每页同构图是反 slop 第一条** —— 同型页连排要换布局换节奏。改完重跑 `check.py`（换布局后越界 / 碰撞要重新实测）。",
+      "files": [
+        "SKILL.md",
+        "references/layout-system.md"
+      ]
     }
   ]
 }

@@ -4,7 +4,7 @@
 Page Planner 输出的"页面意图"稳定转换为**可测量、可约束、可评分、可修复**的页面
 几何。本规则负责：布局、区域、网格、信息层级、留白、对齐、视觉平衡、版式布局、
 Content Fit、评分与修复。不负责：内容事实、品牌身份、最终颜色、图片 Prompt、
-图表语义选型、动画特效本身。每节标落地状态：【✅ 已实现】【约定=规则在、机制未接】。
+图表语义选型、动画特效本身。规范里**规则在、本仓库未接机**的机制，在节标题上用【约定】标出。
 
 > 架构口径：规范设想"Resolved Slide JSON"作为几何层工件；本仓库的对应物是
 > **渲染后的 DOM 本身**（浏览器就是 Layout Resolver：spec 无坐标 → render.py
@@ -13,7 +13,7 @@ Content Fit、评分与修复。不负责：内容事实、品牌身份、最终
 > 字段封闭、`COORD_FIELDS` 直接判错）与几何层（DOM+实测）同样禁止混合——
 > 只是几何层不是一份 JSON，是活页面。
 
-## 0. 核心原则【✅】
+## 0. 核心原则
 
 **LLM 决定语义与意图，程序决定几何与坐标。** LLM 可以决定：pageType /
 layoutFamily（候选）/ regions / priority / semanticRelation / visualWeight /
@@ -22,7 +22,7 @@ width / height / dx / dy / rotate / 任意像素 gap / 任意字号 / 任意 pad
 落地：spec 里**根本没有坐标字段**（`validate_spec.py` 的 `COORD_FIELDS` 把
 x/y/dx/dy/rot/width/height 全判错）；最终几何由渲染层派生。
 
-## 1. 总体架构【✅ 下半段已在】
+## 1. 总体架构
 
 Slide Content → Page Planner → Layout Intent → Layout Family → Layout（作者声明）
 → Region Tree → Grid/Spacing/Constraints → **Layout Resolver** →
@@ -31,35 +31,34 @@ Measurement → Hard Check → Layout Score → Repair → Resolved Slide → Re
 （硬检查 + 软提示流）；Score/Repair 引擎见 §37/§52。
 布局不是脚本从候选里实测选出的 —— 作者在 spec 写 `layout`，脚本只执行与验收。
 
-## 2. 职责边界【✅】
+## 2. 职责边界
 
 Content Engine 决定"说什么"（content-intelligence.md）；Page Planner 决定页面
 类型/主要视觉/密度/谁最重要/语义关系（作者做）；Layout Engine 决定
 放哪里、占多大、间距多少、是否换版、是否拆页（render.py + grid.py）；**Renderer
 只按 Resolved 布局绘制，不重新布局**（渲染分支里没有第二套几何）。
 
-## 3. 坐标体系【✅】
+## 3. 坐标体系
 
 Canonical Canvas = **1600×900**（设计空间，非输出格式）；导出再映射（HTML 走
 `--k` 视口缩放、PDF 矢量、PNG 按宽 ×2、PPTX 转 EMU）。内部不使用 0~1 比例做
 文字/gap/padding（比例只用于 focalPoint/裁切/响应映射），baseline 与间距用
 Design Unit。
 
-## 4. Safe Area【✅】
+## 4. Safe Area
 
 left/right = 84、top = 132（在 96~132 建议带内）、底部页脚独立带（52+24）。
-硬规则落地实况：越界=阻塞（`check.py` 实测逐元素查，标题在内）；logo 压文字
-=阻塞。三条**承诺未全落地**，照实标注：正文进页脚带**无阻塞检查**、页码
-**无独立保护区**（重叠类阻塞目前只有 logo 压文字这一条）——这两条在路线图上；
-bounds 检查**无角色豁免**（所有可见元素一视同仁，不存在"只豁免图片"）。
+硬规则：越界=阻塞（`check.py` 实测逐元素查，标题在内）；logo 压文字=阻塞。
+另有三条**不做检查**，别当它们有牙：正文进页脚带、页码保护区（重叠类阻塞只有
+logo 压文字这一条）；bounds 检查**无角色豁免**（所有可见元素一视同仁）。
 
-## 5. Grid System【✅】
+## 5. Grid System
 
 12 Columns / margin 84 / gutter 24；列宽**动态计算**
 `(1600 − 2×84 − 11×24) / 12 = 97.33`（非整数是刻意的），只从 `grid.py` 取。
 禁止手写列宽 —— 几何只有 `grid.py` 一个来源（第二份手写常量必然漂移）。
 
-## 6. Grid Span【✅】
+## 6. Grid Span
 
 核心组件宽度取整列（`grid.py` 的 ALLOWED_SPANS：2/3/4/5/6/7/8/12）：图文页 = 7+5 列、
 两栏 = 6+6 列、时间线宽度按节点数从网格算（原写死 300px，6 节点超宽 538px 靠
@@ -73,13 +72,13 @@ VISUAL/META，支持嵌套。落地形态：`grid.py` 的 `REGIONS` 常量 + HTM
 （`.pad` = HEADER+BODY、`.footrow` = FOOTER、图/图表列 = VISUAL）；**没有独立
 的 region-tree JSON**——要"版式族 × 布局"（§15-18）时才需要它。
 
-## 8. Auto Layout 参数【✅ 精神落地】
+## 8. Auto Layout 参数
 
 父 Region 负责 direction/padding/gap/align/justify；子组件不写坐标。落地 =
 CSS flex/grid：父容器 padding/gap 全走 `--sp-*` 令牌，子元素内容变化自动重排
 （父容器内容变化自动重排正是容量反馈依赖的机制，§55）。
 
-## 9. Spacing Tokens【✅】
+## 9. Spacing Tokens
 
 Global Ramp：8/12/16/24/32/48/64/96；Alias：inner 16 / item 24 / block 32 / group 48 /
 section 64（+hero 96）。注入产物为 CSS 变量 `--sp-*`；壳里的 gap **全部**走令牌 —— 不出现裸数字。
@@ -89,19 +88,19 @@ section 64（+hero 96）。注入产物为 CSS 变量 `--sp-*`；壳里的 gap *
 （这条由一条**机械校验**守着：壳 CSS 里 25~64px 区间的裸间距直接判失败 ——
 间距无律就是这样长出来的。）
 
-## 10. 间距关系【✅】
+## 10. 间距关系
 
 inner < item < group < section；**组距 ≥ 1.5 × 条目距**（Gestalt 接近性）、
 节距 ≥ 1.33 × 组距（`grid.py` 的 SECTION_RATIO）——成文进 `grid.py`，
 `--json` 自检。间距必须表达关系，
 不是装饰。
 
-## 11. Style 与 Spacing【✅】
+## 11. Style 与 Spacing
 
 Style 不重定义任意 spacing，只允许覆盖语义档（spacingOverrides）。skin 里的
 `gap` 只能引用 `--sp-*`，`gap=57` 这种手写值没有合法来源。
 
-## 11b. 安全盒（Clearance Box）与碰撞政策【✅ layout/ 包】
+## 11b. 安全盒（Clearance Box）与碰撞政策
 
 页面元素除**视觉边界**外还有一个**安全盒**（四向外扩的视觉安全范围）。
 两个不同视觉组的元素安全盒相交 = 按重叠处理（阻塞）—— 只查真实边界
@@ -151,21 +150,21 @@ Style 不重定义任意 spacing，只允许覆盖语义档（spacingOverrides�
 第 9 页 s9.chart 与 s9.caption 太近（visual×caption：需要 ≥44px，实际 24px）
 ```
 
-## 11c. 标题块与装饰锚定【✅】
+## 11c. 标题块与装饰锚定
 
 标题块高度是**内高的下限**（`min-height`），不是钉死的盒子：标题换行 /
 换字体 / 换字号时块随内容长，皮肤锚在 `.titleblock` 上的装饰（侧条 / 下划线）
 跟着真实几何走。`measure.py` 对标题元素额外输出**逐行真实矩形**
 （`lineRects`，Range API）—— 行数与行高变了，装饰是否跟得上拿它验证。
 
-## 11d. 间距治理【✅】
+## 11d. 间距治理
 
 块与块的间距**全部由父容器（`.pad`）的邻接规则给**；组件自身零外距。
 当前只有标题块带 `margin-bottom: var(--sp-section)`（64）；下方组件不写
 `margin-top`（块布局的相邻外距折叠取大者，写不写结果一样，写两处必漂移）。
 安全距离表的最低线（标题底 28 + 正文顶 20 = 48）由这 64 兜住。
 
-## 11e. Repair 修复梯【✅ render --repair】
+## 11e. Repair 修复梯
 
 ```bash
 python3 scripts/render.py spec.json -o out.html --repair
@@ -188,7 +187,7 @@ python3 scripts/render.py spec.json -o out.html --repair
 （iterations / fixed / patches / diagnostics）、`out.repaired.spec.json`（有补丁时）。
 退出码：全部修好 = 0；仍有问题 = 1（不能假装修好了）。
 
-## 12. Alignment【✅ 提示级】
+## 12. Alignment
 
 对齐体检三条（提示级）：**左缘吸附**（锚点在列起点上）、**右缘在栅格缘**
 （视觉容器的宽度数学 —— content-box 的 width+padding 会把右缘顶出内容界）、
@@ -201,28 +200,27 @@ python3 scripts/render.py spec.json -o out.html --repair
 **84**（边距）、**448**（col4）、**812**（col7）、**933**（col8）、**1176**（col10）。
 优先序：同 Region 左缘 > 网格列 > baseline > 光学对齐。
 
-## 13. Optical Alignment【✅】
+## 13. Optical Alignment
 
 允许组件规则做少量视觉修正（图标超 baseline 1~3px、圆形视觉中心微移、大标题
 字形边界微调）——本仓库的这类修正都在 skin.css 里**由风格作者写**，不由 LLM
 生成。
 
-## 14. Page Type 与 Layout Family 分离【 部分 ✅】
+## 14. Page Type 与 Layout Family 分离
 
 Page Type=页面语义类型，Layout Family=空间组织方式（comparison 页型 → split
-族）。落地：页型→版式的映射由作者声明 `layout`（§17）。**family/layout
-两级中间层未建**（§15-18；两族已带 layout 字段，全量铺开在阶段 3）。
+族）。页型→版式的映射由作者声明 `layout`（§17）。本仓库**没有 family → layout
+两级中间层**：`layout` 直接写在 spec 上。
 
-## 15. Layout Family【✅ 第一片已落地（content-image）】
+## 15. Layout Family
 
 规范至少支持 single/split/stack/grid/hero/editorial/overlay/timeline/
-chart/table/dashboard/full-bleed。现状：7 种 slide type（title/content-text/
-content-image/two-column/timeline/chart/end）+ 自建风格。**content-image 率先
-成为显式家族**：`layout` 字段进 spec（作者声明的自由字符串）；two-column
-已跟上（3 个结构布局，§16）；其余 type 仍是单版式 ——
-family 命名层全量铺开在路线图阶段 3。
+chart/table/dashboard/full-bleed。本仓库有 7 种 slide type（title/content-text/
+content-image/two-column/timeline/chart/end）+ 自建风格。**content-image 与
+two-column 有显式家族**：`layout` 字段进 spec（作者声明的自由字符串；two-column
+3 个结构布局，§16）；其余 type 仍是单版式。
 
-## 16. Layout（布局）【✅ 结构布局已落地（content-image 4 + two-column 3）】
+## 16. Layout（布局）
 
 每页一个布局：spec 写 `layout`（**自由字符串**），渲染器给**结构**，皮肤/风格
 负责细排。分工是"渲染器能力 + 作者自由"：
@@ -252,7 +250,7 @@ trace 里注明"缺省结构 + data-layout，排法由 skin.css 写"。不写 `l
 HINTS 指路 layout）、`auto` 被 `validate_spec.py` 拦（`BAD_LAYOUT`）。其余 type（时间线）
 仍是隐式单版式。
 
-## 17. 布局选择依据【✅ 作者声明】
+## 17. 布局选择依据
 
 不得随机选版式；必须考虑内容量/视觉角色/图比例/优先级/语义关系/风格/密度/
 平衡/前后页节奏。口径：**这些判断是作者的内容决策，写在 spec 的
@@ -261,7 +259,7 @@ HINTS 指路 layout）、`auto` 被 `validate_spec.py` 拦（`BAD_LAYOUT`）。�
 visual-right、two-column 缺省 even，§16）；写自造名由 skin.css 排。
 其余 type 仍页型查表（确定性，不随机）。
 
-## 18. Layout Candidate Ranking【✅ --candidates（声明页钉死）】
+## 18. Layout Candidate Ranking
 
 页级**候选**：每页给出 **3 个结构不同**的候选 + 1 个"当前/缺省"，整份 deck 联合
 择优，并输出一页**对比页**供作者挑。
@@ -356,13 +354,13 @@ python3 scripts/render.py spec.json -o out.html --contract --json  # 程序读
 **预算只是估算，不替代实测**：`check.py` 只在超出 `TOLERANCE`（15%）时开口，
 提示里第一句是"改文案 / 换更宽的结构"；渲染后的越界 / 碰撞 / 死白仍是**硬门**。
 
-## 19. Information Hierarchy【部分 ✅】
+## 19. Information Hierarchy
 
 每个核心组件 priority 1..5（P1 主视觉/P2 标题结论/P3 关键证据数字/P4 支撑/
 P5 来源页脚）。落地：`grid.py` 有 PRIORITY 表；量化 P 判定的三把尺（文本预算/
 视觉焦点/密度）由作者声明与人审。
 
-## 20. Priority 影响【✅ 精神落地】
+## 20. Priority 影响
 
 Priority 影响字号 tier/字重/明度/面积/位置/留白/动画强度/突出度，**不能只靠
 "字号越大越重要"**。落地：风格 type 阶梯（cover/subtitle/bullet/colTitle 分
@@ -371,7 +369,7 @@ Priority 影响字号 tier/字重/明度/面积/位置/留白/动画强度/突�
 色板对比度
 另有 `ink.py`，§29）。
 
-## 21. Focal Point【✅】
+## 21. Focal Point
 
 primary ≤1、secondary ≤2；多元素同等抢眼 → focal_conflict。判据（相对焦点
 间距 ≥25% 才算明确 + ≤3 个重元素）**由作者/人审视** —— 早先量化它的那个小工具
@@ -379,18 +377,18 @@ primary ≤1、secondary ≤2；多元素同等抢眼 → focal_conflict。判�
 焦点领先第二名 90%+（标题永远最大字、图/图表永远最大面积——不是偶然，是阶梯
 的结构结果），人眼可复核。
 
-## 22. Visual Weight【✅】
+## 22. Visual Weight
 
 visualWeight = 面积 × 对比 × 字重 × 饱和 × 孤立度 × 语义优先。简化质量
 （墨宽×高度/页面积×10）由作者估；主焦点应显著
 领先（阈值 top1/top2 ≥ 1.25 → 我们用 25% 间距同义）保留为规则。
 
-## 23. Density【✅】
+## 23. Density
 
 density = 占用核心面积 / 安全内容面积；参考带：Minimal 35-50 / Normal 45-65 /
 Information 55-75 / Dashboard 65-82。参考带是工程启发式（不是硬标准），由作者/人审。
 
-## 24. 留白规则【✅】
+## 24. 留白规则
 
 留白分 micro/component/group/structural/narrative 五级；服务分组/焦点/呼吸/
 节奏/视觉方向。落地：令牌 ramp 即五级的参数化（inner=组件内、item=条目间、
@@ -414,7 +412,7 @@ symmetric/asymmetric/centered/editorial/radial/directional/layered；Style 可
 偏好 composition，但内容和 Page Type 优先。现状：每套风格的构图倾向写在
 风格的气质声明里（网格骨架取对称，编辑式骨架取非对称）。
 
-## 28. Content Fit 修复顺序【✅ 顺序成文】
+## 28. Content Fit 修复顺序
 
 布局失败**禁止第一步缩字体**：1 修事实/必需内容 → 2 删无关装饰 → 3 更短
 Copy → 4 删低优先级 → 5 调 gap → 6 调 padding → 7 调区域比 → 8 换 layout
@@ -425,7 +423,7 @@ tier**（权威表：`pipeline.md` §31 的 13 步修复顺序，这里是同一
 缩字号完全由作者显式声明（`slide.bulletTier` / 风格
 `bulletDefault`，§29）—— 脚本不再替内容悄悄缩小字。
 
-## 29. 字号降级【✅ 作者声明】
+## 29. 字号降级
 
 只允许 tier down（body.lg → body.md），禁止任意压缩（32→31→29→27）。
 落地：档位由**作者声明** —— 标题档 `slide.titleTier`（缺省映射在风格
@@ -442,21 +440,21 @@ minWidth/maxWidth/minHeight/aspectPolicy/maxLines/grow/shrink 每组件声明。
 现状：无组件清单；等价约束散在渲染分支（时间线最小节点宽、图列宽 7 列）。
 MetricCard 式声明表未建。
 
-## 31. Image Constraints【✅】
+## 31. Image Constraints
 
 aspect ratio（实测插槽比）/ minResolution（盒子 ×2）/ bleedAllowed / 无放大
 （check **提示**）都在图像契约与 check.py；**禁止非等比拉伸、无 focal 的盲裁、
 小图强放大**——放大检查是 notes 提示不是阻塞（check.py：渲染宽 > 原始宽 5%
 即提示"会糊"），比例在 brief 阶段对齐。
 
-## 32. Chart Constraints【✅】
+## 32. Chart Constraints
 
 Chart Container 负责 chart box/title box/标注区/标签安全区；**Chart Engine
 不得突破 Container**（chartwrap 占内容宽 1432，壳给 `.g2` 容器 330px 高；
 几何由 AntV G2 在容器内算，G2 的 autoFit 必须有这个高度才不抛错）；
 **Layout 不决定 chart type**（图形类型由 spec 显式声明，见 charts.md）。
 
-## 33. Diagram Constraints【部分 ✅】
+## 33. Diagram Constraints
 
 页面布局只负责 Diagram Container，内部 node/edge/connector/间距由引擎自管，
 **页面网格不强行控制每个节点**。落地：timeline 容器宽从网格算，节点内部排布
@@ -468,7 +466,7 @@ Chart Container 负责 chart box/title box/标注区/标签安全区；**Chart E
 表格过高优先拆表/分页/转附录而不是缩到不可读。现状：无 table 版式（表格数据
 走 chart 或截图）；规则留给将来。
 
-## 35. Hard Constraints【部分 ✅——四项在路线图】
+## 35. Hard Constraints
 
 失败即阻塞：out of bounds（越界，实测）✓、text clipping（溢出/容器裁切）✓、
 对比度（叠印墨 vs 纸色——"unreadable min font"的对比度半边）✓、chart label
@@ -479,12 +477,12 @@ logo overlap（logo 压字）✓、decor overlap（墨块压文字栏）✓、un
 做成五种格式只是把问题复制五份"）——这条由交付步骤守（任一步非零即停，
 见 `delivery-formats.md`）。
 
-四项**承诺未落地**（路线图，先别当已有的牙）：unreadable min font 的**最小字号**
-半边、overlap（**文字互压**——重叠类阻塞目前只有 logo 压文字一条）、footer
+四项**不做阻塞**（先别当它们有牙）：unreadable min font 的**最小字号**
+半边、overlap（**文字互压**——重叠类阻塞只有 logo 压文字一条）、footer
 collision（**正文进页脚带**）、impossible aspect（**比例冲突**）。另：image
 excessive upscale（图放大）是 **notes 提示**不是阻塞（渲染宽 > 原始宽 5% 即提示）。
 
-## 36. Soft Constraints【✅】
+## 36. Soft Constraints
 
 进入提示不阻塞：grid alignment / whitespace / focal clarity /
 density / style consistency / decoration restraint —— `check.py` 的提示流
@@ -503,7 +501,7 @@ invalid。未实现分数引擎；等价物：Hard Fail = 退出 1（invalid 的
 ≥90 excellent / 85-89 pass / 75-84 repair recommended / <75 repair required。
 未实现；阈值要等有分数引擎时才有意义（§83）。
 
-## 39. Decoration Restraint【部分 ✅】
+## 39. Decoration Restraint
 
 检查装饰面积占比/是否穿正文/假焦点/重复/匹配风格。落地：装饰压文字=阻塞；
 decor 类型与角位由风格 token 限定（版心已满的版式不放装饰）；面积占比由人审。
@@ -514,7 +512,7 @@ decor 类型与角位由风格 token 限定（版心已满的版式不放装饰�
 不能只评单页：连续同 layout 数、visual/text 节奏、full-bleed 频率、chart
 连续页数、纯文字连续页数。未实现（单页检查为主）；stress deck 提供测试面。
 
-## 41. Repetition Rule【✅ 已落地（提示级）】
+## 41. Repetition Rule
 
 同一 type+layout 连排 **n≥2** 即提示轮换（仅 content-image / two-column，
 `check.LAYOUT_TYPES`；`check.py` 的 `_layout_rotation_notes`，check.py:377-402）
@@ -525,7 +523,7 @@ decor 类型与角位由风格 token 限定（版心已满的版式不放装饰�
 0..1；Corporate 0.2-0.4 / Technical 0.3-0.5 / Creative 0.5-0.8；Novelty 不得
 破坏可读性。由风格性格承担（自建几套 = 几档事实上的 novelty），无数值。
 
-## 43. Style 与 Layout【✅】
+## 43. Style 与 Layout
 
 Style 控制：对称偏好/密度偏好/overlap 倾向/留白倾向/editorial 程度/容器倾向；
 **不直接规定每页几何**。落地：风格只出 tokens（type 阶梯/motion/decor/
@@ -534,90 +532,90 @@ spacing 覆盖），几何全部来自 render+grid。
 ## 44. Shape Language 接口【约定】
 
 Layout 只消费 Shape Profile（cornerRadius/strokeStyle/shadowStyle/
-surfaceStyle/lineStyle/geometry/decorationDensity/iconStyle 八参）。未建独立
-shape 层（圆角/描边等散在各 skin.css）——路线图阶段 4。
+surfaceStyle/lineStyle/geometry/decorationDensity/iconStyle 八参）。本仓库**没有
+独立 shape 层**：圆角/描边等写在各 `skin.css` 里。
 
-## 45. Graphic Grouping【✅】
+## 45. Graphic Grouping
 
 相关元素优先靠 proximity/alignment/共享容器/共享样式/connector 分组，**不要
 一上来就加边框**。落地：两栏=共享容器+对齐；bullet 组=proximity+左对齐；
 时间线 connector 表达流程。
 
-## 46. Container Usage【✅】
+## 46. Container Usage
 
 Card/Container 只用于独立单元/可比模块/明确分组/浮层层级；**禁止所有内容
 卡片化**。落地：多数版式无卡片（文字直接上版面），容器只在两栏/时间线节点。
 
-## 47. Connector Rule【✅】
+## 47. Connector Rule
 
 连接线只表达流程/方向/依赖/数据流/关系；纯装饰连接线禁止——本仓库连接线只在
 timeline（语义=顺序），没有装饰线。
 
-## 48. Visual Direction【✅】
+## 48. Visual Direction
 
 页面应有明确阅读方向（left_to_right / top_to_bottom / center_out / radial）；
 **Layout 与 Motion 共享 direction**。落地：DOM 顺序即 stagger 顺序（自上而
 下）；图在右列=左读文右看图；动画方向与版面方向同源（§20）。
 
-## 49. Layout Intent【部分 ✅】
+## 49. Layout Intent
 
 Page Planner 输出 layoutIntent（family/composition/density/direction/
 focalPoint/visualWeight/whitespace）。落地：`visual`（主视觉类型）与 density
 由作者写；family/composition 字段未建。
 
-## 50. Resolved Layout【✅ 架构差异见顶部注】
+## 50. Resolved Layout
 
 只有 Resolved 层可含坐标：`{canvas, layout, regions:{x,y,w,h},
 components:{…}}`。本仓库的 Resolved 层 = 渲染后的 DOM + `measure.py` 的实测
 矩形（语义清单记意图、几何由测量层量回——两者对不上就是 bug）。无独立 JSON
 工件；要接 Layout Score（§37）时再物化它。
 
-## 51. Schema 分层【✅】
+## 51. Schema 分层
 
 Slide DSL=语义层、Resolved Slide=几何层，**禁止混合**。落地：spec 字段封闭
 且无坐标（COORD_FIELDS 判错）；几何只存在于渲染产物与测量结果。
 
-## 52. Repair Engine【✅ 等价形】
+## 52. Repair Engine
 
 Repair 不重生成整页，输出 Patch（switch_copy_level / switch_layout…）。
 落地：`check.py` 的提示就是诊断（指名哪个元素、什么问题、按 §28 顺序修）。
 Patch=人改 spec 的那几行，重跑门。无机器
 自动改写（人在环是刻意的：修复决策里"删什么内容"是价值判断）。
 
-## 53. Repair Priority【✅ 成文】
+## 53. Repair Priority
 
 R1 删无关装饰 → R2 短 Copy → R3 删低优先级 → R4 调 gap → R5 调 padding →
 R6 调区域比 → R7 换 layout → R8 换组件档 → R9 缩非核心视觉 → R10 拆内容
 → R11 拆页 → **R12 降字号 tier**——在统一表里这是**第 13 位**（第 1 位
 "修事实/必需内容"属内容层，见 `pipeline.md` §31）。与 §28 同一张表（靠作者按序修，没有脚本门）。
 
-## 54. Repair Loop【✅ 人在环版】
+## 54. Repair Loop
 
 resolve → measure → check → score → repair → resolve again，最多 3~5 轮。
 落地：改 spec → `render` → `check` 循环（每轮秒级）；超过几轮应停下来想
 （fail with diagnostic 的精神——check 的报错就是 diagnostic）。
 
-## 55. Fit Engine【✅】
+## 55. Fit Engine
 
 fit 只做真实测量：text height / line count / occupied area / overflow /
 image fit / chart fit；**不决定内容价值**（值不值得说是 content-intelligence
 的事——元规则 14）。落地："装不装得下"由 `measure.py` 实测（越界/裁切）在 `check.py` 里定死
 （§56）；候选并测见 §18/§57。
 
-## 56. Browser Measurement【✅】
+## 56. Browser Measurement
 
 HTML 路径优先真浏览器测量：actual font metrics / wrapping / SVG bounds /
 DOM rect / image natural size。落地：`measure.py` 注入探针脚本、`--dump-dom`
 取回（不走 CDP，见文件头注），拿真矩形；
 **字符宽度估算只能做预判**，最终判断全靠实测。
 
-## 57. Candidate Testing【✅ --candidates（§18）】
+## 57. Candidate Testing
 
 落地：`render --candidates`（§18）—— 未声明布局的页把结构候选各渲一遍、
 整渲实测（每轮套同一候选序号）、打分出表；`--pick` 才落盘。"装不装得下"
 由 `measure.py` 实测在 `check.py` 里定死（§55/§56）。
 
-## 58. Candidate Score【✅ 可测子集（§18 的表）】
+## 58. Candidate Score
 
 只打**可测**维度（密度区间满意 / 换行 / 视觉占比区间 / 平衡），权重见 §18；
 语义契合、风格契合、deck 节奏不打分 —— 表摆出来，决定权在作者。
@@ -630,25 +628,25 @@ DOM rect / image natural size。落地：`measure.py` 注入探针脚本、`--du
 pageImportance，避免连续同构页。未实现（配合 §40 一起做；§41 的轮换提示
 可作起点）。
 
-## 60. Cover Layout【✅】
+## 60. Cover Layout
 
 Cover 允许 hero/大量留白/非对称/full-bleed/overlap/editorial 构图；必须保证
 标题清楚、Logo 安全、主视觉不压信息。落地：title 版式 + 品牌 logoOn=cover
 
 - 装饰角块（不压字，阻塞检查守着）。
 
-## 61. Statement Layout【✅】
+## 61. Statement Layout
 
 目标只有一个：强化一个 Message；优先大标题/单数字/单焦点，避免多卡片多图表
 多层 bullet。落地：无 statement 页型；要单句占页就用 `content-text` 写一条
 短句（声明 `bulletTier: bulletLarge`），密度由作者掌握（§23）。
 
-## 62. Comparison Layout【✅】
+## 62. Comparison Layout
 
 优先 split/成对卡/图表/前后对照，**必须真正表达"对照"**。落地：对照页用
 `chart:bar`（含 emphasis 弱化对照）或 `two-column` 双栏。
 
-## 63. Process Layout【✅】
+## 63. Process Layout
 
 优先 timeline/sequence/pipeline，必须明确方向。落地：顺序/流程页用 `timeline`，
 方向=自左向右（DOM 序=阅读序）。
@@ -659,7 +657,7 @@ Cover 允许 hero/大量留白/非对称/full-bleed/overlap/editorial 构图；�
 面积。**渲染器没有架构图版式，也不打算有**：架构图在这里是一张**出图**
 （`evidence_image` + 提示词），页面只负责给它一块 `content-image` 的图槽。
 
-## 65. Chart Layout【✅】
+## 65. Chart Layout
 
 Chart 是 Primary Evidence 时建议占核心视觉面积 ≥50%，不被正文挤成小角落。
 落地：chart 版式全宽 chartwrap（占内容宽 1432，`.g2` 容器高 330 是版心主体，
@@ -670,112 +668,111 @@ Chart 是 Primary Evidence 时建议占核心视觉面积 ≥50%，不被正文�
 Table 是 Primary 时优先 full-width、减少额外卡片装饰。无 table 版式，规则
 预留。
 
-## 67. Image Role 与面积【✅ 启发式对齐】
+## 67. Image Role 与面积
 
 hero 40-75% / evidence 30-55 / supporting 20-40 / decoration <20（不是硬
 限制）。落地：content-image 的图列 = 5 列 ≈ 版心 40%（supporting~evidence
 带）；**图占满整页（≥60% 全页面积）= 阻塞**（反 slop 的硬边界）。
 
-## 68. Full Bleed【✅ 限定】
+## 68. Full Bleed
 
 主要用于 Cover/Section/Image Story/Mood/特殊过渡页；**正文页默认不用**。
 落地：无 full-bleed 版式；装饰角块是唯一的出血元素且受角位限定。
 
-## 69. Overlap【部分 ✅】
+## 69. Overlap
 
 只在 editorial/hero/creative/共享元素构图用；必须文字可读、层级清楚、不遮
-核心信息。落地：装饰块可越安全区但压字=阻塞（墨块×文字栏）；**文字元素之间
-重叠=阻塞还未实现**——重叠类阻塞目前只有 logo 压文字这一条（`check.py` 的
-`_check_brand`），通用互压检查在路线图上。
+核心信息。装饰块可越安全区但压字=阻塞（墨块×文字栏）；**文字元素之间重叠不做
+阻塞**——重叠类阻塞只有 logo 压文字这一条（`check.py` 的 `_check_brand`）。
 
-## 70. Layout QA【✅】
+## 70. Layout QA
 
 每页硬查：bounds/overlap/text overflow/min font/image distortion/chart
 clipping/logo collision/required region missing；软查：grid/hierarchy/
 whitespace/focal/balance/density/repetition/style consistency/decoration
 restraint。落地：`check.py`（硬，阻塞 + 软项进其提示流）；软尺由作者守。
 
-## 71. QA 输出【✅ 等价形】
+## 71. QA 输出
 
 规范 `{valid, hardErrors, warnings, score, metrics}` ≈ 本仓库：退出码
 （0=valid）+ 阻塞报错清单 + 提示清单；metrics 分项与汇总 score 不做（§37）。
 
-## 72. 与 Content Rules 的边界【✅】
+## 72. 与 Content Rules 的边界
 
 Content 决定 message/claim/evidence/copy/contentBudget；Layout 决定放哪里/
 占多大/是否换版/是否拆页。复杂度 ≥0.70 该拆由作者判断（内容层）；装不装得下
 由 `measure.py` 实测的越界/裁切判（布局层，§55）——同一张表的两侧。
 
-## 73. 与 Typography Rules 的边界【✅】
+## 73. 与 Typography Rules 的边界
 
 Typography 决定 font family/type scale/line height/tracking/最小字号；
 **Layout 只选 type tier，不自行造字号**（阶梯在 style.json，封闭校验）。
 
-## 74. 与 Color Rules 的边界【✅】
+## 74. 与 Color Rules 的边界
 
 Color 决定 theme/accent/surface/contrast；Layout 只读视觉权重用于焦点评分
 （权重看墨量，不定义颜色）。
 
-## 75. 与 Brand Rules 的边界【✅】
+## 75. 与 Brand Rules 的边界
 
 Brand 决定 logo asset/logoOn/锁定政策；Layout 决定 logo region/size/spacing
 （`.brandlogo` 高 56、右上、安全边距——风格侧）。
 
-## 76. 与 Image Rules 的边界【✅】
+## 76. 与 Image Rules 的边界
 
 Image Rules 决定 prompt/focal/asset/裁切容差；Layout 决定 image box/角色/
 比例要求（brief 从实测插槽反推比例——布局先行，§15 的图像协议）。
 
-## 77. 与 Chart Rules 的边界【✅】
+## 77. 与 Chart Rules 的边界
 
 Chart Rules 决定 type/encoding/labels/annotations；Layout 决定 chart
 container/结论标题区/图表面积占比（§32/§65）。
 
-## 78. 与 Motion Rules 的边界【✅】
+## 78. 与 Motion Rules 的边界
 
 Layout 提供 direction/region hierarchy/focal point/shared element geometry；
 Motion 基于这些决定动画。落地：动画按 manifest 角色分派 preset，方向=版面
 方向（§48），强度=层级（§20）。
 
-## 79. Geometry Single Source of Truth【✅ 用血换的】
+## 79. Geometry Single Source of Truth
 
 canvas/safe area/grid/margin/gutter/spacing tokens/footer zone/logo zone
 全部来自 `grid.py` 一个模块。禁止 render.py 一份、check.py 一份、pptx.py
 又一份——本仓库就栽过（824 vs 838 漂 14px），统一后再没漂过。
 
-## 80. Token Single Source of Truth【✅】
+## 80. Token Single Source of Truth
 
 至少统一 grid/spacing/typography tier/radius/stroke/shadow；
 **Renderer/Checker/Fit/Export 读同一套**。落地：几何=grid.py、字号=style
 阶梯、颜色=colorSets，check 与 render 不再各持常量。
 
-## 81. 反 AI-Slop 布局规则【✅】
+## 81. 反 AI-Slop 布局规则
 
 禁止：所有页都是标题+3 卡片（无卡片化默认）；所有内容卡片化（§46）；无意义
 居中；每页完全对称；每页都 50/50（7+5/6+6 按内容选）；任意圆角矩形墙；每个
 区域加边框；纯装饰连接线（§47）；无语义图标墙（无图标系统）；为填满页面消灭
 留白（§24）。
 
-## 82. 合法例外【✅】
+## 82. 合法例外
 
 允许极端留白/非对称/大图压版/Overlap/Full bleed/单句占页/非网格装饰，但必须
 意图明确、信息清楚、可读、不违反 Hard Constraints——statement 页单句占页是
 设计而非空页（密度带提示会解释）。
 
-## 83. Benchmark【部分 ✅】
+## 83. Benchmark
 
 固定测试集覆盖：Cover/Text/Text+Image/Comparison/Timeline/Chart/长中文/长
 英文/中英混排/Image-heavy/Data-heavy —— 压测 21 页
 真实形状（长标题/密页/疏页/全部版式）+ demo。缺：Table/Architecture/
 Dashboard 版式。
 
-## 84. Benchmark 指标【部分 ✅】
+## 84. Benchmark 指标
 
 已记录（测试形态）：hard fail rate（每次跑套件）、overflow/overlap（check
 阻塞）、render 时间。未记录：average layout score（无分数引擎）、repair
 iterations、layout diversity、repetition rate、human rating。
 
-## 85. 最终规则【✅ 逐条在文内】
+## 85. 最终规则
 
 LLM 不写坐标（§0）；页型与族分离（§14）；Region 先于组件（§7）；网格/间距/
 几何单一来源（§79）；所有间距来自令牌（§9）；层级显式 priority 化（§19）；
@@ -787,40 +784,25 @@ Deck 级查节奏（§40 约定）；测量渲染同一套 Token（§80）；复
 fallback（不写 `layout` 就走缺省结构，§16）。最终目标
 不是"把内容塞下"，而是**清晰结构、正确关系、明确焦点、稳定可读**。
 
-## 86. 推荐运行流程【✅ 对应】
+## 86. 推荐运行流程
 
 Slide Content → Page Planner → Layout Intent →（Family/Layout 约定期）→
 Region/Grid+Tokens → Resolve（render）→ Browser Measurement（measure）→
 Hard Check（check）→（Score 约定期）→ Repair（人改 spec）→ Resolve Again
 → Resolved Slide（DOM）→ Renderer → Visual QA。九站总图见 `pipeline.md`。
 
-## 87. 一句话定义【✅】
+## 87. 一句话定义
 
 优秀的 AI PPT 布局系统，不是维护更多模板，而是把页面语义转换成有限的 Layout
 Family 与 Layout，再用 Grid、Region、Spacing、Priority、Constraint、
 Measurement、Scoring 和 Repair 共同求出稳定、清晰且有设计感的最终几何。
-本仓库已兑现：Grid/Region 语义/Spacing/Priority 尺/Constraint（硬+软）/
-Measurement；Family×Layout 已落地第一片（content-image 4 + two-column 3 结构
-布局），全量铺开在路线图上（见下）。v3 口径：审美决策交作者声明，脚本退到
-验收器（§17-18）。
+本仓库提供：Grid / Region 语义 / Spacing / Priority 尺 / Constraint（硬+软）/
+Measurement；Family×Layout 落在 content-image（4）与 two-column（3）。审美决策
+交作者声明，脚本退到验收器（§17-18）。
 
 ---
 
-## 附录 A：落地阶段记录（实测数字）
-
-- **阶段 1**（✅ 规则保留）：文本预算 + 视觉焦点 + 密度三把尺（提示级，
-  作者自查）；规则文本在 §19/§21-§23，修复顺序在 §28/§53 与 pipeline §31。
-- **阶段 2**（✅）：`grid.py` 唯一几何来源；12 列 84/24/97.33；间距 ramp +
-  语义档 + 关系规则；`--sp-*` 注入；时间线宽从网格算；锚点对齐检查（左缘
-  7 任意值 → 全落列）；subtitle==bullet 同级碰撞修复。风格契约由
-  ink.py 与 check.py 覆盖。
-- **阶段 3**（路线图）：版式族 × 布局表全量铺开（§15-18/§57-59；content-image/
-  two-column 两片结构布局已先行落地）+ 档位由作者声明（没有自动降档：
-  换布局/拆页优先，缩字号由作者显式写，脚本不再自动兜底）。
-- **阶段 4**（路线图）：Shape 8 参数（§44）+ Layout Score/Repair 引擎
-  （§37-38/§52-54）+ skin 残余手写间距清零。
-
-## 附录 B：参考标准清单（要深入时看这些）
+## 附录：参考标准清单（要深入时看这些）
 
 | 模块 | 主参考 | 具体借什么 |
 | --- | --- | --- |

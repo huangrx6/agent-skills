@@ -9,7 +9,7 @@
 2. **可局部重渲**：改一页不用重录整支，只重渲它那一段
 3. **可复现**：别人拿到 spec 能渲出一模一样的东西
 
-做到它要避开三个坑（都踩过 / 都有人踩过）：
+做到它要避开三个坑：
 
 - **不用 CSS `transition`** —— transition 走**墙钟**，逐帧截图下每帧都是独立进程/独立
   时刻，中间态取决于「截这帧时真实过了多久」，不可复现（huashu 坑 #18 实测）
@@ -80,7 +80,7 @@ def _ws_connect() -> Any:
     用 importlib 而不是两个 `import` 语句：哪个路径存在要跑起来才知道，
     静态写死一个会在另一条路上直接报 ImportError。
     """
-    import importlib   # noqa: PLC0415
+    import importlib  # noqa: PLC0415
 
     for mod_name in ("websockets.asyncio.client", "websockets"):
         try:
@@ -99,7 +99,7 @@ def _encode_binary() -> str:
     为什么要编译而不是每次 `swift h264_encode.swift`：后者是解释执行，
     几百帧的循环会慢一个数量级。编一次缓存在临时目录，之后是原生速度。
     """
-    import hashlib   # noqa: PLC0415
+    import hashlib  # noqa: PLC0415
 
     src = deckio.read_text(SWIFT_SRC)
     stamp = hashlib.sha256((src + str(os.path.getmtime(SWIFT_SRC))).encode()).hexdigest()[:16]
@@ -216,7 +216,7 @@ async def _capture_async(html: str, out_dir: str, times: list[float], scale: flo
             proc.wait(timeout=5)
         except Exception:
             proc.kill()
-        import shutil   # noqa: PLC0415
+        import shutil  # noqa: PLC0415
         shutil.rmtree(profile, ignore_errors=True)
 
 
@@ -249,7 +249,7 @@ def _resize_all(frames: list[str], width: int, height: int) -> list[str]:
     尺寸已经对了就**不碰** —— 降采样是整条链路里最贵的一步（实测 777 帧要两分多钟），
     而 `--scale 1` 时它本来就不需要。
     """
-    from PIL import Image   # noqa: PLC0415
+    from PIL import Image  # noqa: PLC0415
 
     out = []
     for p in frames:
@@ -281,7 +281,7 @@ def encode_gif(frames: list[str], out: str, fps: int) -> None:
     正确做法是先跨帧建一张全局表（从中等间隔采样几帧拼一张图去量化），所有帧都用它。
     这就是「palette 优化」的实际含义，不是加个 optimize=True 就完了。
     """
-    from PIL import Image   # noqa: PLC0415
+    from PIL import Image  # noqa: PLC0415
 
     imgs = [Image.open(p).convert("RGB") for p in frames]
     step = max(1, len(imgs) // 12)
@@ -318,7 +318,7 @@ def inspect_media(path: str, fps: int) -> dict:
     else:
         raw = deckio.read_bytes(path)
         info["gif_magic"] = raw[:6] in (b"GIF87a", b"GIF89a")
-        from PIL import Image   # noqa: PLC0415
+        from PIL import Image  # noqa: PLC0415
 
         with Image.open(path) as im:
             info["gif_size"] = im.size
@@ -447,7 +447,7 @@ def main(argv: list[str]) -> int:
             times = _parse_times(args.stills)
             frames = _capture(args.html, work, times, scale, args.slow, progress)
             saved = []
-            for t, p in zip(times, frames):
+            for t, p in zip(times, frames, strict=False):
                 dst = os.path.join(stills_dir, f"t{t:07.2f}.png")
                 deckio.copy(p, dst)
                 saved.append(dst)
@@ -464,7 +464,7 @@ def main(argv: list[str]) -> int:
             encode_mp4(frames, args.out, fps)
     finally:
         if not args.keep_frames:
-            import shutil   # noqa: PLC0415
+            import shutil  # noqa: PLC0415
             shutil.rmtree(work, ignore_errors=True)
 
     info = inspect_media(args.out, fps)

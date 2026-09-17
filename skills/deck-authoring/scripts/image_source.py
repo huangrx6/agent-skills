@@ -173,10 +173,10 @@ def _slot_geometry(spec_path: str, style: str | None) -> tuple[dict, str]:
     这也是"不估算"原则用在写提示词上：给模型的尺寸数字必须是实测的。
 
     **尺子只活在临时目录里**（只有本次渲染用的 spec 副本指向它）—— 产物目录里的
-    图永远只有人出的那一份。写进产物目录就等于把一张脚本拼的图混进交付（实测踩过：
+    图永远只有人出的那一份。写进产物目录就等于把一张脚本拼的图混进交付（
     `--brief` 跑完，图片目录里躺着几张拼贴，没人替换它们就跟着交付了）。
     **`--check` 也不走这条路**：检查把它该验的东西自己造出来，就永远验不出
-    "图还没出"（实测踩过：删掉图之后 `--check` 照样报"符合契约"）——
+    "图还没出"（删掉图之后 `--check` 照样报"符合契约"）——
     检查只需要"文件名 + 契约里的尺寸/比例"，不该渲染任何东西。
     """
     render_mod = _load_sibling("render")
@@ -269,7 +269,7 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None,
 
     `out_dir` = **图片在哪**（人出的图存这儿；`--check` 也只看这里）；
     `contract_dir` = **合同在哪**
-    （缺省同 out_dir）。分开是因为 `--dir` 的本意只是前者 —— 实测踩过：一份
+    （缺省同 out_dir）。分开是因为 `--dir` 的本意只是前者 —— 一份
     17 页 deck 的提示词合同被 `--dir` 一起搬进 /tmp，用户拿不到那份要他执行的东西。"""
     info, style_name = _slot_geometry(spec_path, style)
     if not info:
@@ -823,7 +823,7 @@ def _temp_dir_note(path: str) -> str | None:
     """deck 建在临时目录里 → 说一声（不阻塞）。
 
     为什么必须开口：提示词合同是**要交给用户去执行**的东西（他拿它去出图），
-    落在 /tmp 里重启就没了。实测踩过：一份 17 页 deck 的 spec / 风格 / 提示词
+    落在 /tmp 里重启就没了。一份 17 页 deck 的 spec / 风格 / 提示词
     全在 /tmp/dir-*，用户手上只有一段对话，那份合同等于没产出。
     """
     real = os.path.realpath(path).rstrip(os.sep) + os.sep
@@ -852,7 +852,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--style", default=None, help="风格（缺省读 spec 的 deck.style）")
     ap.add_argument("--tokens", default=None,
                     help="风格 tokens 路径（缺省按 spec 的 deck.style 解析）")
-    # 色板名不写死：写死会在换风格 / 改色板名时**静默过期**——实测踩过两次
+    # 色板名不写死：写死会在换风格 / 改色板名时**静默过期**
     # （plate.py 与这里都留着 riso 时代那个已经删掉的 'vivid'，于是默认路径直接崩）。
     ap.add_argument("--color-set", default=None, help="色板（缺省用该 token 的第一个）")
     ap.add_argument("--size", default="640x400")
@@ -863,7 +863,7 @@ def main(argv: list[str]) -> int:
     args = ap.parse_args(argv[1:])
 
     if args.brief:
-        # 合同（md + requests）落 **spec 所在目录**；`--dir` 只管图片在哪（实测踩过：
+        # 合同（md + requests）落 **spec 所在目录**；`--dir` 只管图片在哪（
         # 提示词被 --dir 搬进 /tmp，用户拿不到）。
         spec_dir = os.path.dirname(os.path.abspath(args.brief))
         out_dir = args.dir or spec_dir
@@ -879,7 +879,7 @@ def main(argv: list[str]) -> int:
         if note:
             print(note)
         if args.json:
-            import json   # noqa: PLC0415
+            import json  # noqa: PLC0415
 
             print(json.dumps(brief, ensure_ascii=False, indent=2))
         return 0

@@ -87,7 +87,6 @@ from __future__ import annotations
 
 import base64
 import importlib.util
-import json
 import mimetypes
 import os
 import pathlib
@@ -118,7 +117,7 @@ def brand_roots() -> tuple[str, ...]:
         roots.extend(p for p in extra.split(os.pathsep) if p)
     roots.append(os.path.join(os.getcwd(), "brands"))
     roots.append(os.path.join(SKILL_DIR, "brands"))
-    return tuple(roots)
+    return tuple(dict.fromkeys(roots))      # 去重：cwd 就是 skill 目录时两个根会重合
 
 
 def brand_dir(name: str) -> str | None:
@@ -304,7 +303,7 @@ def logo_ref(brand: dict, file: str) -> str:
     """给语义清单用的**技能相对**路径（导出脚本据此找到原图）。
 
     不用绝对路径：产物是给别人传阅的，里面不该有机主的目录结构
-    （实测过 `data-m="data-m="s1.title""` 那类污染 —— 这类东西一进产物就洗不掉）。
+    —— 绝对路径一进产物就洗不掉（还会被拼成 `data-m="data-m=…"` 那种污染）。
     """
     if not file:
         return ""
@@ -422,7 +421,7 @@ def main(argv: list[str]) -> int:
         return 0
     names = available()
     if not names:
-        print(f"还没有品牌。新建 brands/<name>/brand.json —— 见 references/brand-assets.md")
+        print("还没有品牌。新建 brands/<name>/brand.json —— 见 references/brand-assets.md")
         print(f"（找的是：{list(brand_roots())}）")
         return 0
     for n in names:

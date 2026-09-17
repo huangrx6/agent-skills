@@ -50,8 +50,7 @@ python3 scripts/fonts.py --fetch --temp   # 这一次放临时目录
 DECK_FONT_DIR=/tmp/f python3 scripts/fonts.py --fetch   # 指定任意位置
 ```
 
-旧的 `fonts/ttf/`（如果之前下过）**仍会被读取**当兜底，但**新下载只进缓存** ——
-已经下过的人不用重下。想清掉：`rm -rf fonts/ttf`。
+旧的 `fonts/ttf/`（若存在）**仍会被读取**当兜底，但**新下载只进缓存**。想清掉：`rm -rf fonts/ttf`。
 
 **所以做 PPT 的 AI 可以按实际情况选**：常用就让它落 `~/.config/...`（下次直接有），
 临时跑一遍就 `--temp`，也有环境变量这条路可走。
@@ -153,7 +152,7 @@ sans-serif` 是**回退目标**，不是设计选择 —— 它们就是"这一�
 Chrome 仍然回退到 `STSongti-SC-Regular` —— macOS 的字体缓存不会因为复制一个文件
 就刷新。`@font-face` 指本地文件立刻生效，而且顺带把 PDF 的内嵌也解决了。
 
-### 四个实测出来的坑（都踩过）
+### 四个容易踩的坑
 
 1. **同一个字族有 `.otf` 和 `.ttf` 时，必须选 `.ttf`**。实测同一个得意黑：`.otf`
    那份 Chrome **完全不嵌**（出 PDF 零字体、40KB），`.ttf` 那份正常嵌成
