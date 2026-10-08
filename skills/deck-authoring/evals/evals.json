@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "帮我做一份十页的产品复盘 deck，做成苹果发布会那种感觉。",
-      "expected_output": "**先说风格与大纲，拿到点头再动手。** 用户给了风格词（\"苹果发布会那种\"）也不豁免确认门 —— 风格词收窄的是解释空间，不转移选择权（黑底巨字、大白底衬线都是合法诠释）。顺序：① 把**内容大纲 + 每页视觉载体**过一遍目（页序 / 每页一个观点 / 这页靠什么立住）；② 按四轴（骨架 / 字感 / 密度 / 色彩）**现写** 2~3 个方向 —— 风格是每份 deck 自建的，skill 里**没有内置风格也没有可拷的参考实现**，所以不能写 `--style keynote-dark` 这类名字；把风格放在**临时目录**里（`/tmp/dir-a/style.json` + `skin.css`），渲成图给用户并排看，标清每个方向的名字 / 为什么配它 / 适合什么场合，然后**停下等选择**；③ 选定后把它作为 deck 项目的 `styles/<名>/` 落地，再写 spec。spec 里每页只有 `type` + 内容（标题 / 条目 / 时间点 / 数据 / 图片）与 `visual`，**不要**写坐标、字号、色值。写完跑五道门：`validate_spec.py` → `ink.py styles/<名>/style.json` → `render.py` → `check.py`。所有门全过再交付（**含 HTML**）；任何一项不过就报告问题，不要靠放宽阈值蒙混。",
+      "expected_output": "先整理观众、核心结论与每页证据；风格词不足以明确构图时，按同一份代表内容做三版临时真实预览，同时展示字体、构图、密度与配色。已有明确选择或获授权自主决定时沿用，不重复确认。没有内置成品风格，风格放 deck 项目的 styles/<名>/。spec 只写语义与内容；依次校验 spec、色板、资源、实际渲染，再看缩略图和关键页。保留 HTML 源，交付用户需要的格式。",
       "files": [
         "SKILL.md",
         "references/style-architecture.md",
@@ -14,7 +14,7 @@
     {
       "id": 2,
       "prompt": "标题字号我想大一点，120px。",
-      "expected_output": "拒绝在 spec 层面写 px：**字号不在 schema 里** —— 不存在，不是「不推荐填」；手写会被 `validate_spec.py` 判失败。字号是**风格的属性**（`style.json` 的 `type` 阶梯，逐档给 px），页级只能声明**档名**（`titleTier` / `bulletTier`，风格可用 `titleTiers` / `bulletDefault` 定缺省）。所以两条合法路径：① 换一档更大的名字；② 改风格的 `type` 里那一档的 px（并说明这会影响所有引用该档的页）。顺带提醒：内页标题用封面尺度（128/96 那种）会让每页都像标题页，判据见 `check.py` 的 `TITLE_POSTER_PX`。",
+      "expected_output": "可以实现120px，但写在 style.json 的 type 档位，不在内容spec新增字号字段；页级用 titleTier 选择。说明共享档位的影响，核对该页层级和换行。大标题并非内页一律禁止，连续多页无正文层级才需要调整。",
       "files": [
         "references/style-architecture.md",
         "references/validation.md"
@@ -23,7 +23,7 @@
     {
       "id": 3,
       "prompt": "对比度 4.5 太严了，能不能降到 3.5 让更多色板能用？",
-      "expected_output": "**不调阈值**。4.5 是 WCAG AA 正文底线；降了等于让「荧光色当正文」那种事故合法化。正确做法是换色板：`style.json` 的 `colorSets` 新加一套，或改现有那套让派生的叠印墨变深（每套色板必须含一个深墨 —— 两墨都亮就压不深）。跑 `python3 scripts/ink.py styles/<名>/style.json` 自检：**任一色板不达标就退 1**，这就是墨色门禁。",
+      "expected_output": "保持实际文字的可读性门槛；查文字、实际背景与祖先 opacity，调整文字色或背景。text 可显式指定，不强制通过双墨派生。ink.py 验声明色板，check.py 再验品牌合并后的实际DOM。当前所有文字保守采用4.5，minLarge尚未按字号放宽。",
       "files": [
         "references/validation.md",
         "references/style-architecture.md",
@@ -33,7 +33,7 @@
     {
       "id": 4,
       "prompt": "PPTX 里的字我等下发给你的时候现场改，你先做。",
-      "expected_output": "这个 skill 两种 pptx 都能出，**不要把它说成二选一**：`pptx_native.py --png-dir pages/ -o deck.pptx` 是**贴图**（观感 100%，字改不了）；`pptx_native.py out.html -o deck.pptx` 是**原生 shapes**（字是真字、图表是原生图表，但错位 / 颗粒 / 网点做不出来）。要改字就走原生那条；更稳的观感走 PDF（矢量）或 HTML。把两条都摆出来让对方选。只有一种情况要说「不该用本 skill」：对方要的是**从零编辑的普通 PPT**（版式随内容重排），那本来就该用 PowerPoint。",
+      "expected_output": "用户已明确要改字，直接选择原生PPTX路径，不要求重新二选一。采用实测字号、对齐、行距与图片裁切；说明字体仅记录名字，CSS效果可能不同，最终需在目标宿主回读。combo当前不支持原生导出，应明确告知并提供保真预览，不能静默更换图形。",
       "files": [
         "references/delivery-formats.md"
       ]
@@ -41,7 +41,7 @@
     {
       "id": 5,
       "prompt": "标题颜色我想用 #FF48B0（粉红），醒目一点。",
-      "expected_output": "拒绝：spec 里**不允许**写 `color: '#xxxxxx'`；`color` 只接受 `\"overprint\"`（不写也行，缺省就是它）。文字色只能是 `overprint(primary, secondary)` 派生出来的 —— 主 / 副色单独当文字色对比度天生不达标（它们的语义是墨层 / 色块 / 装饰，不是承载文字）。如果用户要「醒目」，建议改大字号档、或让风格在标题区放色块装饰，而不是改文字色。要改整体颜色就换 `colorSet` 或改那套色板，然后重跑 `ink.py`。",
+      "expected_output": "在风格的colorSets或skin里实现标题配色，不在spec写HEX。先核对粉色在实际背景上的可读性；达标则可用，不虚称主色天然不能当文字色。不达标时调整明度、背景或强调方式，保持用户的粉色意图。",
       "files": [
         "references/validation.md",
         "references/color.md"
@@ -50,7 +50,7 @@
     {
       "id": 6,
       "prompt": "这个 deck 不要孔版风，做个普通的现代简约风。",
-      "expected_output": "**该用本 skill，而且这正是它的默认工作方式。** 风格零内置、按每份 deck 现写 —— 所以「不要孔版风」不是排除条件，而是**这就是要写出来的那个方向**。做法：按四轴取点（骨架＝网格化留白 / 字感＝中性无衬线 / 密度＝疏 / 色彩＝纸感单色或大色场），现写 2~3 个方向渲到临时目录出图给他选。**不要**去找一个叫「简约」的内置风格，也不要把见过的风格名当成菜单（任何清单都会被当成选项清单）。",
+      "expected_output": "按现代简约方向设计，明确程度不足时才做三版代表页比较；方向已选则继续，不再强制配色确认。没有内置成品风格，但可复用经过验证的结构组件与token接口。中性系统字体可以是合理设计选择，需保证实际加载和交付可移植性。",
       "files": [
         "SKILL.md",
         "references/style-architecture.md"
@@ -59,7 +59,7 @@
     {
       "id": 7,
       "prompt": "这页的三个季度数字我想用柱状图，一眼看出涨幅。",
-      "expected_output": "把这一页写成 `type: chart`：图形由 **`chart` 字段显式声明**（八类：bar / bar-horizontal / line / area / bar-stacked / donut / scatter / combo），数据进 `data: [{label, value}]`，`visual` 写 `{\"kind\": \"data\", \"ratio\": \"3:2\", \"intent\": \"…\"}`（图表页的 ratio 也必填）。**不要写任何坐标或柱高** —— 几何由 AntV G2 算（vendor 锁版本内联、图表内部不动）。想强调某一条就写 `emphasis`；`message` 是可选的结论标题（写了就顶上去，图表的标题该是结论而不是数据集名 —— 没写 `message` 时 `check.py` 会提示）。别自己画 SVG 柱形，也别用 `chart` 之外的方式表达数据。",
+      "expected_output": "使用type:chart、chart:bar和data:[{label,value}]，visual声明kind:data与ratio。title保留数据集名，可用message写真实结论；单位与来源清楚。不要手算柱高，不为了美观改数据。emphasis可标类别；annotations暂未实现，非空会拦截，改用caption。",
       "files": [
         "references/charts.md",
         "references/validation.md"
@@ -68,7 +68,7 @@
     {
       "id": 8,
       "prompt": "配图我自己用 AI 出，你把要什么图告诉我就行。",
-      "expected_output": "走 `python3 scripts/image_source.py --brief your.spec.json`：它在 **spec 同目录**写两份东西 —— 人读的 `image-brief.md`（逐槽位：文件名 / 实测像素尺寸 / 槽位比例 / 中英提示词 / 负面清单）与机读的 `assets/requests/<槽位id>.json`。提示词里的比例与像素是**真渲一遍量出来的**，不是估的。**脚本不产图、也不手画**（量槽位用的尺子只在临时目录里）：用户拿着提示词出图，按文件名存回 spec 同目录，然后 `image_source.py --check your.spec.json` 验「在不在 / 够不够大 / 比例合不合」。spec 侧每页的 `visual` 要写清 `{\"kind\": \"evidence_image\", \"ratio\": \"3:2\"}`（纯文字页也要写 `{\"kind\": \"none\"}` —— 必须决定过）。",
+      "expected_output": "尊重用户自行生成素材的分工。image_source.py --brief会按实际图位输出image-brief.md和assets/requests中的v2合同；填写真实内容提示词后交给用户。回填时按合同路径存放，--check核对所有复用图位的二维有效清晰度。真实截图/结构图优先保真或结构化制作，不强制生图。",
       "files": [
         "references/images.md",
         "SKILL.md"
@@ -77,7 +77,7 @@
     {
       "id": 9,
       "prompt": "用我们公司的 logo 和品牌色，署名写 © 2026 某某科技。",
-      "expected_output": "品牌是**第三层**，一个字段接进来：让用户提供资产 → `brands/<name>/brand.json`（`logo` + `logoInverse`（反白版）+ `logoOn`（cover|cover+end|all|none）+ `footer` + 可选 `colorSets` / `fonts`）→ spec 的 `deck` 里加一行 `\"brand\": \"<name>\"`。契约要点：**仓库里没有示例品牌**（可拷的示例资产会被直接当成可用资产用进真实交付），资产必须由用户提供；缺 `logoInverse` 而纸是深底时 `check.py` 会提示（白底 logo 放黑底上会消失）；logo 放哪个角**不归品牌管**（那是构图，归风格）。品牌赢在「是谁」，风格赢在「怎么表达」—— 品牌色不覆盖整套风格色板，最终颜色由解析器融合。",
+      "expected_output": "在deck项目的brands/<name>/brand.json登记可信logo、反白版、footer和可选colors/fonts，deck.brand接入。先用已有资产，缺必要信息才问。validate_spec、compile与check统一用品牌合并主题，品牌新增colorSet能从任意cwd正确解析。logo位置仍由风格决定。",
       "files": [
         "references/brand-assets.md",
         "SKILL.md"
@@ -86,7 +86,7 @@
     {
       "id": 10,
       "prompt": "这份 deck 每一页看起来都差不多，能不能换换排法？",
-      "expected_output": "这是**布局轮换**问题，当前工具直接支持：`render.py your.spec.json -o out.html --candidates` 会按页给出多个结构候选（同内容不同结构）并渲一张带选择面板的对比页；在页面上挑完点「复制选择」得到 picks JSON，再用 `--picks picks.json` 回写（或用 `--pick` 直接采用最优）。也可以逐页显式写 `layout`（`content-image`：`visual-right`（缺省）/ `visual-left` / `even` / `visual-wide` / `hero`；`two-column`：`even` / `lean-left` / `lean-right` / `lean-hard-left` / `lean-hard-right`），或写一个表外的结构名（如 `poster-split`）由 `skin.css` 自己排。判据：**每页同构图是反 slop 第一条** —— 同型页连排要换布局换节奏。改完重跑 `check.py`（换布局后越界 / 碰撞要重新实测）。",
+      "expected_output": "先判断重复是否阻碍叙事；按内容关系换结构而非机械轮换。图文和双栏可用--candidates比较，--picks/--pick或显式layout选择。自造布局由skin CSS实现。候选分数只是几何启发，必须目检；不得为了错落而拆散本应直接对比的数据。",
       "files": [
         "SKILL.md",
         "references/layout-system.md"
@@ -95,10 +95,46 @@
     {
       "id": 11,
       "prompt": "图我自己出太慢了，我配了 MiniMax 的 key，你能直接生成吗？",
-      "expected_output": "可以，但**只有显式调 `--generate` 才会出图**（这一步花钱，不做任何自动触发）：先用 `image_source.py --brief your.spec.json` 拿契约（每槽位一份 `assets/requests/<文件名>.json`），把 `prompt` 里的 `〈…〉`（英文模板是 `<…>`）换成内容，再 `image_source.py --generate your.spec.json` 逐槽位出图，最后 `--check` 照旧验一遍（不问谁画的）。后端优先级：`--provider-cmd` → 内置 MiniMax（`MINIMAX_API_KEY` 或 `MINIMAX_CN_API_KEY`，可选 `MINIMAX_API_HOST` / `MINIMAX_IMAGE_MODEL`）。**没配就一步都不跑**，直接说清手动出图存哪个目录、或该设哪个变量 —— 不产降级图；提示词里还有占位符也停下（不许花钱买一张模板画）；目标文件已在、或同一提示词上次已出过则跳过 / 命中缓存，不重复付费。比例取官方八档里最近的一档；比例不齐不阻塞交付（版式按槽位裁切或留边）。",
+      "expected_output": "用户已明确授权生成且有后端时，先--brief并填写内容准确的prompt，再--generate、--check，无须为同一动作重复确认。未配置后端或仍有占位符时明确停止并给出可执行步骤；不得编造图或调用空模板。已有文件与缓存按脚本规则复用；最终按真实图位核对清晰度与裁切。",
       "files": [
         "references/images.md",
         "SKILL.md"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "风格就沿用上次选好的暖灰色，直接做，不用再问我。",
+      "expected_output": "沿用选择，先做密集内容/图表/图文代表页并自主校验；不强制重做三方向，不再次等待同一授权。",
+      "files": [
+        "SKILL.md",
+        "references/style-architecture.md"
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "把这三组指标放一张趋势图，必须一组都不少。",
+      "expected_output": "line/area使用完整series，数据实测保留全部标记；验证图形而不只检查canvas。不能只取series[0]。若用户选不支持的多系列图形，应明确说明并保留数据。",
+      "files": [
+        "references/charts.md",
+        "scripts/render.py"
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "这份报告是现场投影讲的，如何确保后排看得清？",
+      "expected_output": "deck.delivery写live，按实际尺寸和远距离场景核对标题正文图例来源。优先压缩文案、分组拆页和扩大有效图位，不靠机械缩字通过。字号建议是人工设计下限提示，最终看真实预览。",
+      "files": [
+        "references/visual-quality.md",
+        "scripts/check.py"
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "生成都成功了，但是导出的几页像是空白，能直接给客户吗？",
+      "expected_output": "停止交付，检查资源就绪、图表Promise和失败标记、缺失manifest内容、祖先裁切与透明度。真实文字重叠不能因同组豁免。最终格式打开验证，不拿返回0当完整性证据。",
+      "files": [
+        "references/validation.md",
+        "references/delivery-formats.md"
       ]
     }
   ]

@@ -26,7 +26,9 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
+import math
 import os
 import sys
 
@@ -35,11 +37,13 @@ STYLES_DIR = os.path.join(HERE, "..", "styles")
 
 # 封闭字段集。加字段要同时改这里与 `references/style-architecture.md` ——
 # 这正是设计意图：让"顺手加一个"变得有摩擦。
-DECK_FIELDS = {"colorSet", "seed", "title", "slides", "style", "brand", "note"}
+DECK_FIELDS = {"colorSet", "seed", "title", "slides", "style", "brand", "note", "delivery"}
 # colorSet **必填具名**（配色由作者定：先看候选，选定后写名字；
 # 对比度由 ink.py/check.py 验收）。门里没有"自动配色"这条路。
 CHART_TYPES = ("bar", "bar-horizontal", "line", "area", "bar-stacked",
                "donut", "scatter", "combo")
+CHART_INTENTS = ("trend", "ranking", "comparison", "correlation", "deviation",
+                 "distribution", "composition", "progress")
 # 视觉载体：每页**显式决定**这页靠什么立住。不写下来就等于没决定 ——
 # 实测的后果是全篇靠文字撑、图与元素一直没人提。四个档就是这条流水线能交付的
 # 四种载体（其余"元素"靠版式与条目形状表达，不另设档）：见 references/images.md。
@@ -104,7 +108,7 @@ ITEM_FIELDS = {
     "nodes":   {"label", "note"},
     "data":    {"label", "value"},
     # 散点要两个连续量：x/y（value 视同 y，向后兼容）
-    "series":      {"name", "data"},
+    "series":      {"name", "data", "mark"},
     "annotations": {"type", "target", "text", "value"},
 }
 
@@ -181,8 +185,6 @@ def _check_fields(obj: dict, allowed: set[str], where: str, issues: Issues) -> N
 def _check_items(slide: dict, key: str, where: str, issues: Issues) -> None:
     """校验嵌套列表（columns / nodes / data / series / annotations）的元素字段。"""
     items = slide.get(key)
-    if items is None:
-        return
     if not isinstance(items, list):
         issues.error("BAD_ITEMS", f"{where}.{key}", f"{key} 必须是数组")
         return
@@ -190,14 +192,71 @@ def _check_items(slide: dict, key: str, where: str, issues: Issues) -> None:
     # **限定豁免**：散点图的 x/y 是**数据**（两个连续量），不是版式坐标。
     # COORD_FIELDS 的禁令管的是"模型不许填版式坐标"；散点的 x/y 与 value 同类。
     # 只在 chart 页的 data 项上豁免 —— 禁令在其他所有地方原样有效。
-    if (slide.get("type") == "chart" and key == "data"
-            and (slide.get("chart") == "scatter" or slide.get("intent") == "correlation")):
+    if slide.get("type") == "chart" and key == "data" and slide.get("chart") == "scatter":
         allowed |= {"x", "y"}
     for i, item in enumerate(items):
         if not isinstance(item, dict):
             issues.error("BAD_ITEM", f"{where}.{key}[{i}]", "每一项都必须是对象")
             continue
         _check_fields(item, allowed, f"{where}.{key}[{i}]", issues)
+        loc = f"{where}.{key}[{i}]"
+        if key == "columns":
+            if "title" in item:
+                _text(item["title"], f"{loc}.title", issues)
+            _bullets(item.get("bullets"), f"{loc}.bullets", issues)
+        elif key == "nodes":
+            _text(item.get("label"), f"{loc}.label", issues, nonempty=True)
+            if "note" in item:
+                _text(item["note"], f"{loc}.note", issues)
+        elif key == "data":
+            _text(item.get("label"), f"{loc}.label", issues, nonempty=True)
+            if slide.get("chart") == "scatter":
+                _number(item.get("x"), f"{loc}.x", issues)
+                _number(item.get("y", item.get("value")), f"{loc}.y", issues)
+            else:
+                _number(item.get("value"), f"{loc}.value", issues)
+                value = item.get("value")
+                if slide.get("chart") == "donut" and _finite(value) and value < 0:
+                    issues.error("BAD_DATA", loc, "环图数值不能为负")
+        elif key == "series":
+            _text(item.get("name"), f"{loc}.name", issues, nonempty=True)
+            nested = {"type": "chart", "chart": slide.get("chart"), "data": item.get("data")}
+            _check_items(nested, "data", loc, issues)
+            if isinstance(item.get("data"), list) and not item["data"]:
+                issues.error("BAD_DATA", f"{loc}.data", "系列数据不能为空")
+            if "mark" in item and item["mark"] not in ("bar", "line"):
+                issues.error("BAD_MARK", f"{loc}.mark", "mark 只接受 bar 或 line")
+        elif key == "annotations":
+            for field in ("type", "text"):
+                if field in item:
+                    _text(item[field], f"{loc}.{field}", issues)
+            if "value" in item:
+                _number(item["value"], f"{loc}.value", issues)
+
+
+def _text(value, where: str, issues: Issues, nonempty: bool = False) -> None:
+    if not isinstance(value, str) or (nonempty and not value.strip()):
+        issues.error("BAD_TEXT", where, "必须是非空字符串" if nonempty else "必须是字符串")
+
+
+def _finite(value) -> bool:
+    try:
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def _number(value, where: str, issues: Issues) -> None:
+    if not _finite(value):
+        issues.error("BAD_NUMBER", where, "必须是有限数值（不接受布尔值、NaN 或 Infinity）")
+
+
+def _bullets(value, where: str, issues: Issues) -> None:
+    if not isinstance(value, list):
+        issues.error("BAD_ITEMS", where, "bullets 必须是字符串数组")
+    else:
+        for i, text in enumerate(value):
+            _text(text, f"{where}[{i}]", issues, nonempty=True)
 
 
 def _ratio_ok(raw) -> bool:
@@ -226,6 +285,15 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
         issues.error("BAD_DECK", "deck", "缺少 deck 对象")
         return issues
     _check_fields(deck, DECK_FIELDS, "deck", issues)
+    for field in ("style", "colorSet", "brand", "title", "note"):
+        if field in deck:
+            _text(deck[field], f"deck.{field}", issues,
+                  nonempty=field in ("style", "colorSet", "brand"))
+    if "seed" in deck and (not isinstance(deck["seed"], int) or isinstance(deck["seed"], bool)):
+        issues.error("BAD_SEED", "deck.seed", "seed 必须是整数")
+
+    if "delivery" in deck and deck["delivery"] not in ("live", "async", "printable"):
+        issues.error("BAD_DELIVERY", "deck.delivery", "delivery 支持 live / async / printable")
 
     # 风格必填（工具链不内置任何风格 —— 见 references/style-architecture.md）
     if not deck.get("style"):
@@ -258,11 +326,27 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
             issues.error("BAD_SLIDE", where, "每一页都必须是对象")
             continue
         kind = slide.get("type")
-        if kind not in SLIDE_FIELDS:
+        if not isinstance(kind, str) or kind not in SLIDE_FIELDS:
             issues.error("BAD_TYPE", f"{where}.type",
                          f"未知版式 {kind!r}；支持 {sorted(SLIDE_FIELDS)}")
             continue
         _check_fields(slide, SLIDE_FIELDS[kind], where, issues)
+        _text(slide.get("title"), f"{where}.title", issues, nonempty=True)
+        for field in ("subtitle", "caption", "notes", "message", "unit", "image",
+                      "titleTier", "bulletTier"):
+            if field in slide:
+                _text(slide[field], f"{where}.{field}", issues,
+                      nonempty=field in ("image", "titleTier", "bulletTier"))
+        if "bullets" in slide:
+            _bullets(slide["bullets"], f"{where}.bullets", issues)
+        elif kind == "content-text":
+            issues.error("MISSING_FIELD", f"{where}.bullets", "content-text 必须提供 bullets")
+        if kind == "two-column":
+            cols = slide.get("columns")
+            if not isinstance(cols, list) or not 1 <= len(cols) <= 2:
+                issues.error("BAD_COLUMNS", f"{where}.columns", "two-column 只支持一至两栏；更多内容请拆页")
+        if kind == "timeline" and (not isinstance(slide.get("nodes"), list) or not slide["nodes"]):
+            issues.error("BAD_NODES", f"{where}.nodes", "timeline 必须有非空 nodes 数组")
         # 视觉载体：声明什么载体，就得是能装下它的版式（自相矛盾当场拦）。
         visual = slide.get("visual")
         if visual is not None:
@@ -294,7 +378,7 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
                 # 要图 → **必须写清比例**。出图工具的默认比例各家不同（Midjourney 默认
                 # 1:1、SD 看 sampler、DALL·E 只认 prompt），不写下来就等于没定，
                 # 出回来再改成本高得多；槽位高度也按它算。
-                if vkind in VISUAL_IMAGE_KINDS:
+                if vkind in (*VISUAL_IMAGE_KINDS, "data"):
                     ratio = visual.get("ratio")
                     if ratio is None:
                         issues.error("MISSING_RATIO", vwhere,
@@ -337,6 +421,42 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
             elif ctype not in CHART_TYPES:
                 issues.error("UNKNOWN_CHART_TYPE", f"{where}.chart",
                              f"未知图形 {ctype!r}；支持 {list(CHART_TYPES)}")
+            if "intent" in slide and slide["intent"] not in CHART_INTENTS:
+                issues.error("BAD_INTENT", f"{where}.intent", f"intent 支持 {list(CHART_INTENTS)}")
+            data, series = slide.get("data"), slide.get("series")
+            if not data and not series:
+                issues.error("MISSING_DATA", where, "图表必须提供非空 data 或 series")
+            if data and series:
+                issues.error("AMBIGUOUS_DATA", where, "data 和 series 只能选择一种，避免忽略数据")
+            if isinstance(series, list):
+                names = [s.get("name") for s in series if isinstance(s, dict) and isinstance(s.get("name"), str)]
+                if len(names) != len(set(names)):
+                    issues.error("DUPLICATE_SERIES", f"{where}.series", "系列名称必须唯一")
+                if ctype in ("bar", "bar-horizontal", "donut", "scatter") and len(series) > 1:
+                    issues.error("UNSUPPORTED_SERIES", where, f"{ctype} 当前只支持一个系列；请拆图或选择 line/area/bar-stacked/combo")
+            if ctype in ("bar-stacked", "combo") and not series:
+                issues.error("MISSING_SERIES", where, f"{ctype} 必须提供 series")
+            if ctype == "combo" and isinstance(series, list):
+                marks = [s.get("mark") for s in series if isinstance(s, dict)]
+                if any(m not in ("bar", "line") for m in marks) or not ("bar" in marks and "line" in marks):
+                    issues.error("BAD_COMBO", where, "combo 每个系列必须声明 mark: bar|line，且至少各有一种；共用同单位纵轴")
+            if ctype == "donut":
+                rows = data if isinstance(data, list) else (series[0].get("data", []) if isinstance(series, list) and series and isinstance(series[0], dict) else [])
+                if isinstance(rows, list):
+                    vals = [d.get("value") for d in rows if isinstance(d, dict)]
+                    if vals and all(_finite(v) for v in vals) and sum(vals) <= 0:
+                        issues.error("BAD_DATA", where, "环图数值总和必须大于零")
+            if "emphasis" in slide:
+                emphasis = slide["emphasis"]
+                if not isinstance(emphasis, dict):
+                    issues.error("BAD_EMPHASIS", where, "emphasis 必须是对象")
+                else:
+                    _check_fields(emphasis, {"values"}, f"{where}.emphasis", issues)
+                    vals = emphasis.get("values")
+                    if not isinstance(vals, list) or any(not isinstance(v, str) for v in vals):
+                        issues.error("BAD_EMPHASIS", where, "emphasis.values 必须是字符串数组")
+            if slide.get("annotations"):
+                issues.error("UNSUPPORTED_ANNOTATIONS", f"{where}.annotations", "当前渲染器不绘制 annotations；请将说明写入 caption，不能静默丢失标注")
         for need in REQUIRED_SLIDE_FIELDS.get(kind, ()):
             if not slide.get(need):
                 issues.error("MISSING_FIELD", f"{where}.{need}",
@@ -347,8 +467,8 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
         declared = slide.get("color")
         if declared is not None and declared != "overprint":
             issues.error("BAD_COLOR", f"{where}.color",
-                         f"只接受 \"overprint\"（两墨叠印色），收到 {declared!r} —— "
-                         f"主/副色单独当文字色对比度天生不达标")
+                         f"只接受兼容标记 \"overprint\"，收到 {declared!r} —— "
+                         f"实际文字色由风格 colorSets.*.text 声明或由两墨派生，不能在内容层写色值")
         for key in ITEM_FIELDS:
             if key in slide:
                 _check_items(slide, key, where, issues)
@@ -360,7 +480,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="校验 deck-spec.json 规格（字段集封闭）")
     ap.add_argument("spec", help="规格文件路径")
     ap.add_argument("--tokens", default=None,
-                    help="覆盖 token 文件（缺省按 deck.style 解析：deck 项目 styles/ 优先，--style 也吃路径）")
+                    help="覆盖 token 文件（缺省按 deck.style 与项目目录解析，并合并品牌）")
     ap.add_argument("--json", action="store_true", help="输出 JSON")
     args = ap.parse_args(argv)
 
@@ -374,29 +494,26 @@ def main(argv: list[str] | None = None) -> int:
         print(f"不是合法 JSON：{exc}", file=sys.stderr)
         return 2
 
-    # token 读不到**不算** spec 的错（可能只是没带对路径）—— 那就跳过 colorSet 存在性校验，
-    # 而不是把一件读不到的事报成"规格有问题"。
-    # 风格从 spec 的 deck.style 解析（必填，无内置风格）：色板名单必须
-    # 按**这一份 deck 选的风格**去查，拿别的风格的名单去核会误报。
-    tokens_path = args.tokens
-    if tokens_path is None:
-        deck = spec.get("deck") if isinstance(spec, dict) else None
-        style_name = deck.get("style") if isinstance(deck, dict) else None
-        if isinstance(style_name, str) and style_name:
-            tokens_path = os.path.join(STYLES_DIR, style_name, "style.json")
-    color_sets: set[str] | None = None
-    if tokens_path is None:
-        # 没声明风格（或声明了但找不到 token 文件）—— 不在这里报错：
-        # MISSING_STYLE / 风格缺失由 validate() 与 check.py 各自负责，
-        # 这里只把"查不了色板名单"的降级写在脸上（跳过名单存在性校验）。
-        issues = validate(spec, None)
-    else:
+    issues = validate(spec)
+    # Resolve the exact project style + brand used by compile; never silently skip
+    # palette membership when the project style cannot be loaded.
+    if not issues.errors:
         try:
-            with open(tokens_path, encoding="utf-8") as fh:
-                color_sets = set(json.load(fh)["colorSets"])
-        except (OSError, json.JSONDecodeError, KeyError, TypeError):
-            color_sets = None
-        issues = validate(spec, color_sets)
+            path = os.path.join(HERE, "deck.py")
+            module_spec = importlib.util.spec_from_file_location("_deck_validate_theme", path)
+            module = importlib.util.module_from_spec(module_spec)
+            sys.modules[module_spec.name] = module
+            module_spec.loader.exec_module(module)
+            override = None
+            if args.tokens:
+                with open(args.tokens, encoding="utf-8") as fh:
+                    override = {"name": "validation-override", "tokens": json.load(fh), "skin": ""}
+            style, _brand = module.resolve_theme(
+                spec["deck"], os.path.dirname(os.path.abspath(args.spec)), override)
+            color_sets = set(style["tokens"]["colorSets"])
+            issues = validate(spec, color_sets)
+        except (OSError, ValueError, KeyError, TypeError, SystemExit) as exc:
+            issues.error("STYLE_RESOLUTION", "deck.style", f"无法验证项目风格与品牌：{exc}")
 
     if args.json:
         print(json.dumps({"spec": args.spec, "error_count": len(issues.errors),

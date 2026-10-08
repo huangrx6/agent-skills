@@ -290,10 +290,12 @@ class TestInlineText(unittest.TestCase):
                          '&lt;script&gt;&amp;&quot;x&quot;')
         self.assertNotIn("<script>", self.render.rich("<script>alert(1)</script>"))
 
-    def test_shell_gives_captions_a_default_gap_and_muted_color(self) -> None:
+    def test_shell_gives_captions_a_default_gap_and_readable_color(self) -> None:
         self.assertIn(".chartcap{margin-top:var(--sp-inner)", self.html,
                       "图注的间距/颜色不能只靠皮肤 —— 皮肤没写就贴住图")
-        self.assertIn("opacity:.62", self.html)
+        caption_css = re.search(r"(?:^|\n)\.chartcap\{([^}]+)\}", self.html).group(1)
+        self.assertIn("color:var(--text)", caption_css)
+        self.assertNotIn("opacity:", caption_css)
         self.assertIn(".em{font-weight:700}", self.html,
                       "行内强调要有样式，否则 span 是隐形的")
 

@@ -7,7 +7,7 @@
 
 | 交付格式 | 对方没装字体会怎样 | 依据 |
 | --- | --- | --- |
-| **PDF** | **完全没事** | 实测：Chrome 把用到的字形**子集内嵌**（PDF 里是 `AAAAAA+SmileySans-Oblique` 这种子集名 + `/FontFile2` 流）。25MB 的霞鹜文楷出成 PDF 总共 **113KB** |
+| **PDF** | 嵌入成功时不受影响 | 实测：Chrome 把用到的字形**子集内嵌**（PDF 里是 `AAAAAA+SmileySans-Oblique` 这种子集名 + `/FontFile2` 流）。25MB 的霞鹜文楷出成 PDF 总共 **113KB** |
 | **PDF（另一种形态）** | 也没事 | 同一份 PDF 里另一款字体走的是 **Type3** 形态（12 个 `/CharProcs`）—— Type3 的每个字形是 PDF 内部的绘图指令，**自包含**，与内嵌字体等效 |
 | **PNG 截图 / 贴图版 PPTX / MP4 / GIF** | **没事** | 全部已栅格化成像素，字体信息在导出那一刻就固化进图了 |
 | **原生 PPTX** | **有事** ⚠️ | python-pptx 只写字体**名字**（`<a:latin typeface="...">` / `<a:ea>`），不嵌字体文件。对方没装就由宿主应用替换，版面会走形 |
@@ -66,10 +66,10 @@ DECK_FONT_DIR=/tmp/f python3 scripts/fonts.py --fetch   # 指定任意位置
 | 清松手写体 1（`--fetch` 自动只取第 1 款；2–9 同仓库手工拿） | `jasonhandwriting/JasonHandwriting` | OFL |
 | Fusion Pixel Font | `TakWolf/fusion-pixel-font` | MIT |
 
-其余 120 款按 `--list --urls` 给的来源页手工拿，放进 `fonts/ttf/` 即可 —— 文件名里
+其余字体按 `--list --urls` 给的来源页手工拿，放进 `fonts.py --where` 显示的缓存目录 —— 文件名里
 带得上字体名（或拉丁名）就能被 `--installed` 认出来。
 
-## 只走 A 档：没有 license 也能用的那一套
+## 优先使用清单中的 A 档，并核实实际许可
 
 **没有 license 就用严格 A，别碰 B/C，连 `A/B` 也别碰。**
 
@@ -133,12 +133,11 @@ body / numeral 三档都给齐，所以"只用免费的"不会变成"有几套�
 渲染时会自动为本地已有的字体注入 `@font-face`；本地没有的**静默跳过**（栈里还有
 回退项，不会画出裂图，具体谁顶上了由 `check.py` 的字体回退提示说清楚）。
 
-### 别把系统 UI 族当设计
+### 字体选择与回退检查
 
-`Helvetica / Helvetica Neue / Arial / PingFang SC / Hiragino Sans GB / system-ui /
-sans-serif` 是**回退目标**，不是设计选择 —— 它们就是"这一页没设字体时你会看到的
-那个字形"。写它们有两个后果：字形不承担任何性格；交付或换机后字形还会再变（清单之外
-的族不注入 `@font-face`）。要性格就从六个性格里挑**清单名**（上一节）。
+`Helvetica / Arial / PingFang SC / system-ui / sans-serif` 可以用于需要中性、可靠的设计；
+系统 UI 字体不是审美错误。它们通常不会随产物嵌入，换机器可能改变；需特殊字感时从清单
+选择合适的字体，并确认实际加载。`check.py` 对系统 UI 字体的提示只是设计建议。
 
 `check.py` 现在按**像素指纹**实测判这件事：同一个字串在"声明的族"与"不存在的族"下各画
 一次、逐像素比。为什么不用宽度 —— **CJK 字形全是 1em 等宽**，换字体宽度不变（实测 11 个
@@ -167,3 +166,9 @@ Chrome 仍然回退到 `STSongti-SC-Regular` —— macOS 的字体缓存不会�
    `OPPO **Sans**` 会撞上 `Smiley**Sans**`（实测：只下了 4 款却报"已就位 8 款"）。
    所以认字体要求记号 **≥5 字符**，而且两边都归一化。**宁可漏也不要误报** ——
    报"已就位"但其实是回退，会静默渲出一份字体不对的 deck。
+
+## HTML 字体内嵌
+
+`--embed` 会原位替换现有 `@font-face` 的本地 URL，保留字重与字体样式，支持相对路径和
+`file://` URL，不在 `<style>` 内嵌套新标签。命令检查生成的整个 HTML 体积。
+它不处理图片，也不保证字体许可或跨浏览器表现；交付前移动目录再打开验证。

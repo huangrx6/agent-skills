@@ -435,10 +435,6 @@ def main(argv: list[str]) -> int:
     return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main(sys.argv))
-
-
 def _load_sibling(name: str):
     """同目录模块加载（仓库约定：importlib + sys.modules，不碰 sys.path）。
 
@@ -473,6 +469,15 @@ SCHEMA_VERSION = 1
 RESOLVED_KIND = "resolved.deck"
 
 
+def resolve_theme(deck: dict, project_dir: str | None = None,
+                  style: dict | None = None) -> tuple[dict, dict]:
+    """Resolve the same project style and brand for compilation and validation."""
+    r = _render()
+    chosen = style if style is not None else r.load_style(deck.get("style"), project_dir)
+    brand = load(deck.get("brand"), project_dir)
+    return r._apply_brand(chosen, brand), brand
+
+
 def compile_spec(deck_spec: dict, style: dict | None = None,
                  assets: dict | None = None,
                  project_dir: str | None = None) -> dict:
@@ -492,14 +497,11 @@ def compile_spec(deck_spec: dict, style: dict | None = None,
     trace: list[dict] = []
 
     # ── Theme：风格（双根）→ 品牌合并 → colorSet ─────────────────────────
-    resolved_style: dict = (style if style is not None
-                            else r.load_style(deck.get("style"), project_dir))
-    brand = brand_mod.load(deck.get("brand"), project_dir)
+    resolved_style, brand = resolve_theme(deck, project_dir, style)
     if brand:
         trace.append({"stage": "theme", "decision": f"brand:{deck.get('brand')}",
                       "reason": [f"字体并入（{list(brand.get('fonts', {}))} 或整体替换）",
                                  "色板并入（同名键品牌赢，风格原有不删）"]})
-    resolved_style = r._apply_brand(resolved_style, brand)
     tokens: dict = resolved_style["tokens"]
     seed = deck.get("seed", 1)
 

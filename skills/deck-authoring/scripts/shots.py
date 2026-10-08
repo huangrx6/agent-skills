@@ -1,60 +1,59 @@
 #!/usr/bin/env python3
-"""整页 HTML → 每页一张 PNG：用系统 Chrome 截图，再按固定几何裁开。
+"""HTML → 每页一张 PNG：等待资源就绪，按时间轴逐页捕获完全入场的静帧。
 
-不装 Playwright：macOS 上一定有 Chrome，`--headless=new --screenshot` 就够。
+复用 animate.py 的 CDP 会话，不再截超长页面后按固定间距裁切。
 """
 from __future__ import annotations
 
 import argparse
-import contextlib
+import asyncio
+import importlib.util
+import json
 import os
-import subprocess
 import sys
+import tempfile
 
-from PIL import Image
 
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-GAP = 36          # 页间距，和 render.py 的 `.slide{margin-bottom}` 是同一个数
+def _capture_module():
+    path = os.path.join(os.path.dirname(__file__), "animate.py")
+    spec = importlib.util.spec_from_file_location("_deck_shots_capture", path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def shoot(html: str, out_dir: str, width: int, height: int, count: int) -> list[str]:
-    # 产物不存在就别启 Chrome：它会乐颠颠地截一张**自己的错误页**（深灰底），
-    # 而这里会把它切成 `page-01.png…` 并报“✓ 截出 N 页” —— 于是一整份
-    # “错误页 PPTX”静默进了交付（贴图版 pptx 只吃 pages/，看不出区别）。
+    """Capture each settled slide, sharing animation's resource-ready CDP path."""
     if not os.path.isfile(os.path.abspath(html)):
         raise SystemExit(f"✗ 读不到产物：{os.path.abspath(html)}")
+    if width <= 0 or height <= 0 or count <= 0 or width * 900 != height * 1600:
+        raise SystemExit("✗ 截图尺寸必须为正数且为 16:9，count 必须大于零")
+    with open(html, encoding="utf-8") as fh:
+        source = fh.read()
+    marker = "window.__deck_timeline="
+    if marker not in source:
+        raise SystemExit("✗ 产物没有 deck 时间轴，请先用 render.py 生成 HTML")
     try:
+        spans, _ = json.JSONDecoder().raw_decode(source.split(marker, 1)[1])
+        if count > len(spans):
+            raise SystemExit(f"✗ 请求 {count} 页，但产物只有 {len(spans)} 页")
+        times = [s["start"] + s["enter"] + min(s["hold"] / 2, .1) for s in spans[:count]]
+    except (ValueError, KeyError, TypeError) as exc:
+        raise SystemExit(f"✗ deck 时间轴无效：{exc}") from exc
+    capture = _capture_module()
+    if capture._ws_connect() is None:
+        raise SystemExit("✗ 截图需要 websockets，以等待字体、图片和图表就绪；请安装 requirements.txt")
+    # Keep partial captures out of the delivery folder when resource validation fails.
+    with tempfile.TemporaryDirectory(prefix="deck-shots-") as work:
+        frames = asyncio.run(capture._capture_async(html, work, times, width * 2 / 1600))
         os.makedirs(out_dir, exist_ok=True)
-    except OSError as exc:
-        raise SystemExit(f"✗ 建不了输出目录 {out_dir}：{exc}") from exc
-    full = os.path.join(out_dir, "_full.png")
-    total = height * count + GAP * (count - 1)
-    argv = [CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-            "--force-device-scale-factor=2",           # 2x：投影/打印不模糊
-            f"--screenshot={full}", f"--window-size={width},{total}",
-            f"file://{os.path.abspath(html)}"]
-    try:
-        proc = subprocess.run(argv, check=False, capture_output=True)
-    except FileNotFoundError:
-        raise SystemExit(f"✗ 找不到 Chrome：{CHROME}（这一步要本机 Chrome）") from None
-    if proc.returncode != 0:
-        err = proc.stderr.decode("utf-8", "replace").strip()[:300]
-        raise SystemExit(f"✗ Chrome 截图失败（返回码 {proc.returncode}）：{err}")
-    try:
-        image = Image.open(full)
         out = []
-        for i in range(count):
-            top = i * (height + GAP) * 2               # 2x 缩放后要乘 2
-            box = (0, top, width * 2, top + height * 2)
-            page = os.path.join(out_dir, f"page-{i + 1:02d}.png")
-            image.crop(box).save(page)
-            out.append(page)
-        return out
-    except OSError as exc:
-        raise SystemExit(f"✗ 裁页失败（{full} 不是可读的 PNG？）：{exc}") from exc
-    finally:
-        with contextlib.suppress(OSError):
-            os.remove(full)
+        for i, frame in enumerate(frames, 1):
+            target = os.path.join(out_dir, f"page-{i:02d}.png")
+            os.replace(frame, target)
+            out.append(target)
+    return out
 
 
 def main(argv: list[str]) -> int:

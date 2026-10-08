@@ -17,27 +17,13 @@
 
 ## ① 对比度
 
-**判据**：只有一条 —— 叠印墨（`overprint` 派生的文字色）× 纸色的对比度
-必须达到 `contrast.minBody`（4.5），整副一刀、不分页不分角色（check.py ①）。
-`contrast.minLarge`（3.0，按 ≥ 32px 分大字档）**只是 token 里备着的数，本仓库不检查它**
-—— 对比度只按上面那一条判（`ink.py` 打印门槛时会当场标出这一点，
-以免费劲照一个不生效的数调色）。
+先以项目风格与品牌合并后的 token 做色板预检，再检查真实 DOM 的文字颜色、背景与祖先透明度。
+文字色可用 `colorSets.*.text` 显式声明，未声明时由两墨派生；颜色的名称不决定可读性。
+当前实现仍以至少 4.5 的文字对比度做统一保守门槛，minLarge 不单独启用，不能调低门槛绕过问题。
 
-**为什么文字色不让你自己填**：
-
-主 / 副色单独当文字色对比度天生不达标 —— 它们的语义是**墨层 / 色块 / 装饰**，
-不是**承载文字**。
-文字色是 `overprint(primary, secondary)` 派生出来的（派生后的对比度由 `ink.py` 逐套色板验）。
-
-**会报的情况**：
-
-- `叠印墨对比度 R < 4.5（文字色不达标）` —— 色板派生的叠印墨不达标（整副
-  一条，不带页号）。换色板，不要改 `minBody`。
-- `第 N 页 声明 color='<hex>'` —— spec 里写了 `color` 字段且不是 `"overprint"`。
-  主 / 副色不允许直接当文字色。
-
-**反例**：`style.json` 里 `colorSets` 新加的"两墨都亮"组合会在 `ink.py` 那一关就过不去，
-不该出现在 deck-spec.json 里。
+皮肤把文字覆盖为白底白字、或降低 opacity 后造成对比不足，实测门应给出元素 id 和比值。
+图片、渐变与复杂叠层背景不能可靠用平面色计算时，必须逐页目检；跳过计算不代表已验证通过。
+`color:"overprint"` 只是旧 spec 的兼容标记，不是强迫所有风格使用叠印色。
 
 ## ② 版面越界 / 容器裁切（**实测**，不估算）
 
@@ -45,7 +31,7 @@
 
 - **甲・越出版面**：元素盒子和**它所在那一页**的盒子比。`.slide` 是 `overflow:hidden`，
   出去就是被裁。
-- **乙・容器内裁切**：元素**自己会裁**（`overflow` 不是 `visible`）且 `scrollW/H > clientW/H`。
+- **乙・容器内裁切**：元素自身的 scroll/client 差异，以及所有祖先的有效裁切区域。
 
 **为什么删掉了估算**：原来用 `text_width()` 按 CJK 1em / ASCII 0.55em 估宽。
 实测同一行 12 个汉字标题（`end` 页，真实字号 180px）：
@@ -63,7 +49,7 @@
 
 - 比的是**该元素所在那一页**的盒子，不是全局 1600×900 —— 产物是竖向堆叠的多页，
   第 2 页的元素 y 本来就在 900 以下，拿全局边界比会把后面每一页都误报。
-- 容器裁切只在**元素自己会裁**时才算。`.foot` 那种 `overflow:visible` 的，
+- 元素自身 `overflow:visible` 不会因 scroll/client 的微差误报，但仍会检查祖先裁切。`.foot` 的
   `scrollHeight` 比 `clientHeight` 大 2px 是行高与字面度的正常差，报它就是误报。
 
 **装饰墨块不会误报**：它们故意溢出到版面外（`right:-60px`），但没有 `data-m`、
@@ -130,6 +116,21 @@ python3 scripts/check.py deck.spec.json out.html --resolved resolved.deck.json
   （按 **id** 配对，不按 role —— 栏题与时间线节点标签的 role 也是 subtitle，
   但它们不是标题块的副标题）。实测抓到过 2px 漂移：标题块内缩 6+24=30、
   副标题用了 32 的档 —— 单看每行都「差不多」，并排才露馅。
+
+## ③c 壳的 chrome 逐页钉住（**实测**）
+
+**判据**：页脚（`s{N}.foot`）与品牌 logo 在**每一页**相对自己那一页底边的位置必须一致
+（±2px，`check._check_chrome_anchored`）。**阻塞**级。
+
+为什么单列一条：其余几何门看的都是"这一页内部对不对"（越界 / 碰撞 / 被放大），
+查不出"同一个元素在 16 页里位置各不相同"。而这类错位的成因几乎总是一行皮肤 ——
+皮肤写 `.slide > *{position:relative}` 这类通配（很自然的写法：把内容抬到装饰层之上），
+特指度却比壳的裸类选择器高（0,1,1 > 0,1,0），把 chrome 的绝对定位一起打掉了，
+chrome 于是退回文档流、跟着内容走。实测某份 16 页 deck 的页脚距页底 0.7 ~ 678px
+乱跳。壳那边也做了加固（chrome 选择器带 `.slide >` 前缀，见
+`style-architecture.md` 的风格契约一节）。
+
+`logo` 允许某几页不出现（品牌策略）—— 只比真的出现过的那几页。
 
 ## ④ 错位区间
 
@@ -226,8 +227,8 @@ python3 scripts/check.py deck.spec.json out.html --resolved resolved.deck.json
 第 9 页 s9.chart 与 s9.caption 太近（visual×caption：需要 ≥44px，实际 24px）
 ```
 
-豁免四条（政策与距离表全文见 `layout-system.md` §11b）：同组、caption 被
-visual 包含、同页 visual×caption、`layout == "hero"` 的标题条压图（intentional
+安全距离的豁免见 `layout-system.md` §11b：同组与 figure 内的说明免额外安全距离，
+但独立文字的真实交叠仍需阻塞。`layout == "hero"` 允许标题条压图片，不允许文字互压（intentional
 必须显式声明 —— 不让 QA 猜「这是 bug 还是设计」）。
 
 ## 这一层不覆盖什么

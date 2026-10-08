@@ -355,10 +355,11 @@ python3 scripts/animate.py out.html -o deck.mp4 --fps 60         # 60fps
 python3 scripts/animate.py out.html -o x.mp4 --stills 0,2.5,10   # 只抽帧不编码
 ```
 
-依赖全在系统里：取帧 = 系统 Chrome + **CDP**（一次启动截几百帧；一帧一个
+依赖：取帧 = 系统 Chrome + **CDP**（一次启动截几百帧；一帧一个
 `--screenshot` 要 15 分钟，CDP 70 秒，51 倍）；H.264 = **AVFoundation**
-（`swiftc` 现场编，`xcode-select --install`）；GIF = PIL。缺 `websockets` 会
-说清代价并降级，不静默变慢。
+（`swiftc` 现场编，`xcode-select --install`）；GIF = Pillow。需要安装 `websockets`；
+缺失会停止并提示安装。`--slow` 也走资源就绪的 CDP 链，只是逐帧重启浏览器。
+GIF 按累计时间量化到 10ms，避免 24fps 逐帧截断导致总时长缩短。
 
 产物要验不能只看返回 0：MP4 查 `ftyp` 头 + `avconvert` 回读；GIF 查 `GIF89a`
 头 + **总时长**（Pillow 会把相同帧合并——实测 777 帧写出 160 帧而时长是对的，

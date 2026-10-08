@@ -43,9 +43,11 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import math
 import os
 import re
 import sys
+from functools import lru_cache
 
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData, XyChartData
@@ -78,6 +80,7 @@ def _load_sibling(name: str):
 deckio = _load_sibling("deckio")
 measure_mod = _load_sibling("measure")
 deck_mod = _load_sibling("deck")       # 品牌 logo：路径解析 + 矢量栅格化
+fonts_mod = _load_sibling("fonts")
 
 # 1 CSS px = 0.75pt = 9525 EMU。版面 1600×900px → 1200×675pt。
 EMU_PER_PX = 9525
@@ -171,19 +174,29 @@ def rel_box(el: dict, slides: list[dict]) -> tuple[float, float, float, float]:
     return el["x"] - sx, el["y"] - sy, el["w"], el["h"]
 
 
-# 我们出货的风格里出现过的 CJK 族。加新风格时如果用了新的中文字体，**这里要补**
-# （不补的话 ea 不会被写进去，中文就退回宿主自选 —— 不会报错，只会悄悄换字体）。
+# 常用系统 CJK 族；自定义字体另通过字体清单及本地 name 表解析，不必逐个改导出器。
 CJK_FAMILIES = ("Hiragino Sans GB", "Songti SC", "Heiti SC", "PingFang SC",
                 "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC",
                 "Source Han Serif SC")
+
+
+@lru_cache(maxsize=256)
+def _font_family_name(family: str) -> str:
+    """CSS 的清单别名要还原成字体文件里的族名，PowerPoint 不认识 @font-face 别名。"""
+    path = fonts_mod.local_families().get(family)
+    entry = fonts_mod.owner_of(family)
+    if path is None and entry is not None:
+        path = fonts_mod._local_path_for(entry)
+    names = fonts_mod._font_families(path) if path else []
+    return names[0] if names else family
 
 
 def east_asian_family(stack: str) -> str | None:
     """从 CSS 字体栈里挑第一个**能画汉字**的族（给 `<a:ea>` 用）。挑不到返回 None。"""
     for raw in stack.split(","):
         fam = raw.strip().strip('"').strip("'")
-        if fam in CJK_FAMILIES:
-            return fam
+        if fam in CJK_FAMILIES or fonts_mod.owner_of(fam) is not None:
+            return _font_family_name(fam)
     return None
 
 
@@ -221,23 +234,30 @@ def add_text(slide, el: dict, box: tuple[float, float, float, float],
     # 内边距清零：默认 0.1in 会把文字挤到框内偏移，位置就不来自测量了
     tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
     p = tf.paragraphs[0]
-    p.alignment = PP_ALIGN.LEFT
+    p.alignment = {"center": PP_ALIGN.CENTER, "right": PP_ALIGN.RIGHT,
+                   "end": PP_ALIGN.RIGHT, "justify": PP_ALIGN.JUSTIFY}.get(
+                       el.get("textAlign"), PP_ALIGN.LEFT)
+    line_height = str(el.get("lineHeight", ""))
+    if re.fullmatch(r"[\d.]+px", line_height):
+        p.line_spacing = Pt(float(line_height[:-2]) * PX_TO_PT)
     run = p.add_run()
     run.text = el.get("text", "")
 
-    fam = first_family(vars_.get("--display", "") if role in SERIF_ROLES
-                       else vars_.get("--body", ""))
-    run.font.name = fam
+    stack = el.get("fontFamily") or (vars_.get("--display", "") if role in SERIF_ROLES
+                                    else vars_.get("--body", ""))
+    run.font.name = _font_family_name(first_family(stack))
     # 中文靠 `<a:ea>`；**但不能拿栈首那个族给它** —— 栈首往往是拉丁族
     # （Georgia / Helvetica Neue / Menlo），对汉字没有字形，宿主照样自己去挑，
     # 等于没写（实测：ea 写成 Georgia 之后，LibreOffice 渲出来的中文还是个加粗黑体）。
     # 所以从栈里挑一个**声明过的 CJK 族**；挑不到就不写 ea（让宿主决定，
     # 比写一个错的强 —— 错的会让人以为我们指定了）。
-    ea_fam = east_asian_family(vars_.get("--display", "") if role in SERIF_ROLES
-                               else vars_.get("--body", ""))
+    ea_fam = east_asian_family(stack)
     if ea_fam:
         set_east_asian_font(run, ea_fam)
     run.font.size = Pt(round((el.get("fontSize") or 24) * PX_TO_PT, 1))
+    spacing = str(el.get("letterSpacing", ""))
+    if re.fullmatch(r"-?[\d.]+px", spacing):
+        run._r.get_or_add_rPr().set("spc", str(round(float(spacing[:-2]) * PX_TO_PT * 100)))
     # 字重**跟着实测走**，不按角色写死：有的风格标题是 400 字重，
     # 统一 bold 就等于把这两套风格的标题设计抹掉了（XML 里读出来是 b="1" ✗）。
     weight = el.get("fontWeight")
@@ -301,8 +321,7 @@ def _style_labels(labels, vars_: dict[str, str]) -> None:
     labels.font.color.rgb = css_color(vars_["--text"])
 
 
-# DSL 的 chart 类型 → PowerPoint 原生图表类型。combo 在原生层退化成柱
-# （python-pptx 一个图表对象只能一个 plot；组合图是第二阶段的事，先如实降级）。
+# DSL 的 chart 类型 → PowerPoint 原生图表类型。combo 当前明确拒绝，不能改变表达。
 _XL_KIND = {
     "bar": XL_CHART_TYPE.COLUMN_CLUSTERED,
     "bar-horizontal": XL_CHART_TYPE.BAR_CLUSTERED,
@@ -311,7 +330,6 @@ _XL_KIND = {
     "bar-stacked": XL_CHART_TYPE.COLUMN_STACKED,
     "donut": XL_CHART_TYPE.DOUGHNUT,
     "scatter": XL_CHART_TYPE.XY_SCATTER,
-    "combo": XL_CHART_TYPE.COLUMN_CLUSTERED,
 }
 
 
@@ -323,33 +341,71 @@ def add_chart(slide, el: dict, box: tuple[float, float, float, float],
     if not data and not series:
         return
     kind = el.get("chart") or ""
+    if kind == "combo":
+        raise SystemExit("✗ 原生 PPTX 暂不支持 combo 柱线组合图；请用 HTML / PDF / "
+                         "--png-dir 贴图 PPTX，不能把组合图静默改成柱图")
+    if kind not in _XL_KIND:
+        raise SystemExit(f"✗ 原生 PPTX 不支持图表类型 {kind!r}，不能替换成默认柱图")
+    if data and series:
+        raise SystemExit("✗ 图表 data 与 series 不能同时提供，无法确定应导出哪份数据")
+    if kind in ("bar", "bar-horizontal", "donut", "scatter") and len(series) > 1:
+        raise SystemExit(f"✗ {kind} 当前只支持一个系列；请拆图或选择 line/area/bar-stacked")
+
+    def number(value, location):
+        try:
+            valid = (isinstance(value, (int, float)) and not isinstance(value, bool)
+                     and math.isfinite(value))
+        except OverflowError:
+            valid = False
+        if not valid:
+            raise SystemExit(f"✗ {location} 必须是有限数字，不能用零代替缺失或无效数据")
+        return value
+
     x, y, w, h = box
     if kind == "scatter":
         # 散点要两个连续量：XyChartData，不是 CategoryChartData（类别轴画不了它）
+        if series:
+            data = series[0].get("data") or []
+        if not data:
+            raise SystemExit("✗ scatter 没有可导出的点")
         chart_data = XyChartData()
         for d in data:
             chart_data.add_series(str(d.get("label", ""))).add_data_point(
-                d.get("x", 0), d.get("value", d.get("y", 0)))
+                number(d.get("x"), "scatter.x"),
+                number(d.get("y", d.get("value")), "scatter.y"))
     else:
         chart_data = CategoryChartData()
-        if series:
-            chart_data.categories = [str(d.get("label", ""))
-                                     for d in series[0].get("data", [])]
-            for s in series:
-                chart_data.add_series(str(s.get("name", "")) or "值",
-                                      [d.get("value", 0) for d in s.get("data", [])])
-        else:
-            chart_data.categories = [str(d.get("label", "")) for d in data]
-            chart_data.add_series(el.get("unit", "") or "值",
-                                  [d.get("value", 0) for d in data])
+        sources = series or [{"name": el.get("unit", "") or "值", "data": data}]
+        categories: dict[str, None] = {}
+        aligned = []
+        for source in sources:
+            values = {}
+            for row in source.get("data", []):
+                label = row.get("label")
+                if not isinstance(label, str) or not label.strip():
+                    raise SystemExit("✗ 原生分类图表每个点必须有非空 label")
+                if label in values:
+                    raise SystemExit(f"✗ 系列 {source.get('name', '')!r} 的 label {label!r} 重复；"
+                                     "请先聚合或明确区分类别，不能在导出时覆盖数据")
+                values[label] = number(row.get("value"), f"{label}.value")
+                categories.setdefault(label, None)
+            if not values:
+                raise SystemExit(f"✗ 系列 {source.get('name', '')!r} 没有可导出的数据")
+            aligned.append((source.get("name") or "值", values))
+        chart_data.categories = list(categories)
+        for name, values in aligned:
+            # 所有系列共享首次出现顺序的类别并集；没有该类别是缺口，不是数值0。
+            chart_data.add_series(str(name), [values.get(label) for label in categories])
+        if kind == "donut":
+            data = sources[0]["data"]
     frame = slide.shapes.add_chart(
-        _XL_KIND.get(el.get("chart") or "", XL_CHART_TYPE.COLUMN_CLUSTERED),
+        _XL_KIND[kind],
         Emu(round(x * EMU_PER_PX)), Emu(round(y * EMU_PER_PX)),
         Emu(round(w * EMU_PER_PX)), Emu(round(h * EMU_PER_PX)), chart_data)
     chart = frame.chart
     # 图例：**只在多系列时画**（不画分不开系列；单系列坚决不画 —— 那是噪音）。
     # 这与 SVG 层"名字标在线尾"不同：原生层没有线尾可标。
-    chart.has_legend = len(series) > 1
+    chart.has_legend = kind == "donut" or len(series) > 1
     if chart.has_legend:
         chart.legend.position = XL_LEGEND_POSITION.BOTTOM
         chart.legend.include_in_layout = False
@@ -376,7 +432,9 @@ def add_chart(slide, el: dict, box: tuple[float, float, float, float],
         _style_labels(labels, vars_)
         unit = str(el.get("unit", "") or "")
         if unit:
-            labels.number_format = f'0"{unit}"'
+            # General保留原始小数/科学计数法；固定0会把0.125、1e-12显示成0。
+            unit_literal = unit.replace("\\", "\\\\").replace('"', '\\"')
+            labels.number_format = f'General"{unit_literal}"'
             labels.number_format_is_linked = False
     # 单位跟着数值走的理由见上面分支里的注释（number_format_is_linked=False
     # 是关键：不设的话 PowerPoint 打开时会重新套默认格式，单位就没了）。
@@ -386,10 +444,78 @@ def add_chart(slide, el: dict, box: tuple[float, float, float, float],
     # 直接把外层的 `series`（数据系列表）遮蔽掉，多系列全被涂成同一种颜色。
     n_series = max(1, len(series))
     for si, s in enumerate(plot.series):
-        s.format.fill.solid()
-        s.format.fill.fore_color.rgb = css_color(
+        series_color = css_color(
             _mix(vars_["--accent"], vars_["--paper"], 0.62 * si / max(1, n_series - 1))
             if n_series > 1 else vars_["--accent"])
+        s.format.fill.solid()
+        s.format.fill.fore_color.rgb = series_color
+        if kind in ("line", "area"):
+            # 折线读线条色，面积图另有边界色；只设fill会让宿主用主题蓝/红画线。
+            s.format.line.color.rgb = series_color
+        if kind == "line":
+            # LINE_MARKERS的点填充和轮廓也必须显式写，否则仍会继承宿主主题色。
+            s.marker.format.fill.solid()
+            s.marker.format.fill.fore_color.rgb = series_color
+            s.marker.format.line.color.rgb = series_color
+        if kind == "donut":
+            for pi, point in enumerate(s.points):
+                point.format.fill.solid()
+                point.format.fill.fore_color.rgb = css_color(_mix(
+                    vars_["--accent"], vars_["--paper"],
+                    0.62 * pi / max(1, len(data) - 1)))
+
+
+def _image_position(position: str, free: float, axis: int) -> float:
+    parts = (position or "50% 50%").split()
+    if len(parts) == 1:
+        parts = ["50%", parts[0]] if parts[0] in ("top", "bottom") else [parts[0], "50%"]
+    if parts[0] in ("top", "bottom"):
+        parts = parts[::-1]
+    value = parts[axis]
+    keywords = {"left": 0, "top": 0, "center": 0.5, "right": 1, "bottom": 1}
+    if value in keywords:
+        return free * keywords[value]
+    if re.fullmatch(r"-?[\d.]+%", value):
+        return free * float(value[:-1]) / 100
+    if re.fullmatch(r"-?[\d.]+(?:px)?", value):
+        return float(value.removesuffix("px"))
+    raise SystemExit(f"✗ 原生 PPTX 暂不支持 object-position={position!r}；请使用百分比或像素位置")
+
+
+def add_picture(slide, path: str, box: tuple[float, float, float, float],
+                fit: str = "cover", position: str = "50% 50%") -> None:
+    """把 CSS 图片槽位映射为真实图框与可编辑裁切，保留原图宽高比。"""
+    from PIL import Image
+
+    x, y, w, h = box
+    with Image.open(path) as im:
+        iw, ih = im.size
+    if fit == "fill":
+        rw, rh = w, h
+    elif fit in ("cover", "contain", "scale-down", "none"):
+        scale = max(w / iw, h / ih) if fit == "cover" else min(w / iw, h / ih)
+        if fit == "scale-down":
+            scale = min(1, scale)
+        elif fit == "none":
+            scale = 1
+        rw, rh = iw * scale, ih * scale
+    else:
+        raise SystemExit(f"✗ 原生 PPTX 认不出的 object-fit：{fit!r}")
+    ox = _image_position(position, w - rw, 0)
+    oy = _image_position(position, h - rh, 1)
+    # 图片比槽位小时保留留白；比槽位大时用 srcRect 裁切，不能冲出槽位。
+    left, top = max(0, ox), max(0, oy)
+    right, bottom = min(w, ox + rw), min(h, oy + rh)
+    if right <= left or bottom <= top:
+        raise SystemExit("✗ object-position 把整张图片移出了图位")
+    picture = slide.shapes.add_picture(
+        path, Emu(round((x + left) * EMU_PER_PX)), Emu(round((y + top) * EMU_PER_PX)),
+        width=Emu(round((right - left) * EMU_PER_PX)),
+        height=Emu(round((bottom - top) * EMU_PER_PX)))
+    picture.crop_left = (left - ox) / rw
+    picture.crop_right = (ox + rw - right) / rw
+    picture.crop_top = (top - oy) / rh
+    picture.crop_bottom = (oy + rh - bottom) / rh
 
 
 def build(html_path: str, out_path: str) -> dict:
@@ -433,7 +559,9 @@ def _build(vars_: dict, measured: dict, manifest: list, base_dir: str,
     # 但**漏一个字段就是静默走兜底值** —— 实测就漏过 `fontWeight`：
     # 于是那些 400 字重的标题在 PPTX 里被强制加粗，
     # 而文件照生成、页数照样对，只有把 PPTX 打开看才发现。
-    MERGE_MEASURED = {"color": "measuredColor", "fontWeight": "fontWeight"}
+    MERGE_MEASURED = {"color": "measuredColor", **{key: key for key in (
+        "fontWeight", "fontSize", "fontFamily", "textAlign", "lineHeight", "letterSpacing",
+        "objectFit", "objectPosition")}}
     for entry in manifest:
         m = boxes.get(entry["id"])
         if not m:
@@ -490,18 +618,22 @@ def _build(vars_: dict, measured: dict, manifest: list, base_dir: str,
                     continue
                 # 原生 PPTX 只吃位图：矢量 logo 当场用 Chrome 栅格化。
                 # 栅格化不了会**明说**（异常带原因），不静默少一个 logo。
-                if role == "logo" and deck_mod.need_raster(src):
+                if deck_mod.need_raster(src):
                     try:
                         # 传**实测的盒子尺寸**：栅格化要保住宽高比（传标量会得到
                         # 正方形，图要么被拉、要么一片透明）。
-                        path = deck_mod.rasterize(path, box[2], box[3])
+                        rw, rh = box[2], box[3]
+                        if role == "image" and geo.get("naturalW") and geo.get("naturalH"):
+                            scale = max(rw / geo["naturalW"], rh / geo["naturalH"])
+                            rw, rh = geo["naturalW"] * scale, geo["naturalH"] * scale
+                        path = deck_mod.rasterize(path, rw, rh)
                     except SystemExit as exc:
                         counts["skipped"] += 1
                         notes.append(str(exc))
                         continue
-                slide.shapes.add_picture(path, Emu(round(box[0] * EMU_PER_PX)),
-                                         Emu(round(box[1] * EMU_PER_PX)),
-                                         width=Emu(round(box[2] * EMU_PER_PX)))
+                add_picture(slide, path, box,
+                            entry.get("objectFit") or ("contain" if role == "logo" else "cover"),
+                            entry.get("objectPosition") or "50% 50%")
                 counts["logo" if role == "logo" else "image"] += 1
             elif role in NON_TEXT_ROLES:
                 counts["skipped"] += 1

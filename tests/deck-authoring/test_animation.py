@@ -294,6 +294,9 @@ class TestFramesAreReproducible(unittest.TestCase):
         cls._tmp = tempfile.TemporaryDirectory()
         cls.addClassCleanup(cls._tmp.cleanup)
         cls.html = os.path.join(cls._tmp.name, "out.html")
+        # Real decoding is required before export; provide the fixture image beside HTML.
+        Image.new("RGB", (900, 600), "#dddddd").save(
+            os.path.join(cls._tmp.name, "sample-treated.png"))
         with open(cls.html, "w", encoding="utf-8") as fh:
             fh.write(render.render(spec))
 

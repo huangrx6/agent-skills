@@ -22,6 +22,7 @@ import io
 import json
 import math
 import os
+import math
 import random
 import re
 import shlex
@@ -311,9 +312,8 @@ def _slot_geometry(spec_path: str, style: str | None) -> tuple[dict, str]:
     **尺子只活在临时目录里**（只有本次渲染用的 spec 副本指向它）—— 产物目录里的
     图永远只有人出的那一份。写进产物目录就等于把一张脚本拼的图混进交付（
     `--brief` 跑完，图片目录里躺着几张拼贴，没人替换它们就跟着交付了）。
-    **`--check` 也不走这条路**：检查把它该验的东西自己造出来，就永远验不出
-    "图还没出"（删掉图之后 `--check` 照样报"符合契约"）——
-    检查只需要"文件名 + 契约里的尺寸/比例"，不该渲染任何东西。
+    `--check` 先检查真实文件是否存在，再用临时尺子测布局所需尺寸；尺子不会写进
+    图片目录，也不能代替被验收的真实文件。
     """
     render_mod = _load_sibling("render")
     measure_mod = _load_sibling("measure")
@@ -438,8 +438,6 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None,
     temperature = tokens.get("temperature", "")
     reference = tokens.get("reference", "")
 
-    w = 640 * BRIEF_SCALE
-    h = round(w * BRIEF_ASPECT[1] / BRIEF_ASPECT[0])
     # 按**文件名**合并：同一个文件名用在多页是合法的（复用同一张图）。
     # 按**文件**列，不按页列：同一张图被多页共用时，按页列会列三遍，
     # 人会出三张互相覆盖（实测）。
@@ -449,9 +447,13 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None,
     measured_px: dict[str, tuple[float, float] | None] = {}
     for page, s in sorted(info["slides"].items()):
         box = s["box"] or {}
+        if not box or box.get("w", 0) <= 0 or box.get("h", 0) <= 0:
+            raise SystemExit(f"✗ 第 {page} 页没有测到有效图片槽位，不能生成尺寸合同")
+        w, h = math.ceil(box["w"] * BRIEF_SCALE), math.ceil(box["h"] * BRIEF_SCALE)
         entry = by_file.setdefault(s["file"], {
             "file": s["file"], "pages": [], "titles": [], "bullets": [],
-            "target_px": [w, h], "aspect": _aspect_box(*BRIEF_ASPECT), "alpha": False,
+            "target_px": [w, h], "aspect": _aspect_box(w, h), "alpha": False,
+            "requirements": [],
             "measured": f"实测槽位 {box['w']:.0f}×{box['h']:.0f}px" if box else "",
             # 「主体 / 场景 / 细节」三栏**故意留空**，交给填的人。
             # 该页标题**不进**提示词（那是擅自补充事实）：
@@ -463,13 +465,17 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None,
         # 与 entry["measured"] 同一条规则：取**首次出现**那页的实测值
         if s["file"] not in measured_px:
             measured_px[s["file"]] = (box["w"], box["h"]) if box else None
+        entry["requirements"].append({"page": page, "width": box["w"], "height": box["h"],
+                                      "fit": box.get("objectFit") or "cover"})
+        entry["target_px"] = [max(entry["target_px"][0], w), max(entry["target_px"][1], h)]
+        entry["aspect"] = _aspect_box(*entry["target_px"])
         entry["pages"].append(page)
         entry["titles"].append(s["title"])
         entry["bullets"].extend(str(b) for b in s["bullets"][:3])
     slots = [by_file[k] for k in sorted(by_file, key=lambda k: by_file[k]["pages"][0])]
     brief = {
         "style": style_name, "style_label": label, "temperature": temperature,
-        "reference": reference, "target_px": [w, h], "aspect": _aspect_box(*BRIEF_ASPECT),
+        "reference": reference, "target_px": slots[0]["target_px"], "aspect": slots[0]["aspect"],
         "slots": slots, "colors": info["colors"],
     }
     # 机读的那一半落盘（人读的 md 由 main() 调 write_brief_md 写）。缺省与图片同目录；
@@ -714,9 +720,8 @@ def _write_asset_requests(brief: dict, measured_px: dict, requests_dir: str) -> 
 
     manifest（`render.load_assets`，见 references/images.md）是"图已到位"的登记册；
     requests 是它的**上游合同**：`--brief` 自动写，人按 prompt 出图，再把选中的文件
-    登记进 manifest —— assetId 就是这里的槽位 id，闭环。schema 封闭 v1，封闭集外的
-    字段不许写：{schemaVersion, slide, role, aspect, focal, negative_space, prompt,
-    required, note}。
+    登记进 manifest —— assetId 就是这里的槽位 id，闭环。请求合同 v2：
+    尺寸合同含 target_px 与 requirements（每个复用图位的尺寸和 fit）。
     """
     for slot in brief["slots"]:
         box = measured_px.get(slot["file"])
@@ -725,10 +730,12 @@ def _write_asset_requests(brief: dict, measured_px: dict, requests_dir: str) -> 
             cap = f"说明文字「{slot['caption']}」由版面排"
             note = f"{note}；{cap}" if note else cap
         request = {
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "slide": slot["pages"],      # 该槽位用到的页（同图复用多页时全列）
             "role": slot["layout"],      # 版式 —— 这个槽位在页里的角色
-            "aspect": round(box[0] / box[1], 3) if box else None,   # 实测槽位宽高比
+            "aspect": round(slot["target_px"][0] / slot["target_px"][1], 3),
+            "target_px": slot["target_px"],
+            "requirements": slot["requirements"],
             # focal 留空：画面主体是什么工具不知道 —— 与契约 md 的〈…〉同一条规则，
             # 不许自己编（"用户未提供且会影响事实准确性的内容，不得擅自补充"）。
             "focal": "",
@@ -828,7 +835,7 @@ def write_brief_md(brief: dict, out_path: str) -> str:
             "**参数**（用 API 参数传，**不要写进 prompt**）",
             "",
         ]
-        for item in api_params(brief):
+        for item in api_params({**brief, **s}):
             lines.append(f"- {item}")
         lines.append("")
     lines += [
@@ -927,7 +934,14 @@ def check_images(spec_path: str, out_dir: str, style: str | None = None,
             want_ratio[str(name)] = a / b
     if not wanted:
         raise SystemExit("✗ 这份 spec 里没有任何 image 槽位")
-    want_w = 640 * BRIEF_SCALE
+    # 只量布局，不生产或替换用户图片；缺图仍由下方真实路径检查拦住。
+    has_images = any(os.path.isfile(os.path.join(out_dir, name)) for name in wanted)
+    geometry, _ = _slot_geometry(spec_path, style) if has_images else ({}, None)
+    slots_by_file: dict[str, list[dict]] = {}
+    for page, slot in geometry.get("slides", {}).items():
+        box = slot.get("box") or {}
+        if box.get("w", 0) > 0 and box.get("h", 0) > 0:
+            slots_by_file.setdefault(slot["file"], []).append({**box, "page": page})
     problems: list[str] = []
     notes: list[str] = []
     for name, page in sorted(wanted.items(), key=lambda kv: kv[1]):
@@ -937,30 +951,44 @@ def check_images(spec_path: str, out_dir: str, style: str | None = None,
             continue
         size = image_size(path)
         if size is None:
-            notes.append(f"第 {page} 页：`{name}` 读不出尺寸（不是常见图片格式？）"
-                         f" —— 尺寸与比例都没法验")
+            problems.append(f"第 {page} 页：`{name}` 读不出有效尺寸，无法验收")
             continue
         w, h = size
+        if w <= 0 or h <= 0:
+            problems.append(f"第 {page} 页：`{name}` 尺寸必须为正数")
+            continue
+        slots = slots_by_file.get(name, [])
+        if not slots:
+            problems.append(f"第 {page} 页：`{name}` 没测到图位尺寸，无法验收清晰度")
+            continue
         if path.lower().endswith(".svg"):
             notes.append(f"第 {page} 页：`{name}` 是**矢量图**（SVG）—— 不做放大检查"
                          f"（放多大都不糊）；比例按 viewBox {w}×{h} 算")
-        elif w < want_w * (1 - SIZE_TOLERANCE):
-            problems.append(
-                f"第 {page} 页：`{name}` 只有 {w}px 宽，契约要 {want_w}px —— "
-                f"放进版面会被放大渲染（会糊）")
-        elif w < want_w:
-            notes.append(
-                f"第 {page} 页：`{name}` {w}px 宽，比契约的 {want_w}px 少 "
-                f"{(1 - w / want_w) * 100:.1f}% —— 会轻微放大，肉眼看不出来。"
-                f"服务商每个比例给的是固定像素，这不算出小了")
+        else:
+            requirements = []
+            for slot in slots:
+                fit = slot.get("objectFit") or "cover"
+                scales = (w / slot["w"], h / slot["h"])
+                effective = max(scales) if fit in ("contain", "scale-down") else min(scales)
+                requirements.append((effective / BRIEF_SCALE, slot))
+            quality, limiting = min(requirements, key=lambda item: item[0])
+            want_w = math.ceil(limiting["w"] * BRIEF_SCALE)
+            want_h = math.ceil(limiting["h"] * BRIEF_SCALE)
+            if quality < 1 - SIZE_TOLERANCE:
+                problems.append(
+                    f"第 {limiting['page']} 页：`{name}` 只有 {w}px 宽、{h}px 高，"
+                    f"图位契约要 {want_w}px × {want_h}px（{limiting.get('objectFit') or 'cover'}）；"
+                    f"有效清晰度仅目标的 {quality:.1%}，放大后会糊")
+            elif quality < 1:
+                notes.append(f"第 {page} 页：`{name}` {w}px 宽、{h}px 高，"
+                             f"有效清晰度比目标少 {(1 - quality) * 100:.1f}%（5%容差内）")
         ratio_want = want_ratio.get(name, BRIEF_ASPECT[0] / BRIEF_ASPECT[1])
         ratio_got = w / h
         if abs(ratio_got - ratio_want) > 0.12:
             notes.append(
                 f"第 {page} 页：`{name}` 是 {ratio_got:.2f}:1，槽位要 {ratio_want:.2f}:1"
-                f" —— **不用为比例重出图**：渲染按槽位比例定高度，照片按中心裁切"
-                f"（cover）、结构图留边不裁（contain，按 spec 的 visual.kind 选）。"
-                f"只要主体不贴边、画面里没有文字，裁切看不出来")
+                f" —— 清晰度通过时不用为比例重出图；请预览实际 cover 裁切或 contain 留边，"
+                f"确认主体和文字完整保留")
     return (1 if problems else 0, problems, notes)
 
 def _provider_label(provider_cmd: str | None) -> str:
@@ -1010,8 +1038,6 @@ def generate_images(spec_path: str, out_dir: str, style: str | None = None,
         style or spec_deck.get("style"),
         os.path.dirname(os.path.abspath(spec_path)))["tokens"]
     colors = _pick_colors(spec_deck, tokens)
-    width = 640 * BRIEF_SCALE
-    size = (width, round(width * BRIEF_ASPECT[1] / BRIEF_ASPECT[0]))
     print(f"· {_provider_label(provider_cmd)}：{len(reqs)} 个槽位 · 每槽 1 张")
     done: list[str] = []
     blocked: list[str] = []
@@ -1023,6 +1049,13 @@ def generate_images(spec_path: str, out_dir: str, style: str | None = None,
             notes.append(f"{name}：已存在，跳过（要重出就删掉它）")
             continue
         request = deckio.read_json(req_path)
+        target_px = request.get("target_px")
+        if not (isinstance(target_px, list) and len(target_px) == 2
+                and all(isinstance(v, (int, float)) and v > 0 for v in target_px)):
+            # 兼容旧合同；新 --brief 总是携带真实尺寸。
+            width = 640 * BRIEF_SCALE
+            target_px = [width, round(width / (request.get("aspect") or 1.5))]
+        size = tuple(math.ceil(v) for v in target_px)
         prompt = str(request.get("prompt") or "").strip()
         blanks = PLACEHOLDER_RE.findall(prompt)
         if not prompt or blanks:
@@ -1103,8 +1136,7 @@ def main(argv: list[str]) -> int:
         target = args.out or os.path.join(spec_dir, "image-brief.md")
         write_brief_md(brief, target)
         print(f"✓ 图片提示词契约 → {target}")
-        print(f"  {len(brief['slots'])} 个槽位 · 统一规格 "
-              f"{brief['target_px'][0]}×{brief['target_px'][1]}px · {brief['aspect']}")
+        print(f"  {len(brief['slots'])} 个素材 · 尺寸按实际图位分别列在合同中")
         print(f"  出完图存到：{out_dir}（按上面的文件名）")
         print(f"  存好后验一遍：image_source.py --check {args.brief}")
         note = _temp_dir_note(spec_dir)

@@ -253,7 +253,7 @@ class TestVisualCarrier(unittest.TestCase):
              "visual": {"kind": "none", "note": "三条结论靠文字立住"}},
             {"type": "chart", "title": "t", "chart": "bar",
              "data": [{"label": "甲", "value": 1}],
-             "visual": {"kind": "data", "intent": "对比"}},
+             "visual": {"kind": "data", "ratio": "3:2", "intent": "对比"}},
             {"type": "content-image", "title": "t", "image": "a.png",
              "visual": {"kind": "evidence_image"}},
         ]
@@ -384,8 +384,6 @@ class TestVisualRatio(unittest.TestCase):
         self.assertNotIn("MISSING_RATIO", codes)
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class TestLayoutField(unittest.TestCase):
@@ -518,3 +516,7 @@ class TestChartTypeRequired(unittest.TestCase):
         codes = self._codes({"type": "chart", "title": "图", "intent": "trend",
                              "data": [{"label": "a", "value": 1}]})
         self.assertIn("MISSING_CHART_TYPE", codes)
+
+
+if __name__ == "__main__":
+    unittest.main()

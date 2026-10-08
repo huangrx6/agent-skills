@@ -102,11 +102,12 @@ class TestBrief(unittest.TestCase):
         self.assertIn("第 11 页", self.md)
 
     def test_target_size_is_the_measured_slot_at_2x(self) -> None:
-        """尺寸是**实测槽位 × 2**，不是拍一个数：槽位宽是布局定的 640px。"""
-        self.assertEqual(self.brief["target_px"][0], 640 * image_source.BRIEF_SCALE)
-        self.assertGreater(self.brief["target_px"][1], 0)
+        """每张图按所有复用图位的最大实测宽高给尺寸，不再统一假定640px。"""
+        import math
         for s in self.brief["slots"]:
-            self.assertEqual(s["target_px"], self.brief["target_px"])
+            self.assertEqual(s["target_px"], [
+                math.ceil(max(r[dimension] for r in s["requirements"]) * image_source.BRIEF_SCALE)
+                for dimension in ("width", "height")])
 
     def test_contract_states_every_thing_the_user_listed(self) -> None:
         """用户点名的每一项都要在契约里：名称 / 大小 / 透明度 / 风格 / 内容 / 元素。"""
@@ -304,30 +305,28 @@ class TestAssetRequests(unittest.TestCase):
         self.assertEqual(set(os.listdir(self.requests_dir)),
                          {f"{name}.json" for name in wanted})
 
-    def test_schema_is_closed_v1_and_required_is_always_true(self) -> None:
+    def test_schema_is_closed_v2_and_required_is_always_true(self) -> None:
         for slot in self.brief["slots"]:
             with self.subTest(file=slot["file"]):
                 data = self._load(slot)         # 能 json.load 本身就是要验的
-                self.assertEqual(set(data), self.FIELDS, "封闭集外字段不许写")
-                self.assertEqual(data["schemaVersion"], 1)
+                self.assertEqual(set(data), self.FIELDS | {"target_px", "requirements"}, "封闭集外字段不许写")
+                self.assertEqual(data["schemaVersion"], 2)
                 self.assertIs(data["required"], True)
                 self.assertEqual(data["slide"], slot["pages"])
                 self.assertEqual(data["role"], slot["layout"])
 
-    def test_aspect_is_the_measured_slot_ratio(self) -> None:
-        """aspect 是实测槽位宽高比（来自 _slot_geometry），不是推荐的 3:2 拍脑袋数 ——
-        从 brief 自己的实测字符串交叉验。容差 ±0.01：字符串是 :.0f 取整后的展示值，
-        JSON 里存的是原始测量值，取整会差这么点。"""
+    def test_aspect_covers_all_measured_reuse_slots(self) -> None:
+        """生成比例来自所有复用图位的最大宽高，不能只承诺第一次出现的尺寸。"""
         for slot in self.brief["slots"]:
             with self.subTest(file=slot["file"]):
-                m = re.search(r"实测槽位 (\d+)×(\d+)px", slot["measured"])
-                if m is None:
-                    self.fail(f"槽位没有实测值：{slot['measured']!r}")
-                else:
-                    self.assertGreater(self._load(slot)["aspect"], 0)
-                    self.assertAlmostEqual(self._load(slot)["aspect"],
-                                           int(m.group(1)) / int(m.group(2)),
-                                           delta=0.01)
+                data = self._load(slot)
+                self.assertEqual(data["requirements"], slot["requirements"])
+                width, height = data["target_px"]
+                self.assertGreater(data["aspect"], 0)
+                self.assertAlmostEqual(data["aspect"], width / height, delta=0.001)
+                for requirement in data["requirements"]:
+                    self.assertGreaterEqual(width, requirement["width"] * image_source.BRIEF_SCALE)
+                    self.assertGreaterEqual(height, requirement["height"] * image_source.BRIEF_SCALE)
 
     def test_prompt_is_render_prompt_of_the_slot(self) -> None:
         """prompt 就是 render_prompt 的产物 —— 同一份契约的两个视图，不许各说各的。"""
@@ -349,6 +348,15 @@ class TestCheck(unittest.TestCase):
                           json.dumps(spec, ensure_ascii=False))
         self.spec = os.path.join(self.dir, "deck.spec.json")
         self.name = next(s["image"] for s in spec["deck"]["slides"] if s.get("image"))
+        # 几何是否真实由 TestBrief 验；这里只测验收数学，避免每个尺寸用例都启动浏览器。
+        from unittest.mock import patch
+        geometry = {"slides": {
+            page: {"file": slide["image"], "box": {
+                "w": 640, "h": 640 * 2 / 3, "objectFit": "cover"}}
+            for page, slide in enumerate(spec["deck"]["slides"], 1) if slide.get("image")}}
+        self.geometry_patch = patch.object(image_source, "_slot_geometry", return_value=(geometry, "test"))
+        self.geometry_patch.start()
+        self.addCleanup(self.geometry_patch.stop)
 
     def _write(self, w: int, h: int) -> None:
         Image.new("RGB", (w, h), (180, 90, 60)).save(os.path.join(self.dir, self.name))

@@ -204,7 +204,7 @@
 .foot {
   font: 400 var(--s-foot, 20px) / 1 var(--body);
   color: var(--text);
-  opacity: 0.5;
+  opacity: 0.72;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.08em;
 }

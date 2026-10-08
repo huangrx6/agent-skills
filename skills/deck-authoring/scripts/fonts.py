@@ -37,6 +37,7 @@ import os
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -478,31 +479,49 @@ def embed(html_path: str, out_path: str) -> str:
     但 HTML 换个目录 / 换台机器就断（和 `image` 字段的相对路径是同一个坑）。
     """
     src = deckio.read_text(html_path)
-    picks = _families_from_css(src)
-    if not picks:
-        raise SystemExit("✗ 这份 HTML 里没有可内嵌的 `@font-face`（带本地文件的那些）")
     total = 0.0
-    blocks = []
-    for fam, path in picks.items():
-        if not os.path.isfile(path):
-            raise SystemExit(f"✗ 内嵌 {fam!r} 失败：找不到字体文件 {path}")
-        size_mb = os.path.getsize(path) / 1e6
-        total += size_mb
-        if total > EMBED_LIMIT_MB:
-            raise SystemExit(
-                f"✗ 内嵌后 HTML 会超过 {EMBED_LIMIT_MB}MB（{fam} 一档就 {size_mb:.1f}MB）"
-                f"—— CJK 字体整款内嵌不划算。要单文件交付就**导出 PDF**："
-                f"Chrome 只嵌用到的字形，实测 25MB 的霞鹜文楷进 PDF 总共 62KB")
-        b64 = base64.b64encode(deckio.read_bytes(path)).decode("ascii")
-        fmt = css_format(path)
-        blocks.append(f'@font-face{{font-family:"{fam}";'
-                      f'src:url(data:font/{fmt};base64,{b64}) format("{fmt}")}}')
-    injected = "<style>" + "".join(blocks) + "</style>"
-    marker = "</style>"
-    src = (src.replace(marker, injected + marker, 1) if marker in src
-           else injected + src)
+    embedded: dict[str, str] = {}
+
+    def replace_face(match: re.Match) -> str:
+        nonlocal total
+        block = match.group(0)
+        fam = re.search(r"font-family\s*:\s*[\"']([^\"']+)[\"']", block)
+
+        def replace_url(url_match: re.Match) -> str:
+            nonlocal total
+            ref = url_match.group(1).strip().strip("\"'")
+            parsed = urllib.parse.urlsplit(ref)
+            if parsed.scheme == "data":
+                return url_match.group(0)
+            if parsed.scheme not in ("", "file") or parsed.netloc not in ("", "localhost"):
+                raise SystemExit(f"✗ 字体内嵌只接受本地文件：{ref}")
+            path = urllib.request.url2pathname(parsed.path)
+            if not os.path.isabs(path):
+                path = os.path.join(os.path.dirname(os.path.abspath(html_path)), path)
+            path = os.path.abspath(path)
+            if path in embedded:
+                return f'url("{embedded[path]}")'
+            label = fam.group(1) if fam else ref
+            if not os.path.isfile(path):
+                raise SystemExit(f"✗ 内嵌 {label!r} 失败：找不到字体文件 {path}")
+            size_mb = os.path.getsize(path) / 1e6
+            total += size_mb
+            if total * 4 / 3 > EMBED_LIMIT_MB:
+                raise SystemExit(f"✗ 字体内嵌预计超过 {EMBED_LIMIT_MB}MB —— 请用字体子集或导出 PDF")
+            b64 = base64.b64encode(deckio.read_bytes(path)).decode("ascii")
+            fmt = css_format(path)
+            embedded[path] = f"data:font/{fmt};base64,{b64}"
+            return f'url("{embedded[path]}")'
+
+        return re.sub(r"url\(\s*([^)]*?)\s*\)", replace_url, block)
+
+    src = re.sub(r"@font-face\s*\{[^}]*\}", replace_face, src)
+    if not embedded:
+        raise SystemExit("✗ 这份 HTML 里没有可内嵌的 `@font-face`（带本地文件的那些）")
+    if len(src.encode("utf-8")) > EMBED_LIMIT_MB * 1_000_000:
+        raise SystemExit(f"✗ 完整 HTML 内嵌后超过 {EMBED_LIMIT_MB}MB（含重复字体别名和其他资源）；请用字体子集或 PDF")
     deckio.write_text(out_path, src)
-    return f"{out_path}（内嵌 {len(picks)} 款，约 {total:.1f}MB）"
+    return f"{out_path}（内嵌 {len(embedded)} 个字体文件，约 {total:.1f}MB）"
 
 
 def _families_from_css(html: str) -> dict[str, str]:

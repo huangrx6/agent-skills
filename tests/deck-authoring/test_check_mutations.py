@@ -649,8 +649,6 @@ class TestGridAnchorScope(unittest.TestCase):
         self.assertIn("x=113", notes[0])
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class TestFullPageImageRoleAware(unittest.TestCase):
@@ -763,3 +761,118 @@ class TestTypeSizeNotes(unittest.TestCase):
             check._check_type_size({"elements": [{"slide": 1, "role": "title",
                                                   "fontSize": 200}]},
                                    {}, self.TOKENS), [])
+
+
+class TestChromeAnchored(unittest.TestCase):
+    """壳的 chrome（页脚 / logo）必须逐页钉在同一个位置。
+
+    真实事故形状：皮肤里一条 `.slide > *{position:relative;z-index:1}`（把内容抬到
+    装饰层之上，很自然的写法）特指度压过了壳的裸 `.footrow`（0,1,1 > 0,1,0），chrome
+    于是退回文档流、跟着内容走 —— 某份 16 页 deck 的页脚距页底从 0.7px 跳到 678px，
+    而其余几何门一条都看不见（它们只看"这一页内部对不对"）。所以两头都要有牙：
+    壳的选择器打不动（见 TestHostileWildcardSkin），门的判据看得见。
+    """
+
+    @staticmethod
+    def _measured(gaps: list[float], role: str = "foot") -> dict:
+        """每页一个 chrome 元素，距页底分别是 gaps（页盒 900 高，逐页向下叠）。"""
+        slides = [{"x": 0.0, "y": i * 900.0, "w": 1600.0, "h": 900.0}
+                  for i in range(len(gaps))]
+        els = [{"id": f"s{i + 1}.{role}", "role": role, "slide": i + 1, "x": 84.0,
+                "y": i * 900.0 + 900.0 - gap - 20.0, "w": 400.0, "h": 20.0,
+                "visible": True}
+               for i, gap in enumerate(gaps)]
+        return {"slides": slides, "elements": els}
+
+    def test_drift_is_reported_with_both_pages_and_the_cause(self) -> None:
+        got = check._check_chrome_anchored(self._measured([0.7, 678.0]))
+        self.assertEqual(len(got), 1, got)
+        for needle in ("第 1 页", "第 2 页", "0.7px", "678.0px", "通配选择器", "`.pad > *`"):
+            self.assertIn(needle, got[0])
+
+    def test_consistent_chrome_is_silent(self) -> None:
+        self.assertEqual(check._check_chrome_anchored(self._measured([52.0] * 6)), [])
+
+    def test_tolerance_is_two_pixels(self) -> None:
+        """2px 之内算"手一抖"，超过就算漂 —— 判据必须是这个数，不是随便一个。"""
+        self.assertEqual(check.CHROME_TOLERANCE, 2.0)
+        self.assertEqual(check._check_chrome_anchored(self._measured([52.0, 54.0])), [])
+        self.assertEqual(len(check._check_chrome_anchored(self._measured([52.0, 54.5]))), 1)
+
+    def test_a_single_page_cannot_drift(self) -> None:
+        self.assertEqual(check._check_chrome_anchored(self._measured([10.0])), [])
+
+    def test_logo_absent_on_some_pages_is_not_drift(self) -> None:
+        """`logo` 本就允许某几页不出现（品牌策略）—— 只比真的出现过的那几页。"""
+        slides = [{"x": 0.0, "y": i * 900.0, "w": 1600.0, "h": 900.0} for i in range(3)]
+
+        def logo(page: int) -> dict:
+            return {"id": f"s{page}.logo", "role": "logo", "slide": page, "x": 1400.0,
+                    "y": (page - 1) * 900.0 + 900.0 - 52.0 - 56.0, "w": 100.0, "h": 56.0,
+                    "visible": True}
+
+        measured = {"slides": slides, "elements": [logo(1), logo(3)]}
+        self.assertEqual(check._check_chrome_anchored(measured), [])
+
+    def test_missing_pages_do_not_throw(self) -> None:
+        """check 是交付前最后一道：形状不对时它不许崩（崩了比漏报更糟）。"""
+        self.assertEqual(check._check_chrome_anchored({}), [])
+        self.assertEqual(check._check_chrome_anchored({"elements": [{"role": "foot"}]}), [])
+        self.assertEqual(check._check_chrome_anchored(
+            {"slides": [{"x": 0, "y": 0, "w": 1600, "h": 900}],
+             "elements": [{"role": "foot", "slide": 9, "y": 1, "h": 1}]}), [])
+
+
+class TestHostileWildcardSkin(unittest.TestCase):
+    """皮肤的通配选择器不许把壳的 chrome 顶掉 —— **真渲染实测**，不靠读 CSS 文本。
+
+    为什么非真渲染不可：这条的判据是"最终几何"，而最终几何由级联决定（谁特指度高、
+    谁后加载）。读一眼 `.slide > *` 猜不出结果，量出来才算数。
+    """
+
+    # 皮肤把内容抬到装饰层之上 —— 很常见、很合理，但会连带打到 `.slide` 的每个直接子元素
+    WILDCARD = "\n.slide > *{position:relative;z-index:1}\n"
+    # 同特指度（后加载者胜）：皮肤**故意**接手页脚定位。这是允许的 —— 但它得自己钉住
+    ON_PURPOSE = "\n.slide > .footrow{position:relative}\n"
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        with open(DEMO, encoding="utf-8") as fh:
+            cls.demo = json.load(fh)
+        cls.style = render.load_style(FIXTURE_STYLE)
+
+    def _foot_gaps_and_problems(self, skin_extra: str) -> tuple[list[float], list[str]]:
+        """渲染一次（真浏览器），返回每页页脚距页底的距离 + check 的结论。"""
+        style = dict(self.style, skin=self.style["skin"] + skin_extra)
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "out.html")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(render.render(self.demo, style))
+            _stub_image(td)
+            measured = measure.measure(path)
+            problems = check.check(self.demo, path, self.style["tokens"])
+        slides = measured.get("slides") or []
+        gaps = []
+        for el in measured.get("elements", []):
+            if el.get("role") == "foot" and isinstance(el.get("slide"), int):
+                page = slides[el["slide"] - 1]
+                gaps.append((page["y"] + page["h"]) - (el["y"] + el["h"]))
+        return gaps, problems
+
+    def test_wildcard_skin_cannot_unpin_the_foot(self) -> None:
+        gaps, problems = self._foot_gaps_and_problems(self.WILDCARD)
+        self.assertGreaterEqual(len(gaps), 2, "demo 每页都该有页脚")
+        self.assertLessEqual(max(gaps) - min(gaps), check.CHROME_TOLERANCE,
+                             f"皮肤的通配把页脚顶跑了：距页底 {gaps}")
+        self.assertEqual(problems, [], problems)
+
+    def test_an_equal_specificity_override_is_still_caught_by_the_gate(self) -> None:
+        """皮肤故意接手定位是允许的，但钉不住（跟着内容走）就会被门抓住。"""
+        gaps, problems = self._foot_gaps_and_problems(self.ON_PURPOSE)
+        self.assertGreater(max(gaps) - min(gaps), check.CHROME_TOLERANCE,
+                           f"没造出漂移，用例本身失效了：{gaps}")
+        self.assertTrue(any("不在同一个位置" in p for p in problems), problems)
+
+
+if __name__ == "__main__":
+    unittest.main()

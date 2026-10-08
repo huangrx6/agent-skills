@@ -26,7 +26,7 @@ AI 决定：内容语义、页面意图、风格意图、视觉需求、动画�
 落地：spec 只有语义字段（封闭集），几何/字体/帧全部由脚本派生；色值来自
 风格数据的 `colorSets`，spec 只写色板名（§11/§17）。
 
-### 0.2 越靠近渲染，AI 自由度越低
+### 0.2 内容声明与确定性执行分开
 
 内容理解 中 → Storyline 中 → Page Planner 低~中 → Slide DSL 很低 →
 Compile/Resolve 极低 → Layout 0 → Color 0 → Asset 0 → Render 0 → Export 0。
@@ -103,7 +103,7 @@ original / derived(inferred) / generated 三分；**generated 不得伪装为事
 
 让观众按什么顺序相信；从有限 Archetype 选（五个规范骨架 ⊂ 本仓库十个，
 多出 overview_detail/product/incident/tech_proposal/project_report）；可组合
-最多两种主骨架。乱序 = 阻塞（人审）。
+最多两种主骨架。叙事断层需修复；可以结论先行或按教学目标重排（人审）。
 
 ## 8. Page Planning
 

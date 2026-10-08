@@ -1,151 +1,82 @@
-# 图表：DSL、图形类型、muted+accent、结论先行
+# 图表契约与验收
 
-## 三层架构（谁负责什么）
+HTML 使用本地锁定的 AntV G2，原生 PPTX 使用 python-pptx。数据、图形意图、系列与标注的
+支持范围必须明确，不能以降级图形或丢数据的方式完成导出。
 
-```text
-AI 只写 DSL（chart / intent / message / data / series / emphasis / annotations）
-        ↓
-render.py：图形类型（作者声明）+ 规则 → AntV G2 spec   ← Web / 预览 / PDF 都用它
-        ↓
-pptx_native.py：按类型映射成原生图表       ← 可编辑的 PPT 层
-```
-
-**Web 层用 AntV G2 渲染**（`render.py::chart_g2_spec`，render.py:837）：
-G2 是声明式图形语法，**我们只出 spec（数据 → 编码），几何由 G2 算**。
-（PPTX 层走 SVG 精修，见 delivery-formats.md。）
-
-换取成熟度付出的确定性代价，用三条守住：
-
-- **vendor 锁版本内联进产物**：`scripts/vendor/g2-5.2.10.min.js` 整段写进 HTML
-  （`G2_VENDOR`，render.py:925），离线可用、无 CDN 依赖，产物仍自包含。
-- **animation 关死**：G2 spec 里 `"animation": false`（render.py:837 起）—— 同 spec
-  同输出，`measure.py` / `check.py` 才有稳定 DOM 可量，`animate.py` 的逐帧才有确定性。
-- **壳给容器高度**：`.chartwrap .g2{height:330px}`（render.py:360）—— G2 的 `autoFit`
-  从容器取尺寸，容器没有高度会在渲染时抛错（实测）。
-
-DSL 的边界仍设计成**渲染器可替换**：`chart_g2_spec()` 的输入是纯数据 + 颜色，
-换渲染器只换这一层，DSL 与 PPT 层都不用动。
-
-## AI 只写这个（DSL）
+## 输入
 
 ```json
 {
   "type": "chart",
-  "chart": "bar",                      // 八类之一；**必写**（图形由作者显式声明）
-  "intent": "comparison",              // 想表达什么（可选语义标注，不再决定图形）
-  "message": "DeepSeek 调用量领先第二名 40%",   // ← 结论，会当大标题
-  "title": "模型调用量统计",              // ← 数据集名，降为小标签
-  "data":  [{"label": "DeepSeek", "value": 86}, ...],
-  "series": [{"name": "直连", "data": [...]}, ...],   // 多系列（line/stacked/combo）
-  "emphasis": {"values": ["DeepSeek"]},               // 谁是重点
-  "annotations": [{"type": "reference", "value": 80, "text": "目标 80%"}],  // 字段在 schema 里但不渲染（见下「标注」）
-  "unit": "%"
+  "chart": "line",
+  "title": "调用量统计",
+  "message": "两条渠道的变化需要分别观察",
+  "series": [
+    {"name": "渠道 A", "data": [{"label": "Q1", "value": 20}, {"label": "Q2", "value": 30}]},
+    {"name": "渠道 B", "data": [{"label": "Q1", "value": 30}, {"label": "Q2", "value": 25}]}
+  ],
+  "visual": {"kind": "data", "ratio": "3:2"},
+  "unit": "次"
 }
 ```
 
-散点的 `data` 项是 `{label, x, y}`（`value` 视同 `y`，向后兼容）。
+上例是结构示意数据，不是业务事实。`data` 与 `series` 选择一种，不能同时提供非空值。
+数值必须有限，不能用布尔值、NaN 或 Infinity。系列名须唯一，类别标签不能空。
+`intent` 是可选语义标注：trend / ranking / comparison / correlation / deviation /
+distribution / composition / progress；它不自动选择图形。
 
-渲一张图表页就是渲一份 deck（图表没有单独的 CLI）：
+| chart | 数据 | HTML | 原生 PPTX |
+| --- | --- | --- | --- |
+| bar | 单系列 label/value | 柱图 | 柱图 |
+| bar-horizontal | 单系列 label/value | 横柱图 | 横柱图 |
+| line | data 或多个 series | 按系列画线并标末值 | 折线图 |
+| area | data 或多个 series | 按系列画面积并标末值 | 面积图 |
+| bar-stacked | 非空 series | 堆叠柱图 | 堆叠柱图 |
+| donut | 单系列非负数，总和大于零 | 环图，分类色与图例 | 环图，分类色与图例 |
+| scatter | 单系列 label/x/y；value 可兼容 y | 数值横纵轴散点 | 散点图 |
+| combo | 非空 series，每组显式 mark | 柱线组合，共用同单位纵轴 | 暂不支持，明确拒绝 |
+
+bar、bar-horizontal、donut、scatter 暂不支持多个系列，输入会拒绝，不截取第一组。
+组合图每组写 `"mark":"bar"` 或 `"mark":"line"`，必须至少各一种；不推断哪组应该画柱。
+双轴、不同单位组合尚未提供契约。需要 PPTX 保持组合图外观时使用 PNG 贴图模式。
+
+## 排印与视觉
+
+`message` 写结论，使用真实标题 DOM 和测量标记；原 `title` 成为数据集小标题。
+没有 message 时正常使用 title，不能把 HTML 标签当文字输出。
+轴标签、数据标签与图例读取风格字体及字号；按观看场景检查，不能只要求“装得下”。
+
+单系列柱图可用 `emphasis:{"values":["类别"]}` 强调类别；多系列和构成图必须保留可辨认的
+分类编码与图例，不把“一种强调色”误用成“所有类别都同色”。按目标输出检查深浅背景下的辨识度。
+多系列折线与面积图只标各系列末端数值，长标签、重叠线和极端值仍需视觉审稿。
+
+## 标注与动画的边界
+
+非空 `annotations` 当前会被规格验证和渲染入口明确拒绝，防止悄悄丢失参考线或说明。
+可先把说明写进 `caption`，需要图内 reference / callout 时补齐实现与回归后再启用。
+
+G2 使用 `animate:false` 关闭内部动画；逐页视频只做图表容器入场。
+`window.__deck_charts_ready` 等待所有 `chart.render()` 完成，成功后设置每图
+`data-chart-ready="1"`；失败记录 `data-chart-error`。pending、error 和缺图都不能导出为成功。
+仅存在 canvas、图例或空容器不能证明数据完整，新增图形必须检查实际标记数与系列数。
+
+## 验证
 
 ```bash
-python3 scripts/render.py your.spec.json -o out.html   # 图表页在产物里由 G2 现渲染
-python3 scripts/check.py your.spec.json out.html       # 图表门：G2 就绪 + 数据形状
+python3 scripts/validate_spec.py deck.spec.json
+python3 scripts/render.py deck.spec.json -o deck.html
+python3 scripts/check.py deck.spec.json deck.html
 ```
 
-## 图形类型（规范第 3/16 条）：**作者声明**，脚本不推断
+回归样张覆盖：多系列、长标签、正负数、空数据、环图类别、真实数值 x/y、组合 mark、异步失败。
+检查图上数据与输入对应，不能只检查 render Promise 是否成功。最终 PDF/PPTX 仍需回读，
+不同导出后端的图例、类别顺序、单位和颜色对应关系必须一致。
 
-图形类型是**内容决策**：spec 必须写 `chart`，脚本不替你选图形。
+## 导出时的数据一致性
 
-```text
-chart: "bar" | "bar-horizontal" | "line" | "area"
-     | "bar-stacked" | "donut" | "scatter" | "combo"   （八类，封闭）
-```
+HTML 图旁显示单位，不自动换算原值。原生 PPTX 的分类图按标签并集对齐系列，
+缺值保留为缺口；同系列重复标签会拒绝，避免覆盖。散点的 `y` 优先于兼容字段 `value`。
+数值标签保留小数，不能为整齐而把小数截成整数。
 
-落地（`render.py::chart_declared_type`，render.py:785）：**缺 `chart` → SystemExit**
-（缺哪一类由作者定，脚本猜不了）；**`chart` 不在八类里 → SystemExit**。
-两道图前门在 `validate_spec.py`：缺类型报 `MISSING_CHART_TYPE`、写错报
-`UNKNOWN_CHART_TYPE`（见 `validation.md`），本该在渲染之前就拦住。
-
-**没有意图推断**（不按条数/标签/系列数猜图形、不缺省 bar）：
-推断等于替作者选图形。`intent`（八值：trend/ranking/comparison/composition/
-correlation/progress/deviation/distribution）现在是**可选语义标注**：写了对渲染
-**没有影响**，`validate_spec.py` 仍校验它属于这八值；不写也不影响图形。
-
-## 好看的三条硬规则（与图形类型无关，仍按声明渲染）
-
-1. **muted + 1 accent**（规范第 4 条）：给了 `emphasis` 就只有被强调的那根是
-   Accent，其余降成 muted（主色向纸色褪 55%）。八根柱子八种颜色是业余的第一特征。
-   **没写 emphasis 时不悄悄改观感** —— 全部走主色，观感不变。
-2. **结论先行**（规范第 5 条）：`message` 当大标题（"DeepSeek 调用量领先"），
-   `title` 降为小标签（数据集名）（render.py:1252-1258）。没写 message 时维持旧行为。
-3. **图形上只标数值，不画坐标系杂物**：数值直接标在图形上（这本来就是本仓库
-   的既定风格，PDF/PPTX 两侧都验证过）—— 具体落点见下，都是 `chart_g2_spec`
-   （render.py:837 起）里显式写下的编码：
-   - 柱图（含横柱）：每根标数值（`labels` position outside）；
-   - 折线 / 面积：只标**最后一个点**（`selector: last`）—— 一排数字会把线埋掉；
-   - 散点 / 堆叠 / 组合：当前不标数值；
-   - 坐标轴**标题**在折线 / 面积 / 散点 / 堆叠 / 组合上关掉（`axis.*.title:false`），
-     环图整条轴关掉（`axis:false`）；
-   - 环图例外地画**右侧颜色图例**（扇区名字必须能对上），其余图形不画图例。
-
-   坐标系里的其它东西**也从 token 来，不跟 G2 主题默认走**（深底风格里默认轴文字
-   直接看不见）。每个图的 `axis` 都显式写：标签色 = `text`，轴线/刻度线 = muted，
-   网格线 = muted 虚线、柱图 x 轴不画网格；排印三层全部注入 —— 轴标签（色/字号/
-   字体）、数值标签（字号/字体）、环图图例文字（色/字号/字体）：
-   - 字号取 `type.chartLabel`（轴与图例）、`type.chartValue`（数值标签）；
-   - 字体取风格的正文栈（`fonts.body`）—— **图表不是版面飞地**。
-   键名是 `labelFontFamily` / `itemLabelFontFamily`：这两个字符串在 G2 5.2.10 包里
-   搜不到（运行期按「部件 + 通用样式属性」拼出来的），但实测有效 —— 场景图里能读到
-   注入值，且画布像素随之改变。
-
-   柱形圆角**不做**：像素级实测 `radius` / `cornerRadius` / `radiusTopLeft…` 四组在
-   G2 5.2.10 的 interval 上全部被忽略（画布哈希与基线全等）。想要圆角柱只能绕开
-   spec 自绘 —— 不值得：方柱是这套版面的既有语言。
-
-## 标注（规范第 12 条）—— 不渲染
-
-好图表与普通图表的差距多半不在图形，在标注 —— 规则成立，但**当前渲染器不画
-标注**：`annotations` 字段在封闭 schema 里（`validate_spec.py` 不拦），渲染器
-**不消费它** —— 写了不报错，也不会有标注。
-
-现在图表上有的标注是 G2 自带的：**数值标签**（柱 / 折线末端，见上「好看的三条硬
-规则」第 3 条）与**环图的右侧颜色图例**。要恢复 reference / callout / peak，
-需要把 `annotations` 翻译成 G2 的 mark / annotation —— 记在文末「第二阶段」。
-
-## 图表动画（规范第 6~9 条）—— 关死
-
-动画的"高级感"不在效果多，而在**克制且一致**。**图表动画整体关死**：G2 spec 里
-`"animation": false`（保确定性）—— 图表在产物里是**一次画完的静态图**，
-不逐柱生长、不逐线描画；图表页的动效只有容器入场（见 animation.md）。
-
-所以在 MP4/GIF 里，图表页只有**页面级**的进入动效：图表容器跟随页面进场淡入 +
-微升（见 `animation.md` 的角色表），容器里的图本身不动。规范定的预算
-（普通进入 500~800ms、整张图 < 1.5s、storytelling 页 < 3s）与禁令
-（**禁止** bounce / spin / fly-in / 疯狂 zoom）仍然成立 —— 只是现在没有"逐图形动画"
-这一层来违反它们。
-
-## PPT 层（`pptx_native.py`）
-
-| DSL | PowerPoint 原生类型 |
-| --- | --- |
-| bar / combo | COLUMN_CLUSTERED（combo **如实降级**为柱 —— python-pptx 一个图表一个 plot，组合图是第二阶段） |
-| bar-horizontal | BAR_CLUSTERED |
-| line | LINE_MARKERS |
-| area | AREA |
-| bar-stacked | COLUMN_STACKED |
-| donut | DOUGHNUT（标签用 CENTER —— OUTSIDE_END 对环图非法；没有 value_axis，访问就抛） |
-| scatter | XY_SCATTER（要 `XyChartData`，不是 CategoryChartData） |
-
-多系列会画**底部小图例**（不画分不开系列；单系列坚决不画）；系列上色用 accent 向
-纸色分档褪色（与 Web 层同一条规则：主色向纸色分档褪色，不是彩虹）。
-
-## 第二阶段（还没做，别假装做了）
-
-- Sankey / Treemap / Heatmap / Radar / Gauge / Waterfall / Funnel
-- 组合图的原生输出（目前 combo 在 PPT 层降级为柱）
-- 把 `annotations`（reference / callout / peak）翻译成 G2 的 mark / annotation
-  （见上「标注」）
-- 每根柱子单独的 `data-m`（可以逐根 stagger）
-
-**已取消**：数据驱动动画（growInY / pathIn 接进 `animate.py` 的时间线）—— 图表动画
-关死（G2 `animation: false`）：图表在产物里是静态图，只跟随页面容器入场。
+图表在隐藏其他页之前读取真实容器尺寸，并以固定尺寸绘制；演示与截图只缩放整页。
+这样切页不会因隐藏容器宽度归零而把图表挤窄。坐标文字显式保持不透明，避免主题削弱文字色。

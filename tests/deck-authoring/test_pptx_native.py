@@ -328,7 +328,7 @@ class TestPptxNative(unittest.TestCase):
                 checked += 1
                 self.assertIsNotNone(ea, f"{name} 里有 run 没写 <a:ea>：{latin.group(1)}")
                 assert ea is not None
-                self.assertIn(ea.group(1), cjk,
+                self.assertTrue(ea.group(1) in cjk or self.native.fonts_mod.owner_of(ea.group(1)) is not None,
                               f"{name} 的 ea 写成了 {ea.group(1)!r} —— 那不是 CJK 族，"
                               f"宿主照样会自己挑（等于没写）")
         self.assertGreater(checked, 10, "一个文本 run 都没扫到 —— 这条用例失效了")
@@ -356,7 +356,7 @@ class TestPptxNative(unittest.TestCase):
         chart_xml = "".join(
             self.chart_zip.read(n).decode()
             for n in self.chart_zip.namelist() if re.search(r"ppt/charts/chart\d+\.xml$", n))
-        self.assertIn('formatCode="0&quot;%&quot;"', chart_xml)
+        self.assertIn('formatCode="General&quot;%&quot;"', chart_xml)
         self.assertIn('sourceLinked="0"', chart_xml)
 
     def test_title_weight_follows_the_style_not_a_hardcoded_bold(self) -> None:
@@ -400,9 +400,6 @@ class TestPptxNative(unittest.TestCase):
         self.assertEqual(want, len(self.manifest) + self.counts["decor"],
                          "统计对不上：有元素既没进 pptx 也没被记成跳过")
 
-
-if __name__ == "__main__":
-    unittest.main()
 
 
 class TestResolvedContract(unittest.TestCase):
@@ -456,3 +453,7 @@ class TestResolvedContract(unittest.TestCase):
             json.dump({"trace": []}, fh)
         with self.assertRaises(SystemExit):
             self.native.build_resolved(bad, os.path.join(self._tmp.name, "x.pptx"))
+
+
+if __name__ == "__main__":
+    unittest.main()

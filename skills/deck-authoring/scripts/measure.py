@@ -146,6 +146,81 @@ PROBE_JS = r"""
     return { available: mine !== missing, defaultLike: mine === missing, width: null };
   }
 
+  function rgba(value) {
+    if (value === 'transparent') return [0,0,0,0];
+    if (!/^rgba?\(/.test(String(value))) return null;
+    var nums = String(value).match(/[\d.]+/g);
+    if (!nums || nums.length < 3) return null;
+    return [+nums[0], +nums[1], +nums[2], nums.length > 3 ? +nums[3] : 1];
+  }
+  function over(a, b) {
+    var alpha = a[3] + b[3] * (1 - a[3]);
+    if (!alpha) return [0,0,0,0];
+    return [0,1,2].map(function(i) {
+      return (a[i]*a[3] + b[i]*b[3]*(1-a[3])) / alpha;
+    }).concat([alpha]);
+  }
+  function renderedColors(node) {
+    // Composite the text and its background separately through every opacity group.
+    var style = getComputedStyle(node);
+    var fg = rgba(node instanceof SVGElement ? style.fill : style.color),
+        bg = [0,0,0,0], unknown = false;
+    if (!fg) return {uncertain: true};
+    for (var cur = node; cur; cur = cur.parentElement) {
+      var cs = getComputedStyle(cur), paper = rgba(cs.backgroundColor);
+      if (!paper) { unknown = true; paper = [0,0,0,0]; }
+      if (cs.backgroundImage !== 'none' && bg[3] < 0.999) unknown = true;
+      fg = over(fg, paper); bg = over(bg, paper);
+      var opacity = parseFloat(cs.opacity);
+      fg[3] *= opacity; bg[3] *= opacity;
+    }
+    return { foreground: over(fg,[255,255,255,1]).slice(0,3),
+             background: over(bg,[255,255,255,1]).slice(0,3), uncertain: unknown };
+  }
+  function rect(r) {
+    return {x: Math.round(r.x*10)/10, y: Math.round(r.y*10)/10,
+            w: Math.round(r.width*10)/10, h: Math.round(r.height*10)/10};
+  }
+  function textRuns(el) {
+    var runs = [], walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), node;
+    while ((node = walker.nextNode())) {
+      var owner = node.parentElement;
+      if (!node.nodeValue.trim() || owner.closest('[data-m]') !== el ||
+          owner.closest('[aria-hidden="true"]')) continue;
+      var range = document.createRange(); range.selectNodeContents(node);
+      var cs = getComputedStyle(owner), colors = renderedColors(owner);
+      var seen = visibility(owner, range.getBoundingClientRect());
+      runs.push({text: node.nodeValue.trim(), rects: Array.from(range.getClientRects()).map(rect),
+                 colors: colors, fontSize: parseFloat(cs.fontSize),
+                 visible: seen.visible, clippedBy: seen.clippedBy,
+                 fontWeight: parseInt(cs.fontWeight,10) || 400});
+    }
+    return runs;
+  }
+  function visibility(el, bounds) {
+    var opacity = 1, hidden = [], clips = [];
+    for (var cur = el; cur; cur = cur.parentElement) {
+      var cs = getComputedStyle(cur), label = cur.getAttribute('data-m') ||
+        cur.id || cur.className || cur.tagName;
+      opacity *= parseFloat(cs.opacity);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse')
+        hidden.push(String(label));
+      if (cur !== el) {
+        var r = cur.getBoundingClientRect(), x = /hidden|clip|scroll|auto/.test(cs.overflowX),
+            y = /hidden|clip|scroll|auto/.test(cs.overflowY);
+        // Border is outside the overflow clipping edge. Scrollbars consume client width.
+        var left=r.left+(cur.clientLeft || 0), top=r.top+(cur.clientTop || 0),
+            right=left+(cur instanceof SVGElement ? r.width : cur.clientWidth),
+            bottom=top+(cur instanceof SVGElement ? r.height : cur.clientHeight);
+        if ((x && (bounds.left < left-1 || bounds.right > right+1)) ||
+            (y && (bounds.top < top-1 || bounds.bottom > bottom+1)))
+          clips.push(String(label));
+      }
+    }
+    return {visible: !hidden.length && opacity > 0 && bounds.width > 0 && bounds.height > 0,
+            opacity: opacity, hiddenBy: hidden, clippedBy: clips};
+  }
+
   function collect() {
     var out = {
       viewport: { w: window.innerWidth, h: window.innerHeight },
@@ -156,6 +231,9 @@ PROBE_JS = r"""
     document.querySelectorAll('[data-m]').forEach(function (el) {
       var r = el.getBoundingClientRect();
       var cs = getComputedStyle(el);
+      var seen = visibility(el, r), runs = textRuns(el);
+      var im = el.tagName === 'IMG' ? el : el.querySelector('img');
+      var imageStyle = im ? getComputedStyle(im) : cs;
       out.elements.push({
         id: el.getAttribute('data-m'),
         x: Math.round(r.x * 10) / 10, y: Math.round(r.y * 10) / 10,
@@ -168,6 +246,12 @@ PROBE_JS = r"""
         // 字重：导出层要用它，不能按角色写死（有两套风格的标题就是 400 字重）。
         // getComputedStyle 给的是字符串（'400'/'700'），解析不了就按常规 400。
         fontWeight: parseInt(cs.fontWeight, 10) || 400,
+        textAlign: cs.textAlign, lineHeight: cs.lineHeight,
+        letterSpacing: cs.letterSpacing, opacity: seen.opacity,
+        objectFit: imageStyle.objectFit, objectPosition: imageStyle.objectPosition,
+        textRuns: runs,
+        textRects: runs.reduce(function(all, run) { return all.concat(run.rects); }, []),
+        hiddenBy: seen.hiddenBy, clippedBy: seen.clippedBy,
         // 图元素的原始像素尺寸：判断“是不是被放大渲染了”（放大 = 糊）。
         // SVG 也报自己的 viewBox 尺寸（但 SVG 放大不糊，所以那边不看这条）。
         //
@@ -187,7 +271,7 @@ PROBE_JS = r"""
         boxShadow: cs.boxShadow,
         backgroundImage: cs.backgroundImage,
         overflow: cs.overflow,
-        visible: cs.visibility !== 'hidden' && cs.display !== 'none' && parseFloat(cs.opacity) > 0,
+        visible: seen.visible,
         // 图表就绪（v4）：G2 在浏览器里现渲染 —— 容器里有没有 canvas/svg、
         // 有没有报错，**只有真浏览器知道**。静态读 HTML 判断不出来（产物里
         // 只有容器与 spec），所以 readiness 由这里实测并写进结果。
@@ -198,7 +282,8 @@ PROBE_JS = r"""
           if (!g2) return null;
           var err = g2.getAttribute('data-chart-error');
           if (err) return 'error:' + err;
-          return g2.querySelector('canvas,svg') ? 'ready' : 'pending';
+          return /^(1|true)$/.test(g2.getAttribute('data-chart-ready') || '') &&
+            g2.querySelector('canvas,svg') ? 'ready' : 'pending';
         })(el.querySelector('.g2[data-g2]')),
         // 标题的**逐行真实矩形**（Range API）：标题装饰（侧条/下划线）锚定的是
         // 真实行几何，不是容器盒 —— 行数/行高变了装饰要跟着走，验证需要它。
@@ -286,11 +371,21 @@ PROBE_JS = r"""
     try {
       pre.textContent = btoa(unescape(encodeURIComponent(JSON.stringify(collect()))));
     } catch (e) {
-      pre.textContent = btoa('{"fatal":"' + String(e) + '"}');
+      pre.textContent = btoa(unescape(encodeURIComponent(JSON.stringify({fatal: String(e)}))));
     }
   }
-  if (document.readyState === 'complete') { emit(); }
-  else { window.addEventListener('load', emit); }
+  function ready() {
+    // Emit a pending snapshot first: a never-settling chart must fail closed.
+    emit();
+    Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(),
+                 window.__deck_charts_ready || Promise.resolve(),
+                 Promise.all(Array.from(document.images).map(function(im) {
+                   return im.decode ? im.decode().catch(function(){}) : Promise.resolve();
+                 }))]).then(emit, emit);
+  }
+  if (document.readyState === 'complete') { ready(); }
+  else { window.addEventListener('load', ready); }
+  window.addEventListener('deck:charts-ready', emit);
   // 字体晚到的话再补一次（幂等覆盖）—— 系统字体场景下通常用不上
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function () {
@@ -395,11 +490,13 @@ def measure(html_path: str, budget_ms: int = 2500, chrome: str = CHROME) -> dict
     try:
         with open(probe_path, "w", encoding="utf-8") as fh:
             fh.write(_inject(html))
-        proc = subprocess.run(
-            [chrome, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-             f"--virtual-time-budget={budget_ms}", "--dump-dom",
-             f"file://{probe_path}"],
-            capture_output=True, text=True)
+        try:
+            proc = subprocess.run(
+                [chrome, "--headless=new", "--disable-gpu", "--hide-scrollbars",
+                 f"--virtual-time-budget={budget_ms}", "--dump-dom", f"file://{probe_path}"],
+                capture_output=True, text=True, timeout=30)
+        except subprocess.TimeoutExpired as exc:
+            raise SystemExit("✗ 浏览器测量超过 30 秒，未产出可验收结果") from exc
         raw = _extract(proc.stdout)
     finally:
         with contextlib.suppress(OSError):
@@ -417,6 +514,9 @@ def measure(html_path: str, budget_ms: int = 2500, chrome: str = CHROME) -> dict
     raw["source"] = os.path.abspath(html_path)
     raw["manifest_count"] = len(manifest)
     raw["measured_count"] = len(raw.get("elements", []))
+    measured_ids = {el.get("id") for el in raw.get("elements", [])}
+    raw["missing_elements"] = [entry for key, entry in manifest.items()
+                               if key not in measured_ids]
     _CACHE[cache_key] = raw
     return raw
 

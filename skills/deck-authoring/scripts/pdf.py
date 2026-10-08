@@ -1,36 +1,18 @@
 #!/usr/bin/env python3
-"""out.html → 矢量 PDF（系统 Chrome 打印到 PDF）。
+"""HTML → PDF：等待资源就绪后打印，并验证逐页尺寸。
 
-## 为什么这条路能出**矢量** PDF
-
-页面里的东西全是 CSS/SVG 画的，而 Chrome 打印到 PDF 时把文字保留为**嵌入字体**、
-把形状保留为**路径** —— 只有"合成器才能算"的东西（滤镜 / `<pattern>` / 大位图）
-才会退化成位图。
-
-所以这份 PDF：文字可选可搜、放大不糊、条纹与错位都是路径。实测 6 页 0.65MB、
-零内嵌位图、7 个嵌入字体。
-
-要维持这个性质有两条前提：
-
-1. **`@page` 必须显式给尺寸**（`render.py` 的打印 CSS 里写了 `1600px 900px`）。
-   不给的话 Chrome 用 Letter/A4，deck 会被缩小加留白 —— 尺寸悄悄变了，
-   而页数还是对的，不查就发现不了。
-2. **网点不能是 `<pattern>`**：Chrome 导 PDF 时会把 `<pattern>` 整块栅格化
-   （实测 4 块半调 → 4 张 ~1035×1014 位图）。`render.py` 现在用虚线路径画网点。
-
-## 这个脚本干的事
-
-跑一次 Chrome，然后**验产物**并把话说明白：页数对不对、里面有没有位图、
-字有没有嵌进去。一行 `--print-to-pdf` 谁都会写；会验的才算一层。
-
+文字和部分形状可保留矢量；照片、Canvas 图表与部分合成效果会栅格化。
+通过 Poppler pdfinfo 检查每页 MediaBox，位图/字体标记统计仅作诊断。
 跑法：python3 pdf.py out.html -o deck.pdf
 """
 from __future__ import annotations
 
 import argparse
+import asyncio
 import importlib.util
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -64,19 +46,35 @@ PX_TO_PT = 0.75
 def inspect(pdf_path: str) -> dict:
     """读 PDF 说事实：页数 / 内嵌位图 / 嵌入字体 / 页尺寸。
 
-    不引第三方库 —— 这些都是 PDF 里的字面标记，正则数一下就够；
-    为了"验一下"去装一个 PDF 库不划算。
+    页数与逐页尺寸由 Poppler 解析，不能靠正则猜压缩对象或继承的 MediaBox。
+    位图/字体仍是字面标记统计，仅供诊断，不据此证明整个 PDF 全矢量。
     """
     if not os.path.exists(pdf_path):
         return {"bytes": 0, "pages": 0, "images": 0, "fonts": 0, "mediaboxes": []}
     raw = deckio.read_bytes(pdf_path)
-    page_count = len(re.findall(rb"/Type\s*/Page[^s]", raw))
+    pdfinfo = os.environ.get("DECK_PDFINFO") or shutil.which("pdfinfo")
+    if not pdfinfo:
+        raise SystemExit("✗ 找不到 pdfinfo；请安装 Poppler（macOS: brew install poppler；"
+                         "Linux: apt install poppler-utils），或设置 DECK_PDFINFO 为可执行文件路径")
+    try:
+        summary = subprocess.run([pdfinfo, pdf_path], capture_output=True, text=True,
+                                 timeout=30, env={**os.environ, "LC_ALL": "C"})
+        count = re.search(r"^Pages:\s*(\d+)\s*$", summary.stdout, re.M)
+        if summary.returncode or count is None:
+            raise SystemExit(f"✗ pdfinfo 读不动 PDF：{summary.stderr.strip()[:300]}")
+        page_count = int(count.group(1))
+        detail = subprocess.run([pdfinfo, "-box", "-f", "1", "-l", str(page_count), pdf_path],
+                                capture_output=True, text=True, timeout=30,
+                                env={**os.environ, "LC_ALL": "C"})
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise SystemExit(f"✗ pdfinfo 检查失败：{exc}") from exc
+    if detail.returncode:
+        raise SystemExit(f"✗ pdfinfo 读取逐页尺寸失败：{detail.stderr.strip()[:300]}")
     images = len(re.findall(rb"/Subtype\s*/Image", raw))
     fonts = len(re.findall(rb"/FontFile\d?", raw))
-    boxes = {b.decode("ascii", "replace")
-             for b in re.findall(rb"/MediaBox\s*\[([^\]]+)\]", raw)}
+    boxes = re.findall(r"^(?:Page\s+\d+\s+)?MediaBox:\s*(.+)$", detail.stdout, re.M)
     return {"bytes": len(raw), "pages": page_count, "images": images,
-            "fonts": fonts, "mediaboxes": sorted(boxes)}
+            "fonts": fonts, "mediaboxes": [b.strip() for b in boxes]}
 
 
 def slide_count(html_path: str) -> int:
@@ -95,14 +93,18 @@ def export(html_path: str, out_path: str, timeout: int = 180) -> dict:
     out_path = os.path.abspath(out_path)
     deckio.ensure_dir(os.path.dirname(out_path) or ".")
 
-    proc = subprocess.run(
-        [CHROME, "--headless=new", "--disable-gpu", "--no-sandbox",
-         "--no-pdf-header-footer", f"--print-to-pdf={out_path}",
-         "--virtual-time-budget=8000", f"file://{html_path}"],
-        capture_output=True, text=True, timeout=timeout)
-    if not os.path.exists(out_path):
-        raise SystemExit(f"✗ Chrome 没出 PDF（退出码 {proc.returncode}）\n"
-                         f"  stderr: {(proc.stderr or '').strip()[:400]}")
+    animate = _load_sibling("animate")
+    async def print_ready():
+        return await asyncio.wait_for(
+            animate._capture_async(html_path, "", [], 1, pdf_out=out_path), timeout)
+    try:
+        asyncio.run(print_ready())
+    except RuntimeError as exc:
+        if "no-websockets" not in str(exc):
+            raise
+        raise SystemExit("✗ PDF 导出需要 websockets 等待字体、图片和图表就绪：pip install websockets") from exc
+    except TimeoutError as exc:
+        raise SystemExit(f"✗ PDF 导出超过 {timeout} 秒，未交付旧文件") from exc
 
     info = inspect(out_path)
     info["expected_pages"] = slide_count(html_path)
@@ -121,6 +123,14 @@ def report(info: dict, out_path: str) -> int:
                    f" —— 打印分页被哪些元素推歪了（通常是某个元素撑破了 1600×900）")
     if info["bytes"] < 1024:
         bad.append(f"PDF 只有 {info['bytes']} 字节 —— 基本是空的")
+    if len(info["mediaboxes"]) != info["pages"]:
+        bad.append("缺少逐页 MediaBox，无法验证每页尺寸")
+    for index, box in enumerate(info["mediaboxes"], 1):
+        width, height = _box_size(box)
+        if not (abs(width - 1600 * PX_TO_PT) < 2
+                and abs(height - 900 * PX_TO_PT) < 2):
+            bad.append(f"第 {index} 页尺寸不是 1200×675pt（{width:g}×{height:g}）"
+                       " —— 请检查打印 CSS 的 @page")
 
     size_mb = info["bytes"] / 1048576
     print(f"{'✗' if bad else '✓'} {out_path}")
@@ -129,13 +139,10 @@ def report(info: dict, out_path: str) -> int:
     if info["mediaboxes"]:
         boxes = "、".join(info["mediaboxes"])
         print(f"  页尺寸 {boxes}（1600×900px = 1200×675pt）")
-        if not any(abs(_box_w(b) - 1600 * PX_TO_PT) < 2 for b in info["mediaboxes"]):
-            bad.append("页尺寸不是 1200×675pt —— 打印 CSS 的 @page 大概没生效，"
-                       "deck 会被缩小加留白")
     if not bad and info["images"] == 0:
-        print("  全矢量（零内嵌位图）：文字可选可搜、放大不糊")
+        print("  未检测到内嵌位图标记（诊断统计，不替代逐页视觉验收）")
     if not bad and info["fonts"] == 0:
-        print("  ⚠ 没有嵌入字体 —— 对方机器缺字时文字会换字体（这条不阻塞，但交付前值得看一眼）")
+        print("  ⚠ 未检测到 FontFile 标记，可能是 Type3 字形或未嵌入字体，请检查实际 PDF")
 
     for b in bad:
         print(f"  ✗ {b}")
@@ -144,15 +151,19 @@ def report(info: dict, out_path: str) -> int:
 
 def _box_w(box: str) -> float:
     """从 MediaBox 字符串里取宽度。"""
+    return _box_size(box)[0]
+
+
+def _box_size(box: str) -> tuple[float, float]:
     try:
         parts = [float(x) for x in box.split()]
     except ValueError:
-        return -1.0
-    return parts[2] - parts[0] if len(parts) == 4 else -1.0
+        return (-1.0, -1.0)
+    return (parts[2] - parts[0], parts[3] - parts[1]) if len(parts) == 4 else (-1.0, -1.0)
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(description="out.html → 矢量 PDF")
+    ap = argparse.ArgumentParser(description="out.html → PDF（逐页尺寸验证）")
     ap.add_argument("html")
     ap.add_argument("-o", "--out", required=True)
     args = ap.parse_args(argv[1:])

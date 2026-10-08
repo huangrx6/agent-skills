@@ -9,7 +9,7 @@
 - ``intentional`` 真正的满版设计。目前只有一种：hero 版式的标题条压图
                   （实心反色条，对比度走 token 保证）。
 
-分组豁免（同一组的成员是一个视觉整体，不互相判撞）：
+分组只豁免安全留白距离；实际文字重叠始终阻塞：
 
 - title   = 标题块（title + subtitle）
 - body    = 正文（bullets / 栏题）
@@ -36,6 +36,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import sys
+from dataclasses import dataclass
 
 
 def _sibling(name: str):
@@ -55,18 +56,24 @@ Box, Insets, Rect = model.Box, model.Insets, model.Rect
 boxes_touch = model.boxes_touch
 
 
+@dataclass(frozen=True)
+class MeasuredBox(Box):
+    text_rects: tuple = ()
+    has_text: bool = True
+
+
 def group_of(el: dict) -> str:
     """id 段 → 视觉组（role 兜底）。图表页 caption 的 role 是 bullet，必须看 id。"""
     eid = str(el.get("id", ""))
     seg = eid.split(".", 1)[1] if "." in eid else ""
     head = seg.split(".")[0]
+    role = str(el.get("role", ""))
     if head in ("title", "subtitle"):
         return "title"
-    if head == "caption":
+    if head in ("caption", "chartSource") or role == "caption":
         return "caption"
     if head.startswith("bullet"):
         return "body"
-    role = str(el.get("role", ""))
     if role in ("chart", "image", "nodeLabel", "nodeNote"):
         return "visual"
     if role in ("chartValue", "chartLabel"):
@@ -107,6 +114,8 @@ def build_boxes(elements: list):
     """实测元素 → 碰撞盒。几何四值缺一 / 非数字的元素不参与（check 从不抛）。"""
     out = []
     for el in elements:
+        if not el.get("visible", True):
+            continue
         x, y, w, h = el.get("x"), el.get("y"), el.get("w"), el.get("h")
         slide = el.get("slide")
         if not all(isinstance(v, (int, float)) for v in (x, y, w, h, slide)):
@@ -116,12 +125,18 @@ def build_boxes(elements: list):
         head = eid.split(".", 1)[1].split(".")[0] if "." in eid else ""
         # 图表页的 caption 登记角色是 bullet；安全距离按真实身份（caption）取
         key = "caption" if head == "caption" else role
-        out.append(Box(
+        text_rects = tuple(Rect(r["x"], r["y"], r["w"], r["h"])
+                           for r in el.get("textRects", [])
+                           if all(isinstance(r.get(k), (int, float)) for k in ("x", "y", "w", "h"))
+                           and r["w"] > 0 and r["h"] > 0)
+        out.append(MeasuredBox(
             id=eid,
             role=role,
             slide=slide,
             rect=Rect(x, y, w, h),
             clearance=CLEARANCE.get(key, Insets()),
+            text_rects=text_rects,
+            has_text=bool(text_rects) if "textRects" in el else role not in ("image", "chart", "logo"),
         ))
     return out
 
@@ -150,12 +165,12 @@ def _figure_internal(a, b) -> bool:
 
 
 def violations(boxes: list, hero_slides: frozenset) -> list:
-    """安全盒碰撞清单。只报 deny×deny：不同组、同页、安全盒相交。
+    """同页真实文字重叠，以及不同组的安全盒碰撞。
 
     ``hero_slides``：hero 版式的页码 —— 那些页的 title×visual 是 intentional。
 
     豁免三件（都是「一个视觉整体」，不是兄弟）：
-    - 同组（title 块内 / 列表条目间 / 页脚行内）
+    - 同组的安全留白（title 块内 / 列表条目间 / 页脚行内）；不豁免文字重叠
     - caption 被 visual 包含（figure 的 DOM 子节点；**全幅图包含标题不在此列**
       —— 那是压字，必须走 hero 声明）
     - 同页 visual×caption —— caption 属于 figure 本身（图内间距由 figure
@@ -168,6 +183,21 @@ def violations(boxes: list, hero_slides: frozenset) -> list:
                 continue
             ga = group_of({"id": a.id, "role": a.role})
             gb = group_of({"id": b.id, "role": b.role})
+            # A group can waive comfortable spacing, never text painted on text.
+            # Range fragments avoid mistaking a wide text container for actual ink.
+            a_text = getattr(a, "has_text", a.role not in ("image", "chart", "logo"))
+            b_text = getattr(b, "has_text", b.role not in ("image", "chart", "logo"))
+            rects_a = getattr(a, "text_rects", ()) or (a.rect,)
+            rects_b = getattr(b, "text_rects", ()) or (b.rect,)
+            actual_overlap = a_text and b_text and any(
+                min(r.right, s.right) - max(r.x, s.x) > 1 and
+                min(r.bottom, s.bottom) - max(r.y, s.y) > 1
+                for r in rects_a for s in rects_b)
+            if actual_overlap:
+                out.append({"slide": a.slide, "a": a.id, "b": b.id,
+                            "group": f"{ga}×{gb}", "required": 0, "actual": 0,
+                            "kind": "text-overlap"})
+                continue
             if ga == gb:
                 continue
             if _figure_internal(a, b):

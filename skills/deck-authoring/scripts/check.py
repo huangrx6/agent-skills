@@ -12,6 +12,7 @@
 6. 装饰不压文字 墨块必须落在安全区，不与文字栏相交
 7. 图表就绪 数据形状对（label 非空 / value 是数字）+ G2 真渲染出来了（实测）
 8. 图表区无错位 图表容器（逐层配对地扫完整个容器）里不许出现 `misreg` 错位元素
+9. chrome 钉位  壳的页脚 / logo 在**每一页**都必须在同一位置（相对各自页底 ±2px）
 
 **提示**（`advisories()`，不阻塞）：字体回退 —— 启发式，衬线撞衬线会误报。
 
@@ -26,6 +27,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import math
 import os
 import re
 import sys
@@ -57,6 +59,7 @@ measure_mod = _load_sibling("measure")   # 实测层：版面判断全部走它�
 render_mod = _load_sibling("render")   # 只为拿“同一个风格”的 token（单一来源）
 deck_mod = _load_sibling("deck")       # 品牌资产 + 编译（原 brand/compile）
 grid_mod = _load_sibling("grid")     # 网格与间距（版面几何唯一来源）
+schema_mod = _load_sibling("validate_spec")  # 图表输入约束共用，不在产物门里另写一套
 
 
 def _load_layout():
@@ -459,6 +462,60 @@ def _check_full_page_image(measured: dict, deck: dict) -> list[str]:
     return out
 
 
+# 壳的 chrome：这些角色的元素在**每一页都该钉在同一个位置**（相对各自那一页的底边）。
+CHROME_ROLES = ("foot", "logo")
+CHROME_TOLERANCE = 2.0
+
+
+def _check_chrome_anchored(measured: dict) -> list[str]:
+    """壳的 chrome（页脚 / 品牌 logo）逐页必须钉在同一个位置。
+
+    为什么单列一条：其余几何门看的都是"这一页内部对不对"（越界 / 碰撞 / 被放大），
+    查不出"同一个元素在 16 页里位置各不相同"。而这类错位的成因几乎总是一行皮肤 ——
+    皮肤写 `.slide > *{position:relative;z-index:1}` 这类通配（很自然的写法：把内容
+    抬到装饰层之上），却把壳给 chrome 的绝对定位一起压掉了（0,1,1 > 0,1,0），
+    chrome 于是退回文档流、跟着内容走：实测某份 16 页 deck 的页脚距页底从 0.7px
+    跳到 678px。所以报错要点名这个成因，否则读的人只知道"位置怪"，不知道去哪改。
+
+    判据用**相对页底**的偏移，不用绝对 y：产物是多页竖着叠的，第 5 页的绝对 y 本来
+    就比第 1 页大。只比"真的出现在页里的"那几个 —— `logo` 本就允许某几页不出现
+    （品牌策略），不出现不算不一致。
+    """
+    slides = measured.get("slides") or []
+    if not slides:
+        return []
+    rows: dict[str, list[tuple[int, float]]] = {}
+    for el in measured.get("elements", []):
+        role = str(el.get("role") or "")
+        if role not in CHROME_ROLES or not el.get("visible", True):
+            continue
+        idx, y, h = el.get("slide"), el.get("y"), el.get("h")
+        if not isinstance(idx, int) or not (1 <= idx <= len(slides)):
+            continue
+        if not isinstance(y, (int, float)) or not isinstance(h, (int, float)):
+            continue
+        page = slides[idx - 1]
+        rows.setdefault(role, []).append((idx, (page["y"] + page["h"]) - (y + h)))
+    out: list[str] = []
+    for role, got in rows.items():
+        if len(got) < 2:
+            continue
+        low = min(got, key=lambda r: r[1])
+        high = max(got, key=lambda r: r[1])
+        if high[1] - low[1] <= CHROME_TOLERANCE:
+            continue
+        label = {"foot": "页脚", "logo": "品牌 logo"}.get(role, role)
+        out.append(
+            f"{label}不在同一个位置：第 {low[0]} 页距页底 {low[1]:.1f}px、"
+            f"第 {high[0]} 页距页底 {high[1]:.1f}px（差 {high[1] - low[1]:.1f}px，"
+            f"上限 {CHROME_TOLERANCE:.0f}px）—— 壳的 chrome 每一页都该钉住。"
+            f"最常见的原因是皮肤里一条通配选择器（如 `.slide > *{{position:relative}}`）"
+            f"把壳给 `.footrow` / `.brandlogo` / `.end` 的绝对定位压掉了（它特指度更高），"
+            f"chrome 于是退回文档流、跟着内容走。改法：皮肤把通配收窄到内容层"
+            f"（`.pad > *`）；要挪 chrome 就用同特指度写 `.slide > .footrow{{…}}`。")
+    return out
+
+
 PAGE_BOX = (1600, 900)     # 壳的页盒（render.py 的 .slide 尺寸）
 
 
@@ -594,6 +651,20 @@ def _pair_alignment_notes(measured: dict) -> list:
 def _check_measured_health(measured: dict) -> list[str]:
     """产物健康度：页面报错 / 图片没加载 —— 这两类最容易没人看。"""
     out: list[str] = []
+    if measured.get("fatal"):
+        out.append(f"测量探针失败：{measured['fatal']}")
+    for missing in measured.get("missing_elements", []):
+        out.append(f"语义清单元素缺失：{missing.get('id', '?')} —— 应交付的内容没有对应 DOM")
+    for el in measured.get("elements", []):
+        if not el.get("visible", True):
+            out.append(f"内容不可见：{el.get('id', '?')}（祖先隐藏或零尺寸/透明度）")
+        elif el.get("clippedBy"):
+            out.append(f"内容被祖先容器裁切：{el.get('id', '?')}（{'、'.join(el['clippedBy'])}）")
+        else:
+            if any(not run.get("visible", True) for run in el.get("textRuns", [])):
+                out.append(f"内容文字不可见：{el.get('id', '?')} 的部分文字被子元素隐藏")
+            elif any(run.get("clippedBy") for run in el.get("textRuns", [])):
+                out.append(f"内容文字被祖先容器裁切：{el.get('id', '?')}")
     for err in measured.get("errors", []):
         out.append(f"产物里的脚本报错：{err}")
     for im in measured.get("images", []):
@@ -601,6 +672,108 @@ def _check_measured_health(measured: dict) -> list[str]:
             out.append(f"图片没加载：{im.get('src')!r} —— "
                        f"相对路径的产物挪个目录就会全员裂图（交付前要么同目录交付，要么 base64 内嵌）")
     return out
+
+
+def _check_rendered_contrast(measured: dict, tokens: dict) -> list[str]:
+    """Check the colors actually painted after CSS backgrounds and group opacity.
+
+    Image/gradient backgrounds need visual review; a flat fallback color is not
+    evidence of the pixels behind a label. The probe marks those runs uncertain.
+    """
+    limit = max(4.5, float((tokens.get("contrast") or {}).get("minBody", 4.5)))
+
+    def luminance(rgb):
+        values = [float(v) / 255 for v in rgb]
+        linear = [v / 12.92 if v <= .04045 else ((v + .055) / 1.055) ** 2.4
+                  for v in values]
+        return sum(v * weight for v, weight in zip(linear, (.2126, .7152, .0722)))
+
+    problems = []
+    for el in measured.get("elements", []):
+        if not el.get("visible", True):
+            continue
+        ratios = []
+        for run in el.get("textRuns", []):
+            colors = run.get("colors") or {}
+            if colors.get("uncertain"):
+                continue
+            fg, bg = colors.get("foreground"), colors.get("background")
+            if not (isinstance(fg, list) and isinstance(bg, list) and len(fg) == len(bg) == 3):
+                continue
+            if not all(isinstance(v, (int, float)) and math.isfinite(v) for v in fg + bg):
+                continue
+            a, b = sorted((luminance(fg), luminance(bg)))
+            ratios.append((b + .05) / (a + .05))
+        if ratios and min(ratios) + .01 < limit:
+            problems.append(f"实测文字对比度：{el.get('id', '?')} 为 {min(ratios):.2f} < {limit:g}"
+                            "（已计入 CSS 前景、背景及祖先 opacity）")
+    return problems
+
+
+def _check_chart_readiness(measured: dict, deck: dict) -> list[str]:
+    out = []
+    for i, slide in enumerate(deck.get("slides", []), 1):
+        if slide.get("type") != "chart":
+            continue
+        chart = next((e for e in measured.get("elements", []) if e.get("id") == f"s{i}.chart"), {})
+        state = chart.get("chartReady")
+        if state != "ready":
+            label = "G2 渲染失败" if str(state).startswith("error") else "G2 渲染未完成"
+            out.append(f"第 {i} 页图表：{label}（{state or 'missing'}）"
+                       " —— 空容器不能作为已完成图表交付")
+    return out
+
+
+def _check_chart_data(deck: dict) -> list[str]:
+    """Apply the input validator's chart/data/series contract without a second DSL.
+
+    Other authoring fields stay in the input gate; this gate rechecks the numeric
+    source used by the finished chart, including scatter y/value and series rows.
+    """
+    out = []
+    for i, slide in enumerate(deck.get("slides", []), 1):
+        if not isinstance(slide, dict) or slide.get("type") != "chart":
+            continue
+        chart = {key: slide[key] for key in ("type", "chart", "data", "series") if key in slide}
+        chart["title"] = "chart"
+        probe = {"deck": {"style": "validation", "colorSet": "validation", "slides": [chart]}}
+        for issue in schema_mod.validate(probe).errors:
+            where = issue["where"].replace("deck.slides[0]", f"第 {i} 页图表")
+            out.append(f"{where}：{issue['message']}")
+    return out
+
+
+def _delivery_type_notes(measured: dict, deck: dict, tokens: dict) -> list[str]:
+    """Advisory only; use measured text sizes for an explicitly chosen audience."""
+    floors = {"live": (28, 22), "async": (20, 14)}
+    delivery = deck.get("delivery")
+    if delivery not in floors:
+        return []
+    body_floor, chart_floor = floors[delivery]
+    notes, chart_seen = [], set()
+    for el in measured.get("elements", []):
+        if not el.get("visible", True):
+            continue
+        role, eid = el.get("role"), str(el.get("id", ""))
+        if role == "chart":
+            sizes = [r.get("fontSize") for r in el.get("textRuns", [])]
+            sizes = [v for v in sizes if isinstance(v, (int, float)) and v > 0]
+            if sizes:
+                chart_seen.add(el.get("slide"))
+                if min(sizes) < chart_floor:
+                    notes.append(f"{delivery} 阅读字号：{eid} 图表文字实测最小 {min(sizes):g}px"
+                                 f"，建议至少 {chart_floor}px")
+        elif role in ("bullet", "colTitle", "nodeLabel", "nodeNote") and not any(
+                part in eid.split(".") for part in ("caption", "source")):
+            px = el.get("fontSize")
+            if isinstance(px, (int, float)) and px < body_floor:
+                notes.append(f"{delivery} 阅读字号：{eid} 正文实测 {px:g}px，建议至少 {body_floor}px")
+    for i, slide in enumerate(deck.get("slides", []), 1):
+        if slide.get("type") == "chart" and i not in chart_seen:
+            declared = (tokens.get("type") or {}).get("chartLabel")
+            notes.append(f"{delivery} 第 {i} 页没有可读取的实测图表文字字号"
+                         f"（风格声明 chartLabel={declared!r}，不能当作实测）；建议至少 {chart_floor}px")
+    return notes
 
 
 # ── 字号体检的四条线 ────────────────────────────────────────────────
@@ -678,6 +851,12 @@ def _check_type_size(measured: dict, deck: dict, tokens: dict | None) -> list[st
             f"内页标题是封面尺度：{head}（共 {len(big_titles)} 页超过 {TITLE_POSTER_PX}px）—— "
             f"内页标题的合理区是 40~56px。层级靠**标题与正文的倍数**（2~3 倍）立住，"
             f"不靠绝对值堆大；改 style 的 type.compact / type.small")
+    # Live projection has its own measured reading floor in _delivery_type_notes.
+    # The remaining density advice assumes desktop reading (20–28 px), so it
+    # must not tell a presenter to shrink deliberately readable 28–34 px body text.
+    # Actual overflow, clipping and collisions remain independent blocking gates.
+    if deck.get("delivery") == "live":
+        return notes
     # ② 条目多还用宣言档
     dense = [
         (n, max(pxs), len(pxs)) for n, pxs in sorted(bodies.items())
@@ -949,9 +1128,9 @@ def _check_font_fallback(measured: dict, tokens: dict | None = None) -> list[str
             out.append(f"字体回退（提示）：声明的 {first!r} 在本机没有生效{tail}"
                        f" —— 排版会随机器变；本机可用的族见 references/fonts.md")
         elif first.strip().lower() in SYSTEM_UI_FAMILIES:
-            out.append(f"字体（提示）：{first!r} 是本机**系统 UI 默认族** —— 字形就是没设"
-                       f"字体时的样子，排版不承担设计。要性格就从 references/fonts.md 的"
-                       f"性格映射里挑一个本机可用的族，或自带字体文件走 @font-face")
+            out.append(f"字体（提示）：{first!r} 是本机**系统 UI 默认族**，可用于中性设计；"
+                       f"跨机器可能替换，请核对目标环境。需要固定字形时参考 "
+                       f"references/fonts.md，或自带字体文件走 @font-face")
     return out
 
 def _check_brand(measured: dict, deck: dict, tokens: dict,
@@ -1251,7 +1430,7 @@ def _check_deck_shape(measured: dict, deck: dict,
         notes.append(
             f"全篇 {len(slides)} 页**没有一张图** —— 一页在讲「某个东西长什么样 / "
             f"现场 / 对比」就该有图（用 content-image 版式）；讲「三条结论」不必有。"
-            f"图多一点没坏处，少要才是问题")
+            f"只在图片能补充证据时增加；图表和结构图本身也能承担视觉表达")
         for i, s in text_only[:3]:
             notes.append(
                 f"第 {i} 页「{s.get('title', '')}」是 {len(s.get('bullets', []))} 条纯文字 —— "
@@ -1328,9 +1507,9 @@ def style_tokens(spec: dict, override: dict | None = None,
     去量 B 风格的产物”——那是多风格之后新增的错配面。
     project_dir：deck 项目目录（= spec 所在目录）—— 与渲染层同一套解析根。
     """
-    if override is not None:
-        return override
-    return render_mod.load_style(spec["deck"].get("style"), project_dir)["tokens"]
+    style = {"tokens": override} if override is not None else None
+    resolved, _ = render_mod.deck_mod.resolve_theme(spec["deck"], project_dir, style)
+    return resolved["tokens"]
 
 
 def check(spec: dict, html_path: str, tokens: dict | None = None,
@@ -1368,7 +1547,10 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     data: dict = measure_mod.measure(html_path) if measured is None else measured
     problems.extend(_check_layout(data))
     problems.extend(_check_measured_health(data))
+    problems.extend(_check_rendered_contrast(data, tokens))
+    problems.extend(_check_chart_readiness(data, deck))
     problems.extend(_check_full_page_image(data, deck))
+    problems.extend(_check_chrome_anchored(data))
     brand_problems, _ = _check_brand(data, deck, tokens, project_dir)
     problems.extend(brand_problems)
     # 空内容与品牌无关，但它和越界一样是“一页看着坏了”—— 所以也走阻塞
@@ -1384,6 +1566,10 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     for v in layout_mod.collision.violations(
             layout_mod.collision.build_boxes(data.get("elements", [])), hero_pages):
         fix = _collision_fix(slide_layouts.get(v["slide"]))
+        if v.get("kind") == "text-overlap":
+            problems.append(f"第 {v['slide']} 页 {v['a']} 与 {v['b']} 真实文字重叠"
+                            " —— 同组或 hero 只豁免留白距离，不允许文字互相覆盖")
+            continue
         problems.append(
             f"第 {v['slide']} 页 {v['a']} 与 {v['b']} 太近"
             f"（{v['group']}：需要 ≥{v['required']:.0f}px，实际 {v['actual']:.0f}px）—— "
@@ -1404,22 +1590,7 @@ def check(spec: dict, html_path: str, tokens: dict | None = None,
     # 像素等于用手量尺子。换成的两件事：
     #   a) G2 真的渲染出来了（容器里有 canvas/svg，且没有 data-chart-error）；
     #   b) 数据本身是对的（label 非空、value 是数字）—— 数据错才是真错。
-    sections = page.split('<section class="slide"')[1:]
-    for i, slide in enumerate(deck["slides"], 1):
-        if slide.get("type") != "chart":
-            continue
-        block = sections[i - 1] if i - 1 < len(sections) else ""
-        for k, d in enumerate(slide.get("data", [])):
-            if not str(d.get("label", "")).strip():
-                problems.append(f"第 {i} 页图表 data[{k}].label 是空的 —— 轴上会缺一个标签")
-            _num(str(d.get("value")), f"第 {i} 页图表 data[{k}].value", problems)
-        # 就绪看**实测**（静态 HTML 里只有容器与 spec，判断不出来）
-        measured_chart = next((e for e in data.get("elements", [])
-                               if e.get("slide") == i and e.get("id") == f"s{i}.chart"), None)
-        state = (measured_chart or {}).get("chartReady")
-        if state and state.startswith("error"):
-            problems.append(f"第 {i} 页图表：G2 渲染失败（{state.split(':', 1)[1]}）"
-                            f" —— 产物里那一页是空的")
+    problems.extend(_check_chart_data(deck))
     # ④ 图表区无错位：**逐层配对**扫整个容器，不是扫到第一个 </div> 就停。
     for hit in re.finditer(r'<div class="chartwrap"', page):
         block = _div_subtree(page, hit.start())
@@ -1601,6 +1772,11 @@ def advisories(measured: dict, spec: dict | None = None,
     族当基准比宽度，衬线撞衬线时可能误报，拿它挡交付会把人逼到忽略整个检查。
     """
     notes = _check_font_fallback(measured, tokens)
+    uncertain = [str(el.get("id", "?")) for el in measured.get("elements", [])
+                 if any((run.get("colors") or {}).get("uncertain")
+                        for run in el.get("textRuns", []))]
+    if uncertain:
+        notes.append("复杂背景对比度需人工确认（图片、渐变或未解析色彩空间）：" + "、".join(uncertain[:8]))
     notes.extend(_check_page_box(measured))
     notes.extend(_check_style_rules(measured, tokens))
     if page is not None:
@@ -1616,6 +1792,7 @@ def advisories(measured: dict, spec: dict | None = None,
         # 字号体检：这是“每份 deck 字号都偏大”唯一能被当场看见的地方 ——
         # 装得下就不报错，所以这里必须有人开口。
         notes.extend(_check_type_size(measured, spec.get("deck", {}), tokens))
+        notes.extend(_delivery_type_notes(measured, spec.get("deck", {}), tokens))
         notes.extend(_visual_decision_notes(spec.get("deck", {})))
         notes.extend(_reuse_notes(spec.get("deck", {})))
         notes.extend(_ornament_notes(spec.get("deck", {})))

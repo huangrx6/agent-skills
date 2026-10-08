@@ -110,7 +110,7 @@ Style 不重定义任意 spacing，只允许覆盖语义档（spacingOverrides�
 `intersects` / `gap_between` / `required_gap`），政策在
 `scripts/layout/collision.py`。判据全部来自 `measure.py` 的实测元素盒。
 
-**五个性状分组**（同组是一个视觉整体，不互判）：
+**五个性状分组**（同组免额外安全距离，但实际文字不可交叠）：
 
 | 组 | 成员 |
 | --- | --- |
@@ -126,7 +126,7 @@ Style 不重定义任意 spacing，只允许覆盖语义档（spacingOverrides�
 
 **豁免三条**（豁免的是「视觉整体」，不是放水）：
 
-1. 同组成员（列表条目之间、标题块内部、页脚行内部）；
+1. 同组成员免额外安全距离，但独立文字的真实矩形交叠仍阻塞；
 2. caption 被 visual 包含（figure 的 DOM 子节点；**全幅图包含标题不在此列**
    —— 那是压字，必须走 hero 声明）；
 3. 同页 visual×caption（caption 属于 figure；图内间距由 figure 自己的
@@ -180,7 +180,8 @@ python3 scripts/render.py spec.json -o out.html --repair
   不改风格、不写运行期魔法变量。
 - **作者声明过的字段一律不碰**：显式写了 `bulletTier` / `titleTier` 的页只出
   诊断（"声明过，不自动改"），决定权在作者。
-- **缩字号是最后手段且只降一档一轮**：`bulletLarge → bullet → bulletSmall`，
+- **此自动工具只提供降档尝试，不代表完整设计修复顺序**：先评估换结构、收短或拆页；
+  确认可降档时才运行，每轮只降一档：`bulletLarge → bullet → bulletSmall`，
   到最小档就停 —— 再装不下是内容问题（拆页 / 收短文案），不是字号问题。
 
 产物：`out.html`（最后一轮即交付物）、`out.html.repair.json`
@@ -203,8 +204,7 @@ python3 scripts/render.py spec.json -o out.html --repair
 ## 13. Optical Alignment
 
 允许组件规则做少量视觉修正（图标超 baseline 1~3px、圆形视觉中心微移、大标题
-字形边界微调）——本仓库的这类修正都在 skin.css 里**由风格作者写**，不由 LLM
-生成。
+字形边界微调）——本仓库的这类修正都在 skin.css 里**由风格作者在 CSS 中实现**，不写入内容 spec。
 
 ## 14. Page Type 与 Layout Family 分离
 
@@ -254,7 +254,7 @@ HINTS 指路 layout）、`auto` 被 `validate_spec.py` 拦（`BAD_LAYOUT`）。�
 
 不得随机选版式；必须考虑内容量/视觉角色/图比例/优先级/语义关系/风格/密度/
 平衡/前后页节奏。口径：**这些判断是作者的内容决策，写在 spec 的
-`layout` 里**。脚本不替作者选 —— 不推断、不随机、也不实测排名（§18/§57）。
+`layout` 里**。脚本不替作者选 —— 不推断、不随机、候选评分仅作辅助（§18/§57）。
 不写 `layout` 就走该版式的结构缺省（content-image 缺省
 visual-right、two-column 缺省 even，§16）；写自造名由 skin.css 排。
 其余 type 仍页型查表（确定性，不随机）。
@@ -451,7 +451,7 @@ aspect ratio（实测插槽比）/ minResolution（盒子 ×2）/ bleedAllowed /
 
 Chart Container 负责 chart box/title box/标注区/标签安全区；**Chart Engine
 不得突破 Container**（chartwrap 占内容宽 1432，壳给 `.g2` 容器 330px 高；
-几何由 AntV G2 在容器内算，G2 的 autoFit 必须有这个高度才不抛错）；
+几何由 AntV G2 在容器内算，初始化时读取实际容器宽高并固定图表尺寸，避免切页隐藏导致收缩）；
 **Layout 不决定 chart type**（图形类型由 spec 显式声明，见 charts.md）。
 
 ## 33. Diagram Constraints

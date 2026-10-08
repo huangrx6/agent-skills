@@ -252,8 +252,6 @@ class TestChartContract(unittest.TestCase):
                          f"图注（12px）不该把正文中位数拽低：{ok}")
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class TestEdgeGates(unittest.TestCase):
@@ -892,3 +890,7 @@ class TestCandidates(unittest.TestCase):
         r = self.c.score_page("content-image", els, top, layout_name="hero")
         self.assertTrue(r["valid"], r["invalid_reason"])
         self.assertEqual(r["scores"]["focal"], 0.0)
+
+
+if __name__ == "__main__":
+    unittest.main()

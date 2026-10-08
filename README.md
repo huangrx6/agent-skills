@@ -65,7 +65,7 @@ Codex        全局级  →  ~/.codex/skills/<name>
 
 ---
 
-## Skills 索引（6 个）
+## Skills 索引（7 个）
 
 ### Obsidian 工作流（2 个）
 
@@ -76,12 +76,13 @@ Codex        全局级  →  ~/.codex/skills/<name>
 | [**obsidian-personal-knowledge-base**](skills/obsidian-personal-knowledge-base/SKILL.md) | 在 PARA + MOC vault 内创建、更新、移动、审阅笔记；按 Inbox / Projects / Areas / Resources / Archive / Assets / System 判断归属 |
 | [**obsidian-work-log-release-recorder**](skills/obsidian-work-log-release-recorder/SKILL.md) | 任务结束后把可复用事实沉淀到长期知识；维护周发版记录（脚本、配置、部署路径、验证、回滚、执行假设） |
 
-### 通用能力（3 个）
+### 通用能力（4 个）
 
 不绑定某个 vault 或某个工具，按需触发的确定性能力。
 
 | Skill | 覆盖 |
 | --- | --- |
+| [**deck-authoring**](skills/deck-authoring/SKILL.md) | 从结构规格制作演示文稿；项目风格、真实浏览器质量检查、HTML/PDF/PNG/可编辑或贴图PPTX/逐页视频，交付前回读验证 |
 | [**diagram-authoring**](skills/diagram-authoring/SKILL.md) | 把系统画成可编辑的 Excalidraw 图（架构 / 依赖 / 流程 / 状态 / 部署拓扑 / 思维导图）：区域（网格底 + 虚线框）、四组样式轴、一套配色系统；模型只描述结构，坐标全由脚本算 |
 | [**git-dev-workflow**](skills/git-dev-workflow/SKILL.md) | git 写操作（提交 / 分支 / 丢弃改动 / 删分支与 worktree / 改写历史 / force push）前的状态核对与拦截：先读真实状态，不可逆动作前跑机械前置检查，报告只引原始输出 |
 | [**pingcode**](skills/pingcode/SKILL.md) | PingCode 项目 / 工作项（史诗·特性·用户故事·任务·缺陷）的命令行：查我的待办与缺陷、按条件搜、看详情、建项目、建改工作项（描述 / 起止日期 / 负责人 / 优先级 / 父项 / 迭代）、改状态、加评论、删工作项。端点来自官方文档生成的端点表（发送前校验），名字→ID 解析歧义时列候选而不猜 |

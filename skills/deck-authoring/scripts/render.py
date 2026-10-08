@@ -502,13 +502,13 @@ html,body{margin:0;background:var(--viewer)}
    自己的短横时就成了两个标记，而那个方块没有间距、直接贴住正文（实测截图）。 */
 .bullets{list-style:none;padding:0;margin:0}
 .tl li{flex:1;min-width:0;width:var(--tl-node,300px)}
-/* 图注 / 图表注：壳给一个站得住的缺省 —— 与图之间留一个间距 token，颜色压到
-   muted（注解不是正文）。皮肤要另说就覆盖这两条（皮肤 CSS 在壳之后，同级即胜）。 */
-.chartcap{margin-top:var(--sp-inner);color:var(--text);opacity:.62;
+/* 图注 / 图表注：用字号与间距区分层级，保留已验收的文字色，避免透明度削弱对比度。
+   皮肤要另说就覆盖这两条（皮肤 CSS 在壳之后，同级即胜）。 */
+.chartcap{margin-top:var(--sp-inner);color:var(--text);
   font:400 var(--s-caption,16px)/1.5 var(--body)}
 /* 行内强调（模型写的 `**x**`）：用 span 而不是 b —— 皮肤的 .tl b 会命中裸 b */
 .em{font-weight:700}
-.chartsrc{margin:calc(var(--sp-inner) * -0.5) 0 0;color:var(--text);opacity:.55;
+.chartsrc{margin:calc(var(--sp-inner) * -0.5) 0 0;color:var(--text);
   font:400 var(--s-caption,16px)/1.4 var(--body)}
 .chartwrap{margin-top:var(--sp-item);width:1432px;padding:var(--sp-item);
   position:relative;box-sizing:border-box}
@@ -522,19 +522,25 @@ html,body{margin:0;background:var(--viewer)}
    .chartwrap 内边距不同，同一张图表在不同风格里会差 40~50px。 */
 .chartwrap .g2{position:relative;display:block;height:330px;width:100%}
 .chartwrap .g2 canvas,.chartwrap .g2 svg{display:block;max-width:100%}
-.end{position:absolute;left:84px;top:330px}
+/* 壳的 chrome（页脚行 / 品牌 logo / 结束页那塊）用 `.slide > …` 而不是裸类选择器。
+   为什么：它们是 `.slide` 的直接子元素，而皮肤很容易写一条通配把自己抬上去
+   （`.slide > *{position:relative;z-index:1}` 是常见写法，实测把这三条的绝对定位全
+   打掉了 —— 页脚变成跟着内容跑，16 页里距页底从 0.7px 到 678px 乱跳）。
+   `.slide > .footrow`（0,2,0）压过皮肤的通配（0,1,1）；皮肤真想挪它们仍可以
+   —— 写同特指度的 `.slide > .footrow{…}`，后加载者胜。 */
+.slide > .end{position:absolute;left:84px;top:330px}
 /* 页脚一行：页脚 + 品牌署名同在左下这一带。
    不用 space-between 把署名推到右边 —— 那样它会压在巨号页码上（三套风格都把右下
    给了页码）。所以是 flex-start + 间隔，页脚与署名并排。 */
-.footrow{position:absolute;left:84px;right:84px;bottom:52px;display:flex;
+.slide > .footrow{position:absolute;left:84px;right:84px;bottom:52px;display:flex;
   justify-content:flex-start;align-items:baseline;gap:28px}
 .foot,.brandfoot{position:static}
 /* 品牌 logo：位置在壳里给一个**能在四套风格都站住**的缺省（右上），某个风格需要
    另说就自己覆盖那一条 —— 与 .foot 同机制。
    约束**高度**而不是宽度：logo 多是横长条，锁高度才能让宽高比自然展开
    （给宽会有的被拉横、有的被压扁）。 */
-.brandlogo{position:absolute;right:84px;top:58px;height:56px;width:auto}
-.brandfoot{font:400 var(--s-foot, 14px)/1 var(--body);color:var(--text);opacity:0.42;
+.slide > .brandlogo{position:absolute;right:84px;top:58px;height:56px;width:auto}
+.brandfoot{font:400 var(--s-foot, 14px)/1 var(--body);color:var(--text);
   letter-spacing:0.04em}
 """
 
@@ -1073,8 +1079,8 @@ def _apply_brand(style: dict, brand: dict) -> dict:
 # "可丑的原生感"。G2 是成熟的声明式图形语法：编码、坐标轴、标注、堆叠都由它做，
 # 我们只出 spec（数据 → 编码），不手绘几何。
 #
-# 确定性（§41/42）：`animation: false` 关死；G2 的 SVG 输出是同步的纯函数，
-# 同 spec 同输出 —— measure/check 才有稳定 DOM 可量。
+# 确定性（§41/42）：`animate: false` 关闭 G2 mark/view 动画；等待 render Promise
+# 完成后才发布就绪信号，measure/check/导出都以同一完成状态为准。
 # ═══════════════════════════════════════════════════════════════════════════
 CHART_TYPES = ("bar", "bar-horizontal", "line", "area", "bar-stacked",
                "donut", "scatter", "combo")
@@ -1155,15 +1161,18 @@ def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None,
                   tier: dict | None = None, fonts_body: str = "") -> dict:
     """Chart Resolver 的 G2 产物（§19：链路不绑技术——HTML 路径用 AntV G2）。
 
-    输出 G2 5 的 chart spec（renderer 由壳层指定 svg + animation off——
-    确定性 §41：同输入同输出，measure/check 才有稳定的 DOM 可量）。
+    输出 G2 5 的 chart spec（内联 bundle 的默认 canvas renderer + animate:false；
+    壳层等待 render Promise，measure/check 才能读取已完成的产物）。
     配色守规矩：muted + 1 accent（emphasis 命中的数据用主色，其余灰化）。
     """
-    data = _chart_norm_series(slide)[0]["data"]
+    if slide.get("annotations"):
+        raise ValueError("annotations 尚未实现，不能忽略；请移除标注或先实现对应图形")
+    series = _chart_norm_series(slide)
+    data = series[0]["data"]
     emphasis = emphasis or set()
     primary = colors.get("primary", "#0033CC")
     muted_c = chart_muted(primary, colors.get("background", "#FFFFFF"))
-    text = colors.get("text", "#0A0A0A")
+    text = ink_module.text_color(colors)
     # 坐标轴配色：G2 主题的轴标签/轴名是**theme 自带的深色**，不跟 paper 走。
     # 实测后果：深底反白风格里轴标签与轴名直接看不见（柱在、刻度没了）。
     # 轴是图的一部分，颜色同样从 token 取 —— 这里只覆盖已实测生效的两项。
@@ -1174,24 +1183,33 @@ def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None,
     value_px = (tier or {}).get("chartValue", 16)
     typo_axis = {
         "labelFill": text, "labelFontFamily": fonts_body,
-        "labelFontSize": label_px,
+        "labelFontSize": label_px, "labelOpacity": 1,
         "titleFill": text, "titleFontFamily": fonts_body,
-        "titleFontSize": label_px,
+        "titleFontSize": label_px, "titleOpacity": 1,
         "tickStroke": muted_c, "lineStroke": muted_c,
         "gridStroke": muted_c, "gridLineWidth": 1, "gridLineDash": [3, 3],
     }
-    typo_label = {"fill": text, "fontSize": value_px, "fontFamily": fonts_body}
+    typo_label = {"fill": text, "fontSize": value_px, "fontFamily": fonts_body, "opacity": 1}
+    legend = {"color": {"position": "bottom", "title": False,
+                         "itemLabelFill": text,
+                         "itemLabelFontFamily": fonts_body,
+                         "itemLabelFontSize": label_px}}
+    series_names = [s["name"] for s in series]
+    series_scale = {"color": {"domain": series_names,
+                               "range": chart_series_colors(primary, colors["background"],
+                                                            len(series))}}
+    series_rows = [{**d, "series": s["name"]} for s in series for d in s["data"]]
 
     def enc_color(d):
         return primary if (not emphasis or str(d.get("label")) in emphasis) else muted_c
 
     kind = chart_declared_type(slide)
+    if len(series) > 1 and kind not in ("line", "area", "bar-stacked", "combo"):
+        raise SystemExit(f"✗ {kind} 不支持多 series；请使用 data，或改为支持多系列的图形")
     spec: dict = {
-        "animation": False,                      # 确定性：动画关死（§41/42）
-        # autoFit **不写在这里**：它是 chart 实例选项，写在 spec 里会覆盖构造函数的
-        # autoFit:true（见文末实例化代码与 :952 的注释「autoFit 跟容器走」）——
-        # 实测后果：canvas 退到 G2 默认 640×480，撑出 .g2 的 330px 容器、
-        # 压住图注，而且只占满左侧不到一半宽度。
+        "animate": False,                        # G2 5 mark/view 的真实开关
+        # 尺寸只由构造函数接收壳层的同步快照；spec 不覆盖 width/height/autoFit，
+        # 避免 frame/present 隐藏页面时重置成零宽或 G2 的默认尺寸。
         "padding": "auto",
         # 轴**标题**一律关掉：不关就是数据集名（"label" / "value"）印在轴上 ——
         # 最典型的图表 slop，人话标题由页面 message / 图注承担。
@@ -1211,21 +1229,28 @@ def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None,
             "encode": {"x": "label", "y": "value", "color": "c"},
             "scale": {"color": {"type": "identity"}, **_BAND_PAD},
             "style": {"lineWidth": 0},
-            "labels": [{"text": "value", "style": {**typo_label,
-                                                   "fontWeight": 600,
-                                                   "position": "outside"}}],
+            "labels": [{"text": "value", "position": "outside",
+                        "style": {**typo_label, "fontWeight": 600}}],
         })
         if kind == "bar-horizontal":
             spec["coordinate"] = {"transform": [{"type": "transpose"}]}
     elif kind == "donut":
-        rows = [{**d, "c": enc_color(d)} for d in data]
+        rows = list(data)
+        labels = [str(d["label"]) for d in rows]
+        # 分类需要能彼此区分；emphasis 只改变色阶排序，不把其余类别涂成同色。
+        order = sorted(range(len(rows)), key=lambda j: labels[j] not in emphasis)
+        palette = chart_series_colors(primary, colors["background"], len(rows))
+        category_colors = [""] * len(rows)
+        for rank, index in enumerate(order):
+            category_colors[index] = palette[rank]
         spec.update({
             "type": "interval",
             "data": rows,
-            "coordinate": {"transform": [{"type": "transpose"},
-                                         {"type": "theta", "innerRadius": 0.62}]},
+            "coordinate": {"type": "theta", "innerRadius": 0.62},
+            "transform": [{"type": "stackY"}],
             "encode": {"y": "value", "color": "label"},
-            "scale": {"color": {"range": [d["c"] for d in rows]}},
+            "scale": {"color": {"domain": labels, "range": category_colors}},
+            "style": {"stroke": colors["background"], "lineWidth": 2},
             "axis": False,
             "legend": {"color": {"position": "right",
                                  "itemLabelFill": text,
@@ -1233,42 +1258,64 @@ def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None,
                                  "itemLabelFontSize": label_px}},
         })
     elif kind in ("line", "area"):
+        multi = len(series) > 1
         spec.update({
             "type": "area" if kind == "area" else "line",
-            "data": data,
-            "encode": {"x": "label", "y": "value"},
-            "style": {"stroke": primary, "lineWidth": 2.5},
-            "labels": [{"text": "value", "style": {**typo_label,
-                                                   "selector": "last"}}],
+            "data": series_rows if multi else data,
+            "encode": {"x": "label", "y": "value", **({"color": "series"} if multi else {})},
+            "scale": series_scale if multi else {},
+            "legend": legend if multi else False,
+            "style": {"lineWidth": 2.5, **({} if multi else {"stroke": primary}),
+                      **({"fillOpacity": 0.28, **({} if multi else {"fill": primary})}
+                         if kind == "area" else {})},
+            "labels": [{"text": "value", "selector": "last", "style": typo_label}],
             "axis": {"x": {**typo_axis, "title": False, "grid": False},
                      "y": {**typo_axis, "title": False}},
         })
     elif kind == "scatter":
+        rows = [{**d, "y": d.get("y", d.get("value"))} for d in data]
+        if any(not isinstance(d.get("x"), (int, float)) or isinstance(d.get("x"), bool)
+               or not isinstance(d.get("y"), (int, float)) or isinstance(d.get("y"), bool)
+               for d in rows):
+            raise SystemExit("✗ scatter 每个点必须有数值 x 和 y（value 可兼容 y）")
         spec.update({
             "type": "point",
-            "data": data,
-            "encode": {"x": "label", "y": "value", "size": 4},
+            "data": rows,
+            "encode": {"x": "x", "y": "y", "size": 4},
+            "scale": {"x": {"type": "linear"}, "y": {"type": "linear"}},
             "style": {"fill": primary, "stroke": muted_c},
             "axis": {"x": {**typo_axis, "title": False, "grid": False},
                      "y": {**typo_axis, "title": False}},
         })
-    elif kind in ("bar-stacked", "combo"):
-        series = slide.get("series") or []
-        rows = []
-        for si, srow in enumerate(series):
-            for d in srow.get("data", []):
-                rows.append({"label": d.get("label"), "value": d.get("value", 0),
-                             "series": srow.get("name", f"系列{si+1}")})
+    elif kind == "bar-stacked":
         spec.update({
-            "type": "interval" if kind == "bar-stacked" else "line",
-            "data": rows,
+            "type": "interval",
+            "data": series_rows,
             "encode": {"x": "label", "y": "value", "color": "series"},
-            "transform": [{"type": "stackY"}] if kind == "bar-stacked" else [],
-            "scale": {"color": {"range": chart_series_colors(primary, colors.get(
-                "background", "#FFFFFF"), max(1, len(series)))}, **_BAND_PAD},
+            "transform": [{"type": "stackY"}],
+            "scale": {**series_scale, **_BAND_PAD},
+            "legend": legend if len(series) > 1 else False,
             "axis": {"x": {**typo_axis, "title": False, "grid": False},
                      "y": {**typo_axis, "title": False}},
         })
+    elif kind == "combo":
+        declared = slide.get("series") or []
+        marks = {s.get("mark") for s in declared}
+        if marks != {"bar", "line"}:
+            raise SystemExit("✗ combo 每个 series 必须显式声明 mark=bar 或 line，且至少各一组；共用同单位 y 轴")
+        children = []
+        for mark in ("bar", "line"):
+            names = {s["name"] for s in declared if s["mark"] == mark}
+            children.append({
+                "type": "interval" if mark == "bar" else "line",
+                "data": [d for d in series_rows if d["series"] in names],
+                "encode": {"x": "label", "y": "value", "color": "series"},
+                "transform": [{"type": "dodgeX"}] if mark == "bar" else [],
+                "style": {"lineWidth": 0 if mark == "bar" else 3},
+                "animate": False,
+            })
+        spec.update({"type": "view", "children": children,
+                     "scale": {**series_scale, **_BAND_PAD}, "legend": legend})
     return spec
 
 
@@ -1278,28 +1325,42 @@ def chart_g2_spec(slide: dict, colors: dict, emphasis: set | None = None,
 G2_VENDOR = os.path.join(HERE, "vendor", "g2-5.2.10.min.js")
 
 # 实例化：把每页的 data-g2 spec 交给 G2（animation 关死，确定性）。
-# G2 5 的 API 是 chart.options(spec) + chart.render()；不写 width/height ——
-# autoFit 跟容器走，容器尺寸由壳的 CSS 定（几何 SSOT 在 grid.py）。
+# G2 5 的 API 是 chart.options(spec) + chart.render()。壳是固定画布：同步取初始
+# 容器尺寸并关闭 autoFit，避免 present/frame 隐藏非当前页时 resize 把图表缩成零宽。
 # ⚠️ 不要传 `renderer:` 字符串：这份 UMD bundle 只带默认 canvas 渲染器，
 # 字符串会在运行时抛 `registerPlugin is not a function`（实测）。
 G2_INIT_JS = """
 (function(){
   var nodes=[].slice.call(document.querySelectorAll('.g2[data-g2]'));
-  if(!nodes.length) return;
-  if(!window.G2){ nodes.forEach(function(n){ n.setAttribute('data-chart-error','no-g2'); }); return; }
-  nodes.forEach(function(n){
-    var spec; try{ spec=JSON.parse(n.getAttribute('data-g2')); }catch(e){
-      n.setAttribute('data-chart-error','bad-spec'); return; }
+  // 必须在第一个 await 之前取尺寸：后面的 SHELL 会 display:none 隐藏其他页。
+  // clientWidth/Height 是未缩放的布局尺寸；present 的 CSS transform 只缩放整页。
+  var boxes=nodes.map(function(n){return {node:n,width:n.clientWidth,height:n.clientHeight};});
+  function failed(n,e){
+    n.removeAttribute('data-chart-ready');
+    n.setAttribute('data-chart-error',String(e && e.message || e));
+  }
+  window.__deck_charts_ready=Promise.all(boxes.map(async function(box){
+    var n=box.node;
+    n.removeAttribute('data-chart-ready');
+    n.removeAttribute('data-chart-error');
     try{
+      if(!window.G2) throw new Error('no-g2');
+      if(box.width<=0 || box.height<=0) throw new Error('chart-container-has-no-size');
+      var spec=JSON.parse(n.getAttribute('data-g2'));
+      // 字体就绪后再画 canvas，避免首帧使用系统回退字体。
+      if(document.fonts && document.fonts.ready) await document.fonts.ready;
       // 不要传 renderer: 这份 UMD bundle 只带默认（canvas）渲染器 —— 传字符串
       // 会在运行时抛 registerPlugin is not a function。
       // devicePixelRatio 2：位图在两倍像素下渲染，进 PDF 时够锐。
-      var chart=new G2.Chart({container:n, autoFit:true, devicePixelRatio:2,
-                              animation:false, padding:'auto'});
+      var chart=new G2.Chart({container:n, width:box.width,height:box.height,
+                              autoFit:false, devicePixelRatio:2,
+                              padding:'auto'});
       chart.options(spec);
-      chart.render();
+      await chart.render();
       n.setAttribute('data-chart-ready','1');
-    }catch(e){ n.setAttribute('data-chart-error','render'); }
+    }catch(e){ failed(n,e); }
+  })).then(function(){
+    window.dispatchEvent(new Event('deck:charts-ready'));
   });
 })();
 """
@@ -1407,6 +1468,12 @@ def render_resolved(resolved: dict) -> str:
     —— 渲染器里没有第二套决策，是"去决策化"的物理保证。
     """
     deck = resolved["deck"]
+    # resolved 也可能来自直接 compile_spec 调用，不能依赖 CLI 的前置 schema 校验。
+    for number, slide in enumerate(deck["slides"], 1):
+        if slide.get("type") == "two-column" and len(slide.get("columns", [])) > 2:
+            raise ValueError(f"第 {number} 页 two-column 最多支持 2 栏；请拆页，不能截掉额外栏")
+        if slide.get("annotations"):
+            raise ValueError(f"第 {number} 页 annotations 尚未实现，不能忽略；请移除标注或先实现对应图形")
     style = resolved["style"]
     brand = resolved["brand"]
     tokens = style["tokens"]
@@ -1461,8 +1528,9 @@ def render_resolved(resolved: dict) -> str:
         out.append(decor(tokens, seed, i, kind))
         out.append('<div class="pad">')
         title_mid = f"s{i}.title"
-        th = title_html(slide.get("title", ""), tag(title_mid, i, "title",
-                                                    slide.get("title", ""), tsize))
+        headline = (str(slide.get("message", "")).strip() if kind == "chart" else "") \
+            or slide.get("title", "")
+        th = title_html(headline, tag(title_mid, i, "title", headline, tsize))
         if kind == "title":
             out.append(f'<div class="titleblock tb-{t_tier}" '
                        f'style="--s-title:{tsize}px">{th}</div>')
@@ -1570,7 +1638,7 @@ def render_resolved(resolved: dict) -> str:
             out.append(f'<div class="titleblock tb-{t_tier}" '
                        f'style="--s-title:{tsize}px">{th}</div>')
             cols = []
-            for ci, col in enumerate(slide.get("columns", [])[:2]):
+            for ci, col in enumerate(slide.get("columns", [])):
                 li = "".join(
                     f'<li {tag(f"s{i}.col{ci}.bullet.{bi}", i, "bullet", b, bsize)}>'
                     f'{rich(b)}</li>'
@@ -1628,14 +1696,21 @@ def render_resolved(resolved: dict) -> str:
             # **结论先行**（规范第 5 条）：写了 message 就让它当大标题 —— 图表的
             # 标题该是"DeepSeek 调用量领先"，不是数据集名。原 title 降为小标签。
             message = str(slide.get("message", "")).strip()
-            headline = message or th
             out.append(f'<div class="titleblock tb-{t_tier}" '
-                       f'style="--s-title:{tsize}px">{html.escape(headline)}</div>')
-            if message and str(slide.get("title", "")).strip():
-                # ⚠️ 这里要用**原始标题文本**：th 是渲染好的 <h1> HTML，
-                # 直接塞会把整串标签转义后印在页上。
-                out.append(f'<div class="chartsrc">'
-                           f'{html.escape(str(slide.get("title", "")))}</div>')
+                       f'style="--s-title:{tsize}px">{th}</div>')
+            dataset_title = str(slide.get("title", "")).strip()
+            unit = str(slide.get("unit") or "").strip()
+            source_parts = [dataset_title] if message and dataset_title else []
+            if unit:
+                source_parts.append(f"单位：{unit}")
+            if source_parts:
+                # 单位必须在成品上可见；与数据集名共享一行，不改变数值或比例尺。
+                source_text = " · ".join(source_parts)
+                src_attrs = tag(f"s{i}.chartSource", i, "caption", source_text,
+                                tier["caption"])
+                out.append(f'<div class="chartsrc" {src_attrs} '
+                           f'style="--s-caption:{tier["caption"]}px">'
+                           f'{html.escape(source_text)}</div>')
             # 图表把**数据本身**也带进清单：导出层要拿它建原生图表（数据可改），
             # 而数据不是几何 —— 几何仍旧只从 measure.py 来。
             chart_attrs = tag(f"s{i}.chart", i, "chart", "", None,
@@ -1724,8 +1799,7 @@ def render_resolved(resolved: dict) -> str:
         out.append(f'<script type="application/json" id="{tag_id}">{blob}</script>')
     out.append(CONSOLE_HTML)
     # 图表：先内联 G2 vendor（锁版本、离线可用），再实例化每页的 spec。
-    # renderer: svg + animation: false —— 确定性（§41：同输入同输出）；
-    # 渲染完打 data-chart-ready，测量端据此知道图表 DOM 已就绪。
+    # 默认 canvas renderer + animate:false；render Promise 完成后才打 ready。
     if g2_specs:
         try:
             with open(G2_VENDOR, encoding="utf-8") as fh:

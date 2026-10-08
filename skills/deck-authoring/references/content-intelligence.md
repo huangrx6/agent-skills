@@ -118,7 +118,7 @@ must_have（没它论证不成立）/ supporting（增强可信度）/ optional 
 
 每个 must_have Claim 必须能回答"它如何支撑 Core Thesis"；答不上 → drop / appendix。
 
-## 13. Storyline Archetype（不从零自由生成故事）
+## 13. Storyline Archetype（叙事起点，可按目标调整）
 
 预定义骨架（`planning.md` 列全表）：problem_solution（问题→影响→方案→证明，
 适合方案/产品/销售）、scr（情境→冲突→解法，咨询/决策）、why_what_how（技术方案/
@@ -206,13 +206,12 @@ Decorative（只承担氛围）。Page Planner 优先保留 Primary。
 2~4 条适合一页；5~6 进拆分评估；>6 默认高风险；10 条除 Appendix/Table 外原则上
 拆页。是 QA 初筛，不是绝对法律。
 
-## 28. 内容复杂度评分【≥0.70 未标 split=拦】
+## 28. 内容复杂度评分【复杂度初筛，结合实际页面判断】
 
 complexity = textAmount + nodeCount + evidenceCount + hierarchyDepth +
 chartSeriesCount + visualRequirementCount。本仓库用一条**确定性公式**自查：`字符/120 + 节点×0.12 + 图表×0.25 +
 图×0.15 + (层级-1)×0.10`，封顶 1.0 —— 没有 `complexityScore` / `risk` /
-`splitSuggested` 这类输出字段，现在也没有脚本替你算：**≥ 0.70 且没标拆页 = 硬约束**
-（自查）。标了拆页而内容很轻则会把一页拆散。
+`splitSuggested` 这类输出字段，现在也没有脚本替你算：**≥ 0.70 时评估拆页或改结构**，它是经验提示，不是跨场景的硬门槛。标了拆页而内容很轻则会把一页拆散。
 
 ## 29. 拆页策略
 
@@ -227,7 +226,7 @@ Page Planner 再映射（comparison → chart / two-column）。
 ## 31. Visual Requirement（落进 spec 就是 `visual`）
 
 Page Planner 必须给每页**决定一个视觉载体**，写进 spec 的 `visual`：`none`（纯文字立得住）/ 
-`evidence_image`（照片、插画、结构图、流程图 —— 都由人（或配好的后端）拿提示词出图）/ `data`（图表）。
+`evidence_image`（真实截图、照片、插画，以及由结构化工具制作的架构和流程图）/ `data`（图表）。
 要图与要图表时 `ratio` 必填（`"3:2"` / `"4:3"` / `"1:1"` / `"16:9"`）—— 比例写下来才算定，
 槽位高度按它算。**档位的语义、谁做、落到哪见 `images.md`**；`validate_spec.py` 拦未知档与
 自相矛盾，`check.py` 点出没决定的页。
@@ -248,16 +247,19 @@ Timeline / Chart / Architecture / Process / Table / Diagram 本身已是视觉�
 
 ## 34. 图片职责
 
-图片不承载 PPT 正式信息（标题/正文/数字/标签/图表说明/流程文字必须由 Renderer
-用真实文字绘制）；图片只负责观感、场景、证据、氛围、产品/人物/环境呈现。
+页面标题、正文、结论和数据图表使用真实文字与结构。截图与外部结构图可包含作为证据的标签，
+但必须核对内容、保证缩放后可读，并保留可编辑源；不得用生图模型编造流程关系或截图事实。
 
 ## 35. Chart Requirement
 
-内容层只定义 `{"kind": "data", "intent": "trend", "message": "调用量自 Q3 开始快速增长", "metricIds": ["m01", "m02"]}`；Chart Engine 决定类型、编码、标注、强调、动画。
+作者根据数据关系选型，在 slide 显式写 `chart`，并提供 `data` 或 `series`、`message` 与
+`visual:{"kind":"data","ratio":"3:2"}`；可选 `intent` 只记录语义，不推断图形。
+渲染器负责图形编码和几何；支持字段与当前限制见 `charts.md`。
 
 ## 36. Image Requirement
 
-内容层只定义 `{"kind": "evidence_image", "role": "hero", "reason": "展示产品实际外观"}`；prompt、比例、留白由 Image Pipeline 处理（见 images.md）。
+spec 用 `image` 指向素材，`visual:{"kind":"evidence_image","ratio":"3:2"}` 声明图位意图；
+作者另准备内容准确的 prompt 与构图要求，实际像素需求由 Image Pipeline 测量（见 images.md）。
 
 ## 37. Audience Distance
 
@@ -272,7 +274,7 @@ Content 只读 delivery mode、时长、观看距离（影响页数/密度/解�
 ## 39. 叙事节奏
 
 整套 PPT 不应每页同强度：高强度结论页 → 解释 → 证据 → 结构 → 数据 → 留白/过渡 →
-强结论。Storyline 主动创造节奏。
+强结论。Storyline 主动创造节奏。具体构图、观看场景和三轮视觉审稿见 `visual-quality.md`。
 
 ## 40. 章节内节奏
 
@@ -302,7 +304,7 @@ Section 推荐：Section Message → Explain → Evidence → Implication；不�
 ## 45. Narrative Gap Detection
 
 Story Graph 不允许逻辑断层：Problem → Implementation 缺 Solution → narrative_gap。
-本仓库由骨架顺序检查兜底【乱序=拦】。
+当前由作者审阅论证关系；没有自动语义检查，不把固定页序当作逻辑正确的保证。
 
 ## 46. Narrative Transition
 

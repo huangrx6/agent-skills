@@ -27,7 +27,7 @@
 
 51 倍。这不是优化，是「可用」与「不可用」的区别 —— 所以 CDP 是主路径。
 
-依赖：`websockets`（CDP 走 WebSocket）。缺了它会**说清楚**并降到慢路径，不静默变慢。
+依赖：`websockets`（CDP 走 WebSocket）。所有路径都先等待资源就绪，缺依赖时明确停止。
 
 跑法：
     python3 animate.py out.html -o deck.mp4                  # 默认出 MP4
@@ -124,7 +124,7 @@ def _encode_binary() -> str:
 
 # ── 取帧（CDP）──────────────────────────────────────────────────────────────
 async def _capture_async(html: str, out_dir: str, times: list[float], scale: float,
-                         progress=None):
+                         progress=None, pdf_out: str | None = None):
     """在**一次** Chrome 会话里，把这些时间点逐帧截下来。
 
     传时间点列表而不是 (fps, 帧数)：抽帧检查与整片录制走同一条路 ——
@@ -181,27 +181,67 @@ async def _capture_async(html: str, out_dir: str, times: list[float], scale: flo
             # ⚠️ __recording 必须在**导航之前**注入：页面 boot 时就要知道自己在录制
             #    （隐藏壳、不循环、首帧就 seek(0)）。晚一步就得靠事后纠正，
             #    而“事后纠正”正是 huashu 坑 #12 里那类起点偏移的来源。
-            await cmd(ws, "Page.addScriptToEvaluateOnNewDocument",
-                      {"source": "window.__recording = true;"})
+            if pdf_out is None:
+                await cmd(ws, "Page.addScriptToEvaluateOnNewDocument",
+                          {"source": "window.__recording = true;"})
             await cmd(ws, "Page.navigate", {"url": f"file://{os.path.abspath(html)}"})
 
             # 等 load + 字体就绪（字体没就绪就取帧 = 拍到 fallback 字体的排版，
             # 这是 huashu 坑 #6：测早了等于测错）
+            loaded = False
             for _ in range(200):
                 r = await cmd(ws, "Runtime.evaluate", {
                     "expression": "document.readyState === 'complete'",
                     "returnByValue": True})
                 if r.get("result", {}).get("value"):
+                    loaded = True
                     break
                 await asyncio.sleep(0.1)
-            await cmd(ws, "Runtime.evaluate", {
-                "expression": "document.fonts ? document.fonts.ready : 1",
-                "awaitPromise": True})
+            if not loaded:
+                raise SystemExit("✗ 20 秒内页面未加载完成，停止导出")
+            ready_js = """(async function(){
+              if(document.fonts) await document.fonts.ready;
+              await Promise.all(Array.from(document.images).map(async function(im){
+                if(im.decode) await im.decode();
+                if(!im.complete || !im.naturalWidth) throw Error('image-not-ready: '+im.src);
+              }));
+              if(window.__deck_charts_ready) await window.__deck_charts_ready;
+              var bad=Array.from(document.querySelectorAll('.g2[data-g2]')).find(function(n){
+                return n.hasAttribute('data-chart-error') || n.getAttribute('data-chart-ready')!=='1';
+              });
+              if(bad) throw Error('chart-not-ready: '+(bad.getAttribute('data-chart-error')||'pending'));
+              await new Promise(function(resolve){requestAnimationFrame(function(){requestAnimationFrame(resolve);});});
+              return true;
+            })()"""
+            try:
+                ready = await asyncio.wait_for(cmd(ws, "Runtime.evaluate", {
+                    "expression": ready_js, "awaitPromise": True, "returnByValue": True}), 30)
+            except TimeoutError as exc:
+                raise SystemExit("✗ 30 秒内字体、图片或图表未就绪，停止导出") from exc
+            if ready.get("exceptionDetails") or not ready.get("result", {}).get("value"):
+                detail = ready.get("exceptionDetails", {}).get("exception", {}).get("description", "资源未就绪")
+                raise SystemExit(f"✗ 导出资源加载失败：{detail[:400]}")
+
+            if pdf_out is not None:
+                printed = await cmd(ws, "Page.printToPDF", {
+                    "printBackground": True, "preferCSSPageSize": True,
+                    "displayHeaderFooter": False})
+                deckio.write_bytes(pdf_out, base64.b64decode(printed["data"]))
+                return []
 
             n = len(times)
+            last_slide = object()
             for i, t in enumerate(times):
-                await cmd(ws, "Runtime.evaluate",
-                          {"expression": f"window.__deck.seek({t:.6f})"})
+                seek = await cmd(ws, "Runtime.evaluate", {
+                    "expression": f"window.__deck.seek({t:.6f})"})
+                if seek.get("exceptionDetails"):
+                    raise SystemExit("✗ 页面没有可用的逐帧 seek 接口，停止导出")
+                selected = seek.get("result", {}).get("value")
+                if selected != last_slide:
+                    await cmd(ws, "Runtime.evaluate", {
+                        "expression": "new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))",
+                        "awaitPromise": True})
+                    last_slide = selected
                 shot = await cmd(ws, "Page.captureScreenshot",
                                  {"format": "png", "captureBeyondViewport": False})
                 path = os.path.join(out_dir, f"f{i:05d}.png")
@@ -222,20 +262,17 @@ async def _capture_async(html: str, out_dir: str, times: list[float], scale: flo
 
 def _capture_slow(html: str, out_dir: str, times: list[float], scale: float,
                   progress=None) -> list[str]:
-    """慢路径：一帧开一个 Chrome。缺 websockets / CDP 起不来时用。
-
-    保留它的意义不是「一样好」，而是**别把用户堵死** —— 装上 websockets 就快 51 倍，
-    但没装也得能出片。所以它会把代价说清楚，不静默地慢。
-    """
+    """调试路径：每帧重启 Chrome，仍必须等待同一套资源就绪条件。"""
     frames = []
     for i, t in enumerate(times):
-        path = os.path.join(out_dir, f"f{i:05d}.png")
-        url = f"file://{os.path.abspath(html)}#deckt={t:.6f}"
-        subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-                        f"--force-device-scale-factor={scale}",
-                        f"--window-size={SLIDE_W},{SLIDE_H}",
-                        f"--screenshot={path}", url],
-                       check=True, capture_output=True)
+        try:
+            captured = asyncio.run(_capture_async(html, out_dir, [t], scale))
+        except RuntimeError as exc:
+            if "no-websockets" not in str(exc):
+                raise
+            raise SystemExit("✗ 导出需要 websockets 验证资源就绪：pip install websockets") from exc
+        path = os.path.join(out_dir, f"slow-f{i:05d}.png")
+        os.replace(captured[0], path)
         frames.append(path)
         if progress:
             progress(i + 1, len(times))
@@ -295,7 +332,12 @@ def encode_gif(frames: list[str], out: str, fps: int) -> None:
 
     quantized = [im.quantize(palette=palette, dither=Image.Dither.FLOYDSTEINBERG)
                  for im in imgs]
-    duration = max(20, round(1000 / fps))       # GIF 的 duration 是毫秒整数
+    if fps <= 0 or fps > 50:
+        raise SystemExit("✗ GIF 帧率必须在 1–50fps（兼容播放器的最短帧时长为20ms）")
+    # GIF 以 10ms 为单位；逐帧恒定 round(1000/24) 会被截成40ms并累积4%误差。
+    # 先量化累计时间，再取差，24fps得到40/50ms交替，长片也只有≤5ms总误差。
+    duration = [(round((i + 1) * 100 / fps) - round(i * 100 / fps)) * 10
+                for i in range(len(quantized))]
     quantized[0].save(out, save_all=True, append_images=quantized[1:],
                       duration=duration, loop=0, optimize=True,
                       disposal=2)               # disposal=2：每帧前清底，避免残影
@@ -339,11 +381,7 @@ def inspect_media(path: str, fps: int) -> dict:
 
 def _capture(html: str, work: str, times: list[float], scale: float,
              force_slow: bool, progress=None) -> list[str]:
-    """取帧的入口：优先 CDP，不行就降级并**把代价说清楚**。
-
-    降级不是“静默地慢”：先告诉用户慢多少、以及怎么变快（装 websockets）。
-    堵死用户的导出比慢一点更不可接受。
-    """
+    """取帧入口：复用一个 CDP 会话；--slow 用相同就绪链逐帧重启浏览器。"""
     if force_slow:
         print("· 慢路径：一帧一个 Chrome（约 2.4s/帧 —— 排查 CDP 问题时用）")
         return _capture_slow(html, work, times, scale, progress)
@@ -352,10 +390,7 @@ def _capture(html: str, work: str, times: list[float], scale: float,
     except RuntimeError as exc:
         if "no-websockets" not in str(exc):
             raise
-        est = len(times) * 2.45 / 60
-        print(f"⚠ 没装 websockets，CDP 走不了 → 降级成慢路径（约 {est:.0f} 分钟）。\n"
-              f"  装上它快 51 倍：pip install websockets")
-        return _capture_slow(html, work, times, scale, progress)
+        raise SystemExit("✗ 导出需要 websockets 验证字体、图片和图表就绪：pip install websockets") from exc
 
 
 def _parse_times(raw: str) -> list[float]:
