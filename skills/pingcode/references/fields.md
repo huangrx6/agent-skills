@@ -39,7 +39,7 @@
 
 ## `state.type`：判断「完没完」用这个
 
-官方状态对象是 `{id, name, type, color}`。`type` 是语义值，**实测（真实租户）有 4 个**：
+官方状态对象是 `{id, name, type, color}`。`type` 是语义值，历史租户验证中包括以下值；以后可能扩展：
 
 | `state.type` | 实测对应哪些状态名 | 算不算未完成 |
 | --- | --- | --- |
@@ -51,8 +51,7 @@
 两件事容易踩：
 
 1. **`closed` 是第四个值**（已拒绝）。只看 `completed` 会把已拒绝的条目录进「未完成」。
-2. **「已修复」的语义是 `in_progress`**，不是 `completed` —— 因为还没发布/验收。这是
-   PingCode 自己的定义，别按字面理解。
+2. **「已修复」的语义是 `in_progress`**，不是 `completed` —— 因为还没发布/验收。这只是该租户的配置，其他项目应读取返回的 `state.type`。
 
 `workitem mine --open-only` 的判据是 `state.type ∉ {completed, closed}`（**黑名单**）：
 以后官方再加语义值时，新值会被算进「未完成」—— 宁可多列，也不要把活藏起来。
@@ -75,9 +74,8 @@
 创建项目必填：`type`、`name`、`identifier`。`process_id`（项目流程）可选，
 来自 `GET /v1/pjm/processes`（要 `pcp:read:pjm:configuration` scope）。
 
-**项目没有删除接口。** 只有 `POST /v1/pjm/projects`、`PATCH /v1/pjm/projects/{id}`、
-`POST /v1/pjm/projects/{id}/clone`、`PATCH /v1/pjm/project_states/{id}`。要「关闭项目」
-就改项目状态。
+**当前随附端点表没有项目删除接口。** 只有 `POST /v1/pjm/projects`、`PATCH /v1/pjm/projects/{id}`、
+`POST /v1/pjm/projects/{id}/clone`、`PATCH /v1/pjm/project_states/{id}`。用户明确要求关闭项目时，可修改其项目状态。
 
 ## 迭代 / 类型 / 优先级 / 标签 / 成员
 
@@ -96,7 +94,7 @@
 
 这些进 6 小时的本地缓存；`--no-cache` 或 `config refresh` 可以强制重拉。
 
-**成员的名字不在 `name` 里** —— 实测 `name` 是手机号，真名在 `display_name`。
+成员展示名优先读 `display_name`；`name` 可能是用户名或手机号。
 所以 `--assignee` 支持真名 / 用户名（手机号）/ 邮箱 / id 四种写法。
 
 ## 编号不是 id
@@ -120,7 +118,7 @@ CLI 的做法：形状像编号的（`DEMO-80`）直接走列表接口的 `ident
 
 ## 父工作项的**类型**有约束
 
-实测：这个项目里用户故事的父项**不能是史诗**，得是特性（史诗 → 特性 → 用户故事 → 任务）。
+实测：某次验证的项目里用户故事的父项**不能是史诗**，得是特性（史诗 → 特性 → 用户故事 → 任务）。
 越级挂会返回 **400「父工作项的类型不正确」**。这是项目的类型配置，CLI 不替你猜 ——
 报错提示里已写明这一条。
 
@@ -129,8 +127,7 @@ CLI 的做法：形状像编号的（`DEMO-80`）直接走列表接口的 `ident
 - `page_size` 默认 30、**上限 100**；`page_index` **从 0 开始**。
 - 响应：`{page_size, page_index, total, values: [...]}`。
 - 不需要 `page_index` 的调用用 `GET /v1/pjm/workitems`；复杂组合、日期、自定义属性过滤要用
-  `POST /v1/pjm/workitems/search`（类 MongoDB 的 `payload.filter`），本 skill 目前只封了前者
-  （`workitem list` 的常用条件都走前者），复杂条件走 `api` 逃生口。
+  `POST /v1/pjm/workitems/search`（类 MongoDB 的 `payload.filter`），CLI 分别提供 `workitem list` 与 `workitem search`，常用搜索参数和 `--filter` 见 commands.md。
 
 ## 错误格式与限流
 
@@ -152,7 +149,6 @@ CLI 的做法：形状像编号的（`DEMO-80`）直接走列表接口的 `ident
 官方全部用 **10 位秒级时间戳**。CLI 收 `2026-09-20`、`2026-09-20 18:30` 或时间戳本身，
 只写日期时按当天 00:00（本地时区）算。
 
-> 一个官方文档上的坑：`/v1/auth/token` 响应示例里的 `expires_in` 是 `1577808000`，
-> 那是**绝对时间戳**（2020-01-01），不是常规 OAuth 的「还有多少秒」。代码两种都接
-> （大于 10^9 当绝对时间戳），并在 `auth status` 里把算出来的到期时间打出来 ——
-> 这条属于**未实测**，等真实令牌到手第一次 `auth status` 就能确认。
+`expires_in` 兼容相对秒数和绝对时间戳（大于等于 10^9 按绝对时间处理）。
+缺少有效值时，访问令牌按 30 天回退；refresh_token 的存在不会延长访问令牌寿命。
+实际可用性仍由服务端判断，401 时按授权流程处理。

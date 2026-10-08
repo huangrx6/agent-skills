@@ -148,6 +148,11 @@ class TransportCase(TempConfigCase):
 
 # ── 配置 ──────────────────────────────────────────────────────
 class ConfigTest(TempConfigCase):
+    def test_缺过期字段时_refresh不延长_access有效期(self):
+        with mock.patch.object(cfg.time, "time", return_value=1700000000):
+            record = cfg.save_token({"access_token": "fake-access", "refresh_token": "fake-refresh"}, "user")
+        self.assertEqual(1700000000 + cfg.FALLBACK_ACCESS_TTL, record["expires_at"])
+
     def test_目录与文件名稳定(self):
         saved = os.environ.pop(cfg.ENV_DIR, None)
         try:
@@ -303,6 +308,30 @@ class MultipartTest(TransportCase):
 
 
 class ClientTest(TransportCase):
+    def test_网络错误中的url编码凭据也脱敏(self):
+        import urllib.parse
+        secret = "synthetic secret+with spaces"
+        cli, _calls = self.make_client(urllib.error.URLError("offline"))
+        with self.assertRaises(client.ApiError) as caught:
+            cli.request("GET", "/v1/auth/token", params={"client_secret": secret}, authenticate=False)
+        output = str(caught.exception)
+        for variant in (secret, urllib.parse.quote(secret, safe=""), urllib.parse.quote_plus(secret, safe="")):
+            self.assertNotIn(variant, output)
+        self.assertIn("***", caught.exception.message)
+
+    def test_授权查询凭据可传输但不得出现在预览和错误中(self):
+        secrets = {"client_secret": "test-secret-unique", "code": "test-code-unique",
+                   "refresh_token": "test-refresh-unique"}
+        cli, calls = self.make_client(http_error(400, {"message": "rejected test-secret-unique"}))
+        plan = cli.describe("GET", "/v1/auth/token", params=secrets, body=secrets, authenticate=False)
+        with self.assertRaises(client.ApiError) as caught:
+            cli.request("GET", "/v1/auth/token", params=secrets, authenticate=False)
+        for value in secrets.values():
+            self.assertNotIn(value, json.dumps(plan))
+            self.assertNotIn(value, str(caught.exception))
+            self.assertNotIn(value, caught.exception.url)
+            self.assertIn(value, calls[0].full_url)
+
     def test_describe_不带真令牌(self):
         cli, _calls = self.make_client(FakeResponse({}))
         plan = cli.describe("GET", "/v1/myself")
@@ -483,6 +512,13 @@ class ClientTest(TransportCase):
 
 # ── 授权 ──────────────────────────────────────────────────────
 class AuthTest(TempConfigCase):
+    def test_环境令牌不沿用缓存企业令牌模式(self):
+        cfg.save_token({"access_token": "cached", "expires_in": 2592000}, "enterprise")
+        os.environ[cfg.ENV_TOKEN] = "environment-token"
+        self.assertEqual("", auth.current_mode())
+        os.environ[cfg.ENV_MODE] = "user"
+        self.assertEqual("user", auth.current_mode())
+
     def test_三个_grant_type_都能唯一定位(self):
         for grant in ("client_credentials", "authorization_code", "refresh_token"):
             with self.subTest(grant=grant):

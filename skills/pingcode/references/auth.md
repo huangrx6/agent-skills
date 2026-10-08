@@ -5,7 +5,7 @@
 1. PingCode **企业后台 → 凭据管理（应用管理）→ 创建应用**，拿到 `Client ID` 与 `Secret`。
 2. 同一个应用里登记 **回调地址**。默认用 `http://localhost:8765/callback` ——
    CLI 会在本机起一个监听自动收授权码，不用手抄。换端口就同时改这里和 `credentials.json`。
-3. 配 **数据范围（scope）**。官方一共 54 个 scope，本 skill 的常用命令需要下面这些：
+3. 配 **数据范围（scope）**。按任务只配置需要的 scope；常用命令对应如下：
 
 | 要干的事 | 必需的 scope |
 | --- | --- |
@@ -69,7 +69,7 @@ python3 scripts/pingcode.py auth logout                # 只删本地令牌，�
 
 ## 配置放在哪
 
-**全局一套，放在用户目录，不进仓库**（`PINGCODE_CONFIG_DIR` 可以换目录）：
+默认放在用户目录，不进仓库。每个租户使用独立 `PINGCODE_CONFIG_DIR`，避免上下文与字典缓存串用：
 
 ```text
 ~/.config/agent-skills/pingcode/
@@ -93,7 +93,7 @@ python3 scripts/pingcode.py auth logout                # 只删本地令牌，�
 
 私有部署把 `host` 写成 `你的域名/open`（REST 根带 `/open`，授权页根不带 —— 代码会自动区分）。
 
-令牌与上下文**原子写 + 权限 0600**（先写临时文件再 `os.replace`），不会留下半截文件，
+程序写入的令牌与上下文**原子写 + 权限 0600**（先写临时文件再 `os.replace`），不会留下半截文件，
 同机器其他用户也读不到。
 
 ## 环境变量（优先级高于配置文件）
@@ -103,8 +103,10 @@ python3 scripts/pingcode.py auth logout                # 只删本地令牌，�
 | `PINGCODE_CLIENT_ID` / `PINGCODE_CLIENT_SECRET` | CI / Agent 里免写文件 |
 | `PINGCODE_HOST` | 覆盖 host（私有部署 / 测试环境） |
 | `PINGCODE_AUTH_MODE` | `user` / `enterprise` |
-| `PINGCODE_ACCESS_TOKEN` | **直接给一个令牌**，跳过登录（临时排障、只读场景） |
+| `PINGCODE_ACCESS_TOKEN` | **直接给一个令牌**，优先于本地缓存；模式未知时由服务端判断权限 |
 | `PINGCODE_CONFIG_DIR` | 换配置目录（每个企业一套配置、跑测试时隔离） |
+| `AGENT_SKILLS_CONFIG_DIR` | 共享配置根（默认 `~/.config/agent-skills`） |
+| `PINGCODE_REDIRECT_URI` | 覆盖配置里的回调地址 |
 
 ## 排错
 
@@ -112,12 +114,11 @@ python3 scripts/pingcode.py auth logout                # 只删本地令牌，�
 | --- | --- | --- |
 | 授权页报「应用未配置 'redirect_uri'」 | 应用里没登记回调地址 | 去后台补 `http://localhost:8765/callback`；不行就用 `--code` 那条路（见上） |
 | 401 | 令牌无效/过期/被撤销 | `auth login` 重新授权 |
-| 403 | 应用的数据范围不够（**报错会指出缺哪个 scope**） | 去后台把这个 scope 勾上，然后重新授权。`whoami` / `@me` 需要 `pcp:read:account:personal`，不想加就用 `--assignee <你的真名>` |
+| 403 | 应用的数据范围不够（**报错会指出缺哪个 scope**） | 检查应用数据范围及用户权限，调整后重试；服务端仍拒绝时再重新授权。`whoami` / `@me` 需要 `pcp:read:account:personal`，不想加就用 `--assignee <你的真名>` |
 | 404 | 对象不存在，或路径不对 | 对象确认一遍；路径以生成的端点表为准（`api --list 关键词`） |
 | 429 | 触发了限流 | 报错会带官方建议的等待秒数与剩余配额；CLI 已自动按建议重试 |
 | 连不上 / 域名解析失败 | host 写错（私有部署少了 `/open`）或网络 | `auth status` 会打出解析后的 REST 根与 OAuth2 根 |
 | `/v1/myself` 报「只认用户令牌」 | 当前是企业令牌 | `auth login --mode user` |
 
-限流细节（官方）：公有云两层限流 —— 企业每分钟 200（免费版）/ 500 + 成员数 × 20（付费版），
-单接口每秒 30；429 时公有云返回 `X-RateLimit-Retry-After`，私有部署返回 `X-PC-Retry-After`。
-两种响应头都读。
+限流配额以服务端响应为准。429 时公有云返回 `X-RateLimit-Retry-After`，私有部署返回 `X-PC-Retry-After`。
+两种响应头都读，默认最多重试 3 次；网络中断和 5xx 不自动重试写操作。

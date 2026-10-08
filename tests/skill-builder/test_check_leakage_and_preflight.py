@@ -1,11 +1,4 @@
-"""`check_leakage.py` 与 `preflight.py` 的边界值测试。
-
-按项目定的停止判据：**元工具只需要边界值测试**，不要求"验证测试本身对不对"。
-
-这两个脚本原本**一个测试都没有** —— 而 `check_pointers.py` 刚被证明
-"假阴性比没有检查更糟"（只扫含「见」的句子，别的写法的悬空引用完全看不见）。
-所以同一条理由适用于这里：它们是报告事实的来源，而**来源本身没人查**过。
-"""
+"""名称泄露检查与 preflight 快照的回归测试。"""
 import contextlib
 import importlib.util
 import io
@@ -14,6 +7,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时读的是
@@ -117,7 +111,7 @@ class TestPreflightBoundaries(unittest.TestCase):
         with open(os.path.join(path, "SKILL.md"), "w", encoding="utf-8") as fh:
             fh.write("---\nname: x\ndescription: y\n---\n\n# 标题\n")
         if test_methods:
-            tests = os.path.join(path, "tests")
+            tests = os.path.join(self.dir, "tests", name)
             os.makedirs(tests)
             body = "import unittest\n\n\nclass T(unittest.TestCase):\n"
             for i in range(test_methods):
@@ -136,13 +130,19 @@ class TestPreflightBoundaries(unittest.TestCase):
         """临时目录往上找不到 skills/ 时要返回 None，而不是一路走到根目录乱认。"""
         self.assertIsNone(PRE.find_root(self.dir))
 
-    def test_count_tests_reads_the_real_number(self):
+    def test_counts_test_files_without_running_or_importing_them(self):
         path = self._skill("with-tests", test_methods=3)
-        self.assertEqual(3, PRE._count_tests(path, self.dir))
+        marker = os.path.join(self.dir, "tests", "with-tests", "test_crash.py")
+        with open(marker, "w", encoding="utf-8") as fh:
+            fh.write("raise SystemExit('must not execute')\n")
+        with mock.patch.object(PRE, "_run", side_effect=AssertionError("no execution")):
+            facts = PRE.skill_facts(self.dir)
+        self.assertEqual(2, facts[0]["test_files"])
+        self.assertNotIn("tests", facts[0])
 
     def test_skill_without_tests_counts_zero(self):
         path = self._skill("no-tests")
-        self.assertEqual(0, PRE._count_tests(path, self.dir))
+        self.assertEqual(0, PRE._count_test_files(path, self.dir))
 
     def test_skill_facts_reports_every_skill(self):
         self._skill("aaa", test_methods=1)
@@ -150,12 +150,44 @@ class TestPreflightBoundaries(unittest.TestCase):
         names = [f["skill"] for f in PRE.skill_facts(self.dir)]
         self.assertEqual(["aaa", "bbb"], names, "技能要按名字排序，缺一个都不行")
 
-    def test_hook_steps_are_read_from_the_actual_hook(self):
-        """hook 步骤数是从 `.githooks/pre-commit` 读出来的，不是写死在报告里。"""
-        steps = PRE.hook_steps(ROOT)
-        self.assertGreaterEqual(len(steps), 4, f"读到的步骤：{steps}")
-        self.assertTrue(all(s[0].isdigit() for s in steps),
-                        f"步骤应以序号开头：{steps}")
+    def test_snapshot_survives_invalid_frontmatter_types(self):
+        self._skill("bad-fm")
+        for data in (None, 42, [], {"description": 42}):
+            with self.subTest(data=data), mock.patch.object(PRE._vs, "load_yaml", return_value=(data, None)):
+                fact = PRE.skill_facts(self.dir)[0]
+                self.assertEqual(0, fact["description_chars"])
+
+    def test_snapshot_shares_validator_body_limit(self):
+        path = self._skill("within-limit")
+        with open(os.path.join(path, "SKILL.md"), "a", encoding="utf-8") as fh:
+            fh.write("text\n" * 180)
+        fact = PRE.skill_facts(self.dir)[0]
+        self.assertEqual(PRE._vs.MAX_BODY_LINES, PRE.MAX_BODY_LINES)
+        self.assertFalse(fact["over_limit"])
+        self.assertEqual(PRE._vs.MAX_BODY_LINES - fact["body_lines"], fact["headroom"])
+
+    def test_hook_steps_allow_adjacent_closing_separator(self):
+        os.makedirs(os.path.join(self.dir, ".githooks"))
+        with open(os.path.join(self.dir, ".githooks", "pre-commit"), "w") as fh:
+            fh.write("# ── 1. Check ──\n# ── 2. Advisory（only）──\n")
+        self.assertEqual(["1. Check", "2. Advisory（only）"], PRE.hook_steps(self.dir))
+
+    def test_undocumented_helper_is_advisory_and_snapshot_is_not_a_test_run(self):
+        path = self._skill("demo")
+        os.makedirs(os.path.join(path, "scripts"))
+        with open(os.path.join(path, "scripts", "internal.py"), "w") as fh:
+            fh.write("# loaded by another module\n")
+        output = io.StringIO()
+        with mock.patch.object(PRE, "find_root", return_value=self.dir), \
+                mock.patch.object(PRE, "install_drift", return_value=(True, "fixture")), \
+                contextlib.redirect_stdout(output):
+            code = PRE.main(["--snapshot-only", "--json"])
+        import json
+        payload = json.loads(output.getvalue())
+        self.assertEqual(0, code)
+        self.assertFalse(payload["tests_run"])
+        self.assertNotIn("total_tests", payload)
+        self.assertEqual([["demo", "internal.py"]], payload["orphan_scripts"])
 
 
 if __name__ == "__main__":

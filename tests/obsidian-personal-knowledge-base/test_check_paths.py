@@ -1,19 +1,5 @@
 #!/usr/bin/env python3
-"""check_paths.py 的回归测试。
-
-为什么需要：这个脚本存在的理由就是"配置指向虚空 + 失败静默"没法靠自觉发现
-（better-export-pdf 的 cssSnippet 指向旧 vault 位置，插件的 catch 只打 console，
-PDF 静默地不带自定义样式，而且错误路径还被 prevConfig 每次导出重新固化）。
-脚本本身每个设计决定也都来自具体的坑 —— 含空格的路径被截断、"文件 vs 目录"
-的分层、扫描范围必须排除笔记正文与插件打包 JS。这些同样是会淡忘的经验。
-
-fixture 在 setUpClass 里生成到临时目录，不落盘成真实文件 —— 那些故意写坏的
-路径会被编辑器/检查工具当成真问题报警，而它们本来就是用来测"坏路径能被报出来"的。
-
-跑法：
-    python3 -m unittest discover -s tests -v
-    python3 tests/test_check_paths.py
-"""
+"""只用临时 vault 验证配置扫描边界、路径提取、启发式分类与 CLI 退出码。"""
 
 from __future__ import annotations
 
@@ -27,9 +13,6 @@ import tempfile
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时读的是
-# `skills/<skill>/` 那棵树，测试放在里面会被顺手读进去）。
-# 所以从 `tests/<skill>/` 往上两级到仓库根，再进 `skills/<skill>/`。
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
 CHECK_PATHS = os.path.join(SCRIPTS, "check_paths.py")
@@ -59,7 +42,7 @@ def _config_json(root: str) -> str:
             "spacedBad": f"{root}/.obsidian/我 的/也缺.css",
             # 不存在、无扩展名 → 目录类,只提示
             "outDir": f"{root}/.obsidian/还没建的目录",
-            # ~ 开头:Node 的 fs 不做展开,必然失败 → 要标出来
+            # ~ 开头的缺失路径要保留标记，插件展开规则由人工判断
             "tilde": "~/绝不可能存在-ABC123/foo.css",
         },
         indent=2,
@@ -125,7 +108,7 @@ class CheckPathsTest(unittest.TestCase):
         self.assertIn(
             f"{self.tmp}/.obsidian/snippets/缺失.css",
             self.paths,
-            "配置指向不存在的 CSS 文件却没被报出 —— 这正是 better-export-pdf 那个 bug",
+            "配置指向不存在的 CSS 文件却没被报出",
         )
 
     # ── 防线 2:存在的路径不该报(误报会让人不再信任检查) ──
@@ -166,14 +149,14 @@ class CheckPathsTest(unittest.TestCase):
     # ── 防线 5:~ 开头的路径要被标出来 ──
     def test_tilde_path_is_flagged(self):
         tilde = [i for i in self.result["file_refs"] if i["tilde"]]
-        self.assertEqual(len(tilde), 1, "~/ 开头的路径没有被标记 —— Node 的 fs 不会展开它")
+        self.assertEqual(len(tilde), 1, "~/ 开头的路径没有被标记")
         self.assertTrue(tilde[0]["path"].startswith("~/"))
 
     # ── 防线 6:扫描范围只限配置文件 ──
     def test_notes_are_not_scanned(self):
         self.assertFalse(
             [p for p in self.everything if "/Users/me/" in p or "/opt/app" in p],
-            "笔记正文里的示例绝对路径被扫进来了 —— 实测 vault 里有 64 处,全是误报",
+            "笔记正文里的示例绝对路径被扫进来了",
         )
 
     def test_bundled_plugin_js_is_not_scanned(self):
@@ -191,6 +174,22 @@ class CheckPathsTest(unittest.TestCase):
             len(self.result["dir_refs"]), 1,
             f"期望恰好 1 个不存在的目录,实得 {sorted(self.dirs)}",
         )
+
+    def test_quoted_and_bare_paths_on_same_line(self):
+        text = 'paths: ["/tmp/path with spaces/a.css", /opt/missing/b.css]'
+        self.assertEqual([(1, "/tmp/path with spaces/a.css"), (1, "/opt/missing/b.css")],
+                         self.mod.extract_paths(text))
+
+    def test_bare_path_at_start_of_line(self):
+        self.assertEqual([(1, "/tmp/missing.css")], self.mod.extract_paths("/tmp/missing.css"))
+
+    def test_explicit_directory_with_extension_is_advisory(self):
+        self.assertFalse(self.mod.is_file_reference("/tmp/output.v2/"))
+
+    def test_quiet_output_is_only_count(self):
+        proc = subprocess.run([sys.executable, CHECK_PATHS, "--vault", self.tmp, "--quiet"],
+                              capture_output=True, text=True)
+        self.assertEqual("3\n", proc.stdout)
 
     # ── CLI 行为:退出码契约 ──
     def test_cli_exit_code_is_1_when_file_missing(self):

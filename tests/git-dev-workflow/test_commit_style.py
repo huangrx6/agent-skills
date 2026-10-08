@@ -103,7 +103,8 @@ class TestSpecViolations(StyleCase):
         self.assertIn("规则 4", self.spec_rules("fix(): 补上 scope"))
 
     def test_rule_4_scope_with_space(self):
-        self.assertIn("规则 4", self.spec_rules("fix(a b): 补上 scope"))
+        self.assertNotIn("规则 4", self.spec_rules("fix(a b): 补上 scope"))
+        self.assertIn("scope 格式", self.project_rules("fix(a b): 补上 scope"))
 
     def test_rule_6_body_without_blank_line(self):
         self.assertIn("规则 6", self.spec_rules("fix: 小修\n正文直接接上了"))

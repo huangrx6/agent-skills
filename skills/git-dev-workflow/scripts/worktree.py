@@ -1,45 +1,10 @@
 #!/usr/bin/env python3
-"""worktree 的生命周期：建 / 列 / 查 stale / 回收。
+"""Worktree 的创建、列表、失效记录清理与回收。
 
-## 放在哪（已定：**仓库同级**）
-
-    /a/b/specforge                         ← 仓库
-    /a/b/specforge-feat-ui-shadcn-vue      ← 它的 worktree，同级
-
-好处是**在仓库之外**：不用往 `.gitignore` 里塞规则，`git status` 也看不见它们。
-（放在仓库里的 `.worktrees/` 也能用，但每条新分支都要多一次「记得别提交」的自觉 ——
-而自觉是这整套东西里最不可靠的一环。）
-
-## 判据不在这里，在 git_guard.py
-
-「这个 worktree 能不能回收」只有**一个**实现：`git_guard.py` 的 `delete-worktree`。
-这个脚本调用它，不重写它 —— 两份判据必然漂移，而漂移的那一份会让你在错误的一侧
-得到安全感。
-
-判据按**实测到的事实**定：`git worktree remove` 只拿掉工作目录和记录，**不删分支、
-不删提交**。所以真正会丢的只有那一件 —— **那个目录里的未提交改动**（脏 → 拦）；
-分支没并进基线只是**提醒**（不丢东西，但先确认你不是做到一半）。
-
-## 不做的事
-
-- **不 `--force`**：`remove` 走判据，判据说不行就是不行。
-- **不删还有文件的 worktree**：那是 `rm -rf` 的活，`git worktree remove` 会拒绝，
-  这里也不替它绕过去。
-- **不碰你的分支合并策略**：这个脚本只负责把目录建出来、把目录收回去。
-
-## 退出码
-
-- `0` 成功
-- `1` 被拒绝（原因会打出来）或执行失败
-- `3` / `4`：`remove` 沿用它拿到的 guard 结论（WARN / BLOCK），不自己另定一套
-
-## 用法
-
-    python3 scripts/worktree.py list
-    python3 scripts/worktree.py list --stale
-    python3 scripts/worktree.py create feat/ui --from main
-    python3 scripts/worktree.py prune
-    python3 scripts/worktree.py remove ../specforge-feat-ui
+默认在仓库同级创建新分支工作树，--at 可指定仓库外路径。
+remove 复用 git_guard，仅自动执行 SAFE；不会 --force 或删除分支。
+命令：list [--stale] / create BRANCH [--from REF] / remove PATH / prune。
+退出码：0 成功，1 执行失败，3/4 为 guard 的 WARN/BLOCK。
 """
 
 from __future__ import annotations
@@ -167,6 +132,8 @@ def render_list(state: dict, stale_only: bool) -> str:
             flags.append("prunable")
         if item["dirty"]:
             flags.append(f"未提交 {item['dirty']}")
+        if item.get("ignored_files"):
+            flags.append(f"忽略项 {len(item['ignored_files'])}，回收时一并删除")
         if item["unpushed"]:
             flags.append(f"未推送 {item['unpushed']}")
         rows.append({"path": item["path"], "branch": item["branch"] or "(detached)",
@@ -179,8 +146,8 @@ def render_list(state: dict, stale_only: bool) -> str:
         note = "  [" + ", ".join(row["flags"]) + "]" if row["flags"] else ""
         lines.append(f"{row['verdict']:<6} {row['branch']:<30} {row['head']:<9} "
                      f"{row['path']}{note}")
-    lines.append("（结论来自 git_guard.py 的判据：脏 → BLOCK；未并入基线 → WARN；"
-                 "干净且已并入 → SAFE）")
+    lines.append("（结论来自 git_guard.py：未提交改动或不可丢弃的忽略项 → BLOCK；"
+                 "命名分支未并入 → WARN；提交可保留且本地内容可回收 → SAFE）")
     return "\n".join(lines)
 
 
@@ -188,6 +155,8 @@ def run(args) -> tuple[int, str]:
     state = S.snapshot(args.repo)
     if not state.get("is_repo"):
         return 1, f"不是一个 git 仓库：{os.path.abspath(args.repo)}"
+    if state.get("read_errors") and args.command != "list":
+        return BLOCK, "状态读取不完整：\n" + "\n".join(state["read_errors"])
 
     if args.command == "list":
         rows = render_list(state, args.stale)
@@ -227,6 +196,11 @@ def run(args) -> tuple[int, str]:
                    f"  这个目录在仓库之外 {beside}：不用改 .gitignore，git status 也看不见它")
 
     if args.command == "prune":
+        for item in state["worktrees"]:
+            if not item["exists"]:
+                verdict = GUARD.evaluate("delete-worktree", state, _GuardArgs(item["path"]))
+                if verdict.level == BLOCK:
+                    return BLOCK, GUARD.render(verdict)
         before = len(state["worktrees"])
         code, out, err = S.run_git(state["root"], "worktree", "prune", "-v")
         if code != 0:
@@ -266,9 +240,12 @@ def run(args) -> tuple[int, str]:
         if code != 0:
             return 1, f"移除失败：{err.strip()}\n（目录里还有文件的话，这里是不会替你 --force 的）"
         after = S.snapshot(args.repo)
+        ignored_notice = ""
+        if item.get("ignored_files"):
+            ignored_notice = f"\n同时删除了 {len(item['ignored_files'])} 项忽略的构建产物（按名称分类，需能重新生成）"
         return 0, (f"移除了 {item['path']}\n"
                    f"worktree 条目：{len(state['worktrees'])} → {len(after['worktrees'])}"
-                   f"（分支 {item['branch']} 还在，要删它用 git_guard.py delete-branch）")
+                   f"（分支 {item['branch']} 还在，要删它用 git_guard.py delete-branch）" + ignored_notice)
 
     return 1, f"不认识的子命令：{args.command}"
 

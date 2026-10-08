@@ -1,24 +1,9 @@
 #!/usr/bin/env python3
-"""从官方 api_data.json 生成 scripts/endpoints.py。
+"""从官方 api_data.json 生成端点数据。
 
-为什么要有这个生成器
---------------------
-参考实现（第三方那个 pingcode skill）里写死了 `/v1/project/work_items`、
-`/v1/project/projects` 这类路径，而官方当前文档里**根本不存在**：PJM 的前缀是
-`/v1/pjm/`，且是 `workitems`（没有下划线）。它的测试 mock 了 `urllib.request.urlopen`，
-所以路径写错照样全绿 —— 手抄端点的风险就是这样被掩盖的。
-
-这里的做法：端点表**全部由官方文档生成**，生成文件里记下来源 URL、抓取时间和内容
-指纹；`tests/test_endpoints.py` 拿这份表做契约测试（代码里用到的每个端点都必须先在
-表里存在）。文档改了 → `--check` 报漂移 → 重新生成。
-
-跑法
-----
-    python3 dev-tools/gen_endpoints.py                  # 联网抓官方文档并生成
-    python3 dev-tools/gen_endpoints.py --input x.json   # 用本地快照（离线可跑）
-    python3 dev-tools/gen_endpoints.py --check          # 只比对不写（漂移检测）
-
-退出码：0 成功或无漂移 / 1 漂移或抓取失败 / 2 用法错误
+默认访问公开文档；--input PATH 使用本地快照，--check 只比对不写。
+生成物记录来源、时间和指纹。查询逻辑放在 scripts/api_index.py。
+退出码：0 成功或无漂移；1 读取/生成错误或漂移；2 用法错误。
 """
 
 from __future__ import annotations

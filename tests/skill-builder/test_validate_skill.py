@@ -1,21 +1,5 @@
 #!/usr/bin/env python3
-"""validate_skill.py 的回归测试。
-
-为什么需要：这个脚本是 skill 的机械检查器，其中「正文 ≤ 150 行」和
-「无绑定声明矛盾」都是**阻塞性**的 —— 边界差一行就会误挡正常提交，判定写得宽一点
-就会误报（实测已经误报过两次：WLRR 的「不绑定本机」被当成绑定声明，
-skill-builder 里“描述这个失败模式”的句子被当成在犯这个错）。
-
-检查器本身会坏，而它坏了的表现是**静默放行或静默误挡**。所以边界值和
-判定规则都要有测试守住。我这次先是在临时 bash 里手动验了一遍 —— 那种验证是
-一次性的，不会留下防线，所以搬到这里来。
-
-fixture 在 setUp 里生成到临时目录，不落盘成真实 skill。
-
-跑法：
-    python3 -m unittest discover -s tests -v
-    python3 tests/test_validate_skill.py
-"""
+"""验证结构校验的边界和错误输入；所有 fixture 位于临时目录。"""
 
 from __future__ import annotations
 
@@ -28,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时读的是
@@ -212,6 +197,20 @@ class ValidateSkillTest(unittest.TestCase):
                 )
 
     # ── 防线 4:其余结构检查 ──
+    def test_bad_frontmatter_shapes_fail_without_crashing(self):
+        path = _skill(self.tmp, "bad-shape")
+        for data in (None, [], 42, "text", {"name": "bad-shape", "description": 42},
+                     {"name": "bad-shape", "description": ["Use when"]}):
+            with self.subTest(data=data), mock.patch.object(self.mod, "load_yaml", return_value=(data, None)):
+                self.assertTrue(self.fails(path))
+
+    def test_unhashable_eval_id_is_a_validation_error(self):
+        path = _skill(self.tmp, "bad-id")
+        os.makedirs(os.path.join(path, "evals"))
+        with open(os.path.join(path, "evals", "evals.json"), "w") as handle:
+            json.dump({"skill_name": "bad-id", "evals": [{"id": [1], "prompt": "input", "expected_output": "result"}]}, handle)
+        self.assertTrue(self.fails(path))
+
     def test_missing_skill_md_fails(self):
         path = os.path.join(self.tmp, "empty")
         os.makedirs(path)

@@ -1,27 +1,8 @@
 #!/usr/bin/env python3
-"""端点表的查询门：把生成好的 ENTRIES 变成可查询、可拼装的能力。
+"""查询生成的 PingCode 端点表。
 
-为什么单独一个文件（而不是把函数写进 `endpoints.py`）
-------------------------------------------------------
-`endpoints.py` 是**生成物**，重新生成时整份重写。手写函数放进去会被冲掉，而且
-"生成物里混着手写代码"是最容易被误改的形态。所以：数据一处（生成）、查询一处（手写）。
-
-这个模块存在的理由
-------------------
-让"端点写错"变成**机械错误**，而不是静默失败。第三方的那个 pingcode 实现里写死了
-`/v1/project/work_items` —— 官方当前文档里根本不存在（PJM 前缀是 `/v1/pjm/`，且是
-`workitems` 带下划线）。它的测试 mock 了 `urllib.request.urlopen`，所以错路径照样全绿。
-
-`require()` 会在**发送请求之前**报错，并给出最接近的候选；`build()` 会在参数名拼错时
-当场报错，而不是拼出一个注定 404 的路径。
-
-跑法（自查用）
---------------
-    python3 scripts/api_index.py --groups
-    python3 scripts/api_index.py --list 工作项
-    python3 scripts/api_index.py --show GET /v1/pjm/workitems
-
-退出码：0 正常 / 1 查询无结果或用法错误
+require 校验端点与变体，build 校验并编码占位符；不校验完整请求体 schema。
+使用 --groups / --scopes / --list 关键词 / --show METHOD PATH。
 """
 
 from __future__ import annotations

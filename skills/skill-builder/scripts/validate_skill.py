@@ -1,17 +1,8 @@
 #!/usr/bin/env python3
-"""校验 skill 是否符合 skill-builder 的 Minimum Viable SKILL.md Checklist。
+"""校验本仓库 skill 的结构、入口描述、引用表面与评估数据格式。
 
-为什么有这个脚本：checklist 原本是手工勾选项，但 2026-09-12 一次会话里就有
-两次违反了"正文 ≤ 150 行"（WLRR 256 行、PKB 174 行），两次都是临时脚本抓出来
-的，肉眼没有发现。手工勾选的 checklist 不可靠，这里把它变成可执行检查。
-
-用法：
-    python3 validate_skill.py                    # 扫本仓库 skills/ 下全部 skill
-    python3 validate_skill.py skills/skill-builder
-    python3 validate_skill.py --json
-
-退出码：0 = 全部通过，1 = 有失败，2 = 路径无效。
-正文余量（见 HEADROOM_MIN）只提示，不影响退出码。
+默认检查 skills/，也接受单个 skill 路径；--json 输出结构化结果。
+退出码：0 通过，1 有失败，2 路径无效。正文余量不足只提示。
 """
 
 from __future__ import annotations
@@ -24,14 +15,8 @@ import re
 import sys
 
 MAX_DESC = 800
-# 2026-09-16 由 150 提到 240：150 的预算迫使正文把规则压成电报体，
-# 而这个仓库的正文是给 Agent 逐句执行的 —— 压缩掉的解释恰恰是执行质量。
-# 上限提到 240 后，余量提示的机制不变（HEADROOM_MIN 照旧生效）。
+# 仓库维护预算；preflight 和 skill_health 共用这些常量。
 MAX_BODY_LINES = 240
-# 余量低于此值时提示（不判失败）。
-# 2026-09-12 三个 skill 同时逼近上限（146/143/147），意味着下一次“真实需要的新规则”
-# 没有空间直接加进去 —— 那时会被迫先做 references 瘦身。与其等到那一刻才发现，
-# 不如每次校验都把它显出来。只说事实（余量多少、该先做什么），不替人决定要不要加。
 HEADROOM_MIN = 10
 
 # 「绑定本机」声明 与 「从配置读」表述 同时出现 = 自相矛盾，直接判失败。
@@ -235,7 +220,14 @@ def check_evals(skill_dir: str, name: str, add) -> None:
             for field in EVAL_REQUIRED:
                 if not case.get(field):
                     broken.append(f"{where}缺 {field}")
-            ids.append(case.get("id"))
+            case_id = case.get("id")
+            if isinstance(case_id, (str, int)) and not isinstance(case_id, bool):
+                ids.append(case_id)
+            else:
+                broken.append(f"{where}的 id 必须是字符串或整数")
+            for field in ("prompt", "expected_output"):
+                if not isinstance(case.get(field), str):
+                    broken.append(f"{where}的 {field} 必须是字符串")
             refs = case.get("files")
             if refs is None:
                 continue
@@ -267,7 +259,8 @@ def check_skill(path: str) -> dict:
     add("SKILL.md 存在", True)
 
     try:
-        content = open(skill_md, encoding="utf-8").read()
+        with open(skill_md, encoding="utf-8") as handle:
+            content = handle.read()
     except OSError as exc:
         add("SKILL.md 可读", False, str(exc))
         return result
@@ -283,11 +276,17 @@ def check_skill(path: str) -> dict:
 
     data, err = load_yaml(m.group(1))
     add("YAML 可解析", err is None, err or "")
-    if data is None:
+    if err is not None:
+        return result
+    if not isinstance(data, dict):
+        add("frontmatter 是对象", False, type(data).__name__)
         return result
 
     fm_name = data.get("name")
-    desc = data.get("description") or ""
+    desc = data.get("description")
+    if not isinstance(desc, str):
+        add("description 是字符串", False, type(desc).__name__)
+        return result
     body = content[m.end():]
 
     add("name == 目录名", fm_name == name, f"name={fm_name!r} dir={name!r}")

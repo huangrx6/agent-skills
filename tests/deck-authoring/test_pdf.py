@@ -22,6 +22,7 @@ import io
 import json
 import os
 import re
+import shutil
 import sys
 import tempfile
 import unittest
@@ -53,11 +54,24 @@ def _load(name: str, path: str):
     return module
 
 
+@unittest.skipUnless(
+    os.environ.get("DECK_PDFINFO") or shutil.which("pdfinfo"),
+    "PDF integration requires pdfinfo (Poppler); install it or set DECK_PDFINFO",
+)
 class TestPdfExport(unittest.TestCase):
     """两趟导出（正常 + 删掉 @page）共享给五条用例 —— 一趟真 PDF 约 3 秒。"""
 
     @classmethod
     def setUpClass(cls) -> None:
+        try:
+            cls._prepare_exports()
+        except SystemExit as exc:
+            # CLI-style helpers must not terminate the entire unittest discovery run.
+            # A configured but broken tool is an ERROR, not a missing-dependency skip.
+            raise RuntimeError(f"PDF integration setup failed: {exc}") from exc
+
+    @classmethod
+    def _prepare_exports(cls) -> None:
         cls.pdf = _load("deck_pdf", os.path.join(SCRIPTS, "pdf.py"))
         cls.render = _load("deck_render_pdf", os.path.join(SCRIPTS, "render.py"))
         with open(DEMO, encoding="utf-8") as fh:

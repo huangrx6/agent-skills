@@ -1,112 +1,53 @@
-# 端点表：为什么路径不交给调用方，以及怎么加一个新接口
-
-## 三层结构
+# 端点与请求契约
 
 ```text
-open.pingcode.com/api_data.json        ← 官方机读文档（594 条，含参数表 + 响应示例 + scope）
-        │  dev-tools/gen_endpoints.py（联网，只在这一步需要网络）
-        ▼
-scripts/endpoints.py                   ← 生成物：470 条接口 + 来源 URL + 抓取时间 + 内容指纹
-        │  scripts/api_index.py（手写：require / build / find / scopes）
-        ▼
-scripts/pingcode.py                    ← 类型化子命令；所有路径都过 require()
+官方 https://open.pingcode.com/api_data.json
+  → dev-tools/gen_endpoints.py
+  → scripts/endpoints.py（生成数据、来源时间、SHA256）
+  → scripts/api_index.py（require/build/find/scopes）
+  → scripts/pingcode.py（类型化命令）
 ```
 
-**数据与查询分开**：`endpoints.py` 会被整份重写，所以手写函数放不进去（会被冲掉，
-而且「生成物里混着手写代码」最容易被误改）。
-
-## 为什么值得这么做
-
-参考实现（第三方那个 pingcode skill）把 `--path` 暴露给调用方，自己写死了
-`/v1/project/work_items`、`/v1/project/work_item/types` 这类路径 —— 官方当前文档里
-**根本不存在**（PJM 的前缀是 `/v1/pjm/`，而且 `workitems` 没有下划线）。它测试全绿的
-原因是 mock 了 `urllib.request.urlopen`：路径错了也照样过一个假的 200。
-
-所以这里：
-
-- 路径来自生成表，`require()` 在**发送前**就报错，并给最接近的候选；
-- `build()` 在占位符没填全、或参数名拼错时当场报错（不会拼出一个注定 404 的 URL）；
-- **本 skill 用到的每个端点必须在官方表里** —— 有契约守着：
-  以及**上面那几条过期路径必须不存在**（把那次调研的结论钉成回归）。
-
-## 自己查
+不要手改生成表。端点是否存在、方法、scope 和令牌要求以快照为准；请求字段需查官方 JSON 的
+`parameter.fields`（查询、JSON、form-data），响应参考 `success.examples`。
+生成表不保存完整 body schema，也不能替代租户权限、流程及服务端校验。
 
 ```sh
-python3 scripts/api_index.py --groups               # 有哪些分组、各多少个
-python3 scripts/api_index.py --scopes               # 官方 54 个 scope
-python3 scripts/api_index.py --list 工作项           # 按分组/名称/路径模糊找
-python3 scripts/api_index.py --show GET /v1/pjm/workitems
-python3 scripts/pingcode.py api --list 需求          # 同样的能力，从 CLI 里走
+python3 scripts/api_index.py --groups
+python3 scripts/api_index.py --scopes
+python3 scripts/pingcode.py api --list 工作项
+python3 scripts/pingcode.py api --show GET /v1/pjm/workitems
+python3 dev-tools/gen_endpoints.py --check
+python3 dev-tools/gen_endpoints.py --input /path/to/api_data.json
 ```
 
-## 加一个类型化命令的步骤
+这些路径相对本 skill。`--check` 比对完整生成内容，复用已有抓取日期以免每日误报；
+无 `--input` 时抓取官方文档，加 `--input` 可离线运行。
 
-1. 在生成表里找到端点：`api --list 关键词` 或 `api --show METHOD PATH`，记下分组与 scope。
-2. 在 `scripts/pingcode.py` 里写处理函数，路径用 `_api.require(...)` 取、用 `_api.build(...)` 拼，
-   **不要写字面路径**。
-3. 需要「名字 → ID」就加进 `scripts/resolve.py` 的 `SOURCES` 表（那是字典类型的唯一一处定义）。
-4. 把它登记进 `USED` 清单（契约会守住它真实存在：不在官方表里就被拦下）。
-5. 并且要覆盖这两条：**`--dry-run` 不发请求**、body 里的 id 是**解析后的真 id**。
+新增类型化命令时：查证端点与字段，用 `require()` 取契约、`build()` 填占位符，
+需要字典解析时复用 `resolve.py`。补充端点契约测试和行为测试：dry-run 不发写请求、
+目标 ID 正确、失败不谎报成功。测试中的 `USED` 清单用于验证已使用的端点。
 
-## 文档漂移怎么发现
+## 通用 API
 
 ```sh
-python3 dev-tools/gen_endpoints.py --check    # 有漂移退出 1，并逐条列出 增 / 删 / 改
-python3 dev-tools/gen_endpoints.py            # 重新生成（联网）
-python3 dev-tools/gen_endpoints.py --input 本地快照.json   # 离线也能跑
+python3 scripts/pingcode.py api --method GET --path /v1/pjm/workitem/priorities --param project_id=xxx
+python3 scripts/pingcode.py api --method GET --path '/v1/pjm/workitems/{workitem_id}' --param workitem_id=xxx
 ```
 
-判据是**整份生成文件是否一致**（不是只比端点集合）—— 只比集合的话，改了表头、注释或
-元信息会因为「端点没变」永远不落地，`--check` 也就发现不了。
+`--param` 填路径占位符，也可能作为查询参数发送；`--data` 提供 JSON body。
+同一路径存在多个变体时按查询参数消歧，例：授权端点的 `grant_type`、附件的主体参数。
+`--force` 只绕过“端点不在快照”检查；只有先查证官方契约、且属于已授权任务时才使用。
+不要借通用接口扩大到 skill 范围外的管理操作。
 
-官方文档改过的迹象：`SOURCE_SHA256` 变了。抓取时间与指纹都写在生成文件头部，
-所以「这份表是什么时候、从哪来的」是可追溯的。
+## 附件
 
-## 逃生口
+| 类型 | 端点与内容 |
+| --- | --- |
+| 文件 | `POST /v1/attachments?principal_type=workitem&principal_id=…`；multipart `title` + `file` |
+| 代码段 | `POST /v1/attachments`；JSON `principal_type`、`principal_id`、`title`、`format`、`content`、`comment_id` |
+| 删除 | `DELETE /v1/attachments/{attachment_id}`；带主体查询参数，有评论归属时带 `comment_id` |
 
-剩下 ~460 个接口（测试管理 / 需求 / 工单 / 知识库 / DevOps / 交付 / 组织……）没有类型化命令，
-用 `api` 走：
-
-```sh
-pingcode.py api --method GET --path /v1/pjm/workitem_priorities --param project_id=xxx
-pingcode.py api --method POST --path /v1/comments --data '{...}'
-```
-
-路径不在官方表里会被拦下并给候选；确认要用加 `--force`。**逃生口不猜参数名**——
-它只校验路径；参数写错由服务端返回 400，CLI 会把 `{code, message}` 翻出来。
-
-`--param` 里与模板占位符同名的那些会填进**路径和查询串**（`--path '/v1/attachments/{attachment_id}'
---param attachment_id=…` → `/v1/attachments/…`）；其余才是额外查询参数。这条以前是坏的：
-路径里的 `{attachment_id}` 会原样发出去、值被塞进查询串 —— 于是**凡路径带占位符的端点
-（470 条里的大多数）从逃生口都发不出去**。
-
-## 已知边界
-
-- 生成表只收「接口」条目：官方 JSON 里那 124 条纯文档页（没有 method/url）不进表。
-- **生成表不带请求体 schema**：`normalize()` 只取 `type/url/scopes/permission/group/name`，
-  把 `header` 与 `parameter` 两节整块丢了。后果不是“没信息”，而是**误判成“没信息”** ——
-  曾经据此把附件上传写成「multipart 字段名没法从文档确认」，而官方文档里一直写着。
-  要字段名时直接查快照的 `parameter.fields`（分「查询参数」「请求参数」「请求参数 form-data」）。
-- 同一路径不同变体的接口（`/v1/auth/token` 的三个 `grant_type`）靠 `query=` 消歧，
-  `require` 在没给 query 时会报歧义并列出变体。
-- 官方文档**不保证**等于线上行为。文档里有示例的字段以示例为准；没有示例的一律当未实测，
-  真实调用前不要当成已知（见 README 的「已知限制」）。
-
-## 附件上传的契约（从官方文档抄出来的，不是猜的）
-
-两个端点名字很像，但**一个是 multipart、一个是 JSON**：
-
-| | `POST /v1/attachments`（代码段） | `POST /v1/attachments?principal_type=&principal_id=[&comment_id=]`（文件） |
-| --- | --- | --- |
-| Content-Type | `application/json` | **`multipart/form-data`**（文档写成必填 header） |
-| 正文 | `principal_type` `principal_id` `title` `format` `content`（均必填）+ `comment_id`（**文档写可选，实测必填** —— 不带回 400 code=100039，报错不说是缺它） | **form-data：`title` + `file`**（均必填） |
-| `principal_type` 取值 | `workitem` / `workitem_review` / `workitem_deliverable` / `testcase` / `testcase_review` / `testrun` / `idea` / `idea_review` / `ticket` / `page` | 同左 |
-| 作用域 | 随主体（如 `workitem` 要 `pcp:write:pjm:workitem`） | 同左 |
-
-响应两边一样：`{id, url, title, size, type, file_type, ext, download_url, created_at, created_by}`。
-往某条评论的附件上传时多传一个 `comment_id`（两种都适用）。
-
-**三个都已实测跑通**：文件（传了个 28 字节的文件，列表里能看到下载地址）、代码段（必须带
-`comment_id` —— 先加一条评论拿 id 再传）、删除（`DELETE /v1/attachments/{attachment_id}`
-加两个查询参数；删完再删同 id 回 400 code=100045「附件不存在」，说明是真删）。
-删除有类型化命令 `workitem attach-remove <ref> <附件 id> --yes`。
+文件上传到已有评论时也带 `comment_id`。代码段在历史租户验证中缺少该字段会返回
+400/code=100039，因此当前 CLI 要求它。不要为了上传代码段擅自发布新评论；应先使用已授权的评论。
+上传、删除走类型化命令时会解析主体工作项，并要求删除使用 `--yes`。

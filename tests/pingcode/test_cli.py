@@ -570,6 +570,57 @@ class CliCase(unittest.TestCase):
         self.assertIn("没有建任何东西", out)
         self.assertEqual([], router.find("POST", "/v1/pjm/workitems"), "不加 --yes 绝不能建")
 
+    def test_计划带_yes和dry_run不创建也不报告已建成(self):
+        code, out, err, router = self.run_cli([
+            "workitem", "create-plan", "--file", self.write_plan(self.GOOD_PLAN), "--yes", "--dry-run"])
+        self.assertEqual(0, code, err)
+        self.assertNotIn("建成的树", out)
+        self.assertEqual([], router.find("POST", "/v1/pjm/workitems"))
+
+    def test_计划可解析负责人优先级和迭代(self):
+        plan = {"project": "演示项目", "nodes": [{"type": "bug", "title": "测试",
+                "assignee": "John", "priority": "高", "sprint": "Sprint 12", "state": "新建"}]}
+        code, out, err, router = self.run_cli(
+            ["workitem", "create-plan", "--file", self.write_plan(plan), "--yes"],
+            {("POST", "/v1/pjm/workitems"): {"id": "new", "identifier": "DEMO-9"}})
+        self.assertEqual(0, code, err)
+        body = router.find("POST", "/v1/pjm/workitems")[0][2]
+        self.assertEqual(("u1", "pr1", "sp1", "st1"),
+                         tuple(body[key] for key in ("assignee_id", "priority_id", "sprint_id", "state_id")))
+
+    def test_父项响应缺id时不得把子项建成无父根节点(self):
+        code, out, err, router = self.run_cli(
+            ["workitem", "create-plan", "--file", self.write_plan(self.GOOD_PLAN), "--yes"],
+            {("POST", "/v1/pjm/workitems"): {"identifier": "DEMO-9"}})
+        self.assertEqual(1, code)
+        self.assertIn("DEMO-9", err)
+        self.assertIn("缺少 id", err)
+        self.assertEqual(1, len(router.find("POST", "/v1/pjm/workitems")))
+
+    def test_计划后续本地解析失败也报告已创建节点(self):
+        plan = {"project": "演示项目", "nodes": [
+            {"type": "bug", "title": "第一项"},
+            {"type": "bug", "title": "第二项", "priority": "不存在的优先级"}]}
+        code, out, err, router = self.run_cli(
+            ["workitem", "create-plan", "--file", self.write_plan(plan), "--yes"],
+            {("POST", "/v1/pjm/workitems"): {"id": "new", "identifier": "DEMO-9"}})
+        self.assertEqual(1, code)
+        self.assertIn("已建成的：DEMO-9", err)
+        self.assertEqual(1, len(router.find("POST", "/v1/pjm/workitems")))
+
+    def test_计划后续描述文件缺失也报告已创建节点(self):
+        plan = {"project": "演示项目", "nodes": [
+            {"type": "bug", "title": "第一项"},
+            {"type": "bug", "title": "第二项", "description_file": os.path.join(self._tmp.name, "missing.md")}]}
+        code, _out, err, router = self.run_cli(
+            ["workitem", "create-plan", "--file", self.write_plan(plan), "--yes"],
+            {("POST", "/v1/pjm/workitems"): {"id": "new", "identifier": "DEMO-9"}})
+        self.assertEqual(1, code)
+        self.assertIn("已建成的：DEMO-9", err)
+        self.assertIn("建到 2（第二项）失败", err)
+        self.assertIn("不要整棵重跑", err)
+        self.assertEqual(1, len(router.find("POST", "/v1/pjm/workitems")))
+
     def test_计划带_yes_才建且父先子后(self):
         path = self.write_plan(self.GOOD_PLAN)
         code, out, _err, router = self.run_cli(

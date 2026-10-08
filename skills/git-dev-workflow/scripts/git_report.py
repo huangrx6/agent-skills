@@ -1,29 +1,9 @@
 #!/usr/bin/env python3
-"""动手前后的事实对照 + 一段**可原样粘贴**的原始输出。
+"""可选的 Git 前后状态对照。
 
-## 为什么要有它
-
-「我刚才做了什么」这句话，用叙述写一定会漂：少说一条、把两次操作合并成一句、
-或者把"我打算做"写成"已经做了"。这个项目里已经栽过两次（把没执行的动作写进报告、
-把旧数字当新数字抄）。结论是：**报告里的数字不靠誊写，靠把原始输出贴出来给人对照。**
-
-所以这个脚本干两件事：
-
-1. 动手前 `--capture` 存一份快照；动手后不带参数跑一次，输出**确定性**的差异
-   （分支、HEAD、未提交构成、worktree 数、stash 数、未推送数、以及新增了哪些提交）。
-2. 末尾附一段命令 + 原始输出的粘贴块 —— 它才是报告里该出现的东西。
-
-## 它不做什么
-
-- **不评价**「这次做得好不好」—— 只报事实。
-- **不猜**：拿不到的就写拿不到（例如快照里没有的字段）。
-- **不美化**：差异是 0 就写 0。
-
-## 用法
-
-    python3 scripts/git_report.py --capture      # 动手前
-    python3 scripts/git_report.py                # 动手后
-    python3 scripts/git_report.py --json
+--capture 保存快照；默认模式与当前状态比较，并附可核对的原始命令输出。
+仅报告可观察事实，不推断用户意图或未记录的历史。
+用法：--repo PATH [--capture] [--file PATH] [--json]。
 """
 
 from __future__ import annotations
@@ -33,6 +13,7 @@ import importlib.util
 import json
 import os
 import sys
+from datetime import datetime, timezone
 
 DEFAULT_NAME = "git-dev-workflow-snapshot.json"
 
@@ -77,7 +58,7 @@ def snapshot_for_diff(state: dict) -> dict:
         "worktrees": len(state["worktrees"]),
         "stash": len(state["stash"]),
         "unpushed": state["unpushed"]["count"],
-        "taken_at": S.git_text(state["root"], "log", "-1", "--pretty=%cI") or "",
+        "taken_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -93,16 +74,14 @@ def raw_block(repo: str) -> str:
     """命令 + 原始输出。**报告里该贴的就是这段**，不是转述。"""
     lines = ["```text"]
     for label, args in RAW_COMMANDS:
-        code, out, _ = S.run_git(repo, *args)
-        value = out.strip()
-        if label in ("未提交条数", "worktree 条数", "stash 条数"):
-            # 这几条命令本身输出的是列表，这里只数条数 —— 把数的过程写出来，
-            # 免得看的人以为我直接"知道"了条数。
-            value = str(len([line for line in value.splitlines() if line.strip()]))
+        code, out, err = S.run_git(repo, *args)
+        value = out.rstrip("\n")
         if label == "HEAD 的主题" and not value:
             value = "(还没有提交)"
         lines.append(f"$ git {' '.join(args)}")
         lines.append(f"{value}")
+        if code:
+            lines.append(f"[退出码 {code}] {err.strip()}")
     lines.append("```")
     return "\n".join(lines)
 
@@ -149,6 +128,9 @@ def main(argv: list[str] | None = None) -> int:
     state = S.snapshot(args.repo)
     if not state.get("is_repo"):
         print(f"不是一个 git 仓库：{os.path.abspath(args.repo)}", file=sys.stderr)
+        return 1
+    if state.get("read_errors"):
+        print("状态读取不完整：\n" + "\n".join(state["read_errors"]), file=sys.stderr)
         return 1
 
     path = snapshot_path(state, args.file)

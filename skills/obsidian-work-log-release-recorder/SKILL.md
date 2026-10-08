@@ -1,151 +1,71 @@
 ---
 name: obsidian-work-log-release-recorder
-description: Use this skill after completing a coding, deployment, config, database, or release task, when the user says 记一下 / 记一条 / 沉淀一下 / 总结到知识库 / 更新知识库 / 记到 Obsidian / 写发版文档, or asks where this week's finished work should be recorded. Records only landed, release-relevant facts (scripts, configs, paths, validation, rollback) as durable notes in the Obsidian vault and maintains the weekly release note (发版) — only when there are landed facts, not plans or speculation. Do NOT use for note editing, creating, moving, renaming, reviewing, MOC maintenance, weekly reports, or general what-I-did-this-week summaries — use `obsidian-personal-knowledge-base` for those. Do NOT use for brainstorming or speculation.
+description: >-
+  Use when the user asks to record completed coding, deployment, configuration, database or release work
+  in Obsidian: 这次发布记一下、把刚才完成的改动沉淀到知识库、补本周发版文档。
+  Capture verified changes, commands, validation and recovery details, updating a weekly release note only for release-relevant work.
+  Do NOT use merely because a task finished, for speculative plans, weekly status reports, or editing/moving existing notes without new work facts (use obsidian-personal-knowledge-base).
 ---
 
-# Obsidian Work Log And Release Recorder
+# 已完成工作与发版记录
 
-This skill turns completed work into durable Obsidian notes. It is intentionally selective: the goal is not to preserve the chat transcript, but to keep the small set of facts that will help the next implementation, release, rollback, or handoff.
+把有复用价值的已完成事实写成简短记录。记录请求不授权执行发布、SQL、git、插件配置或外部通知。
+“已实现”“已验证”“已发布”是不同状态，不能相互替代。
 
-## Prerequisites
+## 准备与落点
 
-路径从配置解析，**不绑定本机**（与 PKB 的 Prerequisites 一致；这里不要写任何机器专属路径）：
+依赖同级 `obsidian-personal-knowledge-base`（PKB）：共享路径解析、归位和写作规范，不另存一份 vault 规则。
+先读其 [归位规则](../obsidian-personal-knowledge-base/references/vault-map.md) 与
+[写作规范](../obsidian-personal-knowledge-base/references/writing-conventions.md)，再探查目标目录及最近的笔记/MOC。
+缺少依赖时说明所缺文件；可先整理事实草稿，不猜目录写入 vault。
 
-- vault path resolves from `$OBSIDIAN_VAULT_PATH` or `~/.config/agent-skills/obsidian-vault-path` — never hardcode it
-- 取路径的规范方式：`python3 ../obsidian-personal-knowledge-base/scripts/vault_path.py --explain`
-- 换机器或 vault 搬家只需改上面两项配置，本 skill 与 PKB 都跟着走
+以下命令相对于本 skill 目录：
 
-### Mandatory startup checklist
+```sh
+python3 ../obsidian-personal-knowledge-base/scripts/vault_path.py --explain
+```
 
-Before writing anything to the vault, you **must**:
+路径按 PKB 配置解析，也可向检查器传 `--vault PATH`。
+优先更新拥有该主题的已有笔记；新记录选最窄稳定位置：有交付边界的项目进 Projects，
+长期运维责任进 Areas，可复用方法进 Resources，未归类捕获进 Inbox。
+不假定运维一定属于 Areas，也不从历史记忆恢复不存在的领域。
 
-1. Load `obsidian-personal-knowledge-base/references/vault-map.md` — the vault's directory map and placement conventions.
-2. Load `obsidian-personal-knowledge-base/references/writing-conventions.md` — naming, frontmatter, link, and MOC conventions.
-3. Probe the target area with a single-level `ls` (see Location Decision) — `vault-map.md` is a snapshot, not authoritative; file system wins on conflict.
+用户已指定确切新路径时可直接创建。落点确实不清且会建立新结构时再澄清。
+结合当前工作上下文理解“记一下”；没有上下文的“把这周做的事记一下”才需区分周报与发版事实。
+同时明确要求记录和整理时完成两者，不重复要求二选一。
 
-These are hard requirements, not suggestions. If `obsidian-personal-knowledge-base` is not installed, tell the user to install it first and stop. Do not write into the vault based on assumptions about its structure. Do not fork the vault conventions into this skill — when PKB's references change, this skill inherits the change.
+## 事实筛选
 
-## Scope
+保留未来执行、验证、回滚或交接真正需要的内容：
 
-Reuse the nearest existing project, area, resource note, MOC, or template rather than inventing a parallel structure. When no existing note owns the topic, follow the placement rules in `obsidian-personal-knowledge-base/references/vault-map.md`.
+- 已改动的模块、接口、脚本、配置项、SQL、产物和版本，以及实际状态。
+- 已执行命令的环境、结果和证据；未执行的发布命令单独标为待执行，不能写成执行记录。
+- 验证方式、结果、跳过项及原因；已知前提、执行顺序、影响和恢复方法。
+- 已确认且影响后续工作的决定；不复制所有改动文件、原始对话或未采纳的猜想。
 
-## Trigger Signals
+敏感操作信息只记变量名和凭据位置，不记令牌、密码或连接串中的真实凭据。
+用户未提供的发布人、时间、备份或回滚结果标为未知，不根据模板编造。
 
-Use this skill when one or more of these are true:
+## 写入与验证
 
-- a task has been completed and produced implementation decisions, scripts, paths, configs, database changes, environment variables, validation steps, rollback steps, or release commands
-- the user asks to record work into the personal knowledge base
-- the user asks for a weekly release note, release checklist, deployment record, or 发版文档
-- a project or area note needs to be updated after code, SQL, config, deployment, or operations work
-- a recurring operations process becomes clearer after a task and should be kept for future use
+1. 从当前会话、用户材料或可核查产物整理事实，区分实现、验证、发布状态。
+2. 更新已有主题笔记。涉及发布准备或发布变更时，查找同系统同 ISO 周的记录，已有就追加或合并，
+   不涉及发布的本地实现/测试记录无需另建周发版笔记。
+3. 默认名称为 `发版 - <系统或项目名> - YYYY-Www.md`；ISO 周年可能与日期的公历年不同。
+   采用用户指定的发布周期；没有指定时用本次记录日期所属周，不推断历史发布日期。
+4. 新建周发版笔记按 [模板](references/release-note-template.md)。附近已有稳定格式时沿用本地约定。
+   长脚本可在“04 发布依赖清单”章节引用对应文件；这是章节名，不是要求新建目录。
+5. 新长期记录补一个有用的父页/MOC 链接，更新 vault 内相关索引；不修改 skill 地图或计数器。
+6. 默认模板笔记运行下列检查；本地自定义格式按其约定审阅，不为通过默认模板检查强制改写。
 
-Do not trigger for ordinary explanations, brainstorming, speculative plans, one-off chat summaries, or tiny edits with no future operational value.
+```sh
+python3 scripts/check_release_note.py "<笔记路径>" --vault "<vault 路径>"
+python3 ../obsidian-personal-knowledge-base/scripts/check_links.py --vault "<vault 路径>" --ignore-template
+```
 
-If the request mixes recording landed work with editing or organising existing notes (for example “发版了，帮我整理一下” or “更新一下知识库里某块内容”), **ask which one the user wants before acting** instead of guessing. Both intents are legitimate; only the user knows which.
+`check_release_note.py` 检查默认命名、真实 ISO 周/日期、H1、模板字段与章节、同目录重复周、
+其他笔记中的 wikilink 引用，并提醒明显凭据赋值；不判断事实真实性或发布安全性。
+未配置 vault 时会明确跳过引用检查，不能据此宣称完整验证。
+链接检查的原有断链单独报告，不扩展任务删除无关链接。
 
-## What To Record
-
-Record only landed points. A landed point is something that is now true, was executed, was changed, or is ready to be followed by another person.
-
-Good candidates:
-
-- files, modules, APIs, scripts, SQL files, routes, services, or deployment paths that changed
-- commands that were run or must be run during release
-- config keys, env vars, ports, server paths, container names, cron jobs, or feature flags that matter
-- validation evidence such as build commands, smoke tests, API checks, screenshots, logs, or known skipped checks
-- rollback or backup steps
-- execution order assumptions, dependencies, preconditions, and risks
-- durable design decisions that affect future work
-
-Do not record: raw conversation; every file touched when only a summary matters; failed experiments unless they prevent future mistakes; trivial formatting or local-only noise; secrets, tokens, passwords, or full credentials; speculative plans that were not accepted.
-
-If a detail looks sensitive but operationally important, record the variable or config name and location, not the secret value.
-
-## Location Decision
-
-Choose the narrowest stable home:
-
-- Outcome-driven work with a finish line goes under `01 Projects/<project>/`.
-- Long-running responsibilities, delivery systems, or operations knowledge goes under `02 Areas/<area>/`.
-- Reusable technical knowledge goes under `03 Resources/<topic>/`.
-- Unclear or incomplete capture goes under `00 Inbox/`, but only when there is not enough context to classify safely.
-
-For this skill, resolve paths by **probing**, not from memory.
-
-1. Probe the candidate area before writing (`ls "$VAULT/01 Projects"`, `ls "$VAULT/02 Areas"`, `ls "$VAULT/03 Resources"`).
-2. Pick the narrowest existing directory that owns the topic.
-3. If the intended directory does not exist, **ask the user where to create it** — do not write into a non-existent path. Exception：用户**本轮已指名了确切路径**（「放到 `02 Areas/05 数据平台/` 下」）→ 用那个路径，不要再问一遍（问的是「不知道放哪」，不是「用户说了不算」）。
-4. Update the nearest MOC/index after creating a new durable note.
-
-### Common scenario：部署与运维类发布
-
-这类发布（打包、上传、解压、配置拷贝、容器重启、前后端分开发布）通常归 `02 Areas/<领域>/<子主题>/`。没有匹配领域时：告知用户历史路径已不在，问清记录放哪再动手 —— **不要写进记忆中的旧路径，也不要假定某类项目一定有对应 Area**。
-
-### 模糊话「把这周做的事记一下」：不要自己判
-
-它同时命中触发词（记一下）与排除项（笼统的本周汇总）。先问用户要哪一种：**周报** → PKB（`references/work-management.md`）；**本周已落地的发版事实** → 本 skill。回答前不写任何笔记。
-
-## Weekly Release Note
-
-When the task includes release preparation or release-relevant changes, maintain one weekly release note in the most relevant project or area folder.
-
-Default naming:
-
-`发版 - <系统或项目名> - YYYY-Www.md`
-
-Examples: `01 Projects/<项目名>/发版 - <项目名> - 2026-W18.md` or `02 Areas/<领域>/<子主题>/发版 - <系统或项目名> - 2026-W18.md`.
-
-Use ISO week numbering unless the user provides a different release naming convention. If a note for the current week already exists, update it instead of creating another. Probe the parent folder before writing; if it does not exist, ask the user where the release note should live（同上：用户本轮已指名的路径就是答案）。
-
-## Weekly Release Note Template
-
-Read `references/release-note-template.md` and use its structure unless a nearby existing note has a stronger local convention.
-
-Keep release notes short. Put full scripts or config snippets under `04 发布依赖清单`, but avoid turning the note into a detailed runbook unless the user asks for operational depth.
-
-## Update Workflow
-
-1. Identify the task outcome.
-   - Summarize what actually changed or was decided.
-   - Separate landed facts from guesses, options, and abandoned attempts.
-
-2. Choose note destinations.
-   - Update an existing project/area/resource note first when one already owns the topic.
-   - Create the weekly release note only when release-relevant details exist.
-   - Update the nearest MOC when a new durable note is created.
-
-3. Write the smallest durable update that stays operational.
-   - Compact bullets for work logs; command blocks only when future execution needs exact commands.
-   - Explain non-obvious flags, config fields, paths, and ordering assumptions.
-   - Record what to run, where, what it affects, and how to verify it.
-   - Include skipped validation explicitly, plus backup and rollback steps for release notes when known.
-
-4. Verify link and structure integrity.
-   - Ensure new notes are linked from the nearest MOC or parent note.
-   - Run `python3 scripts/check_release_note.py <笔记路径>` — 它守的是**本 skill 自己写下的规则**（文件名格式、ISO 周号、标题与文件名一致、frontmatter、模板里的章节骨架、同一系统同一周不重复、已挂到 MOC、没有明显密钥值）。章节骨架是**从 `references/release-note-template.md` 读的**，模板改了它跟着改。
-   - **链接是否失效不归它管** —— 那是下面这条 PKB 脚本的事（两者互补，不重叠）。
-   - Run `python3 ../obsidian-personal-knowledge-base/scripts/check_links.py --ignore-template` after creating or moving notes; expect exit 0 (details in PKB's `references/structural-checks.md`).
-   - If this operation changed directory structure, file counts, or hook behaviour, update the description of it in `vault-map.md` or the relevant SKILL.md **in the same operation** — do not leave it for the next probe to discover.
-   - Avoid duplicating the same release instructions in multiple places; cross-link instead.
-
-5. Report back briefly — keep the handoff short; the value is in the notes.
-   - Which notes were created or updated.
-   - What landed points were recorded.
-   - Whether a weekly release note was created or updated.
-   - Any assumptions, skipped validation, or missing release details.
-
-## Writing Style
-
-Write like an operations memory, not a diary:
-
-- direct, factual, and easy to scan
-- Chinese-first, with English technical terms where they are canonical
-- no coaching language such as "第一次", "可以先这样理解", or "接下来我们"
-- no inflated summaries; prefer exact commands, paths, and constraints
-- no secrets
-
-## Installation
-
-Install via the repo-root `npx skills add huangrx6/agent-skills` (see repo-root [README.md](../../README.md)).
-
-**Install `obsidian-personal-knowledge-base` first** — this skill depends on its `references/vault-map.md` and `references/writing-conventions.md`, and refuses to write when they are unavailable.
+返回实际新增/更新的笔记、记录的事实、周发版记录是否更新，以及验证结果和未提供的信息。

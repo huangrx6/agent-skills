@@ -1,20 +1,5 @@
 #!/usr/bin/env python3
-"""check_links.py 的回归测试。
-
-为什么需要:check_links.py 里的每个设计决定都来自踩过的坑 —— 代码块里的
-`[[ ]]`、只索引 .md 导致图片嵌入假失效、路径/别名/锚点/表格转义的处理。
-这些是经验,而经验会随时间淡忘。没有测试的话,未来重构很容易无意中
-重新引入同一批误报,而且不会立刻有人发现(这类 bug 表现为"安静地漏报",
-比报错难察觉得多)。
-
-fixture 在 setUpClass 里生成到临时目录,不落盘成 .md 文件 —— 那些故意
-写坏的链接会被编辑器/语法检查当成真坏链报警,而它们本来就是用来测
-"坏链能被报出来"的。
-
-跑法:
-    python3 -m unittest discover -s tests -v
-    python3 tests/test_check_links.py
-"""
+"""只用临时 vault 验证 wikilink/附件解析、代码剥离与 CLI 退出码。"""
 
 from __future__ import annotations
 
@@ -26,9 +11,6 @@ import tempfile
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时读的是
-# `skills/<skill>/` 那棵树，测试放在里面会被顺手读进去）。
-# 所以从 `tests/<skill>/` 往上两级到仓库根，再进 `skills/<skill>/`。
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPTS = os.path.join(SKILL, "scripts")
 CHECK_LINKS = os.path.join(SCRIPTS, "check_links.py")
@@ -196,6 +178,36 @@ class CheckLinksTest(unittest.TestCase):
 
     def test_total_count(self):
         self.assertEqual(len(self.broken), 2, f"期望恰好 2 个失效引用,实得 {len(self.broken)}")
+
+    def test_explicit_wrong_directory_does_not_resolve_by_basename(self):
+        paths, basenames = self.mod.build_index(self.tmp)
+        self.assertFalse(self.mod.resolve("不存在目录/目标笔记", "来源.md", paths, basenames))
+        self.assertFalse(self.mod.resolve("../../目标笔记", "子目录/来源.md", paths, basenames))
+
+    def test_attachment_extension_must_match(self):
+        paths, basenames = self.mod.build_index(self.tmp)
+        self.assertFalse(self.mod.resolve("存在的图片.jpg", "来源.md", paths, basenames))
+        self.assertFalse(self.mod.resolve("目标笔记.pdf", "来源.md", paths, basenames))
+
+    def test_short_path_with_directory_matches_suffix(self):
+        paths = {"分组/子目录/笔记.md", "分组/子目录/笔记"}
+        self.assertTrue(self.mod.resolve("子目录/笔记", "来源.md", paths, {"笔记"}))
+
+    def test_shorter_fence_does_not_end_long_fence(self):
+        text = "````markdown\n```sh\n[[代码里的链接]]\n```\n````\n[[正文链接]]\n"
+        stripped = self.mod.strip_code(text)
+        self.assertNotIn("代码里的链接", stripped)
+        self.assertEqual(stripped.count("\n"), text.count("\n"))
+        self.assertIn("[[正文链接]]", stripped)
+
+    def test_multiple_backticks_inline_code(self):
+        text = '``内含 ` 和 [[代码链接]]`` 外面的 [[正文]]'
+        self.assertEqual(self.mod.strip_code(text), ' 外面的 [[正文]]')
+
+    def test_quiet_output_is_only_count(self):
+        proc = subprocess.run([sys.executable, CHECK_LINKS, "--vault", self.tmp, "--quiet"],
+                              capture_output=True, text=True)
+        self.assertEqual("2\n", proc.stdout)
 
     # ── CLI 行为:退出码契约 ──
     def test_cli_exit_code_is_1_when_broken(self):

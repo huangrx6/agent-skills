@@ -1,32 +1,30 @@
-# Anatomy of a Skill & Scope Boundaries
+# Skill 的目录与范围
 
-Reference material — not part of the core 5-minute decision flow. Read this only when you need to decide which subdirectory a piece of content belongs to.
+按任务需要选择内容，不要求凑齐下面所有目录。
 
-## Anatomy of a Skill
+| 位置 | 用途 |
+| --- | --- |
+| `SKILL.md` | 必需；frontmatter 负责发现，正文给出可执行主流程 |
+| `README.md` | 本仓库的使用文档：依赖、示例、验证方法与限制 |
+| `references/` | 按条件加载的格式说明、后端差异、详细示例 |
+| `scripts/` | 比临时生成更可靠的确定性操作；有实际调用者才增加 |
+| `assets/` | 输出真正要用的模板、图像、字体或数据；按需要保留 |
+| `evals/` | 输入场景与评判标准；不是已通过的测试成绩 |
 
-```text
-<skill-name>/
-├── SKILL.md                # 必填:YAML frontmatter(name + description)+ Markdown 正文
-├── references/             # 按需加载的长文参考(决策树、anti-patterns、术语表)
-├── assets/                 # 输出用模板 / 数据 / 图表 / 图标
-├── scripts/                # 可执行脚本(uv run / node),仅当 SKILL.md 不够时再加
-├── agents/                 # 子 agent 定义,默认不放
-└── examples/               # 输入输出示例,默认不放
-```
+回归测试位于仓库顶层，与同名 skill 对应，不随安装目录分发。
+不要在给执行 Agent 看的正文里指向仓库专用测试文件；维护者的 README 可以给验证命令。
 
-**默认只有 SKILL.md**。`references/` 在正文超过 ~150 行时再加。其他目录按需——能不放就不放。
+## 按需展开
 
-## Out of Scope(本 skill-builder 不负责的事)
+正文提供判断“什么时候需要这个参考”的线索，并链接到直接可读的文件。
+不必等正文超限才拆分；当一个后端、平台或产物的细节只对部分任务有用时，就可以分开。
+避免多层跳转和在正文、README、references 重复维护同一份规范。
 
-- **Formal eval**:脚本化的触发准确度测量,需要单独流程
-- **Asset / icon 自动生成**:本 skill 不产出视觉资源
-- **与 Agent 加载机制耦合的兼容性测试**:交给各 Agent 维护者
-- **skill-creator 风格的"建 skill 全流程"教学**:那个 skill 已经被这个仓库删除——skill-builder 是它的精简替代
+入口保留必要约束和交付判据，细节文件保留足够上下文，确保单独加载也能理解。
+历史记录优先留在版本控制里；只有仍会影响选择的设计理由才放入操作文档。
 
-## 哪些内容该放 references/ 而不是 SKILL.md?
+## 与其他能力的分工
 
-- 决策树的可视化(mermaid / dot)
-- 完整 anti-pattern 清单(超过 5 条时)
-- 跨 skill 共用的写作约定
-- 大段术语表 / 缩写解释
-- 历史决策日志(为什么这么设计)
+skill-builder 负责复用范围、触发边界与初版入口，不替代具体领域的创作或执行工具。
+若环境提供 skill-creator 等维护流程，可以组合使用；不要假设某个外部 skill 一定存在或已被删除。
+普通内容修订、脚本修复和素材补充不需要重新经过建 skill 的决策流程。

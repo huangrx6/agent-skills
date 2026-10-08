@@ -1,23 +1,9 @@
 #!/usr/bin/env python3
-"""HTTP 传输层：一个地方管好认证头、限流、错误归一化。
+"""HTTP 传输、限流与错误归一化。
 
-为什么值得单独一层
-------------------
-官方的限流是**两层**，而且公有云与私有部署给的重试响应头**不一样**：
-
-| 环境 | 429 时 | 平时 |
-| --- | --- | --- |
-| 公有云 | `X-RateLimit-Retry-After` + `X-RateLimit-Reason` | `X-RateLimit-Team-*`、`X-RateLimit-Burst-*` |
-| 私有部署 | `X-PC-Retry-After` | — |
-
-参考实现只处理了私有的 `x-pc-retry-after`，在公有云上收到 429 就只会硬失败。这里两个
-都读，并把「还剩多少配额」也算出来。
-
-错误也在这里归一化：官方失败时返回 `{code, message}`。401/403 要说清「该怎么办」——
-尤其是 403，我们**知道**这个端点需要哪个 scope（`api_index` 里有），所以能直接指出来，
-而不是让调用方对着一句"无权限"猜。
-
-测试用 `opener=` 注入假的传输函数，不 mock 到库内部。
+兼容公有云 X-RateLimit-Retry-After 与私有部署 X-PC-Retry-After。
+只自动重试 429；写请求的 dry-run 不发送，解析 ID 需要的 GET 仍可读取。
+测试用 opener 注入传输替身。授权查询参数在展示与错误中脱敏。
 """
 
 from __future__ import annotations
@@ -75,6 +61,38 @@ MAX_RETRY_SLEEP = 60
 # 「这个范围里没有优先级可选项」。而 dry-run 的用处正是「把解析后的真 body 给人看一眼」，
 # 那本来就必须要能读。
 WRITE_METHODS = ("POST", "PUT", "PATCH", "DELETE")
+SECRET_FIELDS = frozenset({"client_secret", "access_token", "refresh_token", "code"})
+
+
+def _redact_url(url: str) -> str:
+    """授权端点使用查询参数传凭证；展示和异常信息必须脱敏。"""
+    parts = urllib.parse.urlsplit(url)
+    query = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+    if not any(key.lower() in SECRET_FIELDS for key, _ in query):
+        return url
+    safe_query = urllib.parse.urlencode([
+        (key, "***" if key.lower() in SECRET_FIELDS else value) for key, value in query])
+    return urllib.parse.urlunsplit(parts._replace(query=safe_query))
+
+
+def _redact_message(message: str, url: str) -> str:
+    variants: set[str] = set()
+    for key, value in urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query):
+        if key.lower() in SECRET_FIELDS and value:
+            variants.update((value, urllib.parse.quote(value, safe=""),
+                             urllib.parse.quote_plus(value, safe="")))
+    for value in sorted(variants, key=len, reverse=True):
+        message = message.replace(value, "***")
+    return message
+
+
+def _redact_body(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: "***" if str(key).lower() in SECRET_FIELDS else _redact_body(item)
+                for key, item in value.items()}
+    if isinstance(value, list):
+        return [_redact_body(item) for item in value]
+    return value
 
 
 def _safe_filename(name: str) -> str:
@@ -136,9 +154,9 @@ class ApiError(Exception):
     def __init__(self, status: int, message: str, method: str = "", url: str = "",
                  code: str = "", hints: list[str] | None = None) -> None:
         self.status = status
-        self.message = message
+        self.message = _redact_message(message, url)
         self.method = method
-        self.url = url
+        self.url = _redact_url(url)
         self.code = code
         self.hints = list(hints or [])
         super().__init__(self.render())
@@ -290,17 +308,22 @@ class Client:
                  content_type: str | None = None) -> dict[str, Any]:
         """只描述将发出的请求（`--dry-run` 与写操作回显都用它）。**不含令牌。**"""
         method = method.upper()
-        url = self.url_for(path)
-        if params:
-            query = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
-            if query:
-                url = url + ("&" if "?" in url else "?") + query
+        url = self._request_url(path, params)
         headers = {"Accept": "application/json"}
         if authenticate:
             headers["Authorization"] = "Bearer ***"
         if body:
             headers["Content-Type"] = content_type or "application/json"
-        return {"method": method, "url": url, "headers": headers, "body": body}
+        return {"method": method, "url": _redact_url(url), "headers": headers,
+                "body": _redact_body(body)}
+
+    def _request_url(self, path: str, params: dict[str, Any] | None) -> str:
+        url = self.url_for(path)
+        if params:
+            query = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
+            if query:
+                url += ("&" if "?" in url else "?") + query
+        return url
 
     # ── 发送 ──────────────────────────────────────────────────
     def request(self, method: str, path: str, params: dict[str, Any] | None = None,
@@ -314,6 +337,7 @@ class Client:
                              content_type=content_type)
         if self.dry_run and method in WRITE_METHODS:
             return Result(0, plan, method, plan["url"], Quota({}))
+        url = self._request_url(path, params)
 
         payload = raw
         if payload is None and body is not None:
@@ -323,7 +347,7 @@ class Client:
         while True:
             attempt += 1
             try:
-                return self._once(method, plan["url"], payload, authenticate, content_type)
+                return self._once(method, url, payload, authenticate, content_type)
             except RateLimited as exc:
                 if attempt > self.retries:
                     raise
@@ -400,8 +424,7 @@ class Client:
             # 无关的提示，反而把真正的错因冲淡了（实测撞到过）。
             if payload and b'"parent_id"' in payload:
                 hints.append(
-                    "父工作项的**类型**要允许做它的父（官方报 400「父工作项的类型不正确」；"
-                    "实测：这个项目里用户故事的父项不能是史诗，得是特性）"
+                    "父工作项的类型必须符合该项目的父子类型配置；请查询配置后再选择父项"
                 )
             return hints
         if status >= 500:

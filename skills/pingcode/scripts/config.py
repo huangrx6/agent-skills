@@ -1,25 +1,8 @@
 #!/usr/bin/env python3
-"""配置与本地状态：凭据、令牌缓存、当前上下文。
+"""PingCode 凭据、令牌、上下文与字典缓存。
 
-设计取舍
---------
-**全局一套，不放进仓库。** 配置目录默认 `~/.config/agent-skills/pingcode/`（`PINGCODE_CONFIG_DIR`
-可换），三个文件职责分开 —— 它们的**生命周期不同**，混在一起就会互相覆盖：
-
-| 文件 | 内容 | 谁写 | 生命周期 |
-| --- | --- | --- | --- |
-| `credentials.json` | host / 授权模式 / client_id / client_secret / redirect_uri | **人**手填 | 长期 |
-| `token.json` | access_token / refresh_token / 到期时间 | 程序 | 30 天（refresh 90 天） |
-| `context.json` | 当前项目 / 当前迭代 / 当前用户 | 程序 | 随时改 |
-| `cache.json` | 字典类数据（项目 / 迭代 / 类型 / 状态 / 优先级 / 成员） | 程序 | 手动刷新 |
-
-写文件一律**原子写 + 0600**：令牌是凭证，不能留下半截文件，也不能让同机器其他用户读到。
-
-优先级：命令行参数 > 环境变量 > `credentials.json`。
-环境变量（CI / Agent 用）：`PINGCODE_HOST` `PINGCODE_AUTH_MODE` `PINGCODE_CLIENT_ID`
-`PINGCODE_CLIENT_SECRET` `PINGCODE_ACCESS_TOKEN` `PINGCODE_CONFIG_DIR`。
-
-**绝不回显 client_secret 与 token。** `describe_credentials()` 只给「从哪来 + 前 4 位」。
+PINGCODE_CONFIG_DIR 优先于共享配置根；环境变量覆盖凭据文件。
+程序写入采用同目录临时文件、0600 与原子替换。状态摘要不含 secret/token。
 """
 
 from __future__ import annotations
@@ -53,11 +36,10 @@ ENV_DIR = "PINGCODE_CONFIG_DIR"
 
 # 官方文档：access_token 30 天，refresh_token 90 天。
 FALLBACK_ACCESS_TTL = 30 * 24 * 3600
-FALLBACK_REFRESH_TTL = 90 * 24 * 3600
 
 # 官方示例里的 expires_in 是 1577808000 —— 那是**绝对时间戳**（2020-01-01），
 # 不是秒数。正常 OAuth 的 expires_in 是秒，所以这里两种都可能，靠量级判断。
-# 这条属于「未实测」：等真实令牌到手后第一次 `auth status` 就能确认。
+# expires_at 记录访问令牌的到期时间，不使用 refresh_token 的有效期。
 ABSOLUTE_TS_FLOOR = 10 ** 9
 
 
@@ -103,7 +85,7 @@ def shared_config_dir() -> str:
 
 
 def legacy_config_dir() -> str:
-    """旧位置 `~/.config/agent-skills/pingcode`（只兼容读取，不再首选）。"""
+    """旧位置 `~/.config/pingcode`；新目录尚不存在时兼容沿用。"""
     return os.path.join(os.path.expanduser("~"), ".config", "pingcode")
 
 
@@ -278,13 +260,12 @@ def save_token(payload: dict[str, Any], mode: str, keep_refresh: str = "") -> di
     if not access:
         raise TokenError(f"授权响应里没有 access_token：{sorted(payload)}")
     refresh = str(payload.get("refresh_token", "") or "") or keep_refresh
-    ttl_fallback = FALLBACK_REFRESH_TTL if refresh else FALLBACK_ACCESS_TTL
     record = {
         "mode": mode,
         "access_token": access,
         "refresh_token": refresh,
         "token_type": str(payload.get("token_type", "Bearer") or "Bearer"),
-        "expires_at": expire_at(payload, ttl_fallback),
+        "expires_at": expire_at(payload, FALLBACK_ACCESS_TTL),
         "obtained_at": _as_int(time.time()),
     }
     write_private(path_of(TOKEN), record)

@@ -1,210 +1,88 @@
-# ![agent-skills](assets/icons/agent-skills-light.svg#gh-light-mode-only) ![agent-skills](assets/icons/agent-skills-dark.svg#gh-dark-mode-only) **Agent Skills**
+# ![agent-skills](assets/icons/agent-skills-light.svg#gh-light-mode-only) ![agent-skills](assets/icons/agent-skills-dark.svg#gh-dark-mode-only) Agent Skills
 
-> 个人精选的 AI Coding Agent skill 集合。从头重建，只保留真正高频触发的：Obsidian 工作流、技术图、git 写操作、PingCode 项目与工作项，以及「建 skill」本身的元能力。
+个人维护的 Agent 工作流：演示文稿、技术图、Obsidian 知识管理、Git、PingCode 和 skill 设计。
+每个目录都以 `SKILL.md` 描述触发条件与操作流程，`README.md` 提供依赖、用法和限制。
 
-## 这是什么
+## Skills
 
-每个 skill 是一个独立目录，含 `SKILL.md`（YAML frontmatter + Markdown 正文，**给 Agent 看的规则**）与 `README.md`（**给人看的详解**），以及按需展开的 `references/`（细节手册）、`scripts/`（确定性脚本）、`evals/`（触发与行为的评估集）。**回归测试不在 skill 目录里** —— 它住在仓库顶层 `tests/<skill>/`：AI 调用 skill 时读的就是 skill 目录那棵树，测试放进去会被顺手读走。Agent 靠 `SKILL.md` 的 `description` 判断该不该触发。
+| Skill | 用途 |
+| --- | --- |
+| [deck-authoring](skills/deck-authoring/README.md) | 从结构规格制作演示文稿，建立项目视觉风格，预览并导出 HTML、PDF、PNG、PPTX 或视频 |
+| [diagram-authoring](skills/diagram-authoring/README.md) | 从结构描述生成技术图，支持 Excalidraw 与 draw.io，并检查布局和引用 |
+| [obsidian-personal-knowledge-base](skills/obsidian-personal-knowledge-base/README.md) | 创建、更新、归位和审阅笔记，维护 PARA 目录与 MOC |
+| [obsidian-work-log-release-recorder](skills/obsidian-work-log-release-recorder/README.md) | 将已完成的开发、配置和发布事实记录到工作日志、发版文档与长期知识 |
+| [git-dev-workflow](skills/git-dev-workflow/README.md) | 本地 Git 写操作的状态探查、风险检查、提交规划和结果核验 |
+| [pingcode](skills/pingcode/README.md) | 查询和维护 PingCode 项目、工作项、迭代和看板，按真实接口解析名称和 ID |
+| [skill-builder](skills/skill-builder/README.md) | 设计新 skill、评审触发边界，提供仓库结构与引用检查工具 |
 
-**跨 Agent 通用**：兼容 Claude Code / pi / OpenCode / Cursor / Codex 等任意支持 `SKILL.md` frontmatter 约定的 Agent。
+例如：“使用 `$deck-authoring` 把材料做成演示文稿”，或“使用 `$pingcode` 查我的待办”。
+是否自动发现和如何显式调用，取决于使用的 Agent。
 
----
+## 安装
 
-## 快速安装（推荐）
-
-用的是 skills 生态的**事实标准 CLI** [`vercel-labs/skills`](https://github.com/vercel-labs/skills)（支持 75+ Agent）：
+克隆仓库后，在仓库根目录执行：
 
 ```sh
-# 交互式安装
-npx skills add <repo>
-
-# 只装某个 skill 到某个 Agent 的全局目录
-npx skills add <repo> \
-  --skill obsidian-personal-knowledge-base \
-  --agent claude-code --global --yes
-
-# 一次装全部到指定 Agent
-npx skills add <repo> --skill '*' --agent claude-code
+python3 tools/install_skills.py
+python3 tools/install_skills.py --check
 ```
 
-### 开发机：clone + 软链（本仓库自带安装器）
+默认安装到 `~/.agents/skills/`，使用指向当前仓库的软链，修改即时可见。
+目标 Agent 使用其他目录时，通过 `--install-dir` 指定；安装器的 `--help` 提供完整选项。
+仓库可能移动或需要固定副本时使用 `--copy`，更新后再次安装并检查。
+已有安装内容有差异时，先查看安装器提示，避免覆盖本机定制。
 
-`npx skills add` 装的是**副本**，仓库里改了它不会跟着变 —— 实测过一次：某个 skill 的安装位比仓库**少 571 行**，当天新加的能力一个都没有，而它在下一个会话里会照旧工作、连新能力叫什么都不知道。
+Python 是维护工具的基础依赖；各 skill 所需的浏览器、图形工具、Python 包和外部服务配置，
+见各自 README。安装 skill 不等于安装这些运行依赖。
 
-本仓库自己的安装器**默认装成软链**，装的就是 clone 下来的那一份，没有「两份东西必然漂移」这件事：
+## 配置
+
+本机配置放在用户配置目录，令牌、账号和实际 vault 路径不随 skill 分发。
+主要配置包括 Obsidian vault 路径、PingCode 凭据与令牌缓存、名称泄露词表。
+各解析器的环境变量、文件位置和兼容路径以对应 README 为准。
+
+`skills-lock.json` 是仓库派生文件，记录 SKILL.md 的哈希；
+被忽略的 `.skill-lock.json` 是本机安装状态，两者用途不同。
+
+## 开发与验证
+
+- `SKILL.md` 保留入口和必要流程，`references/` 按需放详细说明，避免重复维护规则。
+- `scripts/`、`assets/` 只放实际使用的程序或素材；目录不是必须凑齐的清单。
+- 回归测试放在根目录的 `tests/<skill>/`，仓库工具测试在 `tools/tests/`。
+- `evals/evals.json` 保存触发和行为场景，不代表这些场景已自动执行或通过。
+- 删除文件前检查代码、文档和动态加载的消费者；忽略的本机文件不作为普通清理对象。
+
+从仓库根目录运行：
 
 ```sh
-git clone https://github.com/<owner>/agent-skills.git
-
-python3 tools/install_skills.py            # 默认：装成软链（推荐）
-python3 tools/install_skills.py --copy     # 要副本（比如仓库会被移走）
-python3 tools/install_skills.py --check    # 软链指向对不对 / 副本内容一致吗
+python3 skills/skill-builder/scripts/preflight.py
+python3 -m unittest discover -s tests/skill-builder -v
+python3 -m unittest discover -s tools/tests -v
+python3 tools/skills_lock.py --update
+python3 tools/skills_lock.py --check
 ```
 
-默认装到 `~/.agents/skills/`（`--install-dir` 可换）。常见的加载目录：
+修改其他 skill 时，将测试目录替换为对应名称。Deck 的浏览器和 PDF 测试需要其运行依赖。
+`preflight.py` 执行结构、名称泄露与本地引用检查，并统计测试文件；它不执行回归或视觉验收。
+`tools/skill_health.py` 给出维护建议；`tools/skill_trigger_log.py` 可分析所支持的本机会话日志，
+覆盖范围取决于日志来源，不能代表所有 Agent 的使用情况。
 
-```text
-Claude Code  项目级  →  ./.claude/skills/<name>
-Claude Code  全局级  →  ~/.claude/skills/<name>
-pi           全局级  →  ~/.agents/skills/<name>
-OpenCode     全局级  →  ~/.opencode/skills/<name>
-Codex        全局级  →  ~/.codex/skills/<name>
-```
+## 提交检查
 
-**「pi 认不认软链」不是猜的**，两处证据：
-
-1. 源码 `dist/core/skills.js` 对每个目录项先 `entry.isDirectory()`，若是 `isSymbolicLink()` 再用 `statSync`（会跟随软链）取真实类型 —— 注释就是「For symlinks, check if they point to a directory and follow them」；
-2. 用**它自己的** `loadSkillsFromDir()` 实测：目录里放两个指向本仓库的软链 + 一个普通目录，两个 skill 都被发现、非 skill 目录被正确忽略；再验主文件内容 —— 真实路径落在仓库、只有仓库新版才有的字串能读到。
-
-两个边界：
-
-- 软链指向仓库，所以**未提交的修改也是活的**（开发时正是想要的）；仓库被移走则链接失效，重跑一次安装器即可。
-- 想让某个 skill 与副本共存（例如固定一个发布版），用 `--copy` 单独装。
-
-`skills/skill-builder/scripts/preflight.py` 的报告里也会带一行安装位状态 —— **只报告、不算失败**（钩子在 commit 之前跑）。
-
----
-
-## Skills 索引（7 个）
-
-### Obsidian 工作流（2 个）
-
-围绕 Huangrx6 的 Obsidian vault 构建的工作流。**vault 路径不写死在文档里** —— 按 `$OBSIDIAN_VAULT_PATH` → `~/.config/agent-skills/obsidian-vault-path` 的顺序解析，换机器或 vault 搬家只改一处。
-
-| Skill | 覆盖 |
-| --- | --- |
-| [**obsidian-personal-knowledge-base**](skills/obsidian-personal-knowledge-base/SKILL.md) | 在 PARA + MOC vault 内创建、更新、移动、审阅笔记；按 Inbox / Projects / Areas / Resources / Archive / Assets / System 判断归属 |
-| [**obsidian-work-log-release-recorder**](skills/obsidian-work-log-release-recorder/SKILL.md) | 任务结束后把可复用事实沉淀到长期知识；维护周发版记录（脚本、配置、部署路径、验证、回滚、执行假设） |
-
-### 通用能力（4 个）
-
-不绑定某个 vault 或某个工具，按需触发的确定性能力。
-
-| Skill | 覆盖 |
-| --- | --- |
-| [**deck-authoring**](skills/deck-authoring/SKILL.md) | 从结构规格制作演示文稿；项目风格、真实浏览器质量检查、HTML/PDF/PNG/可编辑或贴图PPTX/逐页视频，交付前回读验证 |
-| [**diagram-authoring**](skills/diagram-authoring/SKILL.md) | 把系统画成可编辑的 Excalidraw 图（架构 / 依赖 / 流程 / 状态 / 部署拓扑 / 思维导图）：区域（网格底 + 虚线框）、四组样式轴、一套配色系统；模型只描述结构，坐标全由脚本算 |
-| [**git-dev-workflow**](skills/git-dev-workflow/SKILL.md) | git 写操作（提交 / 分支 / 丢弃改动 / 删分支与 worktree / 改写历史 / force push）前的状态核对与拦截：先读真实状态，不可逆动作前跑机械前置检查，报告只引原始输出 |
-| [**pingcode**](skills/pingcode/SKILL.md) | PingCode 项目 / 工作项（史诗·特性·用户故事·任务·缺陷）的命令行：查我的待办与缺陷、按条件搜、看详情、建项目、建改工作项（描述 / 起止日期 / 负责人 / 优先级 / 父项 / 迭代）、改状态、加评论、删工作项。端点来自官方文档生成的端点表（发送前校验），名字→ID 解析歧义时列候选而不猜 |
-
-### 元能力（1 个）
-
-不绑定具体业务场景，Agent 在本仓库内工作时反复用到的元 skill。
-
-| Skill | 覆盖 |
-| --- | --- |
-| [**skill-builder**](skills/skill-builder/SKILL.md) | 建新 skill 前的 5 分钟决策：该不该建 / 触发描述怎么写 / 范围定 P0 还是 P1 / 起 `SKILL.md` 一稿的 checklist |
-
-**触发语法**：
-
-```text
-使用 $obsidian-personal-knowledge-base 帮我 <整理 / 归位 / 创建 / 审阅 笔记>
-使用 $obsidian-work-log-release-recorder 帮我 <记录 / 沉淀 / 写发版文档>
-使用 $diagram-authoring 帮我 <画架构图 / 画流程图 / 把这段说明画出来>
-使用 $git-dev-workflow 帮我 <提交 / 建分支 / 丢弃改动 / 清理分支 / 改写历史>
-使用 $pingcode 帮我 <查我的任务与缺陷 / 建项目 / 建任务或缺陷 / 改状态 / 看项目进度>
-使用 $skill-builder 帮我 <判断要不要建 skill / 评审触发描述 / 起 SKILL.md 一稿>
-```
-
----
-
-## Roadmap
-
-**详细方向与判据看 [`ROADMAP.md`](ROADMAP.md)** —— 这里不抄一份（手抄的表必然过期，实际上已经过期过一次：上一次写「P1 待开工」时 pingcode 已经做完了）。
-
-现状数字现算：
-
-```sh
-python3 tools/skill_health.py                            # 规模 / 余量 / 缺 README / 缺 evals / 死文件
-python3 tools/skill_trigger_log.py                       # 哪个 skill 真在被用（从 pi 会话记录里读）
-python3 skills/skill-builder/scripts/validate_skill.py   # 结构硬错误
-```
-
-已完成的部分：
-
-| 优先级 | 方向 | 状态 |
-| --- | --- | --- |
-| P0 | Obsidian 工作流（知识库 + 发版记录） | ✅ 2026-08 |
-| P0 | `skill-builder`（建 skill 的元能力） | ✅ 2026-09 |
-| P0 | `diagram-authoring`（技术图） | ✅ 2026-09 |
-| P0 | `git-dev-workflow`（git 写操作） | ✅ 2026-09 |
-| P1 | `pingcode`（PingCode 项目 / 工作项） | ✅ 2026-09，已在真实租户跑通只读 + 写全链路 |
-
-每个新 skill 都要通过 skill-builder 的设计评审才会被加进来 —— 避免重蹈「11 个 skill 只用 2 个」的覆辙。
-
----
-
-## 维护约定
-
-- **目录名 = frontmatter `name` 字段**，保持一致。
-- 每个 skill 都要有 `README.md`（详解），模版与硬约束见 `skills/skill-builder/references/skill-readme-template.md`。**`SKILL.md` 管规则、`README.md` 管怎么用与为什么**，两份不要互相复制；README 里不能出现还没实现的能力（没做的归到「已知限制」）。
-- **不再要求 `assets/`**：skill 目录不再约定放图标之类的素材。存量 skill 里已有的 `assets/icons/` 保留（根 README 的索引表还在引用），但新 skill 不用补。
-- 改完 skill 跑 `python3 skills/skill-builder/scripts/validate_skill.py` —— 机械检查结构硬错误（YAML 可解析、`name` 匹配目录名、description < 800 字符、含 Do NOT 边界、正文 ≤ 150 行、无绑定声明矛盾等），退出码 `0` 通过 / `1` 失败。**完整清单以脚本输出为准，不在这里抄一份** —— 抄了就会和脚本漂移。
-- 正文余量不足 10 行时脚本会另提示一行（`!` 前缀，不影响退出码）：**下次要往正文加规则前，先做 references 瘦身**。瘦身由下一次真实需求触发，不靠「等哪天有空」 —— 一直没空就一直不做。
-- **Obsidian 类**的 vault 路径从配置解析（见上方 Skills 索引），换机器或 vault 搬家只改一处，不要在文档或脚本里写死。某个 skill 真的不可移植时才显式声明 —— 而**把它改造成可移植之后，必须在同一次里删掉那条声明**，否则就成了自相矛盾（`validate_skill.py` 会把这种情况判为失败）。
-- `.skill-lock.json` 已被 `.gitignore` 排除 —— 那是 pi 工具的本地 lock，每台机器自己生成。
-- **改完 skill 不用同步安装位**：安装器默认装的是**软链**，装的就是仓库那一份（见上方安装一节）。想确认状态就跑 `python3 tools/install_skills.py --check`。
-
-### 什么时候可以不修（停止判据）
-
-改进会递归：修完一个问题会露出下一层（写回规则 → eval 标尺 → 检查器自己没测试），而「给测试写的测试谁来验证」理论上没有尽头。所以设一条线：
-
-| 层 | 要求 | 不再要求 |
-| --- | --- | --- |
-| **核心行为**（skill 的规则本身） | 必须有 eval 覆盖 | — |
-| **元工具**（校验脚本） | 边界值测试 | 不再验证「测试本身对不对」 |
-
-遇到新遗留先归到这二层：落第一层的就得做；落第二层的，边界值测完就停 —— 不用每轮重新权衡。
-
-### 自动校验（git hook）
-
-`.githooks/pre-commit` 在提交触及 `skills/` 或 `tools/` 时跑**四道阻塞检查 + 两道提示 + 一步自动同步**：
-
-| 工序 | 抓什么 |
-| --- | --- |
-| `validate_skill.py` | 结构硬错误：YAML 不可解析、`name` 与目录名不一致、description 超 800 字符、正文超 150 行 |
-| `check_leakage.py` | 外发内容里的真实名称（真实客户名 / 内部系统名 / 内网主机路径 / 内部接口名） |
-| `tests/*` 与 `tools/tests` | 脚本回归：校验器自己的边界、含空格的路径不被截断、扫描范围不扩散…… 这些测试守的正是上面几道的防线，不跑就等于没写。**默认不阻塞提交**（失败只打印输出 + 提示）；要把它当发布闸门时加 `AGENT_SKILLS_GATE=1` |
-| → 跟在同一段里的 `check_doc_numbers.py` | 文档里写的**测试条数**是不是真的。真实条数刚跑出来就在手上，比一下不要钱。README 现在**已不再写测试条数**（那是每加一条用例都要追着改的数字），这条因此退化成安全网：万一谁又写了，它照样比 |
-| `check_pointers.py` | 指针指向一个不存在的文件（客观错误）；「内容有没有真的搬过去」是语义判断，留给人工核对 |
-| 提示：`tools/skill_health.py` | **只提示不阻塞** —— 它报的是「该优化什么」（正文余量、缺 README、缺 evals、死文件），不是「代码错了」。拿它挡提交会把人逼到 `--no-verify`，而一旦养成那个习惯，前面四道真防线也一起失效 |
-| 同步：`tools/skills_lock.py` | **自动更新并重新暂存** `skills-lock.json`。它是派生文件（`computedHash` = `sha256(SKILL.md)`），却被手工维护过 —— 实测漂成「6 个 skill 里 3 个没登记、2 个哈希过期」。自动而不阻塞的理由同上 |
-
-`check_leakage.py` 的 blocklist 放在仓库**之外**（一行一个词）—— 放进仓库它自己就泄露了。未配置时跳过、不阻塞。
-
-### 配置放在哪
-
-所有 skill 的配置**统一放在一个目录**，跨平台同一个路径 —— 谁读什么一处说清：
-
-```
-~/.config/agent-skills/
-  ├── obsidian-vault-path        # Obsidian 库路径（PKB 解析，WLRR 复用同一处）
-  ├── pingcode/                  # 凭据与令牌缓存
-  └── skill-name-blocklist.txt   # 泄露词表
-```
-
-| 规矩 | 为什么 |
-| --- | --- |
-| 整体可搬走 | `AGENT_SKILLS_CONFIG_DIR` 指到别处即可（换机器、放加密盘） |
-| **旧位置仍可读** | `~/.config/<名字>` 的老配置继续生效，只在**新位置没有时**回退 —— 老机器不用搬家，搬迁是一次性的、不是必须的 |
-| 读不到就提示怎么建 | 提示里给的是 `python3 -c` 一行命令，macOS / Linux / Windows 通用（`mkdir -p` 与 `echo >` 在 PowerShell 里不是这个写法，等于没提示） |
-| 配置不塞进 skill 目录 | 配置属于**这台机器**；跟着 skill 走会把它变成"随仓库外发"的东西 |
-| 测试不塞进 skill 目录 | AI 调用 skill 时读的就是 `skills/<skill>/` 那棵树，测试放进去会被顺手读走 |
-
-hook 不会随 clone 自动生效，新机器上执行一次：
+如需启用仓库 hook，执行一次：
 
 ```sh
 git config core.hooksPath .githooks
 ```
 
-跳过单次检查用 `git commit --no-verify`。
+提交涉及 `skills/`、`tests/`、`tools/` 或 `.githooks/` 时运行：
 
-> 为什么用 hook 而不是靠自觉：2026-09-12 一次会话里「正文 ≤ 150 行」被连续违反两次（WLRR 256 行、PKB 174 行），两次都是脚本抓出来的，肉眼没发现。同一会话里还发生过一次真实名称被推送到本仓库（当时 public），清除它需要重写 35/38 个 commit 并 force push。
->
-> **文档里的测试条数**也是同一类问题：`pingcode` 的 README 写过「120 条」「134 条」（实际早已 139/166）、WLRR 的「0 脚本 0 测试」在补上脚本后还留着、`git-dev-workflow` 的 README 初稿把仓库**实时状态**（「未提交 13 项」）抄进了文档。共同点是**数字手写、事实会变**，而人眼读文档看不出哪个过期了 —— 一个对不上的数字会让人开始怀疑整份文档。所以它现在也由 hook 守：只认测试命令那一行上的数字（「470 条接口」「8 条 eval」不是同一个东西，硬比就是制造误报）。
+| 检查 | 行为 |
+| --- | --- |
+| 结构、敏感名称、引用目标、文档中的测试数字 | 发现错误时阻塞；敏感名称词表未配置则跳过该扫描 |
+| 各 skill 与仓库工具回归 | 默认失败只提示；`AGENT_SKILLS_GATE=1` 时阻塞；跳过项单独报告 |
+| 仓库体检 | 维护建议，不阻塞 |
+| 锁文件同步 | 按暂存区的 SKILL.md 直接更新锁文件的暂存版本，保留工作区未暂存内容 |
 
-## 参考
-
-- [`vercel-labs/agent-skills`](https://github.com/vercel-labs/agent-skills) —— skills 生态参考仓库
-- [Anthropic — Equipping agents for the real world with agent skills](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills) —— SKILL.md frontmatter 约定
-- [`vercel-labs/skills`](https://github.com/vercel-labs/skills) —— `npx skills` CLI（支持 75+ Agent）
+检查上限与具体规则以脚本为准。通过静态检查不代表外部服务可用、视觉产物合格或所有集成测试已执行。
+后续方向见 [ROADMAP.md](ROADMAP.md)。

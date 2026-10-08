@@ -20,6 +20,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
@@ -117,8 +118,21 @@ class DiffTest(Case):
         self.make_skill("aaa", "第二版")
         self.assertEqual(["aaa"], lock.diff(self.root)["哈希过期"])
 
+    def test_malformed_entry_is_reported_and_repairable(self):
+        self.make_skill("aaa")
+        self.write_lock({"aaa": "invalid entry"})
+        self.assertEqual(["aaa"], lock.diff(self.root)["哈希过期"])
+        self.assertEqual(lock.DEFAULT_SOURCE, lock.build(self.root)["skills"]["aaa"]["source"])
+
 
 class MainTest(Case):
+    def test_unreadable_skill_does_not_get_an_empty_content_hash(self):
+        self.make_skill("aaa")
+        with mock.patch.object(lock, "read_bytes", side_effect=PermissionError("fixture unreadable")), \
+                contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(2, lock.main(["--root", self.root, "--update"]))
+        self.assertFalse(os.path.exists(os.path.join(self.root, "skills-lock.json")))
+
     def test_check_不一致时退出_1并给改法(self):
         self.make_skill("aaa")
         err = io.StringIO()
@@ -155,6 +169,17 @@ class MainTest(Case):
         with contextlib.redirect_stdout(io.StringIO()):
             lock.main(["--root", self.root, "--update"])
         self.assertEqual("保留我", self.read_lock()["skills"]["aaa"]["source"])
+
+    def test_explicit_update_uses_worktree_without_git_index_access(self):
+        self.make_skill("aaa", "worktree body")
+        self.write_lock({"aaa": {"source": "pending source", "sourceType": "local"}})
+        with mock.patch.object(lock, "_git_bytes", side_effect=AssertionError("no index access")), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, lock.main(["--root", self.root, "--update"]))
+        entry = self.read_lock()["skills"]["aaa"]
+        self.assertEqual("pending source", entry["source"])
+        self.assertEqual("local", entry["sourceType"])
+        self.assertEqual(lock.sha256_of(os.path.join(self.root, "skills/aaa/SKILL.md")), entry["computedHash"])
 
     def test_json_输出含_diff_与_expected(self):
         self.make_skill("aaa")

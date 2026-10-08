@@ -1,18 +1,5 @@
 #!/usr/bin/env python3
-"""`.githooks/pre-commit` 第 5 段（仓库体检）的回归测试。
-
-为什么只测这一段
-----------------
-前四段（结构 / 泄露 / 回归测试 / 指针）是**阻塞**的，它们的行为已经由各自的脚本测试
-覆盖；这里要守的是一个**很容易在重构里被改错、而改错后不会有人立刻发现**的性质：
-
-> 体检**只提示，不阻塞**。
-
-一旦它变成阻塞，人会开始用 `--no-verify` 跳过整个 hook —— 而那意味着前面四道真的
-防线也一起失效了。所以「体检报出内容时，提交仍然成功」这件事必须有测试。
-
-测试在临时 git 仓库里跑，不碰真仓库。
-"""
+"""在临时仓库验证 hook 的触发、阻塞/提示区别和暂存区锁同步。"""
 
 from __future__ import annotations
 
@@ -22,6 +9,7 @@ import subprocess
 import tempfile
 import unittest
 import json
+import hashlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
@@ -49,6 +37,8 @@ class HookCase(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         self.root = self._tmp.name
+        # hook 可能继承临时 GIT_INDEX_FILE；夹具里的 git 只能操作自己的仓库。
+        self.env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
         self._git("init", "-q")
         hooks = os.path.join(self.root, ".githooks")
         os.makedirs(hooks)
@@ -60,7 +50,7 @@ class HookCase(unittest.TestCase):
             shutil.copy(os.path.join(TOOLS, name), os.path.join(self.root, "tools", name))
 
     def _git(self, *args: str) -> subprocess.CompletedProcess:
-        return subprocess.run(["git", *args], cwd=self.root, capture_output=True, text=True)
+        return subprocess.run(["git", *args], cwd=self.root, capture_output=True, text=True, env=self.env)
 
     def write(self, rel: str, content: str, stage: bool = True) -> None:
         path = os.path.join(self.root, rel)
@@ -70,8 +60,9 @@ class HookCase(unittest.TestCase):
         if stage:
             self._git("add", rel)
 
-    def run_hook(self) -> subprocess.CompletedProcess:
-        return subprocess.run(["sh", self.hook], cwd=self.root, capture_output=True, text=True)
+    def run_hook(self, gate="0") -> subprocess.CompletedProcess:
+        env = dict(self.env, AGENT_SKILLS_GATE=gate)
+        return subprocess.run(["sh", self.hook], cwd=self.root, capture_output=True, text=True, env=env)
 
     def test_文档里的测试条数过期要挡住提交(self):
         """这一类错在本仓库出现过四次；真实条数在跑完测试时就在手上，比一下不要钱。"""
@@ -115,6 +106,8 @@ class HookCase(unittest.TestCase):
         with open(os.path.join(self.root, "skills-lock.json"), encoding="utf-8") as fh:
             payload = json.load(fh)
         self.assertIn("foo", payload["skills"])
+        self.assertEqual("", self._git("diff", "--", "skills-lock.json").stdout)
+        self.assertEqual(payload, json.loads(self._git("show", ":skills-lock.json").stdout))
 
     def test_锁文件本来就对时不插话(self):
         self.write("skills/foo/SKILL.md", "---\nname: foo\n---\n正文\n")
@@ -130,7 +123,7 @@ class HookCase(unittest.TestCase):
         self.assertEqual(0, result.returncode, "体检只提示，不许挡提交")
         self.assertIn("缺 README.md", result.stdout, "提示要真的打出来")
         self.assertIn("不阻塞提交", result.stdout, "要写清它不挡")
-        self.assertIn("pre-commit: 结构、泄露、指针、回归测试与文档数字通过", result.stdout)
+        self.assertIn("pre-commit: 已执行的结构、泄露、指针与文档数字检查通过", result.stdout)
 
     def test_体检脚本自己崩了也不许挡(self):
         """它是个报告工具 —— 崩了也不该把一次正常提交卡住。"""
@@ -150,6 +143,141 @@ class HookCase(unittest.TestCase):
         result = self.run_hook()
         self.assertEqual(0, result.returncode)
         self.assertNotIn("体检提示", result.stdout, "没改 skills/tools 就不跑体检")
+
+    def test_tests_only_failure_runs_and_is_advisory_by_default(self):
+        self.write("tests/foo/test_fail.py", "import unittest\nclass T(unittest.TestCase):\n    def test_fail(self):\n        self.fail('fixture failure')\n")
+        result = self.run_hook()
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("1 个目录失败", result.stdout)
+        self.assertNotIn("1 个目录通过", result.stdout)
+        self.assertIn("fixture failure", result.stderr)
+
+    def test_tests_only_failure_blocks_when_gate_enabled(self):
+        self.write("tests/foo/test_fail.py", "import unittest\nclass T(unittest.TestCase):\n    def test_fail(self):\n        self.fail('fixture failure')\n")
+        result = self.run_hook(gate="1")
+        self.assertEqual(1, result.returncode)
+        self.assertIn("提交已中止", result.stdout)
+
+    def test_skip_count_is_reported_separately(self):
+        self.write("tests/foo/test_skip.py", "import unittest\nclass T(unittest.TestCase):\n    @unittest.skip('missing optional dependency')\n    def test_skip(self):\n        pass\n")
+        result = self.run_hook()
+        self.assertEqual(0, result.returncode)
+        self.assertIn("跳过 1 条", result.stdout)
+
+    def test_hook_only_change_runs_checks(self):
+        with open(HOOK, encoding="utf-8") as handle:
+            self.write(".githooks/pre-commit", handle.read())
+        result = self.run_hook()
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("检查通过", result.stdout)
+
+    def test_lock_uses_staged_skill_and_excludes_unstaged_new_skill(self):
+        staged = "---\nname: foo\n---\nstaged body\n"
+        self.write("skills/foo/SKILL.md", staged)
+        self.write("skills/foo/SKILL.md", staged + "not staged\n", stage=False)
+        self.write("skills/bar/SKILL.md", "unstaged new skill", stage=False)
+        result = self.run_hook()
+        self.assertEqual(0, result.returncode, result.stderr)
+        payload = json.loads(self._git("show", ":skills-lock.json").stdout)
+        self.assertEqual(["foo"], list(payload["skills"]))
+        self.assertEqual(hashlib.sha256(staged.encode()).hexdigest(), payload["skills"]["foo"]["computedHash"])
+        with open(os.path.join(self.root, "skills/foo/SKILL.md"), encoding="utf-8") as handle:
+            self.assertIn("not staged", handle.read())
+
+    def test_current_worktree_lock_does_not_hide_stale_index_lock(self):
+        self.write("skills/foo/SKILL.md", "first body")
+        self.assertEqual(0, self.run_hook().returncode)
+        self.write("skills/foo/SKILL.md", "second body")
+        # 模拟维护者先在工作区生成锁，却忘记暂存它。
+        subprocess.run(["python3", os.path.join(self.root, "tools/skills_lock.py"),
+                        "--root", self.root, "--update"], check=True, capture_output=True, env=self.env)
+        with open(os.path.join(self.root, "skills-lock.json"), "rb") as handle:
+            before = handle.read()
+        result = self.run_hook()
+        self.assertEqual(0, result.returncode, result.stderr)
+        payload = json.loads(self._git("show", ":skills-lock.json").stdout)
+        self.assertEqual(hashlib.sha256(b"second body").hexdigest(), payload["skills"]["foo"]["computedHash"])
+        with open(os.path.join(self.root, "skills-lock.json"), "rb") as handle:
+            self.assertEqual(before, handle.read())
+
+    def test_unstaged_lock_source_type_and_arbitrary_bytes_are_preserved(self):
+        for change in ("source", "sourceType", "arbitrary bytes"):
+            with self.subTest(change=change):
+                self.write("skills/foo/SKILL.md", "first body")
+                payload = {"version": 1, "skills": {"foo": {
+                    "source": "team/staged", "sourceType": "github",
+                    "skillPath": "skills/foo/SKILL.md",
+                    "computedHash": hashlib.sha256(b"first body").hexdigest(),
+                }}}
+                self.write("skills-lock.json", json.dumps(payload))
+                if change == "arbitrary bytes":
+                    pending = b"unfinished lock edit\r\n\xff\x00"
+                else:
+                    payload["skills"]["foo"][change] = "pending value"
+                    pending = (json.dumps(payload, indent=3) + "\r\n").encode()
+                with open(os.path.join(self.root, "skills-lock.json"), "wb") as handle:
+                    handle.write(pending)
+                self.write("skills/foo/SKILL.md", "second body")
+
+                result = self.run_hook()
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+                self.assertIn("已按字节保留", result.stdout)
+                with open(os.path.join(self.root, "skills-lock.json"), "rb") as handle:
+                    self.assertEqual(pending, handle.read())
+                staged = json.loads(self._git("show", ":skills-lock.json").stdout)["skills"]["foo"]
+                self.assertEqual("team/staged", staged["source"])
+                self.assertEqual("github", staged["sourceType"])
+                self.assertEqual(hashlib.sha256(b"second body").hexdigest(), staged["computedHash"])
+
+    def test_untracked_lock_content_is_preserved(self):
+        self.write("skills/foo/SKILL.md", "body")
+        self.write("skills-lock.json", "unfinished local lock", stage=False)
+        result = self.run_hook()
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        with open(os.path.join(self.root, "skills-lock.json"), "rb") as handle:
+            self.assertEqual(b"unfinished local lock", handle.read())
+        staged = json.loads(self._git("show", ":skills-lock.json").stdout)
+        self.assertEqual(hashlib.sha256(b"body").hexdigest(), staged["skills"]["foo"]["computedHash"])
+
+    def test_missing_worktree_lock_is_recreated_after_index_sync(self):
+        self.write("skills/foo/SKILL.md", "first body")
+        self.assertEqual(0, self.run_hook().returncode)
+        os.unlink(os.path.join(self.root, "skills-lock.json"))
+        self.write("skills/foo/SKILL.md", "second body")
+        result = self.run_hook()
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual("", self._git("diff", "--", "skills-lock.json").stdout)
+        with open(os.path.join(self.root, "skills-lock.json"), encoding="utf-8") as handle:
+            payload = json.load(handle)
+        self.assertEqual(hashlib.sha256(b"second body").hexdigest(), payload["skills"]["foo"]["computedHash"])
+
+    def test_failed_index_update_does_not_modify_worktree_lock(self):
+        self.write("skills/foo/SKILL.md", "first body")
+        self.assertEqual(0, self.run_hook().returncode)
+        with open(os.path.join(self.root, "skills-lock.json"), "rb") as handle:
+            before = handle.read()
+        self.write("skills/foo/SKILL.md", "second body")
+        self.write(".git/index.lock", "fixture lock", stage=False)
+        result = self.run_hook()
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn("无法同步", result.stderr)
+        with open(os.path.join(self.root, "skills-lock.json"), "rb") as handle:
+            self.assertEqual(before, handle.read())
+        staged = json.loads(self._git("show", ":skills-lock.json").stdout)
+        self.assertEqual(hashlib.sha256(b"first body").hexdigest(), staged["skills"]["foo"]["computedHash"])
+
+    def test_staged_skill_deletion_is_removed_from_lock(self):
+        self.write("skills/foo/SKILL.md", "body")
+        self.assertEqual(0, self.run_hook().returncode)
+        commit = self._git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                           "-c", "commit.gpgsign=false", "commit", "-qm", "fixture")
+        self.assertEqual(0, commit.returncode, commit.stderr)
+        removed = self._git("rm", "--cached", "skills/foo/SKILL.md")
+        self.assertEqual(0, removed.returncode, removed.stderr)
+        result = self.run_hook()
+        self.assertEqual(0, result.returncode, result.stderr)
+        payload = json.loads(self._git("show", ":skills-lock.json").stdout)
+        self.assertEqual({}, payload["skills"])
 
 
 if __name__ == "__main__":

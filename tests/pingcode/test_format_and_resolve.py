@@ -49,6 +49,13 @@ cfg = _load("config")
 
 
 class TimeTest(unittest.TestCase):
+    def test_省略年份的闰日按当前年解析(self):
+        from unittest import mock
+        today = fmt.datetime.date(2028, 1, 1)
+        with mock.patch.object(fmt.datetime, "date") as date:
+            date.today.return_value = today
+            self.assertEqual("2028-02-29 00:00", fmt.show_time(fmt.parse_time("02-29")))
+
     def test_只写日期按当天零点(self):
         stamp = fmt.parse_time("2026-09-20")
         self.assertEqual("2026-09-20 00:00", fmt.show_time(stamp))
@@ -228,6 +235,15 @@ class ResolveTest(unittest.TestCase):
         self.seed("projects", self.PROJECTS)
         got = resolve.find("projects", self.FakeClient({}), "演示项目")
         self.assertEqual("pj1", got["id"])
+
+    def test_精确同名也必须列出不同_id_而不能取首项(self):
+        self.seed("projects", [{"id": "pj1", "name": "支付"},
+                               {"id": "pj2", "name": "支付"}])
+        with self.assertRaises(resolve.Ambiguous) as caught:
+            resolve.find("projects", self.FakeClient({}), "支付")
+        self.assertIn("pj1", str(caught.exception))
+        self.assertIn("pj2", str(caught.exception))
+        self.assertEqual("pj2", resolve.find("projects", self.FakeClient({}), "pj2")["id"])
 
     def test_按标识精确匹配(self):
         self.seed("projects", self.PROJECTS)

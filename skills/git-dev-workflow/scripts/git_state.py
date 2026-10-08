@@ -83,6 +83,7 @@ CONFLICT_CODES = ("DD", "AU", "UD", "UA", "DU", "AA", "UU")
 # 做两次快照时仓库是可能变的（用例就是这么干的），常驻缓存会给出过期结论。
 # 键里带 repo 路径：一次快照会跨仓库问（worktree 清单里其它 worktree 的脏文件）。
 _CACHE: dict[tuple, Any] = {}
+_READ_ERRORS: list[str] = []
 
 
 def _memo(key: tuple, factory: Callable[[], Any]) -> Any:
@@ -95,6 +96,7 @@ def _memo(key: tuple, factory: Callable[[], Any]) -> Any:
 def clear_cache() -> None:
     """清空去重缓存。snapshot() 开头会调它。"""
     _CACHE.clear()
+    _READ_ERRORS.clear()
 
 
 # ── 文件系统小工具：全部吞掉 OSError ────────────────────────────────────────
@@ -233,7 +235,7 @@ def classify(path: str) -> str:
 
 # ── 各种采集器 ────────────────────────────────────────────────────────────
 def mid_operation(repo: str) -> list[str]:
-    """正在进行的操作 —— 这时候任何写操作都该先停下来问清楚。"""
+    """正在进行的操作；开始无关写操作前需核实，解决当前操作可继续。"""
     root = git_dir(repo)
     if not root:
         return []
@@ -258,9 +260,10 @@ def dirty_entries(repo: str, ignored: bool = False) -> list[dict]:
     调用里最贵的一个。
     """
     def read() -> list[dict]:
-        code, out, _ = run_git(repo, "status", "--porcelain=v1", "-z",
+        code, out, err = run_git(repo, "status", "--porcelain=v1", "-z",
                                "--untracked-files=all", "--ignored=matching")
         if code != 0:
+            _READ_ERRORS.append(f"{repo}: git status 失败（退出码 {code}）：{err.strip()}")
             return []
         fields = out.split("\0")
         parsed: list[dict] = []
@@ -436,7 +439,7 @@ def worktree_state(repo: str, known: dict | None = None) -> list[dict]:
     **目录不存在时明说** —— 那正是 `prunable` 的含义，也是「能不能回收」的第一个判据。
     （手工排查时踩过：把命令跑失败当成「0 个未提交」，于是看起来一切正常。）
 
-    `known` 是已经算过的 {路径: {dirty, unpushed}}：当前站在里面的那个仓库就是主
+    `known` 是已经算过的 {路径: {dirty, unpushed, ignored_files}}：当前站在里面的那个仓库就是主
     worktree，它的脏文件/未推送数在 `snapshot()` 里刚算过，再算一遍不只是浪费 ——
     两次调用之间文件真的会变，两个数字还会不一致。
     """
@@ -447,7 +450,7 @@ def worktree_state(repo: str, known: dict | None = None) -> list[dict]:
             continue
         item: dict = {"path": "", "head": "", "branch": "", "detached": False,
                       "prunable": False, "exists": False, "dirty": None,
-                      "unpushed": None}
+                      "unpushed": None, "ignored_files": None}
         for line in block.splitlines():
             if line.startswith("worktree "):
                 item["path"] = line[len("worktree "):]
@@ -467,8 +470,10 @@ def worktree_state(repo: str, known: dict | None = None) -> list[dict]:
                 if cached:
                     item["dirty"] = cached["dirty"]
                     item["unpushed"] = cached["unpushed"]
+                    item["ignored_files"] = cached.get("ignored_files")
                 else:
                     item["dirty"] = len(dirty_entries(item["path"]))
+                    item["ignored_files"] = dirty_entries(item["path"], ignored=True)
                     item["unpushed"] = unpushed(item["path"], with_subjects=False)["count"]
         out.append(item)
     return out
@@ -552,10 +557,12 @@ def snapshot(start: str) -> dict:
         "ignored_protected": protected_paths(ignored_entries),
         "branches": local_branches(root, branch["baseline"]),
         "worktrees": worktree_state(root, {root: {
-            "dirty": len(entries), "unpushed": unpushed(root)["count"]}}),
+            "dirty": len(entries), "unpushed": unpushed(root)["count"],
+            "ignored_files": ignored_entries}}),
         "stash": stash_state(root),
         "submodules": submodule_state(root),
         "hooks": hooks_state(root),
+        "read_errors": list(_READ_ERRORS),
     }
 
 
@@ -566,6 +573,7 @@ def render(state: dict) -> str:
 
     branch = state["branch"]
     lines = [f"仓库     {state['root']}"]
+    lines.extend(f"读取失败 {error}" for error in state.get("read_errors", []))
     lines.append("分支     " + (branch["branch"] or f"detached HEAD @ {branch['head']}")
                  + (f"（基线 {branch['baseline']}）" if branch["baseline"] else "")
                  + ("  [在 worktree 里]" if branch["in_worktree"] else ""))
@@ -659,7 +667,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(state, ensure_ascii=False, indent=2))
     else:
         print(render(state))
-    return 2 if state["mid_operation"] else 0
+    return 1 if state.get("read_errors") else 2 if state["mid_operation"] else 0
 
 
 if __name__ == "__main__":

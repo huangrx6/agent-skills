@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "帮我把工作区清干净一下，没用的改动都丢掉，然后接着干。",
-      "expected_output": "先跑 git_state.py 看清当前状态（分支、未提交构成、有没有中间态），再跑 git_guard.py discard-worktree。把 guard 的输出原样贴出来（会丢哪些文件、结论是 SAFE/WARN/BLOCK），而不是概括成'有几处改动'。若结论是 BLOCK 就不执行，并说明原因（未提交里含有非构建产物的文件）；若用户改口要执行，也不要自作主张 --force。不允许在没跑 guard 的情况下直接 reset --hard / clean -fd。",
+      "expected_output": "先读取当前仓库与未提交状态，再用 git_guard.py discard-worktree 核验。具体说明会丢的内容和结论；BLOCK 时先保存或解决原因。用户未指明的源码、文档和凭据不因“清理”而默认授权丢弃。不需要贴完整原始输出。",
       "files": []
     },
     {
@@ -16,19 +16,19 @@
     {
       "id": 3,
       "prompt": "帮我提交一下，提交信息写好了：feat(管理端)：修改用户名",
-      "expected_output": "用 commit_style.py --check 校验这条信息，并指出**规范第 1 条**：冒号必须是 ASCII 的 `:`，全角「：」不行（脚本会命名这一条）。修正后（feat(管理端): 修改用户名）再提交。不允许静默把全角冒号换成半角却不告诉用户；也不允许说成'格式不太规范'这种没有依据的话——要引用规范条目号。",
+      "expected_output": "核对仓库约定与改动范围；若使用 Conventional Commits，指出全角冒号不符合前缀语法，改为 ASCII 冒号后提交。已授权且修正明确时无需再次确认。",
       "files": []
     },
     {
       "id": 4,
       "prompt": "我要在另一个分支上并行干活，给它开个 worktree。",
-      "expected_output": "用 worktree.py create 建，默认放在**仓库同级**（dirname(repo_root)/<仓库名>-<分支 slug>），并说明为什么同级而不是仓库内的 .worktrees/（在仓库之外：不用改 .gitignore、git status 也看不见它）。建之前先检查：分支是否已存在、目标路径是否已存在、同级目录是否落在另一个 git 仓库里——撞上就拒绝并说明原因，不做 --force。",
+      "expected_output": "核对工作区及分支/目标路径，再创建独立 worktree。包装脚本默认放仓库同级并拒绝覆盖已有目录；已有分支可使用合适的原生 Git 命令。遵循环境的分支前缀，报告实际目录与分支。",
       "files": []
     },
     {
       "id": 5,
       "prompt": "我刚才把那个 bug 修了并提交了，告诉我改了什么。",
-      "expected_output": "用 git_report.py（若之前 capture 过，走前后对照；没有就先 capture 再操作）或 git_state.py 的输出作为依据，把**原始输出**（HEAD、提交主题、未提交条数等命令与结果）贴出来，而不是用叙述概括。报告里的分支名、提交数、文件数必须能在脚本输出里逐字对上；拿不到的部分要说明拿不到，不许猜。",
+      "expected_output": "只读查看当前状态与相关提交，概括实际改动并引用提交或路径。已有事前快照可用 git_report.py；没有则说明比较边界，不为补报告重新操作或倒造事前快照。",
       "files": []
     },
     {
@@ -40,7 +40,7 @@
     {
       "id": 7,
       "prompt": "坏了，我刚才 git reset --hard 把东西弄丢了，怎么办？",
-      "expected_output": "先取证再动手：把 git reflog 的输出留档（因为后续操作会继续往上面写），然后用 git reflog / git fsck --unreachable 找候选，并且**先 git show 确认再 reset**（reflog 里相邻行很像，点错就又丢一次）。明确区分两类：提交过的东西通常能救；未提交的内容（clean 掉、checkout -- 丢的）**基本救不回**——不许承诺'肯定能恢复'。结尾给出下一步可执行命令，而不是只给安慰。",
+      "expected_output": "先保留当前状态和 reflog，区分已提交与未保存内容。找到候选后先 git show 核验，优先建救援引用或隔离 worktree；需 reset 时先保存当前工作并核对授权。不承诺所有文件可恢复。",
       "files": []
     },
     {
@@ -51,7 +51,7 @@
     {
       "id": 9,
       "prompt": "我 reset --hard 之前还 git clean 掉了一批没提交的文件，这些也能一起找回来吗？",
-      "expected_output": "必须**把两类分开答**，不能合并成「都能/都不能」：① 已经提交过的 → 走 git reflog / git fsck --unreachable 通常能救回，而且**先 git show 确认再 reset**（reflog 里相邻行很像，点错就又丢一次）；② 从来没提交过、被 clean 掉的未跟踪文件、被 checkout -- 丢掉的改动 → 对象库里没有它们，**基本救不回**，不许承诺「都能找回」。若想再挣扎一次，可提的下一条是 git fsck --lost-found（只对「曾 git add 过」的 blob 有戏），并明说这是碰运气。拿不准就直说拿不准。"
+      "expected_output": "已提交内容从 reflog、其他引用或对象库尝试恢复；未跟踪且从未暂存的内容通常无法由 Git 恢复，检查编辑器与系统备份。曾暂存的 blob 可尝试 fsck。先保留候选，不直接再次覆盖当前工作区。"
     }
   ]
 }

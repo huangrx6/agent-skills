@@ -7,37 +7,37 @@
       "sourceType": "github"
     },
     "diagram-authoring": {
-      "computedHash": "84673914620c1b88732ea5878ea0aabe839348c9f706b739d26a00ea2cd4152d",
+      "computedHash": "8d34214b9992e61bbd6352df578e68043e1c51a9fc0d923b8bb462db1f536897",
       "skillPath": "skills/diagram-authoring/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
     "git-dev-workflow": {
-      "computedHash": "ed21dfc55687061ec8d5b390e910b9b3ae3bd6019c583cb8cf266383ff318d66",
+      "computedHash": "fcd4b3575632dd1f907992300df0cb39ab39bdc6e0efd33042940f0a9ec230e6",
       "skillPath": "skills/git-dev-workflow/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
     "obsidian-personal-knowledge-base": {
-      "computedHash": "de6bc0a3a84110fb645b0ca5fb04208311723464f38c91245f5e2ebc8dfdf95f",
+      "computedHash": "db18ecfe1d7775398ad67e9863f82745c9ad73fc2455356893a0b57549dbdf8b",
       "skillPath": "skills/obsidian-personal-knowledge-base/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
     "obsidian-work-log-release-recorder": {
-      "computedHash": "44fa23006a9d149cae91d69364d00b2c882d7a00b33439050fe5acfc930251e5",
+      "computedHash": "b4ba39b005dd5e0953bf68ab9e59cca8713d09094a10ec12b45345cd9603e9ed",
       "skillPath": "skills/obsidian-work-log-release-recorder/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
     "pingcode": {
-      "computedHash": "088ada536de92ae22d5b2709fc4f322df684ca0720c91164bf26ac61922f6202",
+      "computedHash": "9147d435498dc483d96aa2d23cb144f5230b753713d1067343ceb7b5cbbc4504",
       "skillPath": "skills/pingcode/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
     "skill-builder": {
-      "computedHash": "3ddefdbd9d8b64bc1086e013f1b878442bef15eccc6db349847ae2af4e107c6b",
+      "computedHash": "f154cb83c3521564b44bff19e1184ab3d4feb4bb09e3327e838f2d351f85d1bb",
       "skillPath": "skills/skill-builder/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"

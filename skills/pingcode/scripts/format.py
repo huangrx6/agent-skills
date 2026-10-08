@@ -30,8 +30,7 @@ WORKITEM = (
     ("html_url", "链接"),
 )
 
-# 状态字典：`type` 是语义值（pending/in_progress/completed），判断「完没完」靠它 ——
-# 实测里「已修复 / 已发布」都叫 completed 语义，光看中文名看不出来。
+# 状态是否结束看 state.type（completed/closed），不要按租户自定义中文名判断。
 STATE = (
     ("name", "状态"),
     ("type", "语义"),
@@ -141,12 +140,14 @@ def parse_time(text: str) -> int:
     normalized = raw.replace("/", "-").replace("年", "-").replace("月", "-").replace("日", "")
     formats = ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d", "%Y-%m", "%m-%d")
     for fmt in formats:
+        candidate = normalized.strip()
+        if fmt == "%m-%d":
+            candidate = f"{datetime.date.today().year}-{candidate}"
+            fmt = "%Y-%m-%d"
         try:
-            parsed = datetime.datetime.strptime(normalized.strip(), fmt)
+            parsed = datetime.datetime.strptime(candidate, fmt)
         except ValueError:
             continue
-        if fmt == "%m-%d":
-            parsed = parsed.replace(year=datetime.date.today().year)
         return _as_int(parsed.timestamp())
     raise TimeParseError(
         f"看不懂的时间 {text!r}；可用 2026-09-20 / 2026-09-20 18:30 / 10 位时间戳"

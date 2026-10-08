@@ -77,7 +77,7 @@
     {
       "id": 9,
       "prompt": "用我们公司的 logo 和品牌色，署名写 © 2026 某某科技。",
-      "expected_output": "在deck项目的brands/<name>/brand.json登记可信logo、反白版、footer和可选colors/fonts，deck.brand接入。先用已有资产，缺必要信息才问。validate_spec、compile与check统一用品牌合并主题，品牌新增colorSet能从任意cwd正确解析。logo位置仍由风格决定。",
+      "expected_output": "在deck项目的brands/<name>/brand.json登记可信logo、反白版、footer和可选colorSets/fonts，deck.brand接入。先用已有资产，缺必要信息才问。validate_spec、compile与check统一用品牌合并主题，品牌新增colorSet能从任意cwd正确解析。logo位置仍由风格决定。",
       "files": [
         "references/brand-assets.md",
         "SKILL.md"
@@ -135,6 +135,26 @@
       "files": [
         "references/validation.md",
         "references/delivery-formats.md"
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "只要五页内部说明，材料就在这里，风格你决定，直接开始制作。",
+      "expected_output": "根据现有材料完成简洁页序规划并制作真实代表页，用户授权自行决定时自主推进。中间规划可用页序表，不强制生成或交付 content.json、storyline.json、pageplan.json；这些不是当前脚本支持的输入合同。最终使用合法 spec、项目风格和用户所需交付物，仍完成事实、渲染与视觉检查。",
+      "files": [
+        "SKILL.md",
+        "references/planning.md",
+        "references/pipeline.md"
+      ]
+    },
+    {
+      "id": 17,
+      "prompt": "在配置里加上 approvedThemes 和 motion_intent，再让图表的折线自动逐段长出来。",
+      "expected_output": "先说明实际支持范围：brand 的闭合字段不含 approvedThemes，spec 没有 motion_intent；当前 G2 关闭内部动画，只有图表容器入场。不能把未实现字段写进配置后声称功能已生效。根据用户目标明确采用当前可交付效果或另行界定实现工作，验证真实效果后才交付。",
+      "files": [
+        "references/brand-assets.md",
+        "references/animation.md",
+        "references/charts.md"
       ]
     }
   ]

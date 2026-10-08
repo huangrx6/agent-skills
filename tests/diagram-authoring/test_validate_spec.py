@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import importlib.util
+import copy
 import json
 import os
 import subprocess
@@ -81,6 +82,73 @@ class ValidateSpecTest(unittest.TestCase):
     # ── 基线 ──
     def test_valid_spec_passes(self):
         self.assertEqual(self.codes(valid_spec()), set())
+
+    def test_malformed_containers_report_errors_without_crashing(self):
+        for field, code in (("nodes", "MISSING_NODES"), ("edges", "BAD_EDGES"),
+                            ("groups", "BAD_GROUPS")):
+            for value in (None, {}, "bad", 3, True):
+                with self.subTest(field=field, value=value):
+                    spec = valid_spec()
+                    spec[field] = value
+                    self.assert_error(spec, code)
+
+    def test_nonstring_ids_references_and_enums_do_not_raise_typeerror(self):
+        targets = [
+            ((), "type"), ((), "direction"), ((), "visual"), ((), "detail"),
+            (("nodes", 0), "id"), (("nodes", 0), "kind"),
+            (("nodes", 0), "shape"), (("nodes", 0), "emphasis"),
+            (("nodes", 0), "group"), (("nodes", 0), "pin"),
+            (("groups", 0), "id"), (("groups", 0), "level"),
+            (("edges", 0), "from"), (("edges", 0), "to"), (("edges", 0), "kind"),
+        ]
+        for path, field in targets:
+            for value in ([], {}, ["x"], {"value": "x"}, 5, True):
+                with self.subTest(path=path, field=field, value=value):
+                    spec = valid_spec()
+                    target = spec
+                    for key in path:
+                        target = target[key]
+                    target[field] = copy.deepcopy(value)
+                    self.assertTrue(self.mod.validate(spec).errors)
+
+    def test_text_fields_cannot_smuggle_structured_values_to_renderers(self):
+        for path, field in [
+            ((), "title"), ((), "mood"), (("nodes", 0), "label"),
+            (("nodes", 0), "detail"), (("groups", 0), "label"),
+            (("groups", 0), "description"), (("edges", 0), "label"),
+            (("edges", 0), "id"),
+        ]:
+            with self.subTest(path=path, field=field):
+                spec = valid_spec()
+                target = spec
+                for key in path:
+                    target = target[key]
+                target[field] = {"text": "not a string"}
+                self.assertTrue(self.mod.validate(spec).errors)
+
+    def test_card_title_requires_actual_nonempty_text(self):
+        for value in (None, [], {}, 8, True, " "):
+            with self.subTest(value=value):
+                spec = valid_spec()
+                spec["cards"] = [{"title": value, "items": ["detail"]}]
+                self.assert_error(spec, "MISSING_CARD_TITLE")
+
+    def test_explicit_null_emphasis_does_not_pass_to_layout_lookup(self):
+        spec = valid_spec()
+        spec["nodes"][0]["emphasis"] = None
+        self.assert_error(spec, "UNKNOWN_EMPHASIS")
+
+    def test_malformed_cli_returns_structured_diagnostics_not_traceback(self):
+        with tempfile.TemporaryDirectory() as folder:
+            source = os.path.join(folder, "malformed.json")
+            with open(source, "w", encoding="utf-8") as handle:
+                json.dump({"type": ["architecture"], "nodes": None,
+                           "edges": {"from": "a"}}, handle)
+            run = subprocess.run([sys.executable, VALIDATE_SPEC, source, "--json"],
+                                 text=True, capture_output=True)
+            self.assertEqual(run.returncode, 1, run.stderr)
+            self.assertGreater(json.loads(run.stdout)["error_count"], 0)
+            self.assertNotIn("Traceback", run.stderr)
 
     # ── 防线 1:坐标字段必须被拒（前作的病根） ──
     def test_coordinate_field_is_rejected(self):

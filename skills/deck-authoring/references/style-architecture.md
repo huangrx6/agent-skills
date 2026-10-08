@@ -1,487 +1,212 @@
-# 样式架构
+# 项目风格与规格契约
 
-风格目录里的 `style.json` 是**单一来源**（deck 项目的 `styles/<name>/`；`--style` 也吃路径）
-—— 渲染器、skin.css、墨色门禁都从这一处读。
-改色板 / 改字号 / 改错位量，**全在 token 里改**，spec 与脚本零改动。
+内容写在 deck.spec.json；字号、配色、字体和构图视觉写在项目的
+`styles/<name>/style.json` 与 `skin.css`；组织身份放在可选 brand。
+本篇给出当前实现的接口，不是成品风格模板。图表、素材、品牌分别按对应参考文档补充。
 
-## 风格从哪找：两根优先级（`DECK_STYLES` 可注入额外根）
+## 风格查找
 
-`render.py` 按顺序找风格（`style_roots()`，**调用时求值**），先命中先用：
+`deck.style` 必填，可用名字或包含两份风格文件的目录路径。按顺序查找：
 
-1. `DECK_STYLES` 环境变量（`:` 分隔）—— 风格放在 deck 项目之外时的显式入口
-   （CI、/tmp 里的方向草稿）；
-2. `<spec 所在目录>/styles/` —— **deck 项目**（随项目交付、可移植）；
-3. `<当前目录>/styles/` —— 没拿到 spec 路径时的兜底（列风格、测试）；
-4. skill 自己的 `styles/` —— 用户**显式托管**的全局风格；**工具链永不写入**
-   （写它 = 变相内置，用户明令禁止过）。
+1. `DECK_STYLES` 指定的额外根（平台路径分隔符）。
+2. spec 所在目录的 `styles/`。
+3. 当前工作目录的 `styles/`。
+4. skill 自身的 `styles/`，仅供用户显式托管的全局风格。
 
-第 2 根不是可有可无：deck 项目就是 spec 所在目录，从任何 cwd 跑同一个 spec
-都必须命中同一套风格（只看 cwd 的话，报错文案指着"deck 项目的 styles/<名>/"，
-而代码根本没看那里）。
+每份新 deck 在项目内设计风格；不要向 skill 写本次项目文件。
+没有内置默认风格。`--style /tmp/direction-a` 可用于临时探索，正式采用后搬入项目并更新 deck.style。
+从其他 cwd 调用也应解析到同一项目风格；环境变量可覆盖它，因此交付前记录实际采用的目录。
 
-**没有内置风格、没有默认风格**：`deck.style` 必填，缺了就
-`MISSING_STYLE` 并给指路报错。可拷贝的模板必然变成默认答案 ——
-工具链不携带任何参考实现、示例风格或样例 spec，磁盘上也没有可找的。
+## style.json
 
-`--style` 吃名字也吃路径（路径 → 临时草稿可直接渲）。
+下面是可解析的接口示例，数值只是示意，需根据本次观看场景与内容量设计；仍需配套 skin.css：
 
-## 字段集（schema）
-
-```jsonc
+```json
 {
-  // ── 必填顶层键 11 个（**形状契约**；缺键在渲染 / 校验时当场暴露：
-  //    fonts.display|body 缺键渲染器 KeyError、type 缺档 deck 编译 SystemExit）──
-  "version": 1,                          // schema 版本号；改了字段就 +1
-  "label":       "风格显示名",               // `image_source.py --brief` 用；**从这份 deck 的内容长出来，
-                                      // 不复用见过的风格名**（名字是锚：叫什么就会长成什么）
-  "temperature": "一句话气质",              // 如「克制 · 冷」；--brief 按它挑提示词的气质档
-  "reference":   "...",                  // 风格参考出处（--brief 的样式行显示）
-  "note":        "...",                  // 设计缘由（给后人读）
+  "version": 1,
+  "label": "项目风格",
+  "temperature": "清晰克制",
+  "reference": "本项目内容与观看场景",
+  "note": "接口示例，需按实际内容设计皮肤",
   "colorSets": {
-    "<name>": {                          // 色板集；spec 用 colorSet 字段引用名
-      "primary":   "#RRGGBB",            // 主专色 —— 只做墨层 / 色块 / 装饰
-      "secondary": "#RRGGBB",            // 副专色 —— 只做墨层 / 栏标 / 装饰
-      "background": "#RRGGBB"            // 纸色
-      // 文字色：声明了 "text" 用声明，否则 = overprint(primary, secondary) 派生
-      // （ink.py text_color() —— 声明/派生同一个入口，见下文「两个可选字段」）
+    "main": {
+      "primary": "#145A46",
+      "secondary": "#433A32",
+      "background": "#FFFFFF",
+      "text": "#202020"
     }
   },
-  // ── 以下四键是**可选 effect**（缺 = 该风格没有这个效果，不是"声明一堆零"）：
-  //    ink / texture / decor / misregistration。普通风格（Swiss/Minimal/Glass…）
-  //    不写 = 这套风格没有该效果（零错位、无纸纹层、无装饰）。
-  "ink": {                                 // （可选）孔版/印刷系的叠印声明
-    // ⚠️ **说明性元数据**：没有任何脚本读 ink.*；声明/派生的实际开关是
-    // colorSets.*.text 是否存在（ink.py text_color()）。写这块只为留设计缘由。
-    "derivation": "srgb-multiply",        // 叠印方式（sRGB 逐通道相乘 = 真实打印混色）
-    "forText":    "overprint",            // 文字一律用叠印色
-    "note":       "...",                  // 设计缘由（给后人读）
-    "rule":       "每套色板必须含一个深墨 ..."  // 设计铁律
-  },
-  "contrast": {
-    "minBody":     4.5,                   // 正文最小对比度（WCAG AA）—— **唯一判定依据**
-    "minLarge":     3.0,                  // 大字档阀值：**只备着，本仓库不检查**
-    "largeTextPx":  32                    // 同上：只为让 minLarge 可读，不参与判定
-  },
-  "type": {                              // 字号级数（px）—— 15 档全必填（render.py:116）
-    // ⚠️ 这组数**只是形状**，不是推荐值。实测事故：拿 128/96/84/46/32 那组
-    // （海报/展厅尺度）排内页，每页都像封面页。怎么算见下方「字号怎么定」。
+  "contrast": {"minBody": 4.5},
+  "type": {
     "cover": 84, "compact": 48, "small": 38, "end": 84,
     "subtitle": 24, "bulletLarge": 30, "bullet": 24, "bulletSmall": 20,
     "colTitle": 26, "nodeLabel": 20, "nodeNote": 16,
     "chartValue": 16, "chartLabel": 14, "caption": 16, "foot": 14
   },
-  "misregistration": {                     // （可选）错位声明；缺键 = dx/dy/rot 全 0
-    "offsetRangeX": [lo, hi],             // 标题层 A 的 X 错位像素区间
-    "offsetRangeY": [lo, hi],             // 标题层 A 的 Y 错位像素区间
-    "rotationRange": [lo, hi],            // 整组旋转角度区间（度）
-    "blendMode": "multiply"               // A / B 两层都用 multiply
-  },
-  "texture": {                             // （可选）纸纹声明；缺键 = 不发 .grain 层
-    "grainOpacity":        [lo, hi],      // 颗粒层不透明度区间
-    "grainBaseFrequency": 0.9,            // feTurbulence baseFrequency（颗粒密度）
-    "halftoneDotSize":     [lo, hi]       // 装饰墨块的网点直径区间
-  },
-  "fonts": {
-    "display": "Songti SC, Georgia, serif", // 标题字体栈（**必填**）
-    "body":    "SF Mono, Menlo, monospace"  // 正文 / 注释字体栈（**必填**）
-    // display / body 少一键渲染器直接 KeyError（render.py:704、726 读的就是这两键）
-  },
-  "viewerBackground": "#141414",         // 浏览器外底色（让纸色边能看见）
-  "rules": {                            // （可选）**语法声明**：这套风格不许出现什么
-    "corners":    "square",              // square | rounded | any
-    "shadow":     "none",                // none | soft | any
-    "gradients":  "none",                // none | any
-    "weightSteps": 3                      // 全片字重最多几档（正整数）
-  },
-  "motion": {                            // 动效时间轴 —— 7 键必填；缺键 render.timeline 直接 KeyError（render.py:227）
-    "easing":      "expoOut",                       // 只认 expoOut / overshoot（render.py:501 的 ease()）
-    "cssEase":     "cubic-bezier(0.16, 1, 0.3, 1)", // 注入 CSS；现在无脚本校验（写 linear/ease 系显似 AI slop，自查）
-    "enterMs": 520, "staggerMs": 70,                // 入场时长 / 逐条错峰
-    "titleHoldMs": 260,                             // 标题独占期
-    "holdMs": 2600, "readPerItemMs": 760            // 每页停留 / 逐条阅读时长
+  "fonts": {"display": "sans-serif", "body": "sans-serif"},
+  "viewerBackground": "#141414",
+  "motion": {
+    "easing": "expoOut", "cssEase": "cubic-bezier(0.16, 1, 0.3, 1)",
+    "enterMs": 520, "staggerMs": 70, "titleHoldMs": 260,
+    "holdMs": 2600, "readPerItemMs": 760
   }
 }
 ```
 
-### 语法声明（`rules`）：让皮肤守住自己声称的语法
+运行所需核心块是 colorSets、type、fonts、viewerBackground、motion；
+保留 version、label 和说明元数据便于素材 brief 和维护。style 当前没有独立的完整闭合 schema 验证器，
+不要将“JSON 能解析”当成“风格已验证”。缺键和非法值会在各消费路径暴露。
 
-“这套风格是什么”最硬的部分不是颜色，是**它不许出现什么**：直角就没有圆角、
-浅墨风就没有阴影、单色场就没有渐变、层次靠字号就不靠字重。这些话写在 `rules` 里，
-`check.py` 把**实测**（computed style，`measure.py` 新采的 `borderRadius` /
-`boxShadow` / `backgroundImage`）拿回来对账。
-
-为什么必须实测：皮肤是 CSS，它能在任何选择器上冒出圆角或阴影 —— 静态读 CSS
-说不清“最终生效的是哪一条”（继承、覆盖、`!important`）。
-
-**没声明就不检查**：风格没表态，门不能替它发明一套语法 —— 那叫审美偏好。
-
-```text
-· 风格声明 corners=square，但实测有圆角：第 3 页 s3.card（12px）、s3.badge（50%）
-  —— 要么把皮肤的选择器改成直角，要么把声明改成 rounded
-· 风格声明 weightSteps=2，但全片实测 3 档字重（400、600、700）—— 字重档数就是层次
-```
-
-提示里一定带**页号 + 元素 + 实测值** —— “改哪个选择器”得看着这些数字定。
-
-两个**没放进来**的键，都是“硬放会误伤”：
-
-- **字号地板**：`_check_type_size` 的四条线已经在管字号（而且管得更细：标题尺度、
-  正文中位数、条数与字号的关系）。同一个毛病报两遍，人不知道该听哪句。
-- **强调色数量**：要判“这是强调色还是墨色”，得有纸/墨/强调的角色模型；
-  门没有这个模型，硬按亮度猜会在每套色板上误报一次。
-
-### 字号怎么定：观看距离、信息量与视觉层级共同决定
-
-画布是恒定的事实：**1600×900**，正文带 = 900 − 132（上边）− 52（下边距）− 24（页脚）
-= **692px**（`grid.py`）。排印先选观看场景，再用容量与实测校验：
-
-```text
-① 装得下：标题块 + 最满那页的各条文字 × 行高(1.5~1.7) ≤ 692
-② 有层级：标题 : 正文 ≈ 2~3 倍；**相邻两档 ≥ 1.15 倍**（低于这个数，两级分不出来）
-③ 看得清：观众距离 = 一臂之内/笔记本 → 正文 22~26；投影到 3m 外 → 30~34
-```
-
-按这三条算出来的区间（1600×900）：
-
-| 档 | 区间 | 怎么想这件事 |
-| --- | --- | --- |
-| `cover` / `end` | 72~96 | 一页一句话，可以大；结论与章节页也可使用大字，须有明确主次 |
-| `compact`（内页标题） | 40~56 | 内页标题是路牌，不是宣言 —— 用 96 就变成每页都是封面 |
-| `small`（图/表/看板页标题） | 34~44 | 图是主角时，标题退半步 |
-| `subtitle` | 22~28 | 跟正文档拉开 1~2 级，别和标题抢焦点 |
-| `bulletLarge` | 28~34 | **只用于 1~2 条**的宣言页 |
-| `bullet` | 22~26 | 4~6 条内容页的主力档 |
-| `bulletSmall` | 18~21 | 7 条以上 / 双栏 |
-| `colTitle` | 24~30 | 图内文字比正文再小一级 |
-| `nodeLabel` / `nodeNote` | 18~22 / 15~18 | 图内文字比正文再小一级 |
-| `chartValue` / `chartLabel` | 15~18 / 13~15 | 仅作桌面密集场景起点；现场投影应增大 |
-| `caption` / `foot` | 15~18 / 13~15 | 注释与页脚：全场最小 |
-
-这些区间不是通用默认值。`deck.delivery=live` 时须优先保证远处可读；
-`async` 面向桌面阅读，`printable` 按实际打印尺寸检查。详见 `visual-quality.md`。
-
-**字号同时考虑内容量、观看场景和风格层级**：同一套风格里，1 条的宣言页用 `bulletLarge`，
-6 条的内容页用 `bullet` —— 条目数变了，档就换（`bulletTier` 由你在 spec 里声明）。
-
-`check.py` 有**字号体检**（提示级，四条线）—— 装得下就没人报错，所以必须有人开口：
-
-```text
-· 内页标题是封面尺度：第2页 96px（= type.compact）（共 4 页超过 72px）—— 内页标题的合理区是 40~56px
-· 条目多但用的是宣言档字号：第3页 5条×46px —— 大字配 1~2 条是气质，配 4 条以上就挤
-· 内页正文整体偏大：中位数 46px（推荐 20~28px）
-```
-
-### 字体栈：写**意图**，回退了会告诉你
-
-这两个值是完整的 CSS 字体栈，按意图从先到后写 —— **不是**“本机装了哪个”。
-
-本机实测（macOS）：
-
-| 栈 | 首选 | 实际 |
-| --- | --- | --- |
-| `display` | `Songti SC` ✓ 可用 | 就是它 |
-| `body` | `SF Mono` ✗ 本机没有 | 回退到 `Menlo` ✓ |
-
-`check.py` 会把这件事**当提示报出来**，并且说清**谁顶上了**：
-
-```text
-· 字体回退（启发式提示）：声明的 'SF Mono' 在本机不可用，实际用的是 'Menlo'
-```
-
-它不阻塞交付（启发式，衬线撞衬线会误报），但值得看一眼 —— **排版会随机器变**，
-而“排版随机器变”直接影响版面越界（`measure.py` 量的是**当前这台机器**的样子）。
-
-两条容易踩的：
-
-- **通用族不是字体**：`serif` / `monospace` / `sans-serif` 是**回退目标**。
-  拿它们比宽度会得到“与不存在的族一样宽”，从而误报“缺失”。已经排除。
-- **没有文字的元素不该有字体意见**：`<figure class="imgwrap">` 这类不渲染字形的
-  元素，它的 `font-family` 只是浏览器给 CJK 的 UA 默认值（实测报过一次
-  `PingFang SC`，而页面上根本没写这个族）。现在只统计**真有文字**的元素。
-
-### 方向怎么来：从这份 deck 推，不从风格史挑
-
-**铁律：不设风格清单。** 任何样式清单（对照表 / 参数表 / 目录）都会被读者当成
-选项清单 —— 方向只能按下面的程序从内容生成。
-
-选风格看的是**画面**：每渲一页出来看（`render.py` + `shots.py`），不是对着文字想象。
-
-**第 1 步 · 从内容推气质**（一行一个依据，写在草稿里）：
-
-- 观众是谁？他们**信什么**（数字 / 权威 / 现场演示 / 逻辑链）？
-- 场合是什么（投屏远讲 / 桌面近读 / 评审答辩 / 发布会）？
-- 材料本身的气质（工程 / 商业 / 学术 / 创意 / 行政）？
-
-**第 2 步 · 在四条轴上各取一个点**（轴是坐标系，不是风格名）：
-
-- 骨架：版心式 / 边轨式 / 分栏式 / 满版式 / 网格式
-- 字感：衬线 / 无衬线 / 等宽 / 混排
-- 密度：疏（一页一句）/ 中（3~5 条）/ 密（看板）
-- 色彩策略：纸感单色 / 双色对撞 / 深底反白 / 大色场
-
-**第 3 步 · 尚未定方向时，三个方向拉开差异**：任意两方向至少在**两条轴**上不同，且其中一条必须是
-**骨架**轴 —— 只差色板的三个方向是三张同构皮肤。
-
-**第 4 步 · 新方向命名清楚**：可用内容隐喻或视觉特征命名；已定方向沿用已有名字与选择，
-无需重复命名或重新确认。
-
-两个诚实的说明：
-
-- **字体全部映射到本机可用的族**。网上抄来的 preset 大多写 Google Fonts 的名字
-  （Archivo Black / Space Grotesk / Fraunces / Clash Display…），
-  本机没有，直接抄进来会静默回退成默认字体 —— 那比不设计还糟（"看着差不多"但品味全丢）。
-  所以取的是它们的**意图**（衬线/等宽/几何/高饱和），落在本机真有的族上。
-- **核对中西文混排**：选用有中文覆盖的字体，并实测数字和标点的节奏；
-  不要仅因拉丁字母等宽就假定中文的字形与间距也合适。
-
-## 多风格 seam（如何加新风格）
-
-有三类"加风格"：
-
-### A. 加一套色板（同风格、新色板）
-
-`colorSets` 里再加一个键。`ink.py` 会自动把该风格**全部色板**纳入门禁
-（有几套查几套）。
-**唯一约束**：`rule` —— 文字色对比度必须达到 `contrast.minBody`（派生或声明都一样）。
-两墨都亮时压不深（比如朱红 × 土黄只有 3.74 ✗），
-至少其中一个要走深色（朱红 × 深棕 → 达标 ✓）。
-
-`render.py` / `check.py` 不需要改 —— 它们从 token 注入一切。
-
-### B. 加一种新视觉风格
-
-一个风格 = **deck 项目**里 `styles/<name>/` 一个目录，里面两件东西：
-
-```text
-styles/<name>/
-  style.json   token：色板 / 字号级数 / 字体 / 纹理 / 装饰 / 错位区间 / 对比度门槛
-  skin.css     视觉层：颜色、字体、纹理、装饰观感
-```
-
-**加一种风格 = 写一个目录（style.json + skin.css），不碰任何 .py，不留可拷的参考实现
-（模板必然变成默认答案）。** 这条 seam 需要 token 添过一个可选字段
-（`colorSets.*.text`，见下）以外，渲染/校验/导出的代码一行未改。
-
-**为什么要做成目录而不是 CSS 分支**：分支意味着每加一种风格就多一个 if，
-而且校验层也得跟着分支 —— 最后没人愿意加第三种。目录意味着新风格**碰不到别人**。
-
-#### 风格契约（skin.css 只能长在这几个钩子上）
-
-渲染器只出**语义骨架**，类名就是契约 —— 皮肤只能选这份清单里的东西。写清单外的
-类名**不会报错**，只是永远不命中：元素静默掉回浏览器默认样式（字号、字重、字体族
-三样一起跑偏，门只看得见"字体族丢了"那一面）。
-
-| 钩子 | 是什么 |
+| 字段 | 实际语义 |
 | --- | --- |
-| `section.slide` | 一页；`data-page="<版式>"` 做版式级微调 |
-| `.title` / `.subtitle` | 页标题 / 副标题 |
-| `.bullets`、`.bullets.small`（卡片与 hero 里的列表） | 条目列表，标记由 `.bullets li::before` 画 |
-| `.col` / `.colTitle` | 双栏的一栏 / 栏标题 |
-| `.tl`、`.tl .label`、`.tl .note` | 时间线 / 节点标题 / 节点说明 |
-| `.imgwrap`（图槽；皮肤可覆盖 `object-fit` 与 `aspect-ratio`）/ `.chartwrap` | 图槽 / 图表槽 |
-| `.chartcap` / `.foot` / `.band` | 图注 / 页脚 / 栏顶色条 |
-| 风格专属零件（`.grain`、`.halftone`…） | 自己加的，自己负责 |
+| `colorSets.<name>` | primary / secondary / background 必需；text 可显式指定，省略时由 ink.text_color 派生 |
+| `contrast.minBody` | 色板预检门槛；实际文字仍要求至少 4.5，不能通过降低它绕过可读性 |
+| `type` | 示例中 15 个档位覆盖壳/皮肤所用字号，可增加自定义档位 |
+| `fonts.display` / `fonts.body` | 完整 CSS 字体栈；必须核对实际加载和中文覆盖 |
+| `viewerBackground` | 浏览器中幻灯片外侧底色 |
+| `motion` | 七项时间/缓动参数，见 [animation.md](animation.md) |
+| `label` / `temperature` / `reference` / `note` | 说明或素材提示词的输入，不是自动创作规则 |
 
-**壳的 chrome 不归皮肤管**：页脚行（`.footrow`，里面是 `.foot` 与 `.brandfoot`）、
-品牌 logo（`.brandlogo`）、结束页那一块（`.end`）的**位置**由壳钉死（页脚行距页底 52px、
-logo 在右上、结束块在左上）。壳里这三条写的是带子代前缀的 `.slide > .footrow`，
-就是为了不被皮肤的通配误伤 —— 皮肤里 `.slide > *{position:relative;z-index:1}`
-（把内容抬到装饰层之上，很自然的写法）特指度比裸类名高（0,1,1 > 0,1,0），会把 chrome
-的绝对定位一起打掉：chrome 退回文档流、跟着内容走。实测某份 16 页 deck 的页脚距页底
-从 0.7px 跳到 678px，而其余几何门一条都看不见（它们只看"这一页内部对不对"）。
+`contrast.minLarge` / `largeTextPx` 不单独参与当前判定。
+`ink` 可留设计说明，但不存在根据 ink.derivation 自动切换混色算法的机制；
+决定显式文字色的是 colorSets 中的 text。派生色是视觉效果，不是物理印刷精确模拟。
 
-两条该怎么走：
+### 可选默认值与语法
 
-- **只想抬内容层** → 把通配收窄到内容容器（`.pad > *`），别扫 `.slide` 的子代；
-- **就是要挪 chrome** → 写同特指度的 `.slide > .footrow{…}`（后加载者胜，允许）；
-  挪完仍然要**逐页一致** —— `check.py` 的 chrome 门按"距各自页底"比所有页（±2px）。
-
-**变量要带兜底，或确认壳会发**：`--s-*` 是**逐元素**注入的（壳发在那个元素的容器上，
-如 `style="--s-bullet:20px"`），`--t-*` 是整份注入的全局级数。皮肤里 `font: 400
-var(--s-bullet)/1.55 var(--body)` 这种写法，一旦 `--s-bullet` 在某个元素上不存在，
-**整条 shorthand 失效** —— 连字体族一起丢，元素掉回浏览器默认族（那正是"同一页
-一半宋体一半系统 UI 族"的来源）。写成 `var(--s-bullet, 20px)` 就不会踩。
-
-**条目标记归皮肤**：壳只做结构 reset（`.bullets` 无默认圆点、无缩进），标记由
-`.bullets li::before` 画（要短横 / 方块 / 数字 / 不画都行，那是设计决定）。
-所以**条目文本里不要写 `▦ ■ ● ▶` 这类装饰字符** —— 会变成两个标记，而且贴住正文。
-要换标记就改皮肤，不要在内容里塞字符。
-
-必须提供的 CSS 变量：
-
-| 变量 | 含义 |
+| 键 | 形状与用途 |
 | --- | --- |
-| `--paper` / `--text` | 底色 / 正文色 |
-| `--accent` / `--accent-2` | 主色 / 副色（做色块、细线、图表、装饰） |
-| `--display` / `--body` | 标题字体 / 正文字体 |
-| `--viewer` | 浏览器外底色 |
+| `titleTiers` | 页型到 type 档名的映射；逐页 titleTier 优先 |
+| `bulletDefault` | content-text / content-image 的缺省条目档，默认 bullet |
+| `layouts` | 自定义 layout 名称数组，供 check 校验拼写 |
+| `rules.corners` | square / rounded / any |
+| `rules.shadow` | none / soft / any |
+| `rules.gradients` | none / any |
+| `rules.weightSteps` | 实际文字字重最多几档 |
 
-字号不走变量硬写：token 的 `type` 级数整份注入为 `--t-*`，每种版式再用 `--s-title` /
-`--s-bullet` … 指向其中一档。**字号只有这一处来源** —— Python 侧写进语义清单的
-也是同一份（字号两张表必然写岔）。
+默认标题档：title→cover，content-text→compact，end→end，其余→small。
+two-column 缺省条目档是 bulletSmall，可由该页 bulletTier 覆盖。
+脚本不按条数自动缩字；未声明字段的有限修复需显式执行 `render --repair`。
+没有 rules 声明就不做该项语法检查；这不是要求所有风格都直角、无阴影或无渐变。
 
-#### token 里的两个可选字段
+### 可选效果
 
-- **`colorSets.*.text`**：显式文字色。两种来路，走同一个入口 `ink.text_color()`，
-  所以对比度门槛仍然只有一条：
-  - **声明**（`"derivation": "explicit"`）：直接给文字色。黑底白字 / 白底黑字 /
-    粉彩纸这类风格通常适合这样 —— 拿它们的 primary×secondary 去推会得到一个
-    根本不适合当文字的色。
-  - **派生**（`overprint(primary, secondary)`，两墨相乘就是真实叠印的数学）：
-    给"两墨叠印"那种印刷隐喻的风格用。
+无效果时直接省略，不必声明全零对象。
 
-  ⚠️ **声明与派生都要验证最终画面**：token 的对比度只是预检；CSS 覆盖、
-  透明度、品牌合并与实际背景由浏览器测量后再检查。新风格还须完成视觉审稿。
-- **`decor.kind`**：放什么装饰 —— `halftone-circle`（网点圆）/ `accent-block`
-  （大色块，render.py:271）；不写或 `null` = 无装饰（render.py:268 提前返回）。
-  写了 kind 就要配 **`decor.sizes`**（装饰尺寸池，渲染器按 (seed, index) 从里抽，
-  render.py:279-280、285-286）。连带 `decor.types`（哪些版式放）与 `decor.zones`（放哪个角）
-  都是**风格自报的**，不是写死在渲染器里的。
+| 块 | 当前消费的字段 |
+| --- | --- |
+| `misregistration` | offsetRangeX / offsetRangeY / rotationRange：各为两端数值区间，按 seed 派生 |
+| `texture` | grainOpacity 区间、grainBaseFrequency；与 skin 的纸纹实现配合 |
+| `decor` | kind 为 halftone-circle 或 accent-block；sizes 尺寸池、types 适用页型、zones 落点 |
 
-#### token 里的三个可选**作者数据**键
+halftoneDotSize 和 misregistration.blendMode 没有被当前脚本消费，不能依赖它们改变效果。
+效果应服务当前方向。装饰不承载业务事实，不能压正文，图表内部不做错位叠印。
+所有效果都要验证最终导出；原生 PPTX 不复刻任意 CSS 或滤镜。
 
-这三个键**脚本不推断**，是风格自报的数据（缺省 = 走内置缺省）：
+## skin.css
 
-- **`titleTiers`**：`{版式: 档名}`，覆盖渲染器的缺省映射 `render.TITLE_TIER`
-  （`{title: cover, content-text: compact, end: end}`，render.py:105）。值域 =
-  `REQUIRED_TYPE_TIERS`（render.py:116 的档名集合）。合并顺序：缺省映射 →
-  风格 `titleTiers` → spec 逐页 `titleTier`（deck.py:484、490）。
-- **`bulletDefault`**：content-text / content-image 页的缺省条目档名，缺省值
-  `"bullet"`（`render.DEFAULT_BULLET_TIER`，render.py:129）；spec 逐页 `bulletTier`
-  覆盖它（deck.py:486、496-498）。two-column 仍固定 `bulletSmall`（结构事实，
-  不受此键影响）。
-- **`layouts`**：这套风格自报的**布局词表**（非空字符串数组）。渲染器认的结构布局
-  （`IMAGE_LAYOUTS`、`TWO_COL_LAYOUTS`，render.py:84、88）之外，作者自造的布局名
-  写法受它约束：`check.py::_layout_vocab_problems`（check.py:405）在风格声明了
-  `layouts` 时，把不在词表里、又不是结构布局的 `spec.layout` 判成**阻塞** problem
-  —— 自造名写错一个字母，skin 里那条规则就永远不生效，最难查的那种静默。
+壳提供结构，皮肤负责视觉。公共钩子包括：
 
-这三者的校验**分在两处**：`titleTiers` / `bulletDefault`
-的档名由 `deck.py::compile_spec`（deck.py:504-509）在编译时报 —— 档名不在风格的
-`type` 块里直接 SystemExit；`layouts` 的词表门由 `check.py::_layout_vocab_problems`
-（check.py:405）在产物校验时按词表拦拼写。形状的其余部分（如 `layouts` 必须是
-非空字符串数组）没有单独的"契约体检"了 —— 写错会在用到它的那条路上暴露。
+| 钩子 | 对象 |
+| --- | --- |
+| `section.slide[data-page]` | 页型 |
+| `[data-layout]` | 声明的布局，未知名字使用缺省结构 |
+| `.title` / `.subtitle` | 主标题、副标题 |
+| `.bullets` / `.bullets.small` | 正文列表 |
+| `.col` / `.colTitle` | 双栏与栏标题 |
+| `.tl .label` / `.tl .note` | 时间线节点 |
+| `.imgwrap` / `.chartwrap` | 图片与图表区域 |
+| `.chartcap` / `.chartsrc` | 图注、图表来源/单位 |
+| `.footrow` / `.foot` / `.brandfoot` / `.brandlogo` | 页脚与品牌元素 |
 
-#### 换风格需要重审什么
+render 注入 `--paper`、`--text`、`--accent`、`--accent-2`、`--display`、`--body`、`--viewer`，
+以及全局 `--t-<档名>`、逐元素 `--s-title` / `--s-bullet` 等变量和 grid 的间距变量。
+局部变量使用前确认作用域，或用全局 token 回退，例如：
 
-`check.py` 的门槛**全部从所选风格的 token 读**，不用改代码；但要确认新 token 里
-这几项填得合理：`type` 的级数（字号是否匹配观看距离）、`contrast` 门槛、
-`motion` 的时间轴（快慢节奏要配风格气质 —— 缓动只认 expoOut / overshoot，
-render.py:501；7 个时间键缺一个，`render.timeline` 读 `tokens["motion"]` 时直接
-KeyError，render.py:227）、
-`misregistration`（要做错位才写区间 —— ③ 那条区间校验只在**写了**时生效；
-不做错位的风格直接不写这个键）。
-
-### C. 每份 deck 自建风格，复用结构契约
-
-不提供内置成品风格；已经验证的 CSS 结构钩子与 token 接口可以复用。契约在本文档里（顶层键 / 字号档 / 色板 / motion / 可选
-effect）：
-
-```bash
-mkdir -p <deck项目>/styles/<名> && $EDITOR <deck项目>/styles/<名>/style.json
+```css
+.bullets {
+  font-family: var(--body);
+  font-size: var(--s-bullet, var(--t-bullet));
+  line-height: 1.55;
+}
 ```
 
-（在 **deck 项目的 `styles/`** 里现写；skill 自己的 `styles/` 只放用户显式托管的
-全局风格，工具链与手工都不往里写 —— 写它 = 变相内置。）
+不要因缺少局部变量让整条 font shorthand 失效。
+列表默认圆点由壳 reset，皮肤可用 `li::before` 画标记；正文不要再手填装饰符号造成双标记。
+注意 CSS 伪元素不一定进入检查清单，原生 PPTX 也不会自动重建它们。
 
-## spec 字段集（deck-spec.json）
+页脚/品牌元素由壳锚定。避免 `.slide > * {position:relative}` 等通配破坏定位；
+只抬正文层就把选择器收窄到正文容器。若有意移动 chrome，用准确选择器并保持逐页一致。
+壳 CSS 在 skin 后注入，覆盖需看实际选择器优先级，不能仅凭文件先后猜结果。
 
-```jsonc
+截图、结构图与照片的 object-fit 不应一概相同。需要完整证据用 contain，照片可用 cover 并检查焦点。
+图片/渐变上的文字不能只看 token 对比度，必须审查真实叠层。
+
+## 字号与观看场景
+
+1600×900 是画布，不是字号处方。先看 live（投影）、async（桌面）或 printable（打印），
+再设计封面、正文、图注的层级。接口示例中的 14px 图表标签只适合近距离密集阅读的试排，
+不能直接作为投影稿的默认值。
+
+用最密内容页与最长标题试排，图表最小标签也必须读得清；
+装不下时先收内容、换结构或拆页，最后才换较小档。字体加载/回退会改变换行，
+检查浏览器实际用到的字体，并在目标格式中复核。详细字体与嵌入流程见 [fonts.md](fonts.md)。
+
+## deck.spec.json
+
+以下完整示例与上面的 project-style/main 对应；它示范输入结构，不是业务事实：
+
+```json
 {
   "deck": {
-    "style":    "my-style",          // **必填**（缺 = `MISSING_STYLE`）——没有默认风格，
-                                      // 也不内置任何风格。风格名（查找顺序：
-                                      // <spec 所在目录>/styles → <cwd>/styles →
-                                      // skill 的 styles/，另有 DECK_STYLES 可注入额外根）
-                                      // 或**显式目录路径**（临时草稿直接渲：--style /tmp/dir-a）
-    "colorSet": "blue",               // **必填具名**（auto/mood 一律判失败）——
-                                      // 写名 = 该风格 token.colorSets 的键；缺失或写
-                                      // "auto" → validate_spec 判 MISSING_COLOR_SET，
-                                      // render.resolve_color_set 再拦一道 SystemExit
-    "delivery": "live",               // 可选：live / async / printable；字号提示，不自动改字号
-    "seed":     11,                   // 建议显式写（缺省 1）；错位/颗粒按 (seed, 元素) 派生
-    "title":    "封面文案",
-    "brand":    "acme",               // 可选；品牌协议 —— 字体并入、色板同名键品牌赢
-                                      // （deck.py:462）
-    "note":     "...",                // 可选；deck 级备注（封闭字段集放行，工具链不消费）
+    "style": "project-style",
+    "colorSet": "main",
+    "seed": 11,
+    "title": "项目说明",
+    "delivery": "async",
     "slides": [
-      {
-        "type": "title" | "content-text" | "content-image"
-             | "two-column" | "timeline" | "chart" | "end",
-        "title":    "...",            // 所有版式都有
-        "subtitle": "...",            // 仅 title 页
-        "bullets":  ["..."],          // content-text / content-image
-        "image":    "pic.png",        // 仅 content-image；相对路径或 assetId（见下节）
-        "layout":   "visual-right",   // 可选；非空字符串自由值（"auto" 判 BAD_LAYOUT）。
-                                      // 结构布局（渲染器能力）：content-image 的
-                                      //   visual-right（缺省）/ visual-left / even / hero；
-                                      //   two-column 的 even（缺省）/ lean-left / lean-right。
-                                      // 其它字符串 = 作者自造布局名 → 套缺省结构 +
-                                      //   data-layout="<名>"，排法由 skin.css 写；风格声明的
-                                      //   layouts 词表按词表验拼写（check 阻塞，见上文「token 里的三个可选作者数据键」）
-        "titleTier":  "compact",      // 可选；标题档名（风格 type 块里的键）—— 风格
-                                      //   titleTiers 定缺省映射，这里逐页覆盖（chart 除外）
-        "bulletTier": "bullet",       // 可选；条目档名（content-text / content-image /
-                                      //   two-column）—— 缺省取风格 bulletDefault
-        "columns":  [{title, bullets}, ...],  // 仅 two-column；至多两栏
-        "nodes":    [{label, note}, ...],     // 仅 timeline
-        "chart":    "bar",            // 仅 chart；**必填**的显式图形（bar / bar-horizontal /
-                                      //   line / area / bar-stacked / donut / scatter /
-                                      //   combo 八类，render.py:780 / validate_spec.py:41）；缺失 = MISSING_CHART_TYPE
-        "intent":   "comparison",     // 仅 chart；可选**语义标注**（不决定图形）——
-                                      //   trend / ranking / comparison / correlation /
-                                      //   deviation / distribution / composition /
-                                      //   progress，八值封闭，validate_spec 校验
-        "message":  "结论一句话",      // 仅 chart；写了就当图表**大标题**（render.py:1252-1258），
-                                      // 原 title 降为数据集名
-        "data":     [{label, value}, ...],    // 仅 chart（scatter 豁免 x/y）
-        "series":   [{name, data, mark}, ...],      // 仅 chart；多序列
-        "emphasis": {"values": ["标签"]},     // 仅 chart；命中的用主色，其余灰化
-        "annotations": [{type, target, text, value}, ...],  // 仅 chart；当前非空会拒绝，改用 caption（见 charts.md）
-        "unit":     "%",              // 仅 chart；数值单位
-        "caption":  "...",            // 仅 chart / content-image
-        "color":    "overprint"       // 可选；只允许 "overprint"（不写也行）
-      }
+      {"type": "title", "title": "项目说明", "subtitle": "讨论范围与下一步", "role": "cover", "visual": {"kind": "none"}},
+      {"type": "content-text", "title": "先确认范围，再开展验证", "bullets": ["明确需要验证的问题", "为每项结论保留来源"], "role": "actions", "visual": {"kind": "none"}},
+      {"type": "end", "title": "确认下一步", "role": "closing", "visual": {"kind": "none"}}
     ]
   }
 }
 ```
 
-**字段集是封闭的**：`validate_spec.py` 会把未知键直接判失败，并按类别给专门说明
-（坐标 / 字号 / 色值三类各有自己的话）。所以 `fontSize` / `x` / `y` 这类写法一开始
-就被挡下来 —— 不用等到产物那里才发现"它根本没生效"。
+顶层仅 deck；deck 允许 style、colorSet、seed、title、slides、brand、note、delivery。
+style 与具名 colorSet 必填，不能写 auto；slides 必须非空。delivery 可选 live/async/printable，
+用于观看场景提示，不自动改字号。note 为作者备注；brand 见 [品牌](brand-assets.md)。
 
-两个被淘汰的字段名是未知键，写它们会被判 `UNKNOWN_FIELD`，提示里各有一条
-指路：`variant`（字段名是 `layout`）、`mood`（配色不由语义推导，直接写 `colorSet`）。
+每页共通字段：type、title、role、visual、notes，及兼容字段 color（只能是 overprint）。
+role 的闭合词表见 [planning.md](planning.md)；notes 是讲稿，不占版面。
+visual 的字段为 kind / intent / note / ratio，kind 仅 none/data/evidence_image，
+ratio 是比例字符串；必须与页型和素材意图匹配。
 
-`check.py` **不管**字段集（它验的是产物）；它唯一会主动拦的字段是 `color`：第 ① 条
-只接受 `"overprint"`，写成色值（如 `"#FF0000"`）会判失败。
+| type | 该页额外字段 |
+| --- | --- |
+| `title` | subtitle、titleTier |
+| `content-text` | bullets、titleTier、bulletTier |
+| `content-image` | bullets、image、caption、layout、titleTier、bulletTier |
+| `two-column` | columns（至多两栏，每栏 title + bullets）、layout、titleTier、bulletTier |
+| `timeline` | nodes（label + 可选 note）、titleTier |
+| `chart` | chart、data 或 series、unit、caption、intent、message、emphasis、annotations |
+| `end` | titleTier |
 
-## 图怎么进来：assetId → `assets/<file>`（§14 管线 v1）
+图表不接受 titleTier；message 写了就作大标题，原 title 作数据集名，unit 在图旁可见。
+完整图表字段、数量与支持范围见 [charts.md](charts.md)。annotations 当前只能空或省略。
+素材的 image 为项目相对路径或 assetId，manifest 解析见 [images.md](images.md)。
+layout 的内置结构、自由钩子、候选与修复见 [layout-system.md](layout-system.md)。
 
-图文页的 `image` 有两种写法：
+字段集闭合：x/y/width/height、像素字号、色值、旧 variant、deck.mood 都不是合法写法。
+逐页只选档名和布局；更换视觉数值改 style，品牌身份改 brand，不在 spec 中另建一套样式系统。
 
-- **相对路径**（相对 spec 所在目录）：没有 `assets/manifest.json` 时用这种；
-- **assetId**（语义引用）：放了 manifest 时，`image` 写清单里的 id。清单是**封闭
-  schema v1**：`{"schemaVersion": 1, "assets": {id: {file, source, note}}}`
-  （render.py:977-978），`file` 相对 `assets/` 目录。
+## 验证与可复现
 
-解析只发生在 compile：assetId → `"assets/<file>"`（§14 优先级链 v1 —— **manifest 即
-选择**），页对象携带最终路径，渲染器不见 assetId；每条解析写进 compile trace
-（deck.py:522-530）。缺文件由 `check.py` 的「图片加载」门实测拦。
-清单的上游（图纸项目里的 `assets/requests/` 目录：先要一条槽位合同、图回来登记进 manifest）见
-`references/images.md`。
+```sh
+python3 scripts/validate_spec.py /project/deck.spec.json
+python3 scripts/ink.py /project/styles/project-style/style.json
+python3 scripts/render.py /project/deck.spec.json -o /project/deck.html --resolved /project/resolved.deck.json
+python3 scripts/check.py /project/deck.spec.json /project/deck.html --resolved /project/resolved.deck.json
+```
 
-## seed 的不可替代性
-
-`(seed, 元素)` 派生 = 同一份 spec 重渲两次**逐字节一致**。
-全局 random 拿掉 seed 也"看起来差不多"，但：
-
-- 不能回归对比（昨天出的 vs 今天出的）
-- 不能复现一版给别人（"我看到的"和"你看到的"差几个像素）
-
-`render.py` 用的派生 key 是 `"|".join([str(seed)] + [str(p) for p in parts])`，
-所以同一页里不同元素、不同页、不同时间段都互不相关 —— 不会出现
-"整页统一向右偏移 1px"那种肉眼能看出来的相关性。
-
-不要换成 `random.seed(seed); random.uniform(...)` —— 那会破坏可复现性。
+同输入与 seed 的派生可复现；浏览器、字体或资源变化仍可能改变几何。
+替换样式后重新生成 resolved，重新看真实页面与最终导出，不把缓存或旧截图当成新结果。

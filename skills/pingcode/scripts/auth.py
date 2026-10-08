@@ -1,21 +1,8 @@
 #!/usr/bin/env python3
-"""授权：企业令牌 / 用户令牌，令牌缓存与自动刷新。
+"""用户/企业令牌授权、缓存、刷新与本地回调。
 
-为什么默认用户令牌
-------------------
-官方文档里 `/v1/myself` 的 `permission` 只有**用户令牌** —— 企业令牌拿不到"我是谁"。
-参考实现选了企业令牌（配置最少），于是「我的任务」只能靠一个 `PINGCODE_USER_ID`
-环境变量来表达"我"，配错了不报错、只是查出来是别人的东西。
-
-两种模式的取舍（都实现了，`auth_mode` 选）：
-
-| 模式 | 怎么来 | 有效期 | 能不能识别"我" | 风险 |
-| --- | --- | --- | --- | --- |
-| `user`（默认） | 授权码 `authorization_code`，浏览器点一次授权 | access 30 天 / refresh 90 天 | ✅ `/v1/myself` | 只能访问该用户权限内的数据 |
-| `enterprise` | 客户端凭据 `client_credentials` | 30 天 | ❌ 要显式指定用户 | 官方原话：**系统管理员权限** |
-
-令牌接口本身不需要认证头，所以走 `authenticate=False`。
-刷新用 `refresh_token`（官方那条只需要 `grant_type` + `refresh_token`）。
+默认用户令牌支持 /v1/myself；企业令牌需显式指定用户。
+令牌请求按生成表使用 GET，authenticate=False；凭据不得进入展示输出。
 """
 
 from __future__ import annotations
@@ -97,6 +84,9 @@ def bearer() -> str:
 
 def current_mode() -> str:
     """当前令牌是哪一种。没有令牌时按配置里的 auth_mode。"""
+    if os.environ.get(_config.ENV_TOKEN, "").strip():
+        # 环境令牌优先于缓存，不能沿用另一枚缓存令牌的模式。
+        return os.environ.get(_config.ENV_MODE, "").strip()
     record = _config.load_token()
     mode = str(record.get("mode", "") or "")
     if mode:

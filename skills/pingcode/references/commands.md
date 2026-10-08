@@ -8,7 +8,7 @@
 | 开关 | 作用 |
 | --- | --- |
 | `--full` | 出原始 JSON（默认是紧凑表格：编号/标题/类型/状态/优先级/负责人/迭代/截止/链接） |
-| `--dry-run` | 写操作只打印将发出的 `method / url / headers / body`，**不发送** |
+| `--dry-run` | 写操作只打印将发出的 `method / url / headers / body`，**不发送写请求；ID 解析仍可读取接口** |
 | `--no-cache` | 字典（项目/迭代/类型/状态/优先级/标签/成员）不吃缓存，重新拉 |
 | `--host` | 临时覆盖 host |
 
@@ -77,7 +77,7 @@ pingcode.py workitem create --project X --type bug --title "登录页 500" \
 pingcode.py workitem update SCR-12 --description "…" --end 2026-09-30
 pingcode.py workitem set-state SCR-12 已完成
 pingcode.py workitem comment SCR-12 "已定位到网关超时"
-pingcode.py workitem delete SCR-12 --yes            # 不可逆
+pingcode.py workitem delete SCR-12 --yes            # 需明确授权
 
 # 附件：列表默认不列软删除的（--all 才列）；上传两端点形状不同
 pingcode.py workitem attachments SCR-12
@@ -87,7 +87,7 @@ pingcode.py workitem comment SCR-12 "这段是根因"     # 先拿评论 id
 pingcode.py workitem comments SCR-12 --full
 pingcode.py workitem attach-code SCR-12 --comment <评论 id> --title "ngx.conf" \
     --format nginx --content-file ./ngx.conf
-# 删附件：不可逆，所以要 --yes（评论里的附件再加 --comment <评论 id>）
+# 删附件：需明确授权，所以要 --yes（评论里的附件再加 --comment <评论 id>）
 pingcode.py workitem attach-remove SCR-12 <附件 id> --yes
 
 # 批量改**一个**属性（官方限制：单属性 + 单值 + ≤100 个 id）
@@ -123,7 +123,10 @@ pingcode.py workitem create-plan --file plan.json --yes       # 确认才建
 - **`--yes` 之前一定不建** —— 「先打印整棵树再建」不靠自觉，靠接口默认值。
 - **深度优先建（父先子后）** —— 子项要父项的 id。
 - **中途失败不静默** —— 报出**已建成的编号**与失败的节点，让你把剩下的子树单独放一个
-  计划文件接着跑（已建成的不会重复建）。
+  计划文件接着跑（不要整棵重跑；CLI 没有持久化断点或自动去重）。
+
+若剩余节点要挂到已经创建的父项，改用 `workitem create --parent <现有编号>`；
+`create-plan` 的根节点没有“接到既有父项”的参数。
 
 `type` 写中文也行（史诗 / 特性 / 用户故事 / 任务 / 缺陷），本地会翻成枚举；
 自定义类型要写 id。
@@ -150,11 +153,11 @@ pingcode.py config show                   # 凭据/令牌/上下文的完整状�
 ```sh
 pingcode.py api --list 工作项                  # 在生成的端点表里按关键词找
 pingcode.py api --show GET /v1/pjm/workitems   # 看某个端点的分组 / scope / 令牌要求
-pingcode.py api --method GET --path /v1/pjm/workitem_priorities --param project_id=xxx
+pingcode.py api --method GET --path /v1/pjm/workitem/priorities --param project_id=xxx
 pingcode.py api --method POST --path /v1/comments --data '{"principal_type":"workitem","principal_id":"…","content":"…"}'
 ```
 
-路径不在官方文档里会被拦下（并给出最接近的候选）；确认要用就加 `--force`。
+路径不在随附官方文档快照里会被拦下（并给出最接近的候选）；先核实官方契约且属于已授权范围，才使用 `--force`。
 
 ## 常用流程
 
@@ -164,15 +167,15 @@ pingcode.py api --method POST --path /v1/comments --data '{"principal_type":"wor
 | "有哪些没修的缺陷" | `workitem mine --type bug --open-only` 或 `workitem list --type bug` |
 | "把 SCR-12 关了" | 先 `workitem show SCR-12` 确认是它，再 `workitem set-state SCR-12 已完成`（状态名要真实存在，报错会列出可选项） |
 | "建一个需求 / 任务 / 缺陷" | `workitem create`，`--type story\|task\|bug`；缺的信息（项目、标题）先问，别编。不确定先 `--dry-run` |
-| "建一棵史诗 → 特性 → 故事 → 任务" | 写一份 `plan.json` 跑 `workitem create-plan --file plan.json`（先看树）→ 确认后 `--yes`。比逐条 create 少一整轮编号传递 |
+| "建一棵史诗 → 特性 → 故事 → 任务" | 写一份 `plan.json` 跑 `workitem create-plan --file plan.json`（先看树）→ 授权已覆盖该计划时加 `--yes`。比逐条 create 少一整轮编号传递 |
 | "把这个迭代的任务列出来" | `workitem list --sprint "Sprint 12"`（迭代名有歧义时会列候选） |
 | "这个项目进度怎么样" | `project progress --project X` → 总数 / 待处理 / 进行中 / 已完成 |
 | "帮我建个新项目" | `project create --type scrum --name … --identifier …`（identifier ≤15 位大写字母/数字/`_`/`-`，全企业唯一） |
-| "把一批任务都标完成" | 用 `api --method PATCH --path /v1/pjm/workitems` 批量（官方限制：**单属性、单值、≤100 个 id**） |
+| "把一批任务都标完成" | 用 `workitem bulk-update --ids A,B,C --state 已完成`（官方限制：**单属性、单值、≤100 个 id**） |
 
 ## 命令不做的事
 
-- 不做成员 / 权限 / 部门 / 角色管理 —— 走 `api` 逃生口。
-- **不删项目**（官方没有删除项目的接口）。`project update --state` 只能改状态。
+- 不做成员 / 权限 / 部门 / 角色管理；通用 API 不扩大该范围。
+- **不删项目**（当前随附端点表没有删除项目的接口）。`project update --state` 只能改状态。
 - 不按「不同值」批量改字段（官方批量接口只支持一个属性名 + 一个相同值）。
-- 不替你做状态流转判断：可用状态由该类型的「状态方案 + 状态流转」决定，CLI 会把可用状态查出来。
+- 不替你做状态流转判断：可用状态由该类型的「状态方案 + 状态流转」决定，CLI 查询该类型的状态表，具体流转仍由服务端校验。

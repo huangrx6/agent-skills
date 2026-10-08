@@ -338,7 +338,7 @@ class TestGuardWorktree(RepoCase):
         shutil.rmtree(branch_dir, ignore_errors=True)
         code, verdict = self.guard("delete-worktree", branch_dir)
         self.assertEqual(GUARD.SAFE, code)
-        self.assertIn("git worktree prune", verdict["command"])
+        self.assertIn("worktree prune", verdict["command"])
 
     def test_worktree_with_uncommitted_changes_blocks(self):
         self.repo.commit("一")
@@ -585,10 +585,6 @@ class TestWorktreeLifecycle(WorktreeCase):
         self.assertNotIn("feat/x", output, "有未提交的不算可回收")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 # ── git_report ────────────────────────────────────────────────────────────
 class ReportCase(RepoCase):
     def report(self, *argv: str) -> tuple[int, str]:
@@ -703,7 +699,8 @@ class TestPlanGroups(PlanCase):
         _, result = self.plan()
         self.assertTrue(result["groups"])
         for group in result["groups"]:
-            self.assertTrue(group["add_command"].startswith("git add -- "))
+            self.assertTrue(group["add_command"].startswith("git -C "))
+            self.assertIn(" add -- ", group["add_command"])
 
     def test_clean_tree_says_there_is_nothing(self):
         self.repo.commit("一")
@@ -985,3 +982,174 @@ class TestSubmoduleScope(RepoCase):
         self.assertIn("子模块", output, f"没说清子模块在不在范围里：{output}")
         self.assertIn("不在它的范围里", output)
 
+
+
+class TestGuardTargetRegressions(RepoCase):
+    def _finished_worktree_with_ignored(self, ignore: str, filename: str) -> str:
+        self.repo.commit("base")
+        self.repo.write(".gitignore", ignore + "\n")
+        self.repo.git("add", ".gitignore")
+        self.repo.git("commit", "-m", "ignore local data")
+        path = self.tmp + "-side"
+        self.repo.git("worktree", "add", "-b", "finished", path)
+        Repo(path).write(filename, "only in this temporary worktree\n")
+        return path
+
+    def test_remove_worktree_preserves_ignored_credentials(self):
+        path = self._finished_worktree_with_ignored(".env", ".env")
+        code, verdict = self.guard("delete-worktree", path)
+        self.assertEqual(GUARD.BLOCK, code, verdict)
+        self.assertIn(".env", " ".join(verdict["evidence"]))
+        code, output = self.cli(WORKTREE, "remove", path, "--repo", self.repo.path)
+        self.assertEqual(GUARD.BLOCK, code, output)
+        self.assertTrue(os.path.isfile(os.path.join(path, ".env")))
+
+    def test_remove_worktree_preserves_unknown_ignored_data(self):
+        path = self._finished_worktree_with_ignored("local-drafts/", "local-drafts/draft.md")
+        code, output = self.cli(WORKTREE, "remove", path, "--repo", self.repo.path)
+        self.assertEqual(GUARD.BLOCK, code, output)
+        self.assertTrue(os.path.isfile(os.path.join(path, "local-drafts/draft.md")))
+
+    def test_remove_worktree_allows_ignored_build_artifacts_with_notice(self):
+        path = self._finished_worktree_with_ignored("dist/", "dist/bundle.js")
+        code, output = self.cli(WORKTREE, "remove", path, "--repo", self.repo.path)
+        self.assertEqual(0, code, output)
+        self.assertFalse(os.path.isdir(path))
+        self.assertIn("忽略的构建产物", output)
+
+    def test_target_worktree_status_failure_blocks_removal(self):
+        from unittest import mock
+        path = self._finished_worktree_with_ignored(".env", ".env")
+        original = WORKTREE.S.run_git
+        def unreadable(repo, *args):
+            if STATE.same_path(repo, path) and args[:1] == ("status",):
+                return 128, "", "simulated target status failure"
+            return original(repo, *args)
+        with mock.patch.object(WORKTREE.S, "run_git", side_effect=unreadable):
+            code, output = self.cli(WORKTREE, "remove", path, "--repo", self.repo.path)
+        self.assertEqual(GUARD.BLOCK, code, output)
+        self.assertTrue(os.path.isfile(os.path.join(path, ".env")))
+
+    def test_unique_stash_index_snapshot_is_not_proved_safe_by_worktree_patch(self):
+        self.repo.commit("base")
+        self.repo.write("a.txt", "staged-only version\n")
+        self.repo.git("add", "a.txt")
+        self.repo.write("a.txt", "working-tree version\n")
+        self.repo.git("stash", "push")
+        self.repo.write("a.txt", "working-tree version\n")
+        self.repo.git("add", "a.txt")
+        self.repo.git("commit", "-m", "preserve working tree only")
+        code, verdict = self.guard("drop-stash", "stash@{0}")
+        self.assertEqual(GUARD.WARN, code, verdict)
+        self.assertIn("独立暂存内容", " ".join(verdict["reasons"]))
+        self.assertEqual("staged-only version\n", self.repo.git("show", "stash@{0}^2:a.txt"))
+
+    def test_failed_status_read_cannot_look_like_a_safe_clean_tree(self):
+        from unittest import mock
+        self.repo.commit("base")
+        original = GUARD.S.run_git
+        def unreadable(repo, *args):
+            if args[:1] == ("status",):
+                return 128, "", "simulated unreadable index"
+            return original(repo, *args)
+        with mock.patch.object(GUARD.S, "run_git", side_effect=unreadable):
+            code, verdict = self.guard("discard-worktree")
+        self.assertEqual(GUARD.BLOCK, code, verdict)
+        self.assertIn("状态读取不完整", " ".join(verdict["reasons"]))
+
+    def test_force_push_compares_selected_branch_not_head(self):
+        first = self.repo.commit("base")
+        self.repo.git("branch", "feature", first)
+        second = self.repo.commit("remote advancement")
+        self.repo.git("update-ref", "refs/remotes/origin/feature", second)
+        code, verdict = self.guard("force-push", "--branch", "feature")
+        self.assertEqual(GUARD.BLOCK, code, verdict)
+        self.assertIn("远端有 1 条", " ".join(verdict["reasons"]))
+
+    def test_force_push_missing_local_branch_is_blocked(self):
+        self.repo.commit("base")
+        code, verdict = self.guard("force-push", "--branch", "missing")
+        self.assertEqual(GUARD.BLOCK, code)
+        self.assertIn("本地没有分支", " ".join(verdict["reasons"]))
+
+    def test_detached_worktree_requires_a_retaining_reference(self):
+        self.repo.commit("base")
+        path = self.tmp + "-side"
+        self.repo.git("worktree", "add", "--detach", path)
+        tip = Repo(path).commit("detached work")
+        code, verdict = self.guard("delete-worktree", path)
+        self.assertEqual(GUARD.BLOCK, code, verdict)
+        self.assertIn("detached HEAD", " ".join(verdict["reasons"]))
+        self.repo.git("branch", "saved-detached", tip)
+        code, verdict = self.guard("delete-worktree", path)
+        self.assertEqual(GUARD.SAFE, code, verdict)
+
+    def test_missing_detached_worktree_cannot_be_pruned_without_a_reference(self):
+        self.repo.commit("base")
+        path = self.tmp + "-side"
+        self.repo.git("worktree", "add", "--detach", path)
+        Repo(path).commit("detached work")
+        shutil.rmtree(path)
+        code, verdict = self.guard("delete-worktree", path)
+        self.assertEqual(GUARD.BLOCK, code, verdict)
+        named_path = self.tmp + "-feat-x"
+        self.repo.git("worktree", "add", "-b", "stale-named", named_path)
+        shutil.rmtree(named_path)
+        code, verdict = self.guard("delete-worktree", named_path)
+        self.assertEqual(GUARD.BLOCK, code, verdict)
+        code, output = self.cli(WORKTREE, "prune", "--repo", self.repo.path)
+        self.assertEqual(GUARD.BLOCK, code, output)
+        self.assertEqual(3, len(self.state()["worktrees"]))
+
+    def test_untracked_stash_files_cannot_be_proved_safe_by_tracked_patch(self):
+        self.repo.commit("base")
+        self.repo.write("a.txt", "changed\n")
+        self.repo.write("untracked.txt", "unique stash content\n")
+        self.repo.git("stash", "push", "-u")
+        self.repo.git("stash", "apply")
+        self.repo.git("add", "a.txt")
+        self.repo.git("commit", "-m", "tracked part only")
+        code, verdict = self.guard("drop-stash", "stash@{0}")
+        self.assertEqual(GUARD.WARN, code, verdict)
+        self.assertIn("untracked.txt", " ".join(verdict["evidence"]))
+
+    def test_generated_add_commands_preserve_shell_metacharacters(self):
+        import shlex
+        paths = ["a b.txt", "it's.txt", "x;echo-no.txt", "$(not-executed).txt"]
+        paths += [f"file-{i}.txt" for i in range(41)]
+        self.repo.commit("base")
+        for path in paths:
+            self.repo.write(path)
+        result = PLAN.plan(self.state())
+        got = [path for group in result["groups"]
+               for path in shlex.split(group["add_command"])[6:]]
+        self.assertCountEqual(paths, got)
+        for group in result["groups"]:
+            self.assertEqual(result["root"], shlex.split(group["add_command"])[2])
+
+    def test_generated_add_command_does_not_expand_git_pathspecs(self):
+        import shlex
+        self.repo.commit("base")
+        paths = ["[ab].txt", ":(glob)*.txt"]
+        for path in paths:
+            self.repo.write(path, "literal filename\n")
+        self.repo.write("a.txt", "must remain unstaged\n")
+        state = self.state()
+        state["dirty"]["files"] = [e for e in state["dirty"]["files"] if e["path"] in paths]
+        for group in PLAN.plan(state)["groups"]:
+            subprocess.run(shlex.split(group["add_command"]), capture_output=True, check=True)
+        staged = self.repo.git("diff", "--cached", "--name-only", "-z").strip("\0").split("\0")
+        self.assertCountEqual(paths, staged)
+        self.assertIn("a.txt", self.repo.git("diff", "--name-only"))
+
+    def test_raw_report_keeps_porcelain_records_instead_of_line_count(self):
+        self.repo.commit("base")
+        self.repo.write("a.txt", "dirty\n")
+        block = REPORT.raw_block(self.repo.path)
+        raw = self.repo.git("status", "--porcelain").rstrip("\n")
+        self.assertIn("$ git status --porcelain\n" + raw + "\n", block)
+        self.assertIn("worktree " + self.repo.git("rev-parse", "--show-toplevel").strip(), block)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

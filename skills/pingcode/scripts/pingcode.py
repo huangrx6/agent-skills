@@ -637,7 +637,7 @@ def plan_lines(nodes: list[Any], prefix: str = "", depth: int = 0,
     return out
 
 
-def _node_namespace(node: dict[str, Any]) -> argparse.Namespace:
+def _node_namespace(node: dict[str, Any], no_cache: bool = False) -> argparse.Namespace:
     """把计划里的一个节点伪装成 _workitem_body 认识的那种参数对象。
 
     这样字段映射（节点字段 → 官方参数字段名）仍然只有一处，不会两句两份。
@@ -649,7 +649,7 @@ def _node_namespace(node: dict[str, Any]) -> argparse.Namespace:
         priority=node.get("priority"), sprint=node.get("sprint"), state=node.get("state"),
         story_points=node.get("story_points"),
         estimated_workload=node.get("estimated_workload"),
-        remaining_workload=node.get("remaining_workload"), parent=None,
+        remaining_workload=node.get("remaining_workload"), parent=None, no_cache=no_cache,
     )
 
 
@@ -683,24 +683,27 @@ def _create_plan_node(args: argparse.Namespace, client: Any, project_id: str,
                       node: dict[str, Any], parent_id: str, created: dict[str, str],
                       path: str) -> None:
     """深度优先建：**父先子后** —— 子项需要父项的 id。"""
-    type_id = _plan_type_id(str(node["type"]), client, project_id, args)
-    body: dict[str, Any] = {"project_id": project_id, "type_id": type_id,
-                            "title": node["title"]}
-    if parent_id:
-        body["parent_id"] = parent_id
-    body.update(_workitem_body(_node_namespace(node), client, project_id, type_id))
     try:
+        type_id = _plan_type_id(str(node["type"]), client, project_id, args)
+        body: dict[str, Any] = {"project_id": project_id, "type_id": type_id,
+                                "title": node["title"]}
+        if parent_id:
+            body["parent_id"] = parent_id
+        body.update(_workitem_body(_node_namespace(node, args.no_cache), client, project_id, type_id))
         result = client.request("POST", WORKITEM, body=body)
-    except _client.ApiError as exc:
+    except (_client.ApiError, CliError) as exc:
         # 不能静默半途而废 —— 把已建成的编号报出来，用户才知道不用从头再来
         raise CliError(
             f"建到 {path}（{node['title']}）失败：{exc}\n"
             f"  已建成的：{_created_summary(created)}\n"
-            "  修好后把**剩下的子树**单独放一个计划文件再跑（已建成的不会重复建）。"
+            "  先核对失败请求是否已生效，再整理**剩下的子树**；不要整棵重跑，CLI 没有自动去重。"
         ) from exc
     data = result.data if isinstance(result.data, dict) else {}
     new_id = str(data.get("id") or "")
     created[path] = str(data.get("identifier") or new_id or "?")
+    if not new_id:
+        raise CliError(f"创建 {path}（{node['title']}）的响应缺少 id，停止创建子项。\n"
+                       f"  已返回的编号：{_created_summary(created)}；请先查询确认，勿整棵重跑。")
     print(f"  ✓ {created[path]:11} {_fmt.type_label(type_id):8} {node['title']}")
     for index, child in enumerate(node.get("children") or [], start=1):
         _create_plan_node(args, client, project_id, child, new_id, created, f"{path}.{index}")
@@ -718,13 +721,18 @@ def cmd_workitem_create_plan(args: argparse.Namespace) -> int:
     print(f"计划：在「{pname}」建 {count_plan_nodes(nodes)} 条工作项")
     print("\n".join(plan_lines(nodes)))
     print()
-    if not args.yes:
+    if not args.yes or args.dry_run:
         # 「先打印整棵树再建」不靠自觉，靠接口：默认不建，--yes 才建
         print("以上只是计划 —— **没有建任何东西**。确认要建就加 --yes。")
         return 0
     created: dict[str, str] = {}
-    for index, node in enumerate(nodes, start=1):
-        _create_plan_node(args, client, pid, node, "", created, str(index))
+    try:
+        for index, node in enumerate(nodes, start=1):
+            _create_plan_node(args, client, pid, node, "", created, str(index))
+    except (_resolve.NotFound, _resolve.Ambiguous, _fmt.TimeParseError,
+            _config.ConfigError, _config.TokenError) as exc:
+        raise CliError(f"计划未完成：{exc}\n  已建成的：{_created_summary(created)}；"
+                       "请核对后续节点，不要整棵重跑。") from exc
     print()
     print("建成的树：")
     print("\n".join(plan_lines(nodes, created=created)))
@@ -756,7 +764,9 @@ def cmd_workitem_set_state(args: argparse.Namespace) -> int:
     tid = str(current.get("type", "") or "")
     try:
         sid = _resolve.state_id_for(client, pid, tid, args.state, force=args.no_cache)
-    except (_resolve.NotFound, _resolve.Ambiguous) as exc:
+    except _resolve.Ambiguous as exc:
+        raise CliError(str(exc)) from exc
+    except _resolve.NotFound as exc:
         # 报错时把「这个类型到底能用哪些状态」贴出来。这里**不强制联网**：
         # 字典有缓存就用缓存，拿不到也不能把原始错误盖掉。
         names = ""

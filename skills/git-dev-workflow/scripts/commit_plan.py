@@ -1,30 +1,8 @@
 #!/usr/bin/env python3
-"""把工作区的改动分成「候选提交」，**只出计划，不执行**。
+"""按路径区域生成候选提交分组，不暂存或提交。
 
-## 为什么只出计划
-
-分组是判断，不是计算。同一堆文件，按"一个功能"分还是按"一次重构"分，取决于你知道
-而机器不知道的东西。所以这个脚本给的是**一份待确认的清单**：你能一眼看出它猜得对不对，
-然后自己 `git add` 那几行。它不会替你 `add`、更不会替你 `commit`。
-
-## 分组按「区域」，不按「增/改/删」
-
-按区域（顶层目录，必要时下沉一层）分组，是因为**同一件事通常落在同一个区域里**；
-增/改/删只是那件事的形状，把它也当切分轴，一个功能的"新增文件 + 改另一个文件"就会被
-拆成两组 —— 那不是帮忙。
-
-形状仍然有用：它决定**候选前缀**（只有删除 → `chore`/`refactor`；只碰测试 → `test`）。
-
-## 两条硬规矩
-
-1. **疑似凭据单独成组**，并且**不会出现在任何别的组里** —— 它是你提交前最该看一眼的东西。
-2. **只有源码改动时，前缀写"需要你定"** —— `feat` / `fix` / `refactor` / `perf` 之间
-   的差别是语义判断，机器只看得见扩展名。猜一个反倒像给了依据。
-
-## 用法
-
-    python3 scripts/commit_plan.py
-    python3 scripts/commit_plan.py --json
+疑似凭据单独分组；文件分类和前缀建议仅是启发式。
+使用 --repo PATH 指定仓库，--json 获取机器可读结果。
 """
 
 from __future__ import annotations
@@ -33,6 +11,7 @@ import argparse
 import importlib.util
 import json
 import os
+import shlex
 import sys
 
 # 文件名的形状 → 候选前缀。
@@ -199,15 +178,9 @@ def plan(state: dict) -> dict:
                                 for e in untracked[:20]},
             "prefix": prefix,
             "prefix_reason": reason,
-            "add_command": "git add -- " + " ".join(
-                _quote(path) for path in paths[:40])
-            + (" …（文件多，见 --json）" if len(paths) > 40 else ""),
+            "add_command": shlex.join(["git", "-C", repo, "--literal-pathspecs", "add", "--", *paths]),
         })
     return {"root": repo, "total_files": len(entries), "groups": out_groups}
-
-
-def _quote(path: str) -> str:
-    return f"'{path}'" if " " in path or "'" in path else path
 
 
 def render(result: dict) -> str:
@@ -233,7 +206,7 @@ def render(result: dict) -> str:
             lines.append(f"   候选前缀：{group['prefix']}  —— 依据：{group['prefix_reason']}")
         else:
             lines.append(f"   候选前缀：{group['prefix_reason']}")
-        lines.append(f"   git add -- {group['add_command'][len('git add -- '):]}")
+        lines.append(f"   {group['add_command']}")
     return "\n".join(lines)
 
 
@@ -246,6 +219,9 @@ def main(argv: list[str] | None = None) -> int:
     state = S.snapshot(args.repo)
     if not state.get("is_repo"):
         print(f"不是一个 git 仓库：{os.path.abspath(args.repo)}", file=sys.stderr)
+        return 1
+    if state.get("read_errors"):
+        print("状态读取不完整：\n" + "\n".join(state["read_errors"]), file=sys.stderr)
         return 1
 
     result = plan(state)

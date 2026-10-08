@@ -1,35 +1,10 @@
 #!/usr/bin/env python3
-"""按 **Conventional Commits v1.0.0** 校验一条提交信息。
+"""检查 Conventional Commits v1.0.0 的常见语法。
 
-## 为什么按规范而不是按历史
-
-规范是**写在纸上的**：16 条规则、有条目号、有 RFC 2119 的措辞强度（MUST / MAY / SHOULD）。
-历史习惯不是 —— 它里面混着"当时随手写的"和"当时被工具逼的"，照它学等于把当年的将就
-一起继承下来。所以这个脚本的判据只有一个来源：
-<https://www.conventionalcommits.org/en/v1.0.0/>，每条结论都引用条目号。
-
-## 两类结论必须分开说
-
-- **规范违规**（`source: spec`）：真的违反了那 16 条之一。比如用了全角冒号、
-  冒号后面没空格、`breaking change` 没大写。
-- **本项目约定**（`source: project`）：规范**允许**、但这个仓库另外定了规矩。比如
-  type 不在封闭列表里（规则 14 明确说其它 type 可以用，所以这是"我们的约定"而不是"违规"），
-  或者 topic 用了大写（规则 15 说实现者不得区分大小写，所以这只能是建议）。
-
-混在一起说会让人以为规范禁止了某些它其实允许的事 —— 而这类"其实允许"的规则
-恰好是最容易被误传的（"必须用英文"就是典型：规范从头到尾没有限制语言）。
-
-## 退出码
-
-- `0` 符合规范（或者这条提交属于"不适用"类：合并 / autosquash / git 默认的回滚信息）
-- `1` 有违规
-
-## 用法
-
-    python3 scripts/commit_style.py --check "fix(api): 修正分页越界"
-    python3 scripts/commit_style.py --check-file .git/COMMIT_EDITMSG
-    python3 scripts/commit_style.py --template
-    printf 'feat: x\\n' | python3 scripts/commit_style.py --check -
+规范问题与本工具的项目建议分别标记；语义和完整 footer 解析不在检查范围。
+退出码：0 未发现阻断问题或已跳过兼容格式；1 为空信息或规范问题。
+用法：--check MESSAGE / --check-file PATH / --template，可加 --json。
+规范：https://www.conventionalcommits.org/en/v1.0.0/
 """
 
 from __future__ import annotations
@@ -167,9 +142,9 @@ def check(message: str) -> tuple[str, list[Finding]]:
             findings.append(Finding("spec", "规则 4", "主题行", "scope 括号里是空的",
                                     "去掉括号，或者写上具体模块名"))
         elif re.search(r"\s", scope):
-            findings.append(Finding("spec", "规则 4", "主题行",
+            findings.append(Finding("project", "scope 格式", "主题行",
                                     f"scope {scope!r} 里有空格",
-                                    "scope 是名词，不能含空格；用 `-` 连起来"))
+                                    "为兼容常见工具可用 `-` 连起来；规范未明确禁止 scope 含空格"))
 
     commit_type = match.group("type")
     if commit_type.lower() not in TYPES:

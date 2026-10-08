@@ -1,22 +1,8 @@
 #!/usr/bin/env python3
-"""字典缓存 + 「名字 → ID」解析。
+"""字典缓存与名字到 ID 的解析。
 
-两件事放一个文件，因为它们互为前提：解析需要把字典拉下来，而字典拉下来就是为了解析。
-
-**只有字典类数据进缓存。** 项目 / 迭代 / 工作项类型 / 状态 / 优先级 / 标签 / 成员 ——
-这些"配好了就不怎么变"的东西。工作项列表**绝不缓存**：那是业务数据，缓存它只会得到
-一个看着像真的、其实过期的答案。（参考实现把「当前用户的工作项列表」也缓存了。）
-
-解析规则（顺序固定，先严后宽）：
-
-1. ID 精确匹配 → 命中
-2. 名字/标识精确匹配（忽略大小写）→ 命中
-3. 唯一的子串匹配 → 命中
-4. 多个候选 → `Ambiguous`，**列出候选让人选**，不自动取第一个
-5. 没有 → `NotFound`，列出可用的名字
-
-第 4 条是刻意的：两个叫"支付"的迭代里选错一个，比报错更糟 —— 报错只多花一步，
-选错会静默改错东西。
+只缓存配置字典，不缓存工作项；默认 TTL 6 小时。
+先 ID，再唯一精确别名，再唯一子串；多个候选均抛 Ambiguous 并给可选项。
 """
 
 from __future__ import annotations
@@ -107,12 +93,6 @@ SOURCES: dict[str, dict[str, Any]] = {
         "url": "/v1/directory/users",
         "needs": (),
         "scopes": ("pcp:read:global:team",),
-    },
-    "project_states": {
-        "label": "项目状态",
-        "url": "/v1/pjm/project/states?project_id={project_id}",
-        "needs": ("project_id",),
-        "scopes": ("pcp:read:pjm:project",),
     },
     "processes": {
         "label": "项目流程",
@@ -262,9 +242,14 @@ def find(kind: str, client: Any, text: str, force: bool = False,
     for item in values:                       # 1. ID
         if str(item.get("id", "")).lower() == want:
             return item
-    for item in values:                       # 2. 名字 / 标识 / 真名 / 邮箱 / 手机
-        if any(alias.lower() == want for alias in _aliases(item)):
-            return item
+    exact = [item for item in values
+             if any(alias.lower() == want for alias in _aliases(item))]
+    if len(exact) == 1:
+        return exact[0]
+    if len(exact) > 1:
+        shown = "、".join(f"{_name_of(i, kind)} [id={i.get('id', '')}]" for i in exact[:12])
+        raise Ambiguous(f"{query!r} 对应 {len(exact)} 个同名{SOURCES[kind]['label']}，"
+                        f"请用 ID 指定：{shown}")
     if kind == "types" and want in SYSTEM_TYPES:   # 系统类型枚举别名
         for item in values:
             if str(item.get("id", "")).lower() == want:

@@ -14,6 +14,7 @@ python3 -m pip install -r skills/deck-authoring/requirements.txt
 浏览器工具当前使用 macOS 的 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`。
 PNG、PDF 与视频通过 Chrome CDP 等待字体、图片与图表就绪后捕获。PDF 页尺寸验收需要
 Poppler 的 `pdfinfo`，通过 PATH 查找或用 `DECK_PDFINFO` 指定可执行文件。
+macOS 可用 `brew install poppler` 安装；`pip install -r requirements.txt` 不会安装该系统依赖。
 MP4 编码另需 `swiftc` 与系统 AVFoundation；GIF 使用 Pillow。没有默认风格，也不自动下载品牌资产。
 
 ## 项目目录
@@ -102,3 +103,8 @@ python3 skills/skill-builder/scripts/validate_skill.py skills/deck-authoring
 
 测试数量以运行结果为准。新增回归覆盖数据完整性、图表真实绘制、质量门变异、项目主题解析、
 字体内嵌、PPTX 裁切和排印、逐页 PDF 尺寸与 GIF 时长。最终视觉质量仍需查看实际产物。
+
+未设置 `DECK_PDFINFO` 且 PATH 中找不到 `pdfinfo` 时，6 项 PDF 集成测试明确跳过，
+其余测试继续运行；报告应分别列出通过、失败和跳过，不能称为全部通过。
+显式配置的工具不可用或导出失败会记为测试错误，不会伪装成跳过或中断整套测试。
+实际 PDF 导出仍必须有 `pdfinfo`，不会跳过页面尺寸验收。

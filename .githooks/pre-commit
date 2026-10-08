@@ -1,24 +1,10 @@
 #!/bin/sh
-# 提交前几道校验。
-#
-# 为什么都阻塞：它们是客观硬要求，而且失败代价高 ——
-#   · 结构校验：YAML 解析失败意味着 skill 根本加载不了；name 与目录名不一致
-#     意味着触发会错。2026-09-12 一次会话里"正文 ≤ 150 行"被连续违反两次，
-#     都是脚本抓出来的，肉眼没发现。
-#   · 泄露扫描：真实客户名 / 内部系统名一旦推送到 public 仓库，清除要重写
-#     35/38 个 commit 并 force push —— 实际发生过一次。
-#
-# 唯一一道**只提示不阻塞**的是第 5 段（仓库体检）：它报的是「该优化什么」
-# （缺 README、正文余量偏紧、缺 evals、死文件），不是「代码错了」。
-# 拿它挡提交会把人逼到 --no-verify，反而连前面几道真的防线一起丢掉。
-#
-# 只在本次提交触及 skills/ 或 tools/ 时运行。
-# 跳过方式：git commit --no-verify
+# 结构、泄露、指针与文档数字错误阻塞提交。
+# 回归失败默认只提示；AGENT_SKILLS_GATE=1 时阻塞。体检与锁同步只提示。
+# 只对 skills/、tests/、tools/、.githooks/ 的改动运行。
 # 安装：git config core.hooksPath .githooks
 
-# 触发范围也含 tools/: 仓库级工具（装 skill 的安装器）有自己的回归测试，只改 tools/
-# 却跳过这道门，那些测试就等于没接线 —— 而这正是本文件第 3 段要防的事。
-if ! git diff --cached --name-only -z | tr '\0' '\n' | grep -qE '^(skills|tools)/'; then
+if ! git diff --cached --name-only -z | tr '\0' '\n' | grep -qE '^(skills|tests|tools|\.githooks)/'; then
   exit 0
 fi
 
@@ -59,23 +45,19 @@ if [ -f "$LEAK" ]; then
 fi
 
 # ── 3. 脚本回归测试 ──
-# 前两道检查都依赖 skills/*/scripts/ 下的脚本,而这些脚本自己有回归测试,测的正是
-# 它们的防线:代码块里的 [[ ]] 不是 wikilink、含空格的路径不能被截断、扫描范围不能
-# 扩散、“不绑定本机”不能被当成绑定声明…… 不跑的话,那些测试和没写一样 —— 改坏了
-# 脚本也不会有人发现防线已经失效。
-# 扫全部 skills/*/tests/ 与 tools/tests，而不写死某一个:新加测试目录时不用改这里。
-# tools/tests 是仓库级工具（装 skill 的安装器）的用例 —— 那个脚本**会往用户主目录
-# 写东西**，判错了代价很实，所以它也得进这道门。
-# 代价实测每个目录 0.3~0.4 秒。
-# 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时读的是
-# `skills/<skill>/` 那棵树，测试放进去会被顺手读走）。加了新 skill 的测试不用改这里。
+# 按目录分进程执行，避免一个模块中断其余 skill 的测试。
+TEST_FAILURES=0
+TEST_SUITES=0
+TEST_SKIPPED=0
 for d in "$ROOT"/tests/* "$ROOT"/tools/tests; do
   [ -d "$d" ] || continue
+  TEST_SUITES=$((TEST_SUITES + 1))
   OUT=$(cd /tmp && python3 -m unittest discover -s "$d" 2>&1)
   STATUS=$?
   # 默认**不阻塞**：测试是给自己留的回归网，不是每次提交的门票（用户明确要求
   # 「以后不能再影响我」）。想把它当发布闸门时：AGENT_SKILLS_GATE=1 git commit …。
   if [ "$STATUS" -ne 0 ]; then
+    TEST_FAILURES=$((TEST_FAILURES + 1))
     if [ "${AGENT_SKILLS_GATE:-0}" = "1" ]; then
       fail "$OUT" "「$(basename "$d")」的回归测试失败"
     else
@@ -84,9 +66,9 @@ for d in "$ROOT"/tests/* "$ROOT"/tools/tests; do
     fi
   fi
 
-  # 文档里写的测试条数不能过期。这一类错在本仓库出现过四次（pingcode 的 README 两次、
-  # WLRR 的「0 脚本 0 测试」、git-dev-workflow 抄了实时状态），而**真实条数此刻就在手上** ——
-  # 比一下不要钱，所以它是阻塞的：改一个数字而已，但放着不管会让读者开始怀疑整份文档。
+  SKIPPED=$(printf '%s\n' "$OUT" | sed -n 's/.*skipped=\([0-9][0-9]*\).*/\1/p' | tail -1)
+  TEST_SKIPPED=$((TEST_SKIPPED + ${SKIPPED:-0}))
+  # Ran 数包含 skip；这里只比文档声称的总用例数，不把它当作通过数。
   COUNT=$(printf '%s\n' "$OUT" | sed -n 's/^Ran \([0-9][0-9]*\) test.*/\1/p' | head -1)
   # 文档在 skill 目录下（`skills/<skill>/`），测试在同名的顶层目录里。
   DOCS="$ROOT/skills/$(basename "$d")"
@@ -108,19 +90,20 @@ POINTERS="$ROOT/skills/skill-builder/scripts/check_pointers.py"
 if [ -f "$POINTERS" ]; then
   OUT=$(cd "$ROOT" && python3 "$POINTERS" --root "$ROOT" 2>&1)
   STATUS=$?
-  if [ "$STATUS" -eq 1 ]; then
+  if [ "$STATUS" -ne 0 ]; then
     fail "$OUT" "有指针指向不存在的文件"
   fi
 fi
 
-echo "✓ pre-commit: 结构、泄露、指针、回归测试与文档数字通过"
+echo "✓ pre-commit: 已执行的结构、泄露、指针与文档数字检查通过"
+if [ "$TEST_FAILURES" -gt 0 ]; then
+  echo "⚠ 回归测试：$TEST_FAILURES 个目录失败（不阻塞提交）；跳过 $TEST_SKIPPED 条"
+else
+  echo "✓ 回归测试：$TEST_SUITES 个目录通过；跳过 $TEST_SKIPPED 条"
+fi
 
 # ── 5. 仓库体检（**只提示，不阻塞**）──
-# 体检脚本报的是「该优化什么」：正文余量、缺 README、缺 evals、死文件。
-# 这些都不会让 skill 当场坏掉 —— 拿它们挡提交，人会改用 --no-verify，
-# 而一旦养成那个习惯，前面四道真的防线也就一并失效了。
-# 而且它默认就返回 0（只报告不判失败），所以这里的 `|| true` 是双保险：
-# 即使它自己崩了，也不该把一次正常提交卡住。
+# 维护建议不作为提交门槛。
 HEALTH="$ROOT/tools/skill_health.py"
 if [ -f "$HEALTH" ]; then
   OUT=$(cd "$ROOT" && python3 "$HEALTH" 2>&1)
@@ -133,22 +116,19 @@ if [ -f "$HEALTH" ]; then
   fi
 fi
 
-# ── 6. 同步 skills-lock.json（**派生文件：自动更新并重新暂存**）──
-# 它的 computedHash 就是 sha256(SKILL.md)，本该由脚本生成，却一直被手工维护 ——
-# 实测漂成「6 个 skill 里 3 个没登记、2 个哈希过期」。
-# **刻意不做成阻塞**：每次改 SKILL.md 都要手跑一次的话，人会开始用 --no-verify，
-# 而那正是本文件存在的意义所在（前面四道真防线会一起失效）。
+# ── 6. 同步 skills-lock.json（**派生文件：直接更新暂存版本**）──
+# 哈希从暂存区计算；工作区锁文件若有未暂存内容则原样保留。
 LOCK_SYNC="$ROOT/tools/skills_lock.py"
 if [ -f "$LOCK_SYNC" ]; then
-  LOCK_OUT=$(python3 "$LOCK_SYNC" --root "$ROOT" --check 2>&1)
+  LOCK_OUT=$(python3 "$LOCK_SYNC" --root "$ROOT" --staged --check 2>&1)
   if [ $? -ne 0 ]; then
-    python3 "$LOCK_SYNC" --root "$ROOT" --update >/dev/null 2>&1
+    SYNC_OUT=$(python3 "$LOCK_SYNC" --root "$ROOT" --sync-index 2>&1)
     if [ $? -eq 0 ]; then
-      git -C "$ROOT" add skills-lock.json
       echo ""
-      echo "── 已自动更新 skills-lock.json（派生文件）──"
-      printf '%s\n' "$LOCK_OUT" | sed -n '1,4p'
-      echo "（已重新暂存；不想让它进这次提交：git reset -- skills-lock.json）"
+      printf '%s\n' "$SYNC_OUT"
+    else
+      printf '%s\n' "$SYNC_OUT" >&2
+      echo "⚠ 无法同步 skills-lock.json，请运行锁文件工具检查（不阻塞提交）" >&2
     fi
   fi
 fi

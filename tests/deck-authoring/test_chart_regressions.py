@@ -2,6 +2,7 @@
 """Chart regressions: validate rendered marks, not merely the existence of a canvas."""
 from __future__ import annotations
 
+import asyncio
 import copy
 import html
 import importlib.util
@@ -12,7 +13,14 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
+import urllib.request
+
+try:
+    from websockets import connect as ws_connect
+except ImportError:
+    ws_connect = None
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "skills/deck-authoring/scripts/render.py"
@@ -60,30 +68,142 @@ def page_for(slides):
     return render.render(spec, style)
 
 
-def browser_probe(page, script, query=""):
-    """Headless Chrome reads local HTML and emits JSON after the ready promise."""
-    probe = ('<pre id="__chart_test" hidden></pre><script>'
-             'window.__deck_charts_ready.then(async function(){try{'
-             'var result=await (async function(){' + script + '})();'
-             'document.getElementById("__chart_test").textContent=JSON.stringify(result);'
-             '}catch(e){document.getElementById("__chart_test").textContent='
-             'JSON.stringify({fatal:String(e)});}});</script>')
+def browser_probe(page, script, query="", ready_timeout=30):
+    """Use a fresh profile and await the actual promise over CDP, in wall-clock time."""
+    return asyncio.run(_browser_probe_async(page, script, query, ready_timeout))
+
+
+async def _browser_probe_async(page, script, query, ready_timeout):
+    if ws_connect is None:
+        raise unittest.SkipTest("websockets is required for chart readiness verification")
     with tempfile.TemporaryDirectory(prefix="deck-chart-test-") as td:
-        path = Path(td) / "charts.html"
-        path.write_text(page.replace("</body>", probe + "</body>"), encoding="utf-8")
-        proc = subprocess.run(
-            [CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-             "--virtual-time-budget=5000",
-             "--dump-dom", path.as_uri() + query], capture_output=True, text=True, timeout=40)
-        if proc.returncode:
-            raise AssertionError(f"Chrome returned {proc.returncode}: {proc.stderr[-1000:]}")
-        match = re.search(r'<pre id="__chart_test"[^>]*>(.*?)</pre>', proc.stdout, re.S)
-        if not match or not match.group(1):
-            raise AssertionError("Chart readiness promise did not settle")
-        result = json.loads(html.unescape(match.group(1)))
-        if isinstance(result, dict) and result.get("fatal"):
-            raise AssertionError(result["fatal"])
-        return result
+        directory = Path(td)
+        path = directory / "charts.html"
+        path.write_text(page, encoding="utf-8")
+        profile = directory / "profile"
+        stderr_path = directory / "chrome.stderr"
+        with stderr_path.open("w", encoding="utf-8") as stderr:
+            proc = subprocess.Popen(
+                [CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
+                 "--no-first-run", "--no-default-browser-check", "--disable-background-networking",
+                 "--disable-component-update", "--disable-sync", "--remote-debugging-port=0",
+                 "--remote-debugging-address=127.0.0.1", f"--user-data-dir={profile}", "about:blank"],
+                stdout=subprocess.DEVNULL, stderr=stderr)
+            try:
+                target = None
+                deadline = time.monotonic() + 20
+                active_port = profile / "DevToolsActivePort"
+                while time.monotonic() < deadline:
+                    if proc.poll() is not None:
+                        raise AssertionError(f"Chrome exited {proc.returncode}: "
+                                             + stderr_path.read_text()[-1500:])
+                    try:
+                        port = int(active_port.read_text().splitlines()[0])
+                        with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/list", timeout=1) as response:
+                            targets = json.load(response)
+                        target = next((item["webSocketDebuggerUrl"] for item in targets
+                                       if item.get("type") == "page" and item.get("webSocketDebuggerUrl")), None)
+                        if target:
+                            break
+                    except (OSError, ValueError, IndexError):
+                        pass
+                    await asyncio.sleep(0.05)
+                if target is None:
+                    raise AssertionError("Chrome CDP did not start within 20s: "
+                                         + stderr_path.read_text()[-1500:])
+
+                async with ws_connect(target, max_size=None, open_timeout=5) as ws:
+                    sequence = 0
+                    runtime_errors = []
+
+                    async def cmd(method, params=None, timeout=10):
+                        nonlocal sequence
+                        sequence += 1
+                        current = sequence
+                        await ws.send(json.dumps({"id": current, "method": method, "params": params or {}}))
+
+                        async def receive():
+                            while True:
+                                message = json.loads(await ws.recv())
+                                if message.get("method") == "Runtime.exceptionThrown":
+                                    runtime_errors.append(message.get("params", {}).get("exceptionDetails", {}))
+                                if message.get("id") == current:
+                                    if message.get("error"):
+                                        raise AssertionError(f"CDP {method}: {message['error']}")
+                                    return message.get("result", {})
+                        return await asyncio.wait_for(receive(), timeout)
+
+                    async def diagnostics():
+                        try:
+                            data = await cmd("Runtime.evaluate", {"returnByValue": True, "expression": """({
+                              url:location.href, documentState:document.readyState,
+                              promiseState:window.__chart_probe_state || 'not-awaited',
+                              charts:Array.from(document.querySelectorAll('.g2')).map(function(n,i){
+                                return {id:n.getAttribute('data-m') || n.id || 'chart-'+(i+1),
+                                  ready:n.getAttribute('data-chart-ready'),error:n.getAttribute('data-chart-error'),
+                                  width:n.clientWidth,height:n.clientHeight,
+                                  canvasCount:n.querySelectorAll('canvas').length,
+                                  svgCount:n.querySelectorAll('svg').length};
+                              })})"""}, timeout=2)
+                            detail = data.get("result", {}).get("value", data)
+                        except (asyncio.TimeoutError, AssertionError) as exc:
+                            detail = {"diagnosticError": str(exc)}
+                        return json.dumps({"page": detail, "runtimeErrors": runtime_errors[-5:],
+                                           "chromeStderr": stderr_path.read_text()[-1000:]}, ensure_ascii=False)
+
+                    await cmd("Page.enable")
+                    await cmd("Runtime.enable")
+                    await cmd("Emulation.setDeviceMetricsOverride", {
+                        "width": 1600, "height": 900, "deviceScaleFactor": 1, "mobile": False})
+                    url = path.as_uri() + query
+                    navigation = await cmd("Page.navigate", {"url": url})
+                    if navigation.get("errorText"):
+                        raise AssertionError(f"Navigation failed: {navigation['errorText']}")
+                    deadline = time.monotonic() + 20
+                    while time.monotonic() < deadline:
+                        loaded = await cmd("Runtime.evaluate", {
+                            "expression": f"location.href.split('#')[0] === {json.dumps(url.split('#')[0])} && document.readyState === 'complete'",
+                            "returnByValue": True})
+                        if loaded.get("result", {}).get("value"):
+                            break
+                        await asyncio.sleep(0.05)
+                    else:
+                        raise AssertionError("Chart page did not load within 20s: " + await diagnostics())
+
+                    expression = """(async function(){
+                      if(!window.__deck_charts_ready || typeof window.__deck_charts_ready.then !== 'function')
+                        throw Error('Missing chart readiness promise');
+                      window.__chart_probe_state='pending';
+                      try {
+                        if(document.fonts) await document.fonts.ready;
+                        await window.__deck_charts_ready;
+                        window.__chart_probe_state='fulfilled';
+                      } catch(e) {window.__chart_probe_state='rejected';throw e;}
+                      return await (async function(){""" + script + """})();
+                    })()"""
+                    try:
+                        evaluated = await cmd("Runtime.evaluate", {
+                            "expression": expression, "awaitPromise": True, "returnByValue": True},
+                            timeout=ready_timeout)
+                    except asyncio.TimeoutError as exc:
+                        raise AssertionError(f"Chart readiness/probe exceeded {ready_timeout}s: "
+                                             + await diagnostics()) from exc
+                    if evaluated.get("exceptionDetails"):
+                        raise AssertionError("Chart probe JavaScript failed: "
+                                             + json.dumps(evaluated["exceptionDetails"], ensure_ascii=False)
+                                             + "; " + await diagnostics())
+                    result = evaluated.get("result", {})
+                    if "value" not in result:
+                        raise AssertionError("Chart probe did not return JSON: " + str(result))
+                    return result["value"]
+            finally:
+                if proc.poll() is None:
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        proc.wait(timeout=5)
 
 
 class TestChartInputAndTitles(unittest.TestCase):
@@ -163,6 +283,27 @@ class TestChartInputAndTitles(unittest.TestCase):
 
 @unittest.skipUnless(os.path.isfile(CHROME), "Local Chrome is required for scene-graph verification")
 class TestChartBrowser(unittest.TestCase):
+    def test_probe_waits_for_real_readiness_past_old_virtual_time_budget(self):
+        page = """<!doctype html><script>
+          window.__deck_charts_ready=new Promise(function(resolve){
+            setTimeout(function(){window.chartCompleted=true;resolve();},5500);
+          });
+        </script>"""
+        result = browser_probe(page, "return {completed:window.chartCompleted};", ready_timeout=10)
+        self.assertEqual(result, {"completed": True})
+
+    def test_probe_timeout_reports_pending_chart(self):
+        page = """<!doctype html><div class="g2" data-m="s1.chart"></div><script>
+          window.__deck_charts_ready=new Promise(function(){});
+        </script>"""
+        with self.assertRaises(AssertionError) as caught:
+            browser_probe(page, "return null;", ready_timeout=0.2)
+        message = str(caught.exception)
+        self.assertIn("Chart readiness/probe exceeded", message)
+        self.assertIn('"promiseState": "pending"', message)
+        self.assertIn('"id": "s1.chart"', message)
+        self.assertIn('"ready": null', message)
+
     def test_present_and_cross_page_frames_keep_real_plot_width(self):
         page = page_for(chart_slides()[1:3]).replace(
             "await chart.render();", "await chart.render(); n.__test_chart=chart;")

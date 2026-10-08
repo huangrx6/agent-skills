@@ -18,12 +18,9 @@ import re
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时
-# 读的是 `skills/<skill>/` 那棵树，测试放在里面会被顺手读进去）。
-# 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时读的是
-# `skills/<skill>/` 那棵树，测试放在里面会被顺手读进去）。
 SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
 SCRIPT = os.path.join(SKILL, "scripts", "check_release_note.py")
 TEMPLATE = os.path.join(SKILL, "references", "release-note-template.md")
@@ -79,9 +76,10 @@ class Case(unittest.TestCase):
 class TemplateTest(unittest.TestCase):
     def test_章节骨架从模板里读_不在脚本里另抄一份(self):
         sections = check.template_sections()
-        self.assertEqual(6, len(sections), "模板里是 01~06 六节")
+        self.assertEqual(8, len(sections), "模板含发布步骤、验证结果与备份回滚")
         self.assertEqual(("01", "基本信息"), sections[0])
-        self.assertEqual(("06", "发布执行步骤"), sections[-1])
+        self.assertIn(("07", "验证结果"), sections)
+        self.assertEqual(("08", "备份与回滚"), sections[-1])
 
     def test_frontmatter_必需键也从模板读(self):
         self.assertEqual(["type", "status", "area", "project", "created", "tags"],
@@ -101,7 +99,7 @@ class CheckFileTest(Case):
         findings = self.check(path)
         names = {f.label: f for f in findings}
         self.assertFalse(names["文件名是「发版 - <系统> - YYYY-Www.md」"].ok)
-        self.assertIn("Default naming", names["文件名是「发版 - <系统> - YYYY-Www.md」"].hint)
+        self.assertIn("默认命名", names["文件名是「发版 - <系统> - YYYY-Www.md」"].hint)
 
     def test_不存在的周号要拦住(self):
         path = self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W99.md",
@@ -157,21 +155,121 @@ class CheckFileTest(Case):
         self.assertIn("--vault", skipped.hint)
 
     def test_写死的密钥值是提醒而不是失败(self):
-        body = good_note().replace("| 发布名称 |  |", "| 发布名称 |  |\n\npassword: hunter2hunter")
+        body = good_note() + "\npassword: hunter2hunter\n"
         path = self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W18.md", body)
         findings = {f.label: f for f in self.check(path)}
         self.assertFalse(findings["没有明显的密钥值"].ok)
         self.assertTrue(findings["没有明显的密钥值"].warn, "可能是误报，所以只提醒")
 
     def test_只提变量名不算泄密(self):
-        body = good_note().replace("| 发布名称 |  |", "| 发布名称 |  |\n\n- 环境变量 DB_PASSWORD 放在配置中心")
+        body = good_note() + "\n- 环境变量 DB_PASSWORD 放在配置中心\n"
         path = self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W18.md", body)
         findings = {f.label: f for f in self.check(path)}
         self.assertTrue(findings["没有明显的密钥值"].ok,
                         "模板要求「只写变量名和位置」—— 那种写法是对的")
 
+    def test_invalid_calendar_date_is_rejected(self):
+        path = self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W18.md",
+                          good_note().replace("created: 2026-05-01", "created: 2026-02-30"))
+        item = next(f for f in self.check(path) if f.label == "frontmatter 有模板要求的键")
+        self.assertFalse(item.ok)
+        self.assertIn("created", item.detail)
+
+    def test_quoted_valid_date_is_accepted(self):
+        path = self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W18.md",
+                          good_note().replace("created: 2026-05-01", 'created: "2024-02-29"'))
+        self.assertTrue(next(f for f in self.check(path) if f.label == "frontmatter 有模板要求的键").ok)
+
+    def test_prose_or_code_mention_is_not_navigation(self):
+        path = self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W18.md", good_note())
+        for text in ("备忘：发版 - 演示系统 - 2026-W18", "`[[发版 - 演示系统 - 2026-W18]]`",
+                     "```markdown\n[[发版 - 演示系统 - 2026-W18]]\n```",
+                     "[[不存在目录/发版 - 演示系统 - 2026-W18]]"):
+            with self.subTest(text=text):
+                self.write("MOC.md", text)
+                self.assertFalse(next(f for f in self.check(path) if f.label == "被别处引用（MOC / 父笔记）").ok)
+
+    def test_relative_link_with_alias_is_navigation(self):
+        path = self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W18.md", good_note())
+        self.write("01 Projects/演示项目/子目录/MOC.md", "[[../发版 - 演示系统 - 2026-W18#验证结果|本周发布]]")
+        self.assertTrue(next(f for f in self.check(path) if f.label == "被别处引用（MOC / 父笔记）").ok)
+
+    def test_ambiguous_short_link_is_not_navigation(self):
+        path = self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W18.md", good_note())
+        self.write("另一个项目/发版 - 演示系统 - 2026-W18.md", good_note())
+        self.write("MOC.md", "[[发版 - 演示系统 - 2026-W18]]")
+        self.assertFalse(next(f for f in self.check(path) if f.label == "被别处引用（MOC / 父笔记）").ok)
+
+    def test_sections_inside_code_do_not_satisfy_template(self):
+        text = good_note().replace("## 07 验证结果", "```markdown\n## 07 验证结果\n```")
+        path = self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W18.md", text)
+        self.assertFalse(next(f for f in self.check(path) if f.label.startswith("章节骨架")).ok)
+
+    def test_secret_value_is_redacted_in_findings_and_output(self):
+        path = self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W18.md",
+                          good_note() + '\nDB_PASSWORD="do-not-print-this-value"\n{"api_key": "another-sensitive-value"}\n')
+        findings = self.check(path)
+        item = next(f for f in findings if f.label == "没有明显的密钥值")
+        self.assertFalse(item.ok)
+        self.assertIn("DB_PASSWORD", item.detail)
+        self.assertIn("api_key", item.detail)
+        self.assertNotIn("do-not-print-this-value", check.render(findings, "检查"))
+        self.assertNotIn("another-sensitive-value", item.detail)
+
+    def test_environment_placeholder_is_not_reported_as_secret(self):
+        path = self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W18.md",
+                          good_note() + '\nDB_PASSWORD=${DB_PASSWORD}\n')
+        self.assertTrue(next(f for f in self.check(path) if f.label == "没有明显的密钥值").ok)
+
 
 class DirTest(Case):
+    def test_single_note_cli_checks_sibling_duplicate(self):
+        path = self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W18.md", good_note())
+        self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W18 (2).md", good_note())
+        self.write("MOC.md", "[[01 Projects/演示项目/发版 - 演示系统 - 2026-W18]]")
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            code = check.main([path, "--vault", self.vault])
+        self.assertEqual(1, code)
+        self.assertIn("同一系统同一周只有一篇", output.getvalue())
+        self.assertIn("(2).md", output.getvalue())
+
+    def test_dir_mode_does_not_silently_skip_malformed_release_names(self):
+        self.write("01 Projects/演示项目/发版 - 演示系统 - 错误周.md", good_note())
+        with contextlib.redirect_stdout(io.StringIO()):
+            code = check.main(["--dir", os.path.join(self.vault, "01 Projects/演示项目"), "--vault", self.vault])
+        self.assertEqual(1, code)
+
+    def test_explicit_invalid_vault_is_input_error(self):
+        path = self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W18.md", good_note())
+        with contextlib.redirect_stderr(io.StringIO()):
+            code = check.main([path, "--vault", os.path.join(self.root, "missing")])
+        self.assertEqual(2, code)
+
+    def test_missing_template_is_input_error(self):
+        path = self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W18.md", good_note())
+        with mock.patch.object(check, "TEMPLATE", os.path.join(self.root, "missing.md")), contextlib.redirect_stderr(io.StringIO()):
+            code = check.main([path, "--vault", self.vault])
+        self.assertEqual(2, code)
+
+    def test_missing_pkb_dependency_with_explicit_vault_is_friendly_error(self):
+        path = self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W18.md", good_note())
+        err = io.StringIO()
+        with mock.patch.object(check, "LINKS_SCRIPT", os.path.join(self.root, "missing.py")), contextlib.redirect_stderr(err):
+            code = check.main([path, "--vault", self.vault])
+        self.assertEqual(2, code)
+        self.assertIn("一起安装 obsidian-personal-knowledge-base", err.getvalue())
+        self.assertNotIn("Traceback", err.getvalue())
+
+    def test_malformed_template_is_friendly_error(self):
+        path = self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W18.md", good_note())
+        malformed = self.write("invalid-template.md", "# Not a template\n")
+        err = io.StringIO()
+        with mock.patch.object(check, "TEMPLATE", malformed), contextlib.redirect_stderr(err):
+            code = check.main([path, "--vault", self.vault])
+        self.assertEqual(2, code)
+        self.assertIn("模板不可用", err.getvalue())
+
     def test_同系统同周两篇要报重复(self):
         """重名副本长成「… 2026-W18 (2).md」—— 用严格的正则会反而漏掉它。"""
         self.write("01 Projects/演示项目/发版 - 演示系统 - 2026-W18.md", good_note())

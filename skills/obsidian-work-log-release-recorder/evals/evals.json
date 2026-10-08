@@ -3,50 +3,68 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "我刚改完内部系统 A 的运营分析页面筛选条件和后端统计口径，顺手把本周发版文档也补一下。前端涉及 web-console 的日志页面，后端涉及 admin-console 的 usage_metrics 和 overview_stats 接口，SQL 有 metrics_v1.sql。",
-      "expected_output": "执行强制启动清单（读 PKB 的 vault-map.md 与 writing-conventions.md，再做单层探查）。位置判断以探查结果为准，不以 vault-map.md 里的记载为准（那是快照，会变）。所请求的领域目录不存在时不写入任何记忆中的旧路径，告知用户历史路径已不在并询问记录该放哪，等确认后再写；已存在就写进去。只记录已落地的事实，不编造密钥。（这条 eval 测的是行为，不是 02 Areas 当前的状态。）",
+      "prompt": "我刚改完内部系统 A 的筛选条件和后端统计口径，顺手把本周发版文档也补一下。SQL 有 metrics_v1.sql。",
+      "expected_output": "探查已有项目/领域记录，读取 PKB 规则，记录实际变更和文件位置；未给的验证和发布状态标未知。寻找同系统同周记录再更新，不假定已经上线。",
       "files": []
     },
     {
       "id": 2,
-      "prompt": "这次只是讨论了下内部系统 B 后续可能怎么做，还没定方案，也没改代码。你帮我看看要不要记知识库。",
-      "expected_output": "不创建发版笔记或长期项目笔记。说明未接受、未实施的猜想不应记录，除非有已确认的决定、可复用的约束或明确的下一步动作。",
+      "prompt": "这次只是讨论后续可能怎么做，还没定方案，也没改代码。你帮我看看要不要记知识库。",
+      "expected_output": "不生成已完成工作或发版记录。说明没有可确认落地事实；若用户明确要求暂存想法，交由 PKB 按草稿记录。",
       "files": []
     },
     {
       "id": 3,
-      "prompt": "今天发布内部系统 A：打包 h5_bundle、admin dist、admin-console app，上传到内网主机的 /srv/release，解压后复制 .env.production，然后执行 admin-console/scripts/docker-restart.sh -e prod -s app，前端重启 web-service。把这些落实到本周发版文档里。",
-      "expected_output": "先执行启动清单与探查，位置一律以探查结果为准（不得引用 vault-map.md 里对该区状态的记载）。探查不到匹配的领域目录时，询问用户发版笔记该放哪，而不是写进任何记忆中的旧路径；位置确认后，用 references/release-note-template.md 的结构写周发版笔记，包含打包、上传、解压、配置拷贝、后端重启、前端重启、验证与回滚。",
+      "prompt": "今天发布内部系统 A：打包后上传到 /srv/release，复制 .env.production，运行 scripts/docker-restart.sh -e prod -s app。把这些落实到本周发版文档里。",
+      "expected_output": "按实际主家和本周记录写入已执行命令、环境及用户提供的结果，不再次执行发布。缺少验证、备份和回滚证据时明确标未提供，不能生成已通过记录。",
       "files": []
     },
     {
       "id": 4,
-      "prompt": "帮我在 Obsidian 里把 Inbox 那篇 Docker 文档移到 03 Resources 的对应目录，顺便更新一下 MOC。",
-      "expected_output": "不触发本 skill。这是日常笔记编辑 / 移动 / MOC 维护，属于 obsidian-personal-knowledge-base，交给它处理。",
+      "prompt": "帮我在 Obsidian 里把 Inbox 那篇 Docker 文档移到 Resources 的对应目录，顺便更新 MOC。",
+      "expected_output": "交给 PKB；没有新完成工作的记录需求，不触发 Recorder。",
       "files": []
     },
     {
       "id": 5,
       "prompt": "把这周做的事记一下。",
-      "expected_output": "这句话同时命中本 skill 的触发词（记一下 / 记录）和它的排除项（笼统的“这周做了什么”汇总）—— 是本 skill 与 PKB 最难分的一句。正确做法是不直接动手：先问用户要做哪一种，是要一份周报（属于 obsidian-personal-knowledge-base，按它的 references/work-management.md 维护），还是要记录本周已落地的发版相关事实（属于本 skill，写成周发版笔记）。用户回答前不创建任何笔记。若用户明确只与发版相关，只记那部分。",
+      "expected_output": "无任何上下文时澄清是周报还是已完成的发布/开发事实；若当前会话已有明确完成任务与记录对象，则利用上下文继续，不因泛词强制重复追问。",
       "files": []
     },
     {
       "id": 6,
-      "prompt": "我把某文档解析服务的本地回归测试跑通了，新建了 tests/regression/ 下的 5 个用例，跑法是 make regression，依赖 Python 3.12 和本地装好的解析包。记一下。",
-      "expected_output": "跨领域验证（与任何特定客户或系统无关）：执行启动清单后探查 01 Projects，找到与该项目对应的目录并把内容写在那里，而不是写入任何记忆中的领域路径。应用 landed points 过滤器，只记已落地事实（用例目录、命令、依赖版本），不记原始对话。因为不涉及发版，不创建周发版笔记。",
+      "prompt": "某文档解析服务的本地回归跑通了，新增 tests/regression/ 用例，跑法 make regression，依赖 Python 3.12。记一下。",
+      "expected_output": "探查该项目并记录用例位置、运行方式、依赖和已验证结果。不涉及发布，不额外生成周发版笔记。",
       "files": []
     },
     {
       "id": 7,
-      "prompt": "开源项目 v2.3.0 发布了：打了 tag v2.3.0，构建产物传到 GitHub Release，更新了 CHANGELOG 和 npm 包。写成发版记录。",
-      "expected_output": "跨领域验证（非平台运维场景）：执行启动清单并探查。找不到匹配的 Areas 目录时，询问用户这个开源项目的记录应放哪（01 Projects 下的项目目录？03 Resources？），等确认后再写。确认位置后用 release-note-template 的结构记录，但不套用平台运维特有的字段假设（如 SQL 脚本、Nginx 配置、内网主机）。",
+      "prompt": "开源项目 v2.3.0 发布了：打了 tag，构建产物传到 GitHub Release，更新了 CHANGELOG 和 npm 包。写成发版记录。",
+      "expected_output": "优先查已有项目记录并按实际归位，不因缺 Areas 就停。记录明确发布事实，不虚构 SQL/Nginx/内网主机或平台运维步骤，不发送消息或执行发布。",
       "files": []
     },
     {
       "id": 8,
-      "prompt": "开源项目 v2.3.0 的发版记录（打了 tag v2.3.0，构建产物传到 GitHub Release，更新了 CHANGELOG 和 npm 包）帮我放到一个新的领域目录 `02 Areas/05 数据平台/` 下，之前没有这个领域。",
-      "expected_output": "先探查 02 Areas 确认现状（不得引用 vault-map.md 里对该区状态的记载）。新建领域目录属于结构性改动：除了写好发版笔记、挂到最近的 MOC 之外，还必须在**同一次操作**里按 PKB 的起手流程第 8 步同步文档——02 Areas 目前只有入口索引，新建领域会让它和 vault-map.md 的 Areas 段同时过期，两处都要改（索引里登记新领域，vault-map.md 的 Areas 段改成新的真实状态）。不能只说一句“建议更新 vault-map.md”就完事，也不能留给下一次探查去发现。",
+      "prompt": "开源项目 v2.3.0 的发版记录放到一个新的领域目录 `02 Areas/05 数据平台/` 下，之前没有这个领域。",
+      "expected_output": "已指定路径无需重问。探查冲突后建目录和记录，补 vault 内领域索引或父页导航；不修改 PKB skill、地图或配置。",
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "把刚才上线的改动记到已有发版笔记，顺便整理它的标题和链接。",
+      "expected_output": "明确包含事实记录与笔记整理，完成两者；不要求用户二选一。保留原有属性和有效内容，写入有依据的状态并修正授权范围的导航。",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "校验器说发版笔记没有挂到 MOC，但我在代码示例里写了它的名字。这样算通过吗？",
+      "expected_output": "代码示例和普通文字提及不算导航。添加实际有用的 wikilink 后验证；不能因为文件名子串存在就认定已挂载。",
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "项目用了自己的发版模板，帮我只补这次的真实验证结果。",
+      "expected_output": "保持本地格式，不为了默认模板校验增加不相关章节或重命名。补已知结果并说明默认格式检查不适用，单独检查受影响链接。",
       "files": []
     }
   ]
