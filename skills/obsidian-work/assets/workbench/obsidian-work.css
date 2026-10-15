@@ -1,0 +1,147 @@
+/* 工作台首页专用；普通笔记、主题和独立 Bases 视图沿用原有外观。 */
+.obsidian-work-home {
+  --work-accent: #58b8ac;
+  --work-tint: rgba(88, 184, 172, 0.08);
+  --work-line: var(--background-modifier-border);
+  --file-line-width: 1060px;
+  --metadata-display-reading: none;
+}
+.obsidian-work-home.markdown-preview-view {
+  padding: clamp(24px, 4vw, 64px) clamp(24px, 5vw, 72px) 48px;
+}
+.obsidian-work-home .markdown-preview-sizer {
+  max-width: 1060px;
+  margin-inline: auto;
+}
+.obsidian-work-home.markdown-preview-view.show-properties .metadata-container,
+.obsidian-work-home .inline-title {
+  display: none;
+}
+.obsidian-work-home h1 {
+  font-size: clamp(30px, 3vw, 42px);
+  font-weight: 720;
+  letter-spacing: -0.045em;
+  margin: 0 0 12px;
+  color: var(--text-normal);
+}
+.obsidian-work-home h1::before {
+  content: "";
+  display: block;
+  width: 38px;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--work-accent);
+  margin-bottom: 24px;
+}
+.obsidian-work-home h2 {
+  font-size: 19px;
+  font-weight: 650;
+  border: 0;
+  margin: 30px 0 8px;
+  padding: 0;
+  letter-spacing: -0.02em;
+}
+.obsidian-work-home p {
+  line-height: 1.7;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.obsidian-work-home h1 + p {
+  font-size: 15px;
+  margin-bottom: 28px;
+}
+.obsidian-work-home a.internal-link {
+  text-decoration: none;
+}
+.obsidian-work-home a.internal-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.obsidian-work-home a:focus-visible {
+  outline: 2px solid var(--work-accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+.obsidian-work-home .callout[data-callout="work-nav"] {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 26px 0 34px;
+  box-shadow: none;
+}
+.obsidian-work-home .callout[data-callout="work-nav"] > .callout-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.09em;
+  padding: 0 0 12px;
+}
+.obsidian-work-home .callout[data-callout="work-nav"] .callout-icon,
+.obsidian-work-home .callout[data-callout="work-start"] .callout-icon {
+  display: none;
+}
+.obsidian-work-home .callout[data-callout="work-nav"] .callout-content > ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.obsidian-work-home .callout[data-callout="work-nav"] .callout-content > ul > li {
+  list-style: none;
+  margin: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--work-line);
+  border-radius: 12px;
+  background: var(--background-primary-alt);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.8;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.obsidian-work-home .callout[data-callout="work-nav"] li:hover {
+  border-color: var(--work-accent);
+  background: var(--work-tint);
+}
+.obsidian-work-home .callout[data-callout="work-nav"] li > .list-bullet {
+  display: none;
+}
+.obsidian-work-home .callout[data-callout="work-nav"] li a {
+  display: inline-block;
+  color: var(--text-normal);
+  font-size: 16px;
+  font-weight: 650;
+  margin-bottom: 6px;
+}
+.obsidian-work-home .callout[data-callout="work-start"] {
+  --callout-color: 88, 184, 172;
+  border: 1px solid var(--work-line);
+  border-left: 3px solid var(--work-accent);
+  border-radius: 10px;
+  background: var(--work-tint);
+  padding: 16px 20px;
+  margin: 18px 0 28px;
+}
+.obsidian-work-home .callout[data-callout="work-start"] .callout-title {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-normal);
+}
+.obsidian-work-home .callout[data-callout="work-start"] p {
+  font-size: 12px;
+  margin-block: 8px 0;
+}
+.obsidian-work-home .internal-embed[src$="待推进"],
+.obsidian-work-home .internal-embed[src$="近期记录"] {
+  border: 1px solid var(--work-line);
+  border-radius: 10px;
+}
+.obsidian-work-home hr {
+  border: none;
+  border-top: 1px solid var(--work-line);
+  margin: 32px 0 20px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .obsidian-work-home .callout[data-callout="work-nav"] li { transition: none; }
+}

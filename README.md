@@ -9,11 +9,13 @@
 | --- | --- |
 | [deck-authoring](skills/deck-authoring/README.md) | 从结构规格制作演示文稿，建立项目视觉风格，预览并导出 HTML、PDF、PNG、PPTX 或视频 |
 | [diagram-authoring](skills/diagram-authoring/README.md) | 从结构描述生成技术图，支持 Excalidraw 与 draw.io，并检查布局和引用 |
-| [obsidian-personal-knowledge-base](skills/obsidian-personal-knowledge-base/README.md) | 创建、更新、归位和审阅笔记，维护 PARA 目录与 MOC |
-| [obsidian-work-log-release-recorder](skills/obsidian-work-log-release-recorder/README.md) | 将已完成的开发、配置和发布事实记录到工作日志、发版文档与长期知识 |
+| [obsidian-wiki](skills/obsidian-wiki/README.md) | 学习 Wiki：吸收资料、关联证据、更新主题知识、检索问答与复习，独立运行 |
+| [obsidian-work](skills/obsidian-work/README.md) | 独立工作台：需求、缺陷、任务分工、日常记录与 Bases 首页，支持外部来源快照 |
 | [git-dev-workflow](skills/git-dev-workflow/README.md) | 本地 Git 写操作的状态探查、风险检查、提交规划和结果核验 |
 | [pingcode](skills/pingcode/README.md) | 查询和维护 PingCode 项目、工作项、迭代和看板，按真实接口解析名称和 ID |
 | [skill-builder](skills/skill-builder/README.md) | 设计新 skill、评审触发边界，提供仓库结构与引用检查工具 |
+
+Obsidian 两项能力各自独立，通过笔记数据关联；理念和工具取舍见 [学习 Wiki 与工作台架构](docs/obsidian-architecture.md)。
 
 例如：“使用 `$deck-authoring` 把材料做成演示文稿”，或“使用 `$pingcode` 查我的待办”。
 是否自动发现和如何显式调用，取决于使用的 Agent。

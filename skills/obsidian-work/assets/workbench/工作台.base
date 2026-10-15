@@ -1,0 +1,209 @@
+filters:
+  and:
+    - 'file.ext == "md"'
+    - '["requirement", "bug", "task", "log", "release"].contains(note.work_kind)'
+    - '!file.folder.split("/").containsAny("Templates", "templates", "模板")'
+    - 'note.type != "template"'
+formulas:
+  kind_label: 'if(note.work_kind == "requirement", "需求", if(note.work_kind == "bug", "缺陷", if(note.work_kind == "task", "任务", if(note.work_kind == "log", "日常记录", "发布记录"))))'
+properties:
+  file.name:
+    displayName: 事项
+  file.mtime:
+    displayName: 笔记修改
+  formula.kind_label:
+    displayName: 类型
+  note.work_id:
+    displayName: 工作项编号
+  note.authority:
+    displayName: 主档归属
+  note.project:
+    displayName: 项目
+  note.status:
+    displayName: 本地状态
+  note.assignee:
+    displayName: 本地负责人
+  note.priority:
+    displayName: 优先级
+  note.due:
+    displayName: 截止日期
+  note.parent:
+    displayName: 上级工作项
+  note.related:
+    displayName: 相关事项
+  note.created:
+    displayName: 记录创建
+  note.updated:
+    displayName: 内容更新
+  note.external_system:
+    displayName: 外部平台
+  note.external_id:
+    displayName: 外部编号
+  note.external_url:
+    displayName: 来源链接
+  note.external_status:
+    displayName: 外部状态快照
+  note.external_assignee:
+    displayName: 外部负责人快照
+  note.external_updated_at:
+    displayName: 来源更新时间
+  note.observed_at:
+    displayName: 读取时间
+views:
+  - type: table
+    name: 待推进
+    filters:
+      and:
+        - 'note.authority == "local"'
+        - '["requirement", "bug", "task"].contains(note.work_kind)'
+        - '!["已完成", "已取消"].contains(note.status)'
+    order:
+      - file.name
+      - formula.kind_label
+      - note.status
+      - note.assignee
+      - note.priority
+      - note.due
+    sort:
+      - property: note.due
+        direction: ASC
+      - property: file.name
+        direction: ASC
+  - type: table
+    name: 需求
+    filters:
+      and:
+        - 'note.authority == "local"'
+        - 'note.work_kind == "requirement"'
+    order:
+      - file.name
+      - note.project
+      - note.status
+      - note.assignee
+      - note.priority
+      - note.due
+    sort:
+      - property: file.mtime
+        direction: DESC
+      - property: file.name
+        direction: ASC
+  - type: table
+    name: 缺陷
+    filters:
+      and:
+        - 'note.authority == "local"'
+        - 'note.work_kind == "bug"'
+    order:
+      - file.name
+      - note.project
+      - note.status
+      - note.priority
+      - note.assignee
+      - note.related
+    sort:
+      - property: file.mtime
+        direction: DESC
+      - property: file.name
+        direction: ASC
+  - type: table
+    name: 任务分工
+    filters:
+      and:
+        - 'note.authority == "local"'
+        - 'note.work_kind == "task"'
+    groupBy:
+      property: note.assignee
+      direction: ASC
+    order:
+      - file.name
+      - note.status
+      - note.assignee
+      - note.parent
+      - note.priority
+      - note.due
+    sort:
+      - property: note.due
+        direction: ASC
+      - property: file.name
+        direction: ASC
+  - type: table
+    name: 外部跟踪
+    filters:
+      and:
+        - 'note.authority == "external"'
+        - '["requirement", "bug", "task"].contains(note.work_kind)'
+    order:
+      - file.name
+      - formula.kind_label
+      - note.external_system
+      - note.external_id
+      - note.external_status
+      - note.external_assignee
+      - note.external_updated_at
+      - note.observed_at
+      - note.external_url
+    sort:
+      - property: note.external_system
+        direction: ASC
+      - property: file.name
+        direction: ASC
+  - type: table
+    name: 近期记录
+    filters:
+      and:
+        - '["log", "release"].contains(note.work_kind)'
+    limit: 30
+    order:
+      - file.name
+      - formula.kind_label
+      - note.project
+      - note.created
+      - file.mtime
+    sort:
+      - property: file.mtime
+        direction: DESC
+      - property: file.name
+        direction: ASC
+  - type: table
+    name: 待整理
+    filters:
+      and:
+        - '["requirement", "bug", "task"].contains(note.work_kind)'
+        - or:
+            - 'note.work_id.isEmpty()'
+            - '!["local", "external"].contains(note.authority)'
+            - and:
+                - 'note.authority == "local"'
+                - or:
+                    - 'note.status.isEmpty()'
+                    - 'note.status == "待确认"'
+                    - 'note.assignee.isEmpty()'
+                    - '["待确认", "未提供", "未提供/待确认"].contains(note.assignee)'
+    order:
+      - file.name
+      - formula.kind_label
+      - note.work_id
+      - note.authority
+      - note.status
+      - note.assignee
+    sort:
+      - property: file.name
+        direction: ASC
+  - type: table
+    name: 已完成
+    filters:
+      and:
+        - 'note.authority == "local"'
+        - '["requirement", "bug", "task"].contains(note.work_kind)'
+        - 'note.status == "已完成"'
+    order:
+      - file.name
+      - formula.kind_label
+      - note.project
+      - note.assignee
+      - file.mtime
+    sort:
+      - property: file.mtime
+        direction: DESC
+      - property: file.name
+        direction: ASC

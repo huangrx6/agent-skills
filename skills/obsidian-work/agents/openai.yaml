@@ -1,0 +1,4 @@
+interface:
+  display_name: "Obsidian 工作台"
+  short_description: "在 Obsidian 管理需求、缺陷、任务分工、日常进度与周报，独立运行"
+  default_prompt: "使用 $obsidian-work 整理我的 Obsidian 项目工作台，记录需求、缺陷、任务分工和当前进度。"

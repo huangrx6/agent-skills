@@ -21,7 +21,7 @@ HEADROOM_MIN = 10
 
 # 「绑定本机」声明 与 「从配置读」表述 同时出现 = 自相矛盾，直接判失败。
 #
-# 2026-09-12 实测（WLRR）：同一段里上面写着
+# 2026-09-12 实测（工作台）：同一段里上面写着
 #     This skill is bound to a specific machine and Obsidian vault
 # 下面写着
 #     vault path resolves from $OBSIDIAN_VAULT_PATH — never hardcode it
@@ -82,7 +82,7 @@ def find_contradiction(desc: str, body: str) -> tuple[set[int], set[int]]:
     1. **否定式不算**。“路径从配置解析，**不绑定本机**”里的“绑定本机”是在说
        不绑定，意思正好相反。只看匹配前两个字符里有没有否定词。
     2. **必须在不同行**。真正出问题的形态是“上面写一边、下面写另一边”
-       （WLRR：上半段 bound、下半段 resolves from）。同一行里两侧同时出现的，
+       （工作台：上半段 bound、下半段 resolves from）。同一行里两侧同时出现的，
        几乎都是在**描述这个失败模式本身** —— skill-builder 那句就是
        “上面说绑定本机，下面说路径从配置解析”，它不是在犯这个错。
 
@@ -103,6 +103,8 @@ def find_contradiction(desc: str, body: str) -> tuple[set[int], set[int]]:
     return bound, portable
 # description 里应出现的触发表达（中英皆可）
 TRIGGER_HINTS = ("Use this skill", "Use when", "用于", "触发")
+# 排除边界可用中文书写，不能因本地化而要求重新加入英文。
+EXCLUSION_HINT_RE = re.compile(r"[Dd]o NOT use|不适用于|不用于")
 
 
 def _minimal_parse(text: str) -> dict:
@@ -292,7 +294,7 @@ def check_skill(path: str) -> dict:
     add("name == 目录名", fm_name == name, f"name={fm_name!r} dir={name!r}")
     add(f"description {len(desc)} 字符 < {MAX_DESC}", len(desc) < MAX_DESC)
     add("description 含触发表达", any(h in desc for h in TRIGGER_HINTS))
-    add("description 含 Do NOT use 边界", bool(re.search(r"[Dd]o NOT use", desc)))
+    add("description 含排除边界", bool(EXCLUSION_HINT_RE.search(desc)))
     lines = body.count("\n")
     add(f"正文 {lines} 行 ≤ {MAX_BODY_LINES}", lines <= MAX_BODY_LINES)
     headroom = MAX_BODY_LINES - lines

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Obsidian 学习 Wiki"
+  short_description: "吸收资料、关联来源、更新知识与复习自测，保留个人理解和现有笔记"
+  default_prompt: "使用 $obsidian-wiki 把这份材料融入我的学习 Wiki，先查已有笔记，说明新增认识、来源和仍有的疑问。"

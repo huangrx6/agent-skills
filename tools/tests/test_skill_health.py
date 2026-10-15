@@ -174,7 +174,7 @@ class AssetTest(RepoCase):
 class TreeTest(RepoCase):
     """README 的「目录结构」树 vs 真实目录。
 
-    这一类已经咬过两次，其中一次是**假陈述**（WLRR 写着「没有 scripts/ 与 tests/」，
+    这一类已经咬过两次，其中一次是**假陈述**（工作台 写着「没有 scripts/ 与 tests/」，
     而它两个都有了）—— 所以否定句要单独查。
     """
 

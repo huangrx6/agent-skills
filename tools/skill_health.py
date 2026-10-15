@@ -149,7 +149,7 @@ def contradicted_dirs(block: str, skill_dir: str) -> list[str]:
 def readme_tree_issues(skill_dir: str) -> list[str]:
     """README 的「目录结构」树与真实目录是否一致。
 
-    这一类已经咬过两次，其中一次是**假陈述**：WLRR 的 README 写着
+    这一类已经咬过两次，其中一次是**假陈述**：工作台 的 README 写着
     「没有 `scripts/` 与 `tests/` —— 这是刻意的」，而它两个都有了。
     所以同时查两件事：
       1. 真实存在的顶层条目有没有出现在树里

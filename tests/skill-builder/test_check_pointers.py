@@ -11,7 +11,7 @@
 
 第 2 条为什么不能也阻塞：实测有两条**合理**的"解析不到"——
 skill-builder 自己写「假如有决策树图就放 references/decision-tree.md」（举例子），
-PKB 里写 vault 的 `better-export-pdf/data.json`（仓库外的路径）。
+学习 Wiki 里写 vault 的 `better-export-pdf/data.json`（仓库外的路径）。
 全都阻塞就会制造误报，而**误报会训练人忽略整个检查**（前作 lint 全 warn 没人看）。
 
 第 1 / 2 条的分界来自一次真实缺陷：一句「图标（`references/icons.md`）遵循同一条纪律」

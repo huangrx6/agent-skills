@@ -18,15 +18,15 @@
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
-    "obsidian-personal-knowledge-base": {
-      "computedHash": "db18ecfe1d7775398ad67e9863f82745c9ad73fc2455356893a0b57549dbdf8b",
-      "skillPath": "skills/obsidian-personal-knowledge-base/SKILL.md",
+    "obsidian-wiki": {
+      "computedHash": "469ce2854222fc9165fbcafa4c3df11393fcbcd8ab2763d25e93c5277a67507b",
+      "skillPath": "skills/obsidian-wiki/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
-    "obsidian-work-log-release-recorder": {
-      "computedHash": "b4ba39b005dd5e0953bf68ab9e59cca8713d09094a10ec12b45345cd9603e9ed",
-      "skillPath": "skills/obsidian-work-log-release-recorder/SKILL.md",
+    "obsidian-work": {
+      "computedHash": "126c403ebe6fcaca5ecf256aff3e6fe3e130ca746ee1ed5e96837ec59635c5e2",
+      "skillPath": "skills/obsidian-work/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },

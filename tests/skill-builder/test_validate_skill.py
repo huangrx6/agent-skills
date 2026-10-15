@@ -110,7 +110,7 @@ class ValidateSkillTest(unittest.TestCase):
                 "- vault path resolves from $OBSIDIAN_VAULT_PATH\n")
         self.assertTrue(
             self.fails(_skill(self.tmp, "contradiction", body=body)),
-            "分两行声明的真矛盾没被抓到 —— 这正是 WLRR 当初的形态",
+            "分两行声明的真矛盾没被抓到 —— 这正是 工作台 当初的形态",
         )
 
     # 已知的否定写法 —— 全是实测过会误报的。一个合理的“不绑定”写法被当成矛盾，
@@ -154,7 +154,7 @@ class ValidateSkillTest(unittest.TestCase):
     def test_describing_the_antipattern_is_not_flagged(self):
         # skill-builder 里就有这么一句:它在讲这个失败模式本身,不是在犯它
         body = ("# t\n\n"
-                "- 实测 WLRR 就是如此:上面说绑定本机,下面说路径从配置解析。\n"
+                "- 实测 工作台 就是如此:上面说绑定本机,下面说路径从配置解析。\n"
                 "\n"
                 "- path is never hardcoded\n")
         self.assertFalse(
@@ -232,7 +232,30 @@ class ValidateSkillTest(unittest.TestCase):
 
     def test_missing_do_not_boundary_fails(self):
         path = _skill(self.tmp, "no-boundary", desc="Use this skill when 整理笔记。")
-        self.assertTrue(self.fails(path), "description 缺 Do NOT 边界应失败")
+        self.assertTrue(self.fails(path), "description 缺排除边界应失败")
+
+    def test_chinese_exclusion_boundary_passes(self):
+        descriptions = (
+            ">-\n"
+            "  用于在 Obsidian 中学习和维护个人 Wiki：吸收文章、整理概念与实践。\n"
+            "  不适用于： 不涉及知识库的普通问答、需求缺陷和任务分工的业务管理。",
+            "用于在 Obsidian 管理工作：整理需求、记录缺陷、拆解任务。"
+            "不用于普通知识学习或没有本地笔记需求的远端项目系统操作。",
+        )
+        for i, desc in enumerate(descriptions):
+            with self.subTest(description=desc):
+                path = _skill(self.tmp, f"chinese-boundary-{i}", desc=desc)
+                self.assertFalse(self.fails(path), "中文入口的明确排除边界应通过")
+
+    def test_chinese_dependency_or_scope_hint_is_not_an_exclusion_boundary(self):
+        descriptions = (
+            "用于在 Obsidian 管理工作，不要求安装其他插件。",
+            "仅用于整理笔记和维护工作台。",
+        )
+        for i, desc in enumerate(descriptions):
+            with self.subTest(description=desc):
+                path = _skill(self.tmp, f"chinese-no-boundary-{i}", desc=desc)
+                self.assertTrue(self.fails(path), "依赖声明或正向用途不能代替排除边界")
 
     def test_good_skill_passes(self):
         self.assertFalse(self.fails(_skill(self.tmp, "good")), "合法 skill 应通过")
