@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="diagram-authoring" agent="diagram-authoring" version="24.0.0" type="device">
+  <diagram id="499617bc050f" name="订单请求通过服务写入数据库">
+        <mxGraphModel dx="800" dy="600" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1352" pageHeight="826" background="#FFFFFF" math="0" shadow="0">
+          <root>
+        <mxCell id="0" />
+        <mxCell id="2" value="区域与标题（锁定）" parent="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="region-core" value="" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;locked=1;movable=0;resizable=0;editable=0;fillColor=#E9EFFD;strokeColor=#CDD0D4;strokeWidth=1;dashed=0" vertex="1" parent="2">
+          <mxGeometry x="398.5" y="93.6" width="930.0" height="207.4" as="geometry" />
+        </mxCell>
+        <mxCell id="region-label-core" value="订单系统" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;locked=1;movable=0;resizable=0;editable=0;fontColor=#374151;fontSize=20;fontFamily=Helvetica" vertex="1" parent="2">
+          <mxGeometry x="823.5" y="103.6" width="80.0" height="28.0" as="geometry" />
+        </mxCell>
+        <UserObject id="n-client" label="Web 客户端" node_id="client" kind="client" emphasis="normal" level="neutral">
+          <mxCell style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#374151;strokeWidth=2;fontSize=16;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="24.0" y="169.02" width="288.5" height="99.56" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject id="n-gateway" label="API 入口" node_id="gateway" kind="service" group="core" emphasis="normal" level="neutral">
+          <mxCell style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#374151;strokeWidth=2;fontSize=16;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="432.5" y="183.6" width="204.0" height="70.4" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject id="n-orders" label="订单服务" node_id="orders" kind="service" group="core" emphasis="primary" level="accent">
+          <mxCell style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#E0E9FC;strokeColor=#2563EB;strokeWidth=3;fontSize=17;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="756.5" y="182.9" width="214.0" height="71.8" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject id="n-db" label="订单库" node_id="db" kind="data" group="core" emphasis="normal" level="neutral">
+          <mxCell style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=12;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#374151;strokeWidth=2;fontSize=16;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="1090.5" y="170.6" width="204.0" height="96.4" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="e-0" value="HTTPS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;fontSize=12;fontFamily=Helvetica;labelBackgroundColor=#FFFFFF;exitX=1.0;exitY=0.5;exitPerimeter=1;entryX=0.0;entryY=0.5;entryPerimeter=1" edge="1" source="n-client" target="n-gateway" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-1" value="提交订单" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;fontSize=12;fontFamily=Helvetica;labelBackgroundColor=#FFFFFF;exitX=1.0;exitY=0.5;exitPerimeter=1;entryX=0.0;entryY=0.5;entryPerimeter=1" edge="1" source="n-gateway" target="n-orders" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-2" value="持久化" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;fontSize=12;fontFamily=Helvetica;labelBackgroundColor=#FFFFFF;exitX=1.0;exitY=0.5;exitPerimeter=1;entryX=0.0;entryY=0.5;entryPerimeter=1" edge="1" source="n-orders" target="n-db" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="diagram-title" value="订单请求通过服务写入数据库" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;locked=1;movable=0;resizable=0;fontColor=#374151;fontSize=24;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="520.25" y="24.0" width="312.0" height="33.6" as="geometry" />
+        </mxCell>
+          </root>
+        </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,62 @@
+{
+  "type": "architecture",
+  "title": "订单服务校验后保存数据",
+  "visual": "editorial",
+  "style": {
+    "fill": "solid",
+    "line": "straight"
+  },
+  "intent": {
+    "question": "订单数据在哪里校验和保存？",
+    "audience": "mixed"
+  },
+  "nodes": [
+    {
+      "id": "api",
+      "label": "API 入口",
+      "kind": "service",
+      "detail": "接收订单"
+    },
+    {
+      "id": "order",
+      "label": "订单服务",
+      "kind": "service",
+      "group": "core",
+      "detail": "校验必要字段",
+      "emphasis": "primary"
+    },
+    {
+      "id": "db",
+      "label": "订单库",
+      "kind": "data",
+      "group": "core",
+      "detail": "保存订单记录"
+    }
+  ],
+  "edges": [
+    {
+      "from": "api",
+      "to": "order",
+      "label": "提交订单"
+    },
+    {
+      "from": "order",
+      "to": "db",
+      "label": "持久化"
+    }
+  ],
+  "groups": [
+    {
+      "id": "core",
+      "label": "订单处理边界"
+    }
+  ],
+  "cards": [
+    {
+      "title": "阅读重点",
+      "items": [
+        "入口接收，服务校验，数据库保存。"
+      ]
+    }
+  ]
+}

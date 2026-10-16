@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="diagram-authoring" agent="diagram-authoring" version="24.0.0" type="device">
+  <diagram id="45ab117a5fd0" name="质量审查覆盖事实、结构与呈现">
+        <mxGraphModel dx="800" dy="600" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="826" background="#FFFFFF" math="0" shadow="0">
+          <root>
+        <mxCell id="0" />
+        <mxCell id="2" value="区域与标题（锁定）" parent="0" />
+        <mxCell id="1" parent="0" />
+        <UserObject id="n-root" label="图的质量" node_id="root" kind="plain" emphasis="primary" level="accent">
+          <mxCell style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#E0E9FC;strokeColor=#2563EB;strokeWidth=3;fontSize=17;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="146.5" y="306.74" width="214.0" height="85.8" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject id="n-facts" label="事实依据" node_id="facts" kind="plain" emphasis="normal" level="neutral">
+          <mxCell style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#374151;strokeWidth=2;fontSize=16;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="24.0" y="93.6" width="204.0" height="70.4" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject id="n-structure" label="关系结构" node_id="structure" kind="plain" emphasis="normal" level="neutral">
+          <mxCell style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#374151;strokeWidth=2;fontSize=16;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="406.5" y="314.44" width="204.0" height="70.4" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject id="n-visual" label="呈现可读性" node_id="visual" kind="plain" emphasis="normal" level="neutral">
+          <mxCell style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#374151;strokeWidth=2;fontSize=16;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="24.0" y="535.28" width="204.0" height="70.4" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject id="n-direction" label="箭头方向" node_id="direction" kind="plain" emphasis="normal" level="neutral">
+          <mxCell style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#374151;strokeWidth=2;fontSize=16;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="656.5" y="314.44" width="204.0" height="70.4" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="e-0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;noLabel=1;exitX=0.3843;exitY=0.0;exitPerimeter=1;entryX=0.5996;entryY=1.0;entryPerimeter=1" edge="1" source="n-root" target="n-facts" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;noLabel=1;exitX=1.0;exitY=0.5;exitPerimeter=1;entryX=0.0;entryY=0.5;entryPerimeter=1" edge="1" source="n-root" target="n-structure" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;noLabel=1;exitX=0.3843;exitY=1.0;exitPerimeter=1;entryX=0.5996;entryY=0.0;entryPerimeter=1" edge="1" source="n-root" target="n-visual" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;noLabel=1;exitX=1.0;exitY=0.5;exitPerimeter=1;entryX=0.0;entryY=0.5;entryPerimeter=1" edge="1" source="n-structure" target="n-direction" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="diagram-title" value="质量审查覆盖事实、结构与呈现" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;locked=1;movable=0;resizable=0;fontColor=#374151;fontSize=24;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="274.25" y="24.0" width="336.0" height="33.6" as="geometry" />
+        </mxCell>
+          </root>
+        </mxGraphModel>
+  </diagram>
+</mxfile>

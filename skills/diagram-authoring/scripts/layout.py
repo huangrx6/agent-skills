@@ -370,9 +370,9 @@ def break_cycles(node_ids: list[str], edges: list[dict]
     for e in edges:
         key = (e["from"], e["to"])
         if key in reversed_set:
-            dag.append({**e, "from": e["to"], "to": e["from"]})
+            dag.append({**e, "from": e["to"], "to": e["from"], "_cycle_reversed": True})
         else:
-            dag.append(dict(e))
+            dag.append({**e, "_cycle_reversed": False})
     return dag, sorted(reversed_set)
 
 
@@ -1244,10 +1244,10 @@ def geometric_crossing_pairs(edges: list[dict]) -> list[list[int]]:
     """
     polylines: list[list] = []
     origins: list[int] = []
-    for edge in edges:
-        origin = edge.get("origin")
+    for index, edge in enumerate(edges):
+        origin = edge.get("origin", index)
         if not isinstance(origin, int):
-            continue          # 没有来源序号的边不参与定位（两条路径都会填上）
+            origin = index
         polylines.append(edge.get("points") or [])
         origins.append(origin)   # 与 polylines 同步追加，下标才对得上
     pairs: list[list[int]] = []
@@ -1260,11 +1260,29 @@ def geometric_crossing_pairs(edges: list[dict]) -> list[list[int]]:
 
 
 def _polylines_cross(first: list, second: list) -> bool:
-    """两条折线是否**真正穿过**彼此（端点相碰不算）。"""
+    """Whole-path shared terminals are allowed; interior vertices aren't.
+
+    A crossing at a bend or a redundant collinear waypoint is still a crossing.
+    Testing only strict segment intersections silently missed those cases.
+    Collinear spans remain the separate overlap check's responsibility.
+    """
     for a, b in zip(first, first[1:]):
         for c, d in zip(second, second[1:]):
             if _segments_intersect(a, b, c, d):
                 return True
+            ux, uy = b[0]-a[0], b[1]-a[1]
+            vx, vy = d[0]-c[0], d[1]-c[1]
+            determinant = ux*vy-uy*vx
+            if abs(determinant) < 1e-8:
+                continue
+            dx, dy = c[0]-a[0], c[1]-a[1]
+            t, u = (dx*vy-dy*vx)/determinant, (dx*uy-dy*ux)/determinant
+            if -.0001 <= t <= 1.0001 and -.0001 <= u <= 1.0001:
+                point = [a[0]+t*ux, a[1]+t*uy]
+                shared_terminal = (any(math.dist(point, p) < .01 for p in (first[0], first[-1]))
+                                   and any(math.dist(point, p) < .01 for p in (second[0], second[-1])))
+                if not shared_terminal:
+                    return True
     return False
 
 
@@ -1512,13 +1530,16 @@ def route_edges(origins: list[dict], segments: list[dict],
         pts = straighten(pts, placed, {chain[0], chain[-1]}, orthogonals=variants,
                          endpoints=(chain[0], chain[-1]))
         a, b = e["from"], e["to"]
-        was_reversed = (b, a) in reversed_set
+        # A→B and B→A become the same ordered pair in the temporary DAG.
+        # Preserve reversal per edge; looking up the pair reverses BOTH messages.
+        was_reversed = e.get("_cycle_reversed", (b, a) in reversed_set)
         if was_reversed:
             # 回到原始方向。只翻折线点不动 from/to 的话，报告里的两端与点的走向相反 ——
             # 下游照着 from→to 画箭头就会画反。
             a, b = b, a
             pts = list(reversed(pts))
         out.append({"from": a, "to": b, "points": pts, "reversed": was_reversed,
+                    "origin": e.get("origin", idx),
                     "label": e.get("label"), "kind": e.get("kind")})
     return out
 
@@ -3096,7 +3117,7 @@ def _open_channels(placed: dict[str, Placed], node_ids: list[str],
 
 
 def layout(spec: dict, boxes: dict[str, Box],
-           params: dict[str, float] | None = None) -> LayoutResult:
+           params: dict[str, float] | None = None, *, presentation=None) -> LayoutResult:
     p = dict(DEFAULT_PARAMS)
     p.update(params or {})
     # spec 是外部 JSON，字段可能缺、可能是 null；先收成 str 再当 dict 的键。
@@ -3160,6 +3181,11 @@ def layout(spec: dict, boxes: dict[str, Box],
                                 p["nodeSeparation"], p["rankSeparation"],
                                 groups_of=groups_of)
     placed = coords.placed
+    if P.resolve(presentation).preset != "fit" and direction == "TB" and not coords.bands:
+        # Reserve space between visible region envelopes before routing.
+        # Node gaps alone exclude the padding and title bands of both groups.
+        placed = load_sibling("readable_routing").reserve_region_corridors(
+            spec, placed, boxes, sys.modules[__name__], presentation)
     # 主轴拉直是一把双刃剑：它让主流程直着走，但也可能把某条边推到别的节点上。
     # **两种都算，挑更干净的** —— 判据是「连线穿节点的处数」，同分时留着拉直版
     # （那是用户明确要的直）。这跟径向那次「只在遮挡真的变少时才换顺序」是同一套路：
@@ -3317,6 +3343,13 @@ CARD_WRAP_UNITS = 24.0        # 条目**自然**断行宽度（单位数，与 L
 # 为什么要有上限：只有一张卡时它会撑满整幅图的宽，成了"横幅"而不是"卡"。
 CARD_MAX_W = 480.0
 
+
+def card_wrap_units(card: dict) -> float:
+    """Long notes need reading width, not a taller version of a short caption."""
+    lines = sum(len(_tm.wrap(str(item), CARD_WRAP_UNITS)[0])
+                for item in card.get("items", []))
+    return 40.0 if lines > 8 else CARD_WRAP_UNITS
+
 REGION_PAD = 34.0        # 区域边框到成员节点的距离
 # 区域标题的字号：比节点标题（16）大一步 —— 参考图里它就是整块区域的名字。
 REGION_LABEL_SIZE = 20.0
@@ -3336,12 +3369,12 @@ REGION_MIN_GAP = 18.0    # 两个区域贴在一起时至少留这么多
 
 
 def card_rows(spec: dict, content_left: float, content_right: float,
-              content_bottom: float) -> list[dict]:
+              content_bottom: float, *, presentation=None) -> list[dict]:
     """把 `cards` 排成内容下方的若干行，返回每张卡的折行与几何（绝对坐标）。
 
     两个后端共用这一份推导（同一件几何量只留一处）：
-      - 打包按**自然**断行宽度（`CARD_WRAP_UNITS`，标题按字号比折算）；
-      - 然后**行内平分内容宽**（上限 `CARD_MAX_W`）：撑成栅格、行数更少，
+      - 短说明用 `CARD_WRAP_UNITS`；超过八行的长说明扩到 40 单位，标题按字号比折算；
+      - 然后**行内平分内容宽**（短卡上限 `CARD_MAX_W`，长卡随字号扩宽）：撑成栅格、行数更少，
         也不会出现"窄条里挤五行"的样子（用户反馈"换了那么多行，就不能框宽一点吗"）；
       - 宽度不够平分时退回内容宽（卡片内容是硬要求，不能被排版挤掉）；
       - 行内居中于内容宽，新行的 y 在上一行最高那张卡之下。
@@ -3349,14 +3382,15 @@ def card_rows(spec: dict, content_left: float, content_right: float,
     卡片**不参与布局**（与标题同一条规矩）：它在内容算完之后才落位，
     不会反过来把任何节点推开。
     """
+    ctx = P.resolve(presentation)
     cards = spec.get("cards") or []
     if not cards:
         return []
     usable = max(240.0, content_right - content_left)
-    title_units = CARD_WRAP_UNITS * _tm.FONT_DETAIL / _tm.FONT_NODE
 
     # 第一遍：按**自然**断行宽度算每张卡的最小尺寸（打包按这个来）
-    entries = [_card_entry(i, card, CARD_WRAP_UNITS, title_units)
+    entries = [_card_entry(i, card, card_wrap_units(card),
+                           card_wrap_units(card) * ctx.detail / ctx.node, presentation=ctx)
                for i, card in enumerate(cards)]
 
     rows: list[list[dict]] = []
@@ -3374,17 +3408,19 @@ def card_rows(spec: dict, content_left: float, content_right: float,
 
     # 第二遍：行内**平分**内容宽 —— 卡片撑成栅格，行数随之变少（用户要的"大气"），
     # 多行文本也不再挤在窄条里。宽度不够平分时退回各自的内容宽。
-    y = content_bottom + CARD_GAP_BELOW
+    y = content_bottom + ctx.card_gap
     placed: list[dict] = []
     for row in rows:
         gaps = CARD_GAP_BETWEEN * max(0, len(row) - 1)
         share = (usable - gaps) / len(row)
         needed = max(c["width"] for c in row)
         if needed <= share:
-            uniform = max(min(share, CARD_MAX_W), needed)
+            cap = max(CARD_MAX_W, max(card_wrap_units(cards[c["index"]])
+                                     * ctx.detail + 2 * CARD_PAD_X for c in row))
+            uniform = max(min(share, cap), needed)
             row = [_card_entry(c["index"], cards[c["index"]],
-                               max(1.0, (uniform - 2 * CARD_PAD_X) / _tm.FONT_DETAIL),
-                               max(1.0, (uniform - 2 * CARD_PAD_X) / _tm.FONT_NODE))
+                               max(1.0, (uniform - 2 * CARD_PAD_X) / ctx.detail),
+                               max(1.0, (uniform - 2 * CARD_PAD_X) / ctx.node), presentation=ctx)
                    for c in row]
             for card in row:
                 card["width"] = uniform      # 宽度由栅格定，内容不再回改它
@@ -3401,24 +3437,27 @@ def card_rows(spec: dict, content_left: float, content_right: float,
 
 
 def _card_entry(index: int, card: dict, item_units: float,
-                title_units: float) -> dict:
+                title_units: float, *, presentation=None) -> dict:
     """一张卡在给定断行宽度下的折行与自然尺寸（不含位置）。"""
+    ctx = P.resolve(presentation)
     title_lines, _ = _tm.wrap_balanced(str(card.get("title", "")), title_units)
     item_lines: list[str] = []
     for item in card.get("items", []):
+        if item_lines:
+            item_lines.append("")  # Paragraph space is measured and serialized alike.
         got, _ = _tm.wrap_balanced(f"• {item}", item_units)
         item_lines.extend(got)
-    title_w = max([_tm.weighted_units(l) for l in title_lines] or [0.0]) * _tm.FONT_NODE
-    items_w = max([_tm.weighted_units(l) for l in item_lines] or [0.0]) * _tm.FONT_DETAIL
-    title_h = len(title_lines) * _tm.FONT_NODE * _tm.LINE_HEIGHT
-    items_h = len(item_lines) * _tm.FONT_DETAIL * CARD_ITEM_LINE_HEIGHT
+    title_w = max([_tm.weighted_units(l) for l in title_lines] or [0.0]) * ctx.node
+    items_w = max([_tm.weighted_units(l) for l in item_lines] or [0.0]) * ctx.detail
+    title_h = len(title_lines) * ctx.node * _tm.LINE_HEIGHT
+    items_h = len(item_lines) * ctx.detail * CARD_ITEM_LINE_HEIGHT
     return {"index": index, "title_lines": title_lines, "item_lines": item_lines,
             "width": round(max(title_w, items_w) + 2 * CARD_PAD_X, 2),
             "height": round(title_h + (CARD_PAD_Y if item_lines else 0.0)
                             + items_h + 2 * CARD_PAD_Y, 2)}
 
 
-def region_label_lines(label: str, width: float) -> tuple[list[str], float]:
+def region_label_lines(label: str, width: float, *, presentation=None) -> tuple[list[str], float]:
     """把区域标题**断到区域的宽度里**。返回 `(行, 最宽一行的像素宽)`。
 
     尺寸链和节点是同一套，只是两端互换：
@@ -3428,10 +3467,11 @@ def region_label_lines(label: str, width: float) -> tuple[list[str], float]:
     实测一个 368px 的标题画在 324px 的可用宽度里，两头各冒出去 22px，
     而当时的九项校验里**没有一项在量区域标题** —— 标题宽度压根没进过任何尺寸链。
     """
+    ctx = P.resolve(presentation)
     if not label:
         return [], 0.0
     # 下限 1 个单位：区域比一个字还窄时也不让断行退化成死循环
-    max_units = max(1.0, (width - 2 * REGION_LABEL_MARGIN) / REGION_LABEL_SIZE)
+    max_units = max(1.0, (width - 2 * REGION_LABEL_MARGIN) / ctx.region)
     lines, _forced = _tm.wrap(label, max_units)
     # 行数定下来之后，在**同一行数**里挑最均衡的一版。
     # 贪心断行会把最后一行剩下一两个字（实测 "…× 执行 × 物 / 化对齐"），
@@ -3446,10 +3486,10 @@ def region_label_lines(label: str, width: float) -> tuple[list[str], float]:
         candidate_widest = max(_tm.weighted_units(line) for line in candidate)
         if candidate_widest < widest - 1e-6:
             lines, widest = candidate, candidate_widest
-    return lines, widest * REGION_LABEL_SIZE
+    return lines, widest * ctx.region
 
 
-def region_boxes(spec: dict, placed: dict, boxes: dict) -> list[dict]:
+def region_boxes(spec: dict, placed: dict, boxes: dict, *, presentation=None) -> list[dict]:
     """把 `groups` 变成**看得见的区域**：成员节点的并集 + 留白 + 标题带。
 
     区域是图上**唯一的整片颜色**：节点受颜色预算限制（单点关注），
@@ -3472,6 +3512,7 @@ def region_boxes(spec: dict, placed: dict, boxes: dict) -> list[dict]:
     「规格里写了、校验通过、出图却静默无效」。实测：夹具 `07-regions.json` 的
     `boot` 组写 `{stroke: dashed, fill: cross-hatch}`，出图仍是 solid + hachure。
     """
+    ctx = P.resolve(presentation)
     members: dict[str, list[str]] = {}
     for node in spec.get("nodes", []):
         gid = node.get("group")
@@ -3489,10 +3530,12 @@ def region_boxes(spec: dict, placed: dict, boxes: dict) -> list[dict]:
         bottom = max(placed[nid].y + boxes[nid].height for nid in ids)
         width = (right - left) + REGION_PAD * 2
         label = group.get("label") or ""
-        lines, label_width = region_label_lines(label, width)
-        label_height = len(lines) * REGION_LABEL_SIZE * _tm.LINE_HEIGHT
+        lines, label_width = region_label_lines(label, width, presentation=ctx)
+        label_height = len(lines) * ctx.region * _tm.LINE_HEIGHT
         # 标题带的高度 = 上边距 + 标题块 + 与成员之间的空；没有标题时用单行那个数
-        head = ((REGION_LABEL_TOP + label_height + REGION_LABEL_GAP)
+        label_top = REGION_LABEL_TOP if ctx.preset == "fit" else max(18., ctx.region * .8)
+        label_gap = REGION_LABEL_GAP if ctx.preset == "fit" else max(12., ctx.detail)
+        head = ((label_top + label_height + label_gap)
                 if lines else REGION_HEAD)
         x = left - REGION_PAD
         y = top - REGION_PAD - head
@@ -3505,7 +3548,7 @@ def region_boxes(spec: dict, placed: dict, boxes: dict) -> list[dict]:
             "style": group.get("style"),
             # 标签断行结果与实际占的尺寸 —— 落笔那边直接用这几个数
             "label_lines": list(lines),
-            "label_size": REGION_LABEL_SIZE,
+            "label_size": ctx.region,
             "label_width": round(label_width, 2),
             "label_height": round(label_height, 2),
             # 成员列表一起带出去：校验器要判"框里有没有夹着非成员"
@@ -3514,7 +3557,7 @@ def region_boxes(spec: dict, placed: dict, boxes: dict) -> list[dict]:
             "width": round(width, 2), "height": round(height, 2),
             # 标题在标题带里**水平居中**（参考图就是这个样子）
             "label_x": round(x + width / 2.0, 2),
-            "label_y": round(y + REGION_LABEL_TOP, 2),
+            "label_y": round(y + label_top, 2),
         })
     return out
 
@@ -3547,7 +3590,7 @@ def shows_edge_label(edge: dict, level: str | None) -> bool:
     return level != "executive"
 
 
-def boxes_from_spec(spec: dict, icon_sizes: dict | None = None) -> dict[str, Any]:
+def boxes_from_spec(spec: dict, icon_sizes: dict | None = None, *, presentation=None) -> dict[str, Any]:
     """由文字 + 形状反推每个节点的尺寸。**尺寸不由模型给。**
 
     尺寸链：文字 → `text_metrics.measure` → `shapes.box_for` →
@@ -3565,6 +3608,7 @@ def boxes_from_spec(spec: dict, icon_sizes: dict | None = None) -> dict[str, Any
     “尺寸只有一个来源”那条前提从这一版起不再成立 —— 已按约定先改文档，
     再改 `TestSizeSourcePremise`（它先失败，那就是流程在起作用）。
     """
+    ctx = P.resolve(presentation)
     detail_level = spec.get("detail", DEFAULT_DETAIL)
     tm = load_sibling("text_metrics")
     sh = load_sibling("shapes")
@@ -3578,7 +3622,8 @@ def boxes_from_spec(spec: dict, icon_sizes: dict | None = None) -> dict[str, Any
         step = _palette.emphasis_font_step(str(n.get("emphasis", "normal")))
         node_detail = n.get("detail", "") if shows_node_detail(n, detail_level) else ""
         text = tm.measure(n.get("label", ""), node_detail,
-                          font_size=tm.FONT_NODE + step)
+                          font_size=ctx.node + step, detail_font_size=ctx.detail,
+                          padding_x=ctx.padding_x, padding_y=ctx.padding_y)
         shape = sh.resolve(n)
         width, height = sh.box_for(shape, text.width, text.height)
         # 强调的**尺寸层级**：重点节点略大一点。颜色退出主次之后，这是"层次感"的
@@ -3607,9 +3652,9 @@ def boxes_from_spec(spec: dict, icon_sizes: dict | None = None) -> dict[str, Any
             # 而不是删除icon"。
             visible = max(
                 max([tm.weighted_units(line) for line in text.lines] or [0.0]) * text.font_size,
-                max([tm.weighted_units(line) for line in text.detail_lines] or [0.0]) * tm.FONT_DETAIL,
+                max([tm.weighted_units(line) for line in text.detail_lines] or [0.0]) * ctx.detail,
             )
-            width = max(width, visible + (icon_w or ICON_RESERVE) + ICON_GAP + 2 * tm.PADDING_X)
+            width = max(width, visible + (icon_w or ICON_RESERVE) + ICON_GAP + 2 * ctx.padding_x)
         out[n["id"]] = NodeBox(id=n["id"], shape=shape, width=width,
                                 height=height, text=text)
     return out
@@ -3638,6 +3683,7 @@ def load_sibling(name: str):
 _palette = load_sibling("palette")
 # 量区域标题用的那一份。**模块级只加载一次**：`region_boxes` 每次出图会被调两次
 # （校验一次、落笔一次），`load_sibling` 每调一次就重新 exec 一遂模块。
+P = load_sibling("presentation")
 _tm = load_sibling("text_metrics")
 
 def main(argv: list[str] | None = None) -> int:

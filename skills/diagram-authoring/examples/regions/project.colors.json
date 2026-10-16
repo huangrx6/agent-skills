@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "name": "区域浅底色",
+  "source": "项目自主设计；用于说明分区与节点配色独立。",
+  "canvas": "#FFFFFF",
+  "ink": "#28333D",
+  "accent": "#356B91",
+  "critical": "#B4453A",
+  "swatches": {
+    "sage": "#78A68C",
+    "sand": "#D0B16F"
+  },
+  "by_group": {
+    "entry": {
+      "color": "accent",
+      "strength": 0.12
+    },
+    "process": {
+      "color": "sage",
+      "strength": 0.23
+    },
+    "data": {
+      "color": "sand",
+      "strength": 0.23
+    }
+  },
+  "by_kind": {},
+  "by_node": {}
+}

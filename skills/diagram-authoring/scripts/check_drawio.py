@@ -14,14 +14,14 @@
 5. 边给了 `source` / `target` 的话，必须指向存在的 **vertex**
 6. `<mxGeometry>` 的宽高必须 > 0（0 尺寸的元素点不中、也看不见）
 
-**压缩过的文件不解**：draw.io 应用保存时默认把 `<diagram>` 的内容压缩成 base64。
-那不是一个可以"顺手支持一下"的格式（要 zlib + urllib 解 base64 + 再解析），
-所以这里明确报出来，而不是当空文件放行 —— 静默放行是最坏的一种做法。
+支持编辑器保存的压缩页；解压后执行与未压缩页相同的结构检查。
 """
 
 from __future__ import annotations
 
 import argparse
+import importlib.util
+from pathlib import Path
 import math
 import os
 import sys
@@ -30,6 +30,9 @@ from typing import Any
 
 REQUIRED_IDS = ("0", "1")
 ROOT_TAG = "root"
+_spec = importlib.util.spec_from_file_location("_drawio_xml", Path(__file__).with_name("drawio_xml.py"))
+XML = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(XML)
 
 
 def _diagrams(root: ET.Element) -> list[ET.Element]:
@@ -42,8 +45,8 @@ def check_text(text: str) -> list[str]:
     if not text.strip():
         return ["文件是空的"]
     try:
-        root = ET.fromstring(text)  # noqa: S314 - 本地自检工具，输入是自己生成的文件
-    except ET.ParseError as exc:
+        root = XML.parse(text)
+    except (ET.ParseError, ValueError) as exc:
         return [f"XML 解析失败：{exc}"]
 
     diagrams = _diagrams(root)
@@ -53,14 +56,7 @@ def check_text(text: str) -> list[str]:
         name = diagram.get("name") or "?"
         models = list(diagram.iter("mxGraphModel"))
         if not models:
-            inner = (diagram.text or "").strip()
-            if inner and "<" not in inner[:1]:
-                problems.append(
-                    f"<diagram name=\"{name}\"> 的内容是压缩过的（app 保存的默认形态）—— "
-                    "本 checker 不解压。要检查就先在 draw.io 里另存为未压缩，"
-                    "或者用 emit 重新生成一份")
-            else:
-                problems.append(f"<diagram name=\"{name}\"> 里没有 <mxGraphModel>")
+            problems.append(f"页 {name} 里没有 <mxGraphModel>")
             continue
         for model in models:
             problems += _check_model(model, name)
@@ -93,7 +89,7 @@ def _cells_with_identity(root: ET.Element) -> tuple[list[tuple[str, ET.Element]]
     out: list[tuple[str, ET.Element]] = []
     problems: list[str] = []
     for element in root:
-        if element.tag == "UserObject":
+        if element.tag in ("UserObject", "object"):
             cell_id = element.get("id")
             inner = element.find("mxCell")
             if cell_id is None:

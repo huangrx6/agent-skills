@@ -1,42 +1,9 @@
 #!/usr/bin/env python3
-"""颜色不是模板，而是**有审美锚点的自适应系统**：规则决定颜色如何工作，
-Seed 决定颜色往哪里走，视觉层级最终由构图、尺寸、留白、线条、文字与颜色共同完成。
+"""Color roles for both editable backends.
 
-## 这套系统回答的是什么问题
-
-不是"这张图用什么颜色"，而是"**这张图应该是什么气质，以及怎么用最少的颜色把它表达出来**"。
-前一版把它当配色模板做（六种语义六种颜色 → 五档层级五个色相），工程上干净，
-视觉上一定丑 —— 实测色相跨度 310°、一张 14 节点的图出现 9 种颜色，
-最后的效果是"看起来专业，但没有生命力"。
-
-## 三层各自负责什么
-
-    用户意图 / 图表内容
-            ↓
-    Visual Direction（视觉母体：什么气质）
-            ↓
-    Character（形容词，给**模型**判断"该选哪个方向"用）
-    Seed（人工审美锚点，给**代码**一个品味基准）
-            ↓
-    Adaptive Color System（wash / soft / edge / muted 全部派生）
-            ↓
-    Semantic Role → Visual Level → 实际 Excalidraw 颜色
-
-**Character 是给模型读的，Seed 是给代码读的** —— 这是两者唯一的区别。
-形容词生成不出 `#2F5D46`；而"哪一个是高级的绿"恰恰就是审美本身。
-
-## 颜色数量 ≠ 语义数量
-
-语义角色可以自由增加（`plain` 就是这么来的），**颜色只有 4 档层级**。
-加一个角色只是让它指向已有的层级之一，不会多出一个颜色。
-
-## 两条不可协商的规矩
-
-1. **未知值判失败，绝不 fallback。** fallback 会让"颜色必须落在板内"这条校验
-   自己绕过自己 —— 程序补的默认色当然合法，校验通过了，但语义已经错了。
-2. **禁止灰蓝企业风成为默认。** 白底 + 灰字 + 灰蓝节点 + 蓝灰线这一套
-   （`#6E879B` / `#7F96A5` / `#AAB8C0` 那一路）是被明确否掉的结果。
-   `tests/test_palette.py` 里有用例守着这条。
+Legacy directions/schemes remain compatible. A project-owned color design may
+supply arbitrary swatches and role/node assignments independently of drawing
+style. Do not treat the old directions or a previous user's taste as a limit.
 """
 
 from __future__ import annotations
@@ -44,13 +11,15 @@ from __future__ import annotations
 import colorsys
 import contextlib
 import math
+import importlib.util
+from pathlib import Path
+import sys
 
 # ══════════════════════════════════════════════════════════════════
-# Visual Levels —— 只有 4 档
+# Visual Levels —— 四档强调，不限制可用色相
 # ══════════════════════════════════════════════════════════════════
 #
-# 上一版有 5 档（多一个 `secondary`）。删掉它是因为：**多一档就多诱惑一次** ——
-# "这个也重要、那个也重要"最后会变成每个节点都有颜色。4 档已经把该说的说完：
+# 旧方向使用以下四档；项目配色可在同一强调档内按类别使用不同颜色。
 #
 #   普通  →  轻微区分  →  重点  →  异常 / 关键状态
 #
@@ -62,9 +31,9 @@ _LEVEL_ORDER = {name: i for i, name in enumerate(VISUAL_LEVELS)}
 # 层级 → 视觉角色（描边角色, 填充角色）。这一层把"我有多重要"翻译成"用哪几个颜色"。
 LEVEL_ROLES: dict[str, tuple[str, str]] = {
     "neutral":  ("ink",      "canvas"),         # 完全中性：填充就是画布色
-    "tint":     ("ink",      "accent-wash"),    # 极轻的一片，**不是第二种颜色**
+    "tint":     ("ink",      "accent-wash"),    # 背景区域
     "accent":   ("accent",   "accent-soft"),    # 整张图真正的视觉重点
-    "critical": ("critical", "critical-soft"),  # 唯一允许跳出主色系的
+    "critical": ("critical", "critical-soft"),  # 警示编码
 }
 
 # 派生配比。放一起，方便一眼看出"深浅关系"是从哪来的。
@@ -88,9 +57,8 @@ EDGE_MUTED_MIX = 0.24  # 弱连线：更靠近画布
 # ⚠️ `stroke` **只管节点的框和区域**，不管连线。连线的虚实是**语义**（§7：
 # 虚线 = 异步 / 可选）—— 让 `style.stroke` 去改它会把语义一起改掉。
 #
-# ⚠️ 默认**不是实心**。用户的要求是"尽量不要用实心的颜色"：斜条纹的填充是把
-# 浅色画成一组细线，整体更轻更透，一屏十几个框也不会糊成一片色块。
-# 实心要显式要（`"fill": "solid"`）。
+# 保留旧默认 hachure 以兼容已有输出；作者可按当前设计选择 solid，
+# 不把某次历史偏好当成全局审美限制。
 FILL_STYLES = ("hachure", "cross-hatch", "solid")
 # `shape` = **听形状自己的**（`shapes.SHAPES` 的 roundness / stroke_style）。
 # 做成一个默认档位而不是"默认 None"，是为了让"显式覆盖"和"不改"两件事都说得清楚：
@@ -148,6 +116,8 @@ def frame_stroke(level: str) -> str:
     判据：区域是**背景**，它的框只该表示"到这儿为止"，不该和前景抢。所以往画布
     方向退一半多，让它明确落在"背景层"那一档。
     """
+    if _custom_colors:
+        return LEVELS[level]["stroke"]
     return _mix(CANVAS["background"], LEVELS[level]["stroke"], _FRAME_RATIO)
 
 
@@ -437,6 +407,7 @@ LEVELS: dict[str, dict[str, str]] = {}
 KINDS: dict[str, str] = {}
 EDGE_KINDS: dict[str, dict[str, str]] = {}
 CANVAS: dict = {}
+_custom_colors: dict | None = None
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -540,9 +511,7 @@ def delta_e(a: str, b: str) -> float:
 def _mix(a: str, b: str, ratio: float) -> str:
     """在 a 与 b 之间线性插值。ratio=0 得到 a，ratio=1 得到 b。
 
-    **所有派生颜色都走这里** —— 这是"一张图只有一个主色系"的实现处：
-    wash / soft / edge 都是同一个主色与画布 / 墨色按固定配比混出来的，
-    想弄出第二个色相都做不到。
+    派生色共用此插值；项目配色可以分别从多个源色派生。
     """
     ar, ag, ab = _parse_hex(a)
     br, bg, bb = _parse_hex(b)
@@ -560,6 +529,8 @@ def _mix(a: str, b: str, ratio: float) -> str:
 
 def _rebind() -> None:
     """按**当前后端**重建派生表。语义档位两边一样，画法是各自一套。"""
+    global _custom_colors
+    _custom_colors = None
     if _active_backend == "drawio":
         _rebind_drawio()
     else:
@@ -871,12 +842,15 @@ def direction_context(name: str | None = None, seed: str | None = None):
     """测试用：进出一个方向，出来时恢复原状。"""
     global _active_direction, _active_seed
     before = (_active_direction, _active_seed)
+    colors_before = _custom_colors["raw"] if _custom_colors else None
     use_direction(name, seed)
     try:
         yield _active_direction
     finally:
         _active_direction, _active_seed = before
         _rebind()
+        if colors_before is not None:
+            use_colors(colors_before)
 
 
 # ── 层级与颜色 ───────────────────────────────────────────────────
@@ -894,14 +868,99 @@ def level_for(kind: str, emphasis: str = DEFAULT_EMPHASIS) -> str:
     return override if override else KINDS[kind]
 
 
-def stroke_for(kind: str, emphasis: str = DEFAULT_EMPHASIS) -> str:
-    """取节点边框色。未知值直接抛错 —— 不 fallback。"""
-    return LEVELS[level_for(kind, emphasis)]["stroke"]
+def use_colors(value, *, spec: dict | None = None) -> dict:
+    """Apply project data after choosing the backend/style; return audit evidence.
+
+    Existing serial emit calls rebuild the palette first. This is not a
+    thread-safe rendering context; concurrent rendering should use processes.
+    """
+    global _custom_colors, LEVELS, CANVAS, EDGE_KINDS, ROLES
+    path = Path(__file__).with_name("color_design.py")
+    module_spec = importlib.util.spec_from_file_location("_diagram_color_design", path)
+    module = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(module)
+    resolved = module.resolve(value, sys.modules[__name__])
+    if spec is not None:
+        unknown = set(resolved["by_node"]) - {n["id"] for n in spec.get("nodes", [])}
+        if unknown:
+            raise ValueError(f"配色 by_node 引用了不存在的节点：{sorted(unknown)}")
+        unknown_groups = set(resolved["groups"]) - {g["id"] for g in spec.get("groups", [])}
+        if unknown_groups:
+            raise ValueError(f"配色 by_group 引用了不存在的分组：{sorted(unknown_groups)}")
+    _rebind()
+    _custom_colors = resolved
+    LEVELS = {name: dict(pair) for name, pair in resolved["levels"].items()}
+    CANVAS.update(background=resolved["canvas"], text=resolved["ink"],
+                  grid=_mix(resolved["canvas"], resolved["ink"], .06))
+    ROLES.update(canvas=resolved["canvas"], ink=resolved["ink"],
+                 accent=resolved["raw"]["accent"], critical=resolved["raw"]["critical"],
+                 **{"accent-wash": LEVELS["tint"]["fill"],
+                    "accent-soft": LEVELS["accent"]["fill"],
+                    "critical-soft": LEVELS["critical"]["fill"],
+                    "edge": resolved["edge"], "edge-muted": resolved["edge"]})
+    EDGE_KINDS = {kind: {**entry, "stroke": resolved["edge"]}
+                  for kind, entry in EDGE_KINDS.items()}
+    return resolved["report"]
 
 
-def fill_for(kind: str, emphasis: str = DEFAULT_EMPHASIS) -> str:
-    """取节点填充色。**唯一来源是方向派生出的层级表**，没有第二张表。"""
-    return LEVELS[level_for(kind, emphasis)]["fill"]
+def has_custom_colors() -> bool:
+    return _custom_colors is not None
+
+
+def group_colors(group_id, level="tint") -> dict:
+    """Explicit region fills distinguish areas without recoloring their nodes."""
+    if _custom_colors and level != "critical" and group_id in _custom_colors["groups"]:
+        return _custom_colors["groups"][group_id]
+    return {"fill": LEVELS[level]["fill"], "stroke": frame_stroke(level),
+            "text": CANVAS["text"] if _custom_colors else text_for_level(level)}
+
+
+def _node_colors(kind, emphasis, node_id=None):
+    level = level_for(kind, emphasis)  # validate even when an assignment exists
+    if _custom_colors and emphasis not in ("critical", "muted"):
+        name = _custom_colors["by_node"].get(node_id, _custom_colors["by_kind"].get(kind))
+        if name:
+            return _custom_colors["primary" if emphasis == "primary" else "colors"][name]
+    return LEVELS[level]
+
+
+def stroke_for(kind: str, emphasis: str = DEFAULT_EMPHASIS, node_id=None) -> str:
+    return _node_colors(kind, emphasis, node_id)["stroke"]
+
+
+def fill_for(kind: str, emphasis: str = DEFAULT_EMPHASIS, node_id=None) -> str:
+    return _node_colors(kind, emphasis, node_id)["fill"]
+
+
+def text_for(kind: str, emphasis: str = DEFAULT_EMPHASIS, node_id=None) -> str:
+    return _node_colors(kind, emphasis, node_id).get("text", CANVAS["text"])
+
+
+def text_for_level(level: str) -> str:
+    return LEVELS[level].get("text", LEVELS[level]["stroke"])
+
+
+def check_pattern_text(spec: dict) -> None:
+    """Pattern gaps expose the underlying canvas/group, unlike solid fills."""
+    if not _custom_colors:
+        return
+    style = resolve_style(spec.get("style"))
+    groups = {g["id"]: g for g in spec.get("groups", [])}
+    for group in groups.values():
+        colors = group_colors(group["id"], group.get("level", "tint"))
+        group_style = merge_style(style, group.get("style"))
+        if group_style["fill"] != "solid" and contrast(colors["text"], CANVAS["background"]) < 4.5:
+            raise ValueError(f"分组 {group['id']} 的文字无法在纹理空隙上读清；改用分组 style.fill=solid")
+    if style["fill"] == "solid":
+        return
+    for node in spec.get("nodes", []):
+        group = groups.get(node.get("group"), {})
+        backgrounds = [CANVAS["background"]]
+        if group:
+            backgrounds.append(group_colors(group["id"], group.get("level", "tint"))["fill"])
+        color = text_for(node.get("kind"), node.get("emphasis", DEFAULT_EMPHASIS), node["id"])
+        if any(contrast(color, background) < 4.5 for background in backgrounds):
+            raise ValueError(f"节点 {node['id']} 的文字无法在纹理空隙上读清；改用 style.fill=solid 或调整填充/文字明暗")
 
 
 def emphasis_scale(emphasis: str) -> float:

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "name": "自由搭配 · 珊瑚焦点",
+  "source": "project-authored; no external palette claimed",
+  "rationale": "自选深墨画布与珊瑚焦点；其余节点和边保持中性，不为分类增添不必要的颜色。",
+  "canvas": "#182429",
+  "ink": "#EDF3EF",
+  "accent": "#F3A38F",
+  "critical": "#FF7685",
+  "swatches": {
+    "sea-glass": "#80C9C2",
+    "gold": "#E7C278"
+  },
+  "by_kind": {},
+  "strength": {
+    "normal": 0.1,
+    "primary": 0.22,
+    "surface": 0.035
+  }
+}

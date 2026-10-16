@@ -311,7 +311,10 @@ def check_text_fit(spec: dict, result: ResultT,
         node_detail = (node.get("detail", "") if L.shows_node_detail(node, detail_level)
                        else "")
         fresh = tm.measure(node.get("label", ""), node_detail,
-                           font_size=getattr(used, "font_size", tm.FONT_NODE))
+                           font_size=getattr(used, "font_size", tm.FONT_NODE),
+                           detail_font_size=getattr(used, "detail_font_size", tm.FONT_DETAIL),
+                           padding_x=getattr(used, "padding_x", tm.PADDING_X),
+                           padding_y=getattr(used, "padding_y", tm.PADDING_Y))
         if abs(fresh.width - used.width) > TOLERANCE or abs(fresh.height - used.height) > TOLERANCE:
             out.append(Issue("text", True, nid,
                              f"落笔尺寸 {used.width:.0f}×{used.height:.0f}，"
@@ -582,7 +585,7 @@ def check_edge_slant(result: ResultT) -> list[Issue]:
 
 # ── #10 区域标题（后置断言 + 一条内容级上限）─────────────
 def check_region_labels(spec: dict, result: ResultT,
-                        boxes: dict[str, BoxT]) -> list[Issue]:
+                        boxes: dict[str, BoxT], *, presentation=None) -> list[Issue]:
     """区域标题必须装在标题带里。
 
     **两条性质不同的失败共用一个 check**（`Issue` 的 docstring 里就写了这种情况）：
@@ -599,11 +602,11 @@ def check_region_labels(spec: dict, result: ResultT,
     下次改断行或改标题带时，它会立刻变成真实的门（和 #1 / #3 那两条后置断言同理）。
     """
     out: list[Issue] = []
-    for region in L.region_boxes(spec, result.placed, boxes):
+    for region in L.region_boxes(spec, result.placed, boxes, presentation=presentation):
         lines = list(region.get("label_lines") or ())
         if not lines:
             continue
-        expect, expect_width = L.region_label_lines(region["label"], region["width"])
+        expect, expect_width = L.region_label_lines(region["label"], region["width"], presentation=presentation)
         if list(expect) != lines or abs(expect_width - region["label_width"]) > TOLERANCE:
             out.append(Issue(
                 "region_label", True, region["id"],
@@ -636,7 +639,7 @@ def check_region_labels(spec: dict, result: ResultT,
 
 
 # ── #7 区域 ────────────────────────────────────────────────
-def check_regions(spec: dict, result: ResultT, boxes: dict[str, BoxT]) -> list[Issue]:
+def check_regions(spec: dict, result: ResultT, boxes: dict[str, BoxT], *, presentation=None) -> list[Issue]:
     """区域之间**要么分开、要么一个完全包住另一个** —— 不许部分重叠。
 
     实测踩过：一个 group 的节点在空间上被另一个 group 的节点夹在中间时，两个区域框
@@ -647,7 +650,7 @@ def check_regions(spec: dict, result: ResultT, boxes: dict[str, BoxT]) -> list[I
 
     为什么允许完全包含：分区里面再圈一块（"这一段属于异常路径"）是正当用法。
     """
-    regions = L.region_boxes(spec, result.placed, boxes)
+    regions = L.region_boxes(spec, result.placed, boxes, presentation=presentation)
     out: list[Issue] = []
     for i in range(len(regions)):
         for j in range(i + 1, len(regions)):
@@ -725,7 +728,7 @@ def check_readability(spec: dict, result: ResultT) -> list[Issue]:
 
 
 def check(spec: dict, result: ResultT,
-          boxes: dict[str, BoxT]) -> Outcome:
+          boxes: dict[str, BoxT], *, presentation=None) -> Outcome:
     return Outcome(issues=[
         *check_gaps(result),
         *check_edge_lengths(result),
@@ -737,9 +740,9 @@ def check(spec: dict, result: ResultT,
         *check_edge_slant(result),
         *check_bends(result),
         *check_geometric_crossings(spec, result),
-        *check_regions(spec, result, boxes),
-        *check_region_labels(spec, result, boxes),
-        *check_readability(spec, result),
+        *check_regions(spec, result, boxes, presentation=presentation),
+        *check_region_labels(spec, result, boxes, presentation=presentation),
+        *(check_readability(spec, result) if presentation is None else []),
     ])
 
 
@@ -822,7 +825,7 @@ def _extremeness(result: Any) -> float:
 
 
 def layout_with_retry(spec: dict, boxes: dict[str, BoxT],
-                      params: dict[str, float] | None = None
+                      params: dict[str, float] | None = None, *, presentation=None
                       ) -> tuple[Any, Outcome, list[Attempt]]:
     """算 → 校验 → 失败就调参重跑，最多 MAX_TUNE_ROUNDS 轮。
 
@@ -833,8 +836,19 @@ def layout_with_retry(spec: dict, boxes: dict[str, BoxT],
     current = dict(L.DEFAULT_PARAMS)
     current.update(params or {})
     attempts: list[Attempt] = []
-    result = L.layout(spec, boxes, current)
-    outcome = check(spec, result, boxes)
+    result = L.layout(spec, boxes, current, presentation=presentation)
+    if presentation is not None and L.P.resolve(presentation).preset != "fit" and result.direction == "LR":
+        # A larger font needs a larger reading corridor. Reserve room for an
+        # annotation plus its clearances and a region's inset border before
+        # attempting to place text; moving it onto a node is not a solution.
+        ctx = L.P.resolve(presentation)
+        label_width = max((tm.weighted_units(e.get("label", "")) * ctx.detail
+                           for e in spec.get("edges", [])), default=0)
+        required = min(L.PARAM_LIMIT["rankSeparation"], label_width + 60) if label_width else 0
+        if required > current["rankSeparation"]:
+            current["rankSeparation"] = required
+            result = L.layout(spec, boxes, current, presentation=presentation)
+    outcome = check(spec, result, boxes, presentation=presentation)
 
     for round_no in range(MAX_TUNE_ROUNDS + 1):
         attempts.append(Attempt(round_no=round_no, params=dict(current), outcome=outcome))
@@ -845,8 +859,8 @@ def layout_with_retry(spec: dict, boxes: dict[str, BoxT],
         stepped = _step(current, outcome)
         if stepped == current:
             break                       # 已到上限；再跑只会得到同一个结果
-        candidate = L.layout(spec, boxes, stepped)
-        candidate_outcome = check(spec, candidate, boxes)
+        candidate = L.layout(spec, boxes, stepped, presentation=presentation)
+        candidate_outcome = check(spec, candidate, boxes, presentation=presentation)
         # 护栏：调参器只盯它自己那几项检查，对**长宽比完全无感**。实测它会为了修
         # 折段带出来的 2 处穿节点，把层间距从 120 一路顶到 270 —— 图又变回细长条，
         # 折段刚省下来的高度全被吃回去。所以明确规定：**让图变得更极端的一步不采纳**。
@@ -854,6 +868,18 @@ def layout_with_retry(spec: dict, boxes: dict[str, BoxT],
             break
         current, result, outcome = stepped, candidate, candidate_outcome
 
+    if presentation is not None and L.P.resolve(presentation).preset != "fit":
+        # Refine only explicit reading presets; frozen legacy fit output stays
+        # stable. Re-run all geometry checks before accepting a candidate.
+        from collections import Counter
+        router = L.load_sibling("readable_routing")
+        candidate = router.refine(spec, result, boxes, L, presentation)
+        candidate_outcome = check(spec, candidate, boxes, presentation=presentation)
+        before = Counter((i.check, i.blocking) for i in outcome.issues)
+        after = Counter((i.check, i.blocking) for i in candidate_outcome.issues)
+        if all(count <= before[key] for key, count in after.items()):
+            result, outcome = candidate, candidate_outcome
+            attempts.append(Attempt(round_no=len(attempts), params=dict(current), outcome=outcome))
     return result, outcome, attempts
 
 

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "name": "网站参考 · 明黄焦点",
+  "source": "https://www.happyhues.co/palettes/14",
+  "rationale": "参考 Happy Hues #14 的画布、文字和亮黄，仅强调订单服务；青绿色作为候选保留，本图不使用。",
+  "canvas": "#FFFFFE",
+  "ink": "#272343",
+  "accent": "#FFD803",
+  "critical": "#B23A48",
+  "swatches": {
+    "mint": "#BAE8E8",
+    "pale-mint": "#E3F6F5"
+  },
+  "by_kind": {},
+  "strength": {
+    "normal": 0.8,
+    "primary": 0.75,
+    "surface": 0.04
+  }
+}

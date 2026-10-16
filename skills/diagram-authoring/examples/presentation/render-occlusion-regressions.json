@@ -1,0 +1,63 @@
+{
+  "status": "pass",
+  "basis": "real-browser-synthetic-svg-controls",
+  "cases": [
+    {
+      "case": "separate-labels",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "case": "overlapping-labels",
+      "expected": [
+        "render/text-overlap"
+      ],
+      "actual": [
+        "render/text-overlap"
+      ],
+      "pass": true
+    },
+    {
+      "case": "opaque-cover",
+      "expected": [
+        "render/text-occluded"
+      ],
+      "actual": [
+        "render/text-occluded"
+      ],
+      "pass": true
+    },
+    {
+      "case": "transparent-cover",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "case": "cover-behind-text",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "case": "overflow-hidden",
+      "expected": [
+        "render/internal-clipping"
+      ],
+      "actual": [
+        "render/internal-clipping"
+      ],
+      "pass": true
+    },
+    {
+      "case": "overflow-visible",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    }
+  ],
+  "limits": [
+    "合成 SVG 控制实验；不代表任意图形、字体或真实业务图均已通过"
+  ]
+}

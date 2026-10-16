@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="diagram-authoring" agent="diagram-authoring" version="24.0.0" type="device">
+  <diagram id="ff2e7ab40f6a" name="库存校验决定接单或等待">
+        <mxGraphModel dx="800" dy="600" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="826" background="#FFFFFF" math="0" shadow="0">
+          <root>
+        <mxCell id="0" />
+        <mxCell id="2" value="区域与标题（锁定）" parent="0" />
+        <mxCell id="1" parent="0" />
+        <UserObject id="n-request" label="接收订单" node_id="request" kind="client" emphasis="normal" level="neutral">
+          <mxCell style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#374151;strokeWidth=2;fontSize=16;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="100.75" y="93.6" width="288.5" height="99.56" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject id="n-check" label="库存充足？" node_id="check" kind="plain" emphasis="primary" level="accent">
+          <mxCell style="rhombus;whiteSpace=wrap;html=1;fillColor=#E0E9FC;strokeColor=#2563EB;strokeWidth=3;fontSize=17;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="24.0" y="313.16" width="442.0" height="143.6" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject id="n-accept" label="确认接单" node_id="accept" kind="service" emphasis="normal" level="neutral">
+          <mxCell style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#374151;strokeWidth=2;fontSize=16;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="143.0" y="579.76" width="204.0" height="70.4" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject id="n-wait" label="登记等待" node_id="wait" kind="async" emphasis="normal" level="neutral">
+          <mxCell style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#374151;strokeWidth=2;fontSize=16;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="360.0" y="576.76" width="250.72" height="76.4" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="e-0" value="校验" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;fontSize=12;fontFamily=Helvetica;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1.0;exitPerimeter=1;entryX=0.5;entryY=0.0;entryPerimeter=1" edge="1" source="n-request" target="n-check" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-1" value="充足" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;fontSize=12;fontFamily=Helvetica;labelBackgroundColor=#FFFFFF;exitX=0.32;exitY=1.0;exitPerimeter=1;entryX=0.5;entryY=0.0;entryPerimeter=1" edge="1" source="n-check" target="n-accept" parent="1">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="165.44" y="516.76" /><mxPoint x="245.0" y="516.76" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e-2" value="不足" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;fontSize=12;fontFamily=Helvetica;labelBackgroundColor=#FFFFFF;exitX=0.68;exitY=1.0;exitPerimeter=1;entryX=0.5;entryY=0.0;entryPerimeter=1" edge="1" source="n-check" target="n-wait" parent="1">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="324.56" y="516.76" /><mxPoint x="485.36" y="516.76" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="diagram-title" value="库存校验决定接单或等待" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;locked=1;movable=0;resizable=0;fontColor=#374151;fontSize=24;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="185.36" y="24.0" width="264.0" height="33.6" as="geometry" />
+        </mxCell>
+          </root>
+        </mxGraphModel>
+  </diagram>
+</mxfile>

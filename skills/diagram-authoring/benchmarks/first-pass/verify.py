@@ -69,20 +69,24 @@ def bind_nodes(candidate: dict, required: list[dict]) -> tuple[dict, list[str]]:
             for n in nodes]
     binding: dict[str, str] = {}
     missing: list[str] = []
+    used = set()
     for req in required:
-        hit = None
-        for alias in req["aliases"]:
-            key = _norm(alias)
-            for label, nid, node in pool:
-                if key == label or key == nid or key in label:
-                    hit = (alias, node)
-                    break
-            if hit:
-                break
-        if hit is None:
-            missing.append("/".join(req["aliases"][:3]))
-        else:
-            binding[hit[0]] = hit[1]["id"]
+        aliases = {_norm(alias) for alias in req["aliases"]}
+        hits = {node["id"] for label, nid, node in pool if label in aliases or nid in aliases}
+        if not hits:
+            hits = {node["id"] for label, _, node in pool if any(key in label for key in aliases if key)}
+        name = "/".join(req["aliases"][:3])
+        if len(hits) != 1:
+            missing.append(name + ("（匹配歧义）" if hits else ""))
+            continue
+        nid = next(iter(hits))
+        if nid in used or any(alias in binding and binding[alias] != nid for alias in req["aliases"]):
+            missing.append(name + "（节点或别名被重复绑定）")
+            continue
+        used.add(nid)
+        # Edges use manifest aliases, which may differ from the alias matched
+        # by the candidate. Register all of them so missing edges cannot skip.
+        binding.update({alias: nid for alias in req["aliases"]})
     return binding, missing
 
 
@@ -99,17 +103,19 @@ def gate_semantic(case: dict, candidate: dict) -> tuple[bool, list[str]]:
         want = req.get("kind")
         if not want or want not in kinds:
             continue
-        for alias, nid in binding.items():
-            if _norm(alias) in {_norm(a) for a in req["aliases"]}:
-                got = by_id.get(nid, {}).get("kind")
-                if got != want:
-                    problems.append(f"节点 {nid!r} 的 kind 是 {got!r}，清单要求 {want!r}")
+        matched = {nid for alias, nid in binding.items() if _norm(alias) in {_norm(a) for a in req["aliases"]}}
+        for nid in matched:
+            got = by_id.get(nid, {}).get("kind")
+            if got != want:
+                problems.append(f"节点 {nid!r} 的 kind 是 {got!r}，清单要求 {want!r}")
     edges = candidate.get("edges") or []
+    normalized = {_norm(alias): nid for alias, nid in binding.items()}
     for req in case.get("required_edges", []):
-        src = binding.get(req["from"])
-        dst = binding.get(req["to"])
+        src = normalized.get(_norm(req["from"]))
+        dst = normalized.get(_norm(req["to"]))
         if not src or not dst:
-            continue                       # 端点缺失已报过，不重复计
+            problems.append(f"必须边端点无法绑定：{req['from']} → {req['to']}")
+            continue
         ok = any(e.get("from") == src and e.get("to") == dst for e in edges)
         if not ok:
             problems.append(f"必须边缺失或方向反了：{req['from']} → {req['to']}")

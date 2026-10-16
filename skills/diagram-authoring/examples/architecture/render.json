@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "binary": "/Applications/draw.io.app/Contents/MacOS/draw.io",
+  "format": "png",
+  "out": "examples/architecture/drawio.png",
+  "engine": "draw.io desktop --export (官方命令行导出)",
+  "size": {
+    "width": 2121,
+    "height": 579
+  }
+}

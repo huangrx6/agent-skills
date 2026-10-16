@@ -33,7 +33,7 @@ XML，我们自己就能生成；导出也可以人在应用里点一下。没�
     python3 dev-tools/export_drawio.py x.drawio -o x.png --border 48 --embed
     python3 dev-tools/export_drawio.py x.drawio -o x.pdf --format pdf --crop
 
-- `-s/--scale` 倍率；`-b/--border` 四周留白（**按图内单位算**，**默认 48**）。
+- `-s/--scale` 倍率；`-b/--border` 四周留白（**按图内单位算**，**默认 80**）。
   官方默认是 0，导出来内容紧贴边框、像被框卡住 —— 外面的留白比图内节点自己的
   内边距（22~24）还小就不自然。实测官方 `-b N` 每边只加 0.75×N 图内单位
   （16→12 / 32→24 / 64→48，72dpi 换算），本工具已经替你换算过，写 48 就是每边 48。
@@ -54,9 +54,13 @@ from __future__ import annotations
 import argparse
 import glob
 import json
+import math
 import os
 import re
 import shutil
+import importlib.util
+import xml.etree.ElementTree as ET
+from pathlib import Path
 import subprocess
 import sys
 from typing import Sequence
@@ -75,9 +79,8 @@ BORDER_TO_DIAGRAM = 0.75
 #     --border 16 → 21.0 / 26.5 / 11.5 / 11.5 图内单位（左/上/右/下）
 #     --border 32 → 42.0 / 47.5 / 22.0 / 22.0
 #     --border 64 → 85.0 / 90.5 / 43.5 / 43.5
-# 「挤不挤」看的是**最紧的一边**，所以默认按右/下算：48 → 最紧 ≈33 图内单位
-# （≈1.4 × 图内内边距），四个方向都松得下来。
-DEFAULT_BORDER = 48.0
+# 与其他后端采用相同的名义留白 80；官方四边分配仍不均，不能承诺每边恰好 80。
+DEFAULT_BORDER = 80.0
 TIMEOUT_S = 180
 
 _MAC_CANDIDATES = (
@@ -119,7 +122,7 @@ def _px(value, name: str) -> int:
     """像素尺寸输入校验（与"未知 kind 不 fallback"同一条规矩：看不懂就报错）。"""
     try:
         got = int(value)
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError(f"{name} 要是整数像素（{value!r}）：{exc}") from None
     if got <= 0:
         raise ValueError(f"{name} 要大于 0，收到 {value!r}")
@@ -130,7 +133,8 @@ def build_command(binary: str, source: str, out: str, fmt: str, scale: float,
                   transparent: bool = False, crop: bool = False,
                   no_sandbox: bool = False, border: float | None = None,
                   embed: bool = False, size: str = "diagram",
-                  width: int | None = None, height: int | None = None) -> list[str]:
+                  width: int | None = None, height: int | None = None,
+                  page_index: int | None = None) -> list[str]:
     """拼官方导出命令。**纯函数**，方便测试（不依赖机器上有没有 draw.io）。
 
     参数语义照 `draw.io --help`（31.4.5）：`-x` 导出、`-f` 格式、`-o` 输出、
@@ -158,6 +162,10 @@ def build_command(binary: str, source: str, out: str, fmt: str, scale: float,
     if no_sandbox:
         # Docker / root 下 Electron 需要它；普通桌面会话不需要（也不该默认加）
         cmd.append("--no-sandbox")
+    if page_index is not None:
+        cmd += ["--page-index", str(page_index)]
+    elif fmt == "pdf":
+        cmd.append("--all-pages")
     cmd.append(source)
     return cmd
 
@@ -213,7 +221,7 @@ def export(source: str, out: str, fmt: str = "png", scale: float = 2.0,
            binary: str | None = None, border: float | None = DEFAULT_BORDER,
            embed: bool = False, size: str = "diagram",
            width: int | None = None, height: int | None = None,
-           aspect: str | None = None) -> dict:
+           aspect: str | None = None, page_index: int | None = None) -> dict:
     """跑一次官方导出。结果一律进回执，不抛业务异常。
 
     width/height = 官方 `--width/--height`（实测：单边精确、两边=装进这个框）；
@@ -232,11 +240,15 @@ def export(source: str, out: str, fmt: str = "png", scale: float = 2.0,
                            f"dev-tools/export_excalidraw.py x.excalidraw --aspect {aspect}；"
                            f"在 draw.io 上只能固定一边：--width 或 --height"}
     try:
+        if page_index is not None:
+            if isinstance(page_index, bool) or float(page_index) != int(page_index):
+                raise ValueError("page_index 必须是从 1 开始的整数")
+            page_index = _px(page_index, "page_index")
         if width is not None:
             width = _px(width, "width")
         if height is not None:
             height = _px(height, "height")
-    except ValueError as exc:
+    except (ValueError, TypeError, OverflowError) as exc:
         return {"ok": False, "stage": "input", "message": str(exc)}
     if fmt not in FORMATS:
         return {"ok": False, "stage": "input",
@@ -255,15 +267,31 @@ def export(source: str, out: str, fmt: str = "png", scale: float = 2.0,
         scale = float(scale)
     except (TypeError, ValueError) as exc:
         return {"ok": False, "stage": "input", "message": f"scale 不合法：{exc}"}
+    if not math.isfinite(scale) or scale <= 0:
+        return {"ok": False, "stage": "input", "message": "scale 必须为有限正数"}
     if border is not None:
         try:
             # 对外是"图内单位"，传给 draw.io 前按实测比例换算（见 BORDER_TO_DIAGRAM）
             border = float(border) / BORDER_TO_DIAGRAM
         except (TypeError, ValueError) as exc:
             return {"ok": False, "stage": "input", "message": f"border 不合法：{exc}"}
+        if not math.isfinite(border) or border < 0:
+            return {"ok": False, "stage": "input", "message": "border 必须为有限非负数"}
     if not os.path.exists(source):
         return {"ok": False, "stage": "input", "message": f"读不到 {source}"}
 
+    try:
+        module_spec = importlib.util.spec_from_file_location("_export_drawio_xml", Path(__file__).resolve().parents[1] / "scripts/drawio_xml.py")
+        codec = importlib.util.module_from_spec(module_spec)
+        module_spec.loader.exec_module(codec)
+        root = codec.parse(Path(source).read_text(encoding="utf-8"))
+        pages = len(root.findall("diagram"))
+        if page_index is not None and page_index > pages:
+            raise ValueError(f"页码 {page_index} 超出总页数 {pages}")
+        if pages > 1 and fmt != "pdf" and page_index is None:
+            raise ValueError("多页图片导出需明确 --page-index（从 1 开始），避免只导第一页；整本可导出 PDF")
+    except (ValueError, OSError, ET.ParseError) as exc:
+        return {"ok": False, "stage": "input", "message": str(exc)}
     declared = _declares_background(source)
     exe = find_binary(binary)
     if not exe:
@@ -273,7 +301,7 @@ def export(source: str, out: str, fmt: str = "png", scale: float = 2.0,
                            "不装也行：在 app.diagrams.net 打开这个 .drawio，"
                            "File → Export as 手动导出（references/drawio-backend.md 第五节）。"}
     cmd = build_command(exe, source, out, fmt, scale, transparent, crop,
-                        no_sandbox, border, embed, size, width, height)
+                        no_sandbox, border, embed, size, width, height, page_index)
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT_S)
     except subprocess.TimeoutExpired:
@@ -312,6 +340,7 @@ def export(source: str, out: str, fmt: str = "png", scale: float = 2.0,
 
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="draw.io 官方命令行导出（PNG/SVG/PDF）")
+    ap.add_argument("--page-index", type=int, help="页码从 1 开始；多页图片必须指定，PDF 不指定则全部页")
     ap.add_argument("source", help="*.drawio")
     ap.add_argument("-o", "--out", required=True, help="输出文件")
     ap.add_argument("-f", "--format", default=None,
@@ -322,7 +351,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     help=f"四周留白，图内单位（默认 {DEFAULT_BORDER:g}；官方默认 0 = 贴边）")
     ap.add_argument("-e", "--embed", action="store_true",
                     help="把图嵌进产物（PNG/SVG/PDF）—— 导出的图还能在 draw.io 里打开继续改")
-    ap.add_argument("--size", choices=D.MODE_CHOICES if False else SIZE_MODES,
+    ap.add_argument("--size", choices=SIZE_MODES,
                     default="diagram",
                     help="diagram（默认，按内容裁切）/ page（整页）")
     ap.add_argument("--width", help="最终宽度（像素；官方：fits into width，保留比例）")
@@ -341,7 +370,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                      transparent=args.transparent, crop=args.crop,
                      no_sandbox=args.no_sandbox, binary=args.binary,
                      border=args.border, embed=args.embed, size=args.size,
-                     width=args.width, height=args.height, aspect=args.aspect)
+                     width=args.width, height=args.height, aspect=args.aspect, page_index=args.page_index)
     if args.json:
         print(json.dumps(receipt, ensure_ascii=False, indent=2))
     if not receipt["ok"]:

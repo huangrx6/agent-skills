@@ -1,0 +1,465 @@
+{
+  "status": "pass",
+  "basis": "resolved-solid-color-pairs",
+  "checks": [
+    {
+      "subject": "neutral:text",
+      "foreground": "#292436",
+      "background": "#FCFAFF",
+      "minimum": 4.5,
+      "ratio": 14.471,
+      "passed": true
+    },
+    {
+      "subject": "neutral:boundary-0",
+      "foreground": "#8C8894",
+      "background": "#FCFAFF",
+      "minimum": 3,
+      "ratio": 3.34,
+      "passed": true
+    },
+    {
+      "subject": "neutral:boundary-1",
+      "foreground": "#8C8894",
+      "background": "#F7F5FA",
+      "minimum": 3,
+      "ratio": 3.198,
+      "passed": true
+    },
+    {
+      "subject": "neutral:boundary-2",
+      "foreground": "#8C8894",
+      "background": "#FCFAFF",
+      "minimum": 3,
+      "ratio": 3.34,
+      "passed": true
+    },
+    {
+      "subject": "surface-boundary:text",
+      "foreground": "#292436",
+      "background": "#FCFAFF",
+      "minimum": 4.5,
+      "ratio": 14.471,
+      "passed": true
+    },
+    {
+      "subject": "surface-boundary:boundary-0",
+      "foreground": "#8C8894",
+      "background": "#FCFAFF",
+      "minimum": 3,
+      "ratio": 3.34,
+      "passed": true
+    },
+    {
+      "subject": "surface-boundary:boundary-1",
+      "foreground": "#8C8894",
+      "background": "#F7F5FA",
+      "minimum": 3,
+      "ratio": 3.198,
+      "passed": true
+    },
+    {
+      "subject": "surface-boundary:boundary-2",
+      "foreground": "#8C8894",
+      "background": "#FCFAFF",
+      "minimum": 3,
+      "ratio": 3.34,
+      "passed": true
+    },
+    {
+      "subject": "primary:text",
+      "foreground": "#292436",
+      "background": "#D0C5E8",
+      "minimum": 4.5,
+      "ratio": 9.168,
+      "passed": true
+    },
+    {
+      "subject": "primary:boundary-0",
+      "foreground": "#7255B8",
+      "background": "#FCFAFF",
+      "minimum": 3,
+      "ratio": 5.465,
+      "passed": true
+    },
+    {
+      "subject": "primary:boundary-1",
+      "foreground": "#7255B8",
+      "background": "#F7F5FA",
+      "minimum": 3,
+      "ratio": 5.232,
+      "passed": true
+    },
+    {
+      "subject": "primary:boundary-2",
+      "foreground": "#7255B8",
+      "background": "#D0C5E8",
+      "minimum": 3,
+      "ratio": 3.462,
+      "passed": true
+    },
+    {
+      "subject": "critical:text",
+      "foreground": "#292436",
+      "background": "#F2D9DD",
+      "minimum": 4.5,
+      "ratio": 11.247,
+      "passed": true
+    },
+    {
+      "subject": "critical:boundary-0",
+      "foreground": "#C44343",
+      "background": "#FCFAFF",
+      "minimum": 3,
+      "ratio": 4.788,
+      "passed": true
+    },
+    {
+      "subject": "critical:boundary-1",
+      "foreground": "#C44343",
+      "background": "#F7F5FA",
+      "minimum": 3,
+      "ratio": 4.584,
+      "passed": true
+    },
+    {
+      "subject": "critical:boundary-2",
+      "foreground": "#C44343",
+      "background": "#F2D9DD",
+      "minimum": 3,
+      "ratio": 3.721,
+      "passed": true
+    },
+    {
+      "subject": "surface:text",
+      "foreground": "#292436",
+      "background": "#F7F5FA",
+      "minimum": 4.5,
+      "ratio": 13.855,
+      "passed": true
+    },
+    {
+      "subject": "surface:boundary",
+      "foreground": "#8C8894",
+      "background": "#F7F5FA",
+      "minimum": 3,
+      "ratio": 3.198,
+      "passed": true
+    },
+    {
+      "subject": "companion-1:text",
+      "foreground": "#292436",
+      "background": "#F2E9E6",
+      "minimum": 4.5,
+      "ratio": 12.553,
+      "passed": true
+    },
+    {
+      "subject": "companion-1:boundary-0",
+      "foreground": "#A37C50",
+      "background": "#FCFAFF",
+      "minimum": 3,
+      "ratio": 3.646,
+      "passed": true
+    },
+    {
+      "subject": "companion-1:boundary-1",
+      "foreground": "#A37C50",
+      "background": "#F7F5FA",
+      "minimum": 3,
+      "ratio": 3.491,
+      "passed": true
+    },
+    {
+      "subject": "companion-1:boundary-2",
+      "foreground": "#A37C50",
+      "background": "#F2E9E6",
+      "minimum": 3,
+      "ratio": 3.163,
+      "passed": true
+    },
+    {
+      "subject": "companion-2:text",
+      "foreground": "#292436",
+      "background": "#E7F0E6",
+      "minimum": 4.5,
+      "ratio": 12.861,
+      "passed": true
+    },
+    {
+      "subject": "companion-2:boundary-0",
+      "foreground": "#60934D",
+      "background": "#FCFAFF",
+      "minimum": 3,
+      "ratio": 3.506,
+      "passed": true
+    },
+    {
+      "subject": "companion-2:boundary-1",
+      "foreground": "#60934D",
+      "background": "#F7F5FA",
+      "minimum": 3,
+      "ratio": 3.357,
+      "passed": true
+    },
+    {
+      "subject": "companion-2:boundary-2",
+      "foreground": "#60934D",
+      "background": "#E7F0E6",
+      "minimum": 3,
+      "ratio": 3.116,
+      "passed": true
+    },
+    {
+      "subject": "accent:text",
+      "foreground": "#292436",
+      "background": "#E7E1F4",
+      "minimum": 4.5,
+      "ratio": 11.768,
+      "passed": true
+    },
+    {
+      "subject": "accent:boundary-0",
+      "foreground": "#7255B8",
+      "background": "#FCFAFF",
+      "minimum": 3,
+      "ratio": 5.465,
+      "passed": true
+    },
+    {
+      "subject": "accent:boundary-1",
+      "foreground": "#7255B8",
+      "background": "#F7F5FA",
+      "minimum": 3,
+      "ratio": 5.232,
+      "passed": true
+    },
+    {
+      "subject": "accent:boundary-2",
+      "foreground": "#7255B8",
+      "background": "#E7E1F4",
+      "minimum": 3,
+      "ratio": 4.444,
+      "passed": true
+    },
+    {
+      "subject": "critical:text",
+      "foreground": "#292436",
+      "background": "#F4DFE3",
+      "minimum": 4.5,
+      "ratio": 11.794,
+      "passed": true
+    },
+    {
+      "subject": "critical:boundary-0",
+      "foreground": "#C44343",
+      "background": "#FCFAFF",
+      "minimum": 3,
+      "ratio": 4.788,
+      "passed": true
+    },
+    {
+      "subject": "critical:boundary-1",
+      "foreground": "#C44343",
+      "background": "#F7F5FA",
+      "minimum": 3,
+      "ratio": 4.584,
+      "passed": true
+    },
+    {
+      "subject": "critical:boundary-2",
+      "foreground": "#C44343",
+      "background": "#F4DFE3",
+      "minimum": 3,
+      "ratio": 3.902,
+      "passed": true
+    },
+    {
+      "subject": "companion-1:primary:text",
+      "foreground": "#292436",
+      "background": "#E6D6C9",
+      "minimum": 4.5,
+      "ratio": 10.591,
+      "passed": true
+    },
+    {
+      "subject": "companion-1:primary:boundary-0",
+      "foreground": "#94714D",
+      "background": "#FCFAFF",
+      "minimum": 3,
+      "ratio": 4.284,
+      "passed": true
+    },
+    {
+      "subject": "companion-1:primary:boundary-1",
+      "foreground": "#94714D",
+      "background": "#F7F5FA",
+      "minimum": 3,
+      "ratio": 4.102,
+      "passed": true
+    },
+    {
+      "subject": "companion-1:primary:boundary-2",
+      "foreground": "#94714D",
+      "background": "#E6D6C9",
+      "minimum": 3,
+      "ratio": 3.136,
+      "passed": true
+    },
+    {
+      "subject": "companion-2:primary:text",
+      "foreground": "#292436",
+      "background": "#D0E5C9",
+      "minimum": 4.5,
+      "ratio": 11.239,
+      "passed": true
+    },
+    {
+      "subject": "companion-2:primary:boundary-0",
+      "foreground": "#58844A",
+      "background": "#FCFAFF",
+      "minimum": 3,
+      "ratio": 4.208,
+      "passed": true
+    },
+    {
+      "subject": "companion-2:primary:boundary-1",
+      "foreground": "#58844A",
+      "background": "#F7F5FA",
+      "minimum": 3,
+      "ratio": 4.029,
+      "passed": true
+    },
+    {
+      "subject": "companion-2:primary:boundary-2",
+      "foreground": "#58844A",
+      "background": "#D0E5C9",
+      "minimum": 3,
+      "ratio": 3.268,
+      "passed": true
+    },
+    {
+      "subject": "accent:primary:text",
+      "foreground": "#292436",
+      "background": "#D0C5E8",
+      "minimum": 4.5,
+      "ratio": 9.168,
+      "passed": true
+    },
+    {
+      "subject": "accent:primary:boundary-0",
+      "foreground": "#7255B8",
+      "background": "#FCFAFF",
+      "minimum": 3,
+      "ratio": 5.465,
+      "passed": true
+    },
+    {
+      "subject": "accent:primary:boundary-1",
+      "foreground": "#7255B8",
+      "background": "#F7F5FA",
+      "minimum": 3,
+      "ratio": 5.232,
+      "passed": true
+    },
+    {
+      "subject": "accent:primary:boundary-2",
+      "foreground": "#7255B8",
+      "background": "#D0C5E8",
+      "minimum": 3,
+      "ratio": 3.462,
+      "passed": true
+    },
+    {
+      "subject": "critical:primary:text",
+      "foreground": "#292436",
+      "background": "#EABFC3",
+      "minimum": 4.5,
+      "ratio": 9.1,
+      "passed": true
+    },
+    {
+      "subject": "critical:primary:boundary-0",
+      "foreground": "#C44343",
+      "background": "#FCFAFF",
+      "minimum": 3,
+      "ratio": 4.788,
+      "passed": true
+    },
+    {
+      "subject": "critical:primary:boundary-1",
+      "foreground": "#C44343",
+      "background": "#F7F5FA",
+      "minimum": 3,
+      "ratio": 4.584,
+      "passed": true
+    },
+    {
+      "subject": "critical:primary:boundary-2",
+      "foreground": "#C44343",
+      "background": "#EABFC3",
+      "minimum": 3,
+      "ratio": 3.011,
+      "passed": true
+    },
+    {
+      "subject": "edge",
+      "foreground": "#7D7A86",
+      "background": "#FCFAFF",
+      "minimum": 3,
+      "ratio": 4.051,
+      "passed": true
+    },
+    {
+      "subject": "edge",
+      "foreground": "#7D7A86",
+      "background": "#F7F5FA",
+      "minimum": 3,
+      "ratio": 3.879,
+      "passed": true
+    },
+    {
+      "subject": "canvas:text",
+      "foreground": "#292436",
+      "background": "#FCFAFF",
+      "minimum": 4.5,
+      "ratio": 14.471,
+      "passed": true
+    }
+  ],
+  "adjustments": [
+    {
+      "subject": "neutral",
+      "source": "#97939F",
+      "derived": "#8C8894"
+    },
+    {
+      "subject": "surface-boundary",
+      "source": "#97939F",
+      "derived": "#8C8894"
+    },
+    {
+      "subject": "companion-1",
+      "source": "#B88B55",
+      "derived": "#A37C50"
+    },
+    {
+      "subject": "companion-2",
+      "source": "#72B855",
+      "derived": "#60934D"
+    },
+    {
+      "subject": "companion-1:primary",
+      "source": "#B88B55",
+      "derived": "#94714D"
+    },
+    {
+      "subject": "companion-2:primary",
+      "source": "#72B855",
+      "derived": "#58844A"
+    }
+  ],
+  "limits": [
+    "不检查透明度、图标像素、纹理或色觉缺陷；不代表审美或完整无障碍验收"
+  ]
+}

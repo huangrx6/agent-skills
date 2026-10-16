@@ -1,0 +1,52 @@
+{
+  "excalidraw": {
+    "preset": "doc-inline",
+    "target": {
+      "width": 960,
+      "height": null,
+      "min_text": 10,
+      "padding": 32
+    },
+    "basis": "editable_geometry_estimate",
+    "render_verified": false,
+    "pages": [
+      {
+        "page": "scene",
+        "content_size": [
+          836.5,
+          581.68
+        ],
+        "fit_scale": 1.0,
+        "min_viewing_px": 16.0,
+        "undersized": [],
+        "status": "pass"
+      }
+    ],
+    "advice": "文字过小时拆视图、缩短非必要说明或在编辑器调整字号并重新布局；提高 PNG 倍率不能提高观看字号。"
+  },
+  "drawio": {
+    "preset": "doc-inline",
+    "target": {
+      "width": 960,
+      "height": null,
+      "min_text": 10,
+      "padding": 32
+    },
+    "basis": "editable_geometry_estimate",
+    "render_verified": false,
+    "pages": [
+      {
+        "page": "质量审查覆盖事实、结构与呈现",
+        "content_size": [
+          836.5,
+          581.68
+        ],
+        "fit_scale": 1.0,
+        "min_viewing_px": 16.0,
+        "undersized": [],
+        "status": "pass"
+      }
+    ],
+    "advice": "文字过小时拆视图、缩短非必要说明或在编辑器调整字号并重新布局；提高 PNG 倍率不能提高观看字号。"
+  }
+}

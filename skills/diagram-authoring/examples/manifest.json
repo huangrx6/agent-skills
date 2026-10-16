@@ -1,0 +1,504 @@
+{
+  "schema_version": 1,
+  "review_date": "2026-10-16",
+  "review_scope": "author-agent visual inspection; not independent evaluation",
+  "environment": {
+    "platform": "macOS",
+    "drawio": "31.4.5",
+    "chrome": "154.0.8037.98",
+    "excalidraw_utils": "0.1.5",
+    "font_resolution": "system fallback; actual fonts not instrumented"
+  },
+  "generator_inputs": {
+    "scripts/authoring.py": "565e8339080fb0fcdc9c448217664417a90adc5d5ce5e6c14bb07a397a20a72c",
+    "scripts/check_drawio.py": "b5ba045b797665db8192ed02ffeb4ff7033718320d336b46bc7dcfab421c29c7",
+    "scripts/check_layout.py": "772ee69de362a06ed8970d08dbbc3b90e6513b814d659f1d5f19909047ed8325",
+    "scripts/check_presentation.py": "3684644ecc2cd5f7f03e1c45da6a2b84d91b310e69b34644fbf7a969c35eeef6",
+    "scripts/check_semantics.py": "31512698dce111414ef1fae99cf8360f6a091df8454cfa896c79ab275bb9159d",
+    "scripts/direction_preview.py": "e4e8c398439ef67a0a03182101e8efc60f060e83f0747692b4640e899fae67b2",
+    "scripts/emit_drawio.py": "1e212911ddc01fdcf5bc5120c9b287a7bdcbf08b8e99129a6d1ac28e370b31a6",
+    "scripts/emit_excalidraw.py": "4b9b50871b2a98ed6ea76bd49c409f7426d99ef92c53fc8280d9982c7960ee5e",
+    "scripts/guide.py": "61e83879f5d4520c0078466cbe36057e3c2bb95e5507a883dc49bc77d399b439",
+    "scripts/icons.py": "5c05ee7acea366101b4bb75c3d40e0cbbdb342da6a995f3aa0cffdc8ac024db0",
+    "scripts/icons_fetch.py": "2732ca063cb6f86b3ff773d3305ac794049b22682f278895ec294a0c91f7813e",
+    "scripts/layout.py": "b097fb753e209e3f3432979303b5a9ae835b0647ea09ed7a951eb0af449d2c0a",
+    "scripts/open_excalidraw_com.py": "66c0e5a2d7a6ad5eadce10643100a1294d4d47cfd4b583e3ed9db2855db977d9",
+    "scripts/palette.py": "15018f7b3ec657d5d836dfa5769e8ca7ac777f1609713bcf5f2b0cbb9d8f23a7",
+    "scripts/presentation.py": "b6cdf52c3fea89096f636375bb7f534a0a999c77624fce12b3cd0a8130b8286e",
+    "scripts/scheme_preview.py": "0c0652b393e5f27067c52c103da59d87d3bff3affee07e12f9739d61a30265af",
+    "scripts/shapes.py": "5f5a61a857aca9f51bf6f52dc14052ab825ede507beb2475d72e937d66cbec42",
+    "scripts/sigils.py": "832690e8d363c97cbc148bdf7bf24581faa098f5913642773b8c476b052cb117",
+    "scripts/text_metrics.py": "07d1baab776da301b02598b5c2f15985774f13c2be862ae4db8bb3348c2ac4d2",
+    "scripts/validate_spec.py": "50fbed05aedcd9a336d631ffc49e10eba773c1f5652889b6305babd3ce3e7f8e",
+    "dev-tools/export_excalidraw.py": "da1b4a2e6321745123fd6cfe2237ab76f8108bfb547a20bb0cb41218901a609a",
+    "dev-tools/export_drawio.py": "68751ca1f9019dfd83363bd0c8f2c20159689d30bb4866e6c42de5f211bb1ac1",
+    "dev-tools/check_examples.py": "13dc7c0ef9179f761ddc830d53e5175508b5bdb4196a4b9dba9e420582b2d3a8",
+    "dev-tools/check_render.py": "8b7bc5dd0d9a59577fa0f4a64b4fbfb23b6bef602fa5ee9736c763ca8ed87f3e",
+    "dev-tools/render_probe.js": "76f994008fd3c48bc47453e4c989aff5681459af5b008282a461f482f2a8a826",
+    "scripts/color_design.py": "80d1f0d4058e45362b9ba1790db56a30401e7fd654dded03c502a77d62c2d653",
+    "dev-tools/check_render_regressions.py": "0af50ed85a0d981c7472d6d3d668a4706532a1a6e1d1acadccd99a20ff2e1cf1",
+    "scripts/readable_routing.py": "422a64863b1a6c8a3e5a4efee20f48d7e8490bbfa9327d36806d0ad89f98ee5a",
+    "scripts/split_views.py": "1176cc1010efa87d9eb85fb031296bbc3c3db7f3e525d69120ce5a3f482d74fe",
+    "scripts/output_paths.py": "a0bc1cdd9894cb45d9c3a67368983a057bf01a85fa3f416d3a07882073e1a7cf",
+    "dev-tools/sync_exports.py": "68883deb3f507e621ea85f2a192735f30c96143223e545af1ef60c8099d3c7ca",
+    "benchmarks/first-pass/verify.py": "73e4eabaf36cbbcba93136294139d771ee00a4951c5d75f2c5e40b12d1ec0e66",
+    "scripts/drawio_xml.py": "2e95f1fb11456954cd37c6bd9129c6d77ca3ee7a7b299d84f5c013998587a00c",
+    "scripts/emit_mermaid.py": "fe21f4e2fed41e0bba5bf2250fe7c98a5252fa24b97761d9853b1ecd1d4cb164",
+    "scripts/check_mermaid.py": "fe3287949780c8ad612103ffdc173a343d7922ad27b540da5a1517becda0c6e1",
+    "dev-tools/export_mermaid.py": "aee106129138671b9ba6f31c1347119d7a92b0237d452c25d49325be8293abe3"
+  },
+  "examples": [
+    {
+      "type": "architecture",
+      "source": "project-authored fictional example",
+      "preset": "doc-wide",
+      "files": {
+        "examples/architecture/diagram.drawio": "3cbde37a5c37f929c33f3e7d373eafa9d0fe1217cf4c88abd47bdf484c0c28f9",
+        "examples/architecture/diagram.excalidraw": "2ac9833f2188ba5fa4a4bd83886f7e285b28e5a12ea16cacd3ece79681762acb",
+        "examples/architecture/drawio.png": "4e064b9e264090b263e5c019ec8bb3717bd2db0516a2bc14df8ce07ef455a864",
+        "examples/architecture/excalidraw.png": "3cf48d87b0674a0d5436ad9878804337ae93376ced8c03506052d7ec87ba40c4",
+        "examples/architecture/generation.json": "d3fb1c872933d79bb87fd081f989778600491544801e8a50e7dcb9fbce556ec5",
+        "examples/architecture/presentation.json": "e4c8aa42939ee0279cd072ff4b126b0fb99bac8551abfee3aac0eedc968c9020",
+        "examples/architecture/render-excalidraw.json": "8b9a6bcad5e6d9d5f66c0c7ef363ec373676b29e9d1c82739bebea0d6c660b42",
+        "examples/architecture/render.json": "50c5e7ade1a5b3be5b3676dbafc6c7300b5f69f9d747d96db0f6b7bbc89a23f8",
+        "examples/architecture/semantics.json": "c26c0bc807e08f9602b738eb5f2ac1aa5cc3e128de95a49f9e28fc9febfeca31",
+        "examples/architecture/source.diagram.json": "c943278cb2a73234b6d8704c4edf882aaeeac1c89cad4d64e74c4e3143e9729f"
+      },
+      "visual_review": {
+        "excalidraw": {
+          "status": "reviewed",
+          "reviewer": "author-agent",
+          "date": "2026-10-16",
+          "observations": "4 节点 / 3 边；客户端在系统边界外，订单服务是焦点，中英文标签可读。",
+          "limits": "作者目视核对当前 PNG；未验证编辑后重排、字体跨机一致性或对比度标准。"
+        },
+        "drawio": {
+          "status": "reviewed",
+          "reviewer": "author-agent",
+          "date": "2026-10-16",
+          "observations": "4 节点 / 3 边；客户端在系统边界外，订单服务是焦点，中英文标签可读。",
+          "limits": "作者目视核对当前 PNG；未验证编辑后重排、字体跨机一致性或对比度标准。"
+        }
+      }
+    },
+    {
+      "type": "dependency",
+      "source": "project-authored fictional example",
+      "preset": "doc-inline",
+      "files": {
+        "examples/dependency/diagram.drawio": "8cdf9554a9b54013fa628603b6aef5190c07701ea5282944cb11c76a54361763",
+        "examples/dependency/diagram.excalidraw": "aefa18a41a70923347026b2f2995092bca67448660636e680255d49932d33db0",
+        "examples/dependency/drawio.png": "b88f163aaaaa2fde1cd68d2a4549857ed4f094ada8eaddcb67361de9d311c19d",
+        "examples/dependency/excalidraw.png": "af1e613576e83f6b0f62c7b058ec527df4290ba5525ae1c01e01790bfacca433",
+        "examples/dependency/generation.json": "3bcea6fc503da505686b426c600d89d2c899b28a2ac05eee9f0d7b8ac962e757",
+        "examples/dependency/presentation.json": "621ee4614ec80a675e5a86ca13dc286dc54f4f9ffc3200a6be31664dddaf95c0",
+        "examples/dependency/render-excalidraw.json": "17ef80a3a14d2aa5b477a6e24cead9c2e02d3fc527cc37833cc4ac091fbee02d",
+        "examples/dependency/render.json": "396de38a67c227e7d182139335b8db07d99c4e9256cb6e7342ae9b2ac4bf62f9",
+        "examples/dependency/semantics.json": "c26c0bc807e08f9602b738eb5f2ac1aa5cc3e128de95a49f9e28fc9febfeca31",
+        "examples/dependency/source.diagram.json": "de9e08e7877e02568f7190ee0d9b7570f870b96f4fb602f2528f88d174427cba"
+      },
+      "visual_review": {
+        "excalidraw": {
+          "status": "reviewed",
+          "reviewer": "author-agent",
+          "date": "2026-10-16",
+          "observations": "4 节点 / 3 边；依赖方→被依赖方；驱动使用软件节点，方向卡片位于节点下方。",
+          "limits": "作者目视核对当前 PNG；未验证编辑后重排、字体跨机一致性或对比度标准。"
+        },
+        "drawio": {
+          "status": "reviewed",
+          "reviewer": "author-agent",
+          "date": "2026-10-16",
+          "observations": "4 节点 / 3 边；依赖方→被依赖方；驱动使用软件节点，方向卡片位于节点下方。",
+          "limits": "作者目视核对当前 PNG；未验证编辑后重排、字体跨机一致性或对比度标准。"
+        }
+      }
+    },
+    {
+      "type": "flow",
+      "source": "project-authored fictional example",
+      "preset": "doc-inline",
+      "files": {
+        "examples/flow/diagram.drawio": "11b8c9f075858c9ff0b87286bb766d6ad3f4a723aaea75717686d24fbcac88be",
+        "examples/flow/diagram.excalidraw": "f3513551aba3eecdf1dbb771685c18558aeda06ee8e028ac5bd671cb410310c3",
+        "examples/flow/drawio.png": "939e2dfd5d08fe75d93b3e6feb300434ff7aa445b59bd3ff9f9980a2d811fbf7",
+        "examples/flow/excalidraw.png": "902517d5eeae1225afc556566761ba5ff95132828349e50f499f4d1f5d28398e",
+        "examples/flow/generation.json": "2bd1be651d97e6c2a30623255a902a6bdb9ea904c8a1d642385ed3f2be20eee0",
+        "examples/flow/presentation.json": "e0a0932691193782fdf9deebc008f4008bf00111fc9e0bd45e8236dc9eac884c",
+        "examples/flow/render-excalidraw.json": "e4bac5b91e5c8a819f5ebdb68544b4c92fbc96e9c74b12679e74f83484844ee8",
+        "examples/flow/render.json": "840cd35b55245596ec157004f4e7b0c91ab302ebbd32df975055e857386b2f4a",
+        "examples/flow/semantics.json": "c26c0bc807e08f9602b738eb5f2ac1aa5cc3e128de95a49f9e28fc9febfeca31",
+        "examples/flow/source.diagram.json": "db63de4ac877e29066953652fbde9b0c16724f8ec718b56bae2b9501487cd75d"
+      },
+      "visual_review": {
+        "excalidraw": {
+          "status": "reviewed",
+          "reviewer": "author-agent",
+          "date": "2026-10-16",
+          "observations": "4 节点 / 3 边；充足→接单、不足→等待；椭圆与菱形端点相接，没有穿过标签。",
+          "limits": "作者目视核对当前 PNG；未验证编辑后重排、字体跨机一致性或对比度标准。"
+        },
+        "drawio": {
+          "status": "reviewed",
+          "reviewer": "author-agent",
+          "date": "2026-10-16",
+          "observations": "4 节点 / 3 边；充足→接单、不足→等待；椭圆与菱形端点相接，没有穿过标签。",
+          "limits": "作者目视核对当前 PNG；未验证编辑后重排、字体跨机一致性或对比度标准。"
+        }
+      }
+    },
+    {
+      "type": "mindmap",
+      "source": "project-authored fictional example",
+      "preset": "doc-inline",
+      "files": {
+        "examples/mindmap/diagram.drawio": "c33e4e44e45abbfcb4315bd873a4aedd6b5515217e24f0c9fd7f58d6756e91a5",
+        "examples/mindmap/diagram.excalidraw": "9fe5d2036076a365a261aa67b7ecb60b5de7b6eca39f367c0c6eccdd1a6e099d",
+        "examples/mindmap/drawio.png": "eff4cb43d5a0ec9e7cd5fd13ddd271ba8f589ec6fbf3f88cfec607aceb06ad27",
+        "examples/mindmap/excalidraw.png": "9d680df54738c43d5770409ccdf57b1e0ac05038c11d934b7aaca0eec47d01ea",
+        "examples/mindmap/generation.json": "7ea4b74f36ed35d2b65c4b0ef38d4d50fea20a4b93606ea001c7f70ffbc6e6a5",
+        "examples/mindmap/presentation.json": "6ee7ad4cfcc3d6b2e84917f38d5a72ff2a27b9bddc7a357ea1cec1e21988bab7",
+        "examples/mindmap/render-excalidraw.json": "0702de46bc55d9b1376ff2456afbfd7207f9ffb73e45a7316d4ac00e21deccf7",
+        "examples/mindmap/render.json": "7f430a120a0e7658edd99db4107c8e2eee42a0fb896bcbb41d815c6b1696ad41",
+        "examples/mindmap/semantics.json": "c26c0bc807e08f9602b738eb5f2ac1aa5cc3e128de95a49f9e28fc9febfeca31",
+        "examples/mindmap/source.diagram.json": "ade768cd61ce9ecd5c8882be7510480bda3d7364d63255be09b1655f6ce762f5"
+      },
+      "visual_review": {
+        "excalidraw": {
+          "status": "reviewed",
+          "reviewer": "author-agent",
+          "date": "2026-10-16",
+          "observations": "5 节点 / 4 边；根的三个分支齐全，箭头方向属于关系结构子主题。",
+          "limits": "作者目视核对当前 PNG；未验证编辑后重排、字体跨机一致性或对比度标准。"
+        },
+        "drawio": {
+          "status": "reviewed",
+          "reviewer": "author-agent",
+          "date": "2026-10-16",
+          "observations": "5 节点 / 4 边；根的三个分支齐全，箭头方向属于关系结构子主题。",
+          "limits": "作者目视核对当前 PNG；未验证编辑后重排、字体跨机一致性或对比度标准。"
+        }
+      }
+    },
+    {
+      "type": "network",
+      "source": "project-authored fictional example",
+      "preset": "doc-inline",
+      "files": {
+        "examples/network/diagram.drawio": "b3047d8b4c02265c5c9aa2592fe61ebd57064f3bdaa9cfaa4addbcb20ce2995c",
+        "examples/network/diagram.excalidraw": "fb884f798023c49bfb196c9d2e4bfef4b2111b92b2bcc881908d74ed2e1acb34",
+        "examples/network/drawio.png": "18cb04c98b1367ba0b0877291dd1fb81436bd2a18f21158c18bd150e212e6957",
+        "examples/network/excalidraw.png": "295cec48cdba3c99798b1f3f3ff4d408d263d77212d69a390a5232aeec7a9aff",
+        "examples/network/generation.json": "bf62bd580adba788dcd4330fc4af860269fd98c6272541fbb072e1f85a802294",
+        "examples/network/presentation.json": "31e7cdeb70fbef5940cef06531c5503ff0b3d7d41b9be58ba22971b01c7f9827",
+        "examples/network/render-excalidraw.json": "7c39496deb498ca5a0c96d235b1a7a7d683c9760afaa9d3ca7b298b50d4a592c",
+        "examples/network/render.json": "de4e278e18af51a1368e3e164ae9d662d08b073dd7468de84ef8d7bfe9c3aa20",
+        "examples/network/semantics.json": "c26c0bc807e08f9602b738eb5f2ac1aa5cc3e128de95a49f9e28fc9febfeca31",
+        "examples/network/source.diagram.json": "e105ac5d4ba920302e723c556b4b53846e61e0aacc7e7d7b479b356344873772"
+      },
+      "visual_review": {
+        "excalidraw": {
+          "status": "reviewed",
+          "reviewer": "author-agent",
+          "date": "2026-10-16",
+          "observations": "4 节点 / 5 边；A→B→C→D→A 与 A→C 齐全，说明卡片不遮挡节点。",
+          "limits": "作者目视核对当前 PNG；未验证编辑后重排、字体跨机一致性或对比度标准。"
+        },
+        "drawio": {
+          "status": "reviewed",
+          "reviewer": "author-agent",
+          "date": "2026-10-16",
+          "observations": "4 节点 / 5 边；A→B→C→D→A 与 A→C 齐全，说明卡片不遮挡节点。",
+          "limits": "作者目视核对当前 PNG；未验证编辑后重排、字体跨机一致性或对比度标准。"
+        }
+      }
+    },
+    {
+      "type": "state",
+      "source": "project-authored fictional example",
+      "preset": "doc-wide",
+      "files": {
+        "examples/state/diagram.drawio": "d239deb96c62336cde81202a7e9ec842093b650b45f0da4ab60d2ef3299b1ae1",
+        "examples/state/diagram.excalidraw": "59e52e9aebfa9bf509f5ba2fec3b9a96f1e74542568a9b3b63b2b077c9f3b9e1",
+        "examples/state/drawio.png": "0c519ade3b743a89e91522aafa256e0c22fca418c1d5152e635e842323de4f50",
+        "examples/state/excalidraw.png": "8edd0ae8f08e2bcca5e8474439f609738adfa2da5188681ef353b8c43612ca89",
+        "examples/state/generation.json": "1cf69fe826afa636286e229c54342b61d2c7df6facbe37b4c0bb7c32705912db",
+        "examples/state/presentation.json": "7bdaaf83c6e6e267fd41fa0b89b59a7f3ed87b9d89f27f662c00355c55c3990f",
+        "examples/state/render-excalidraw.json": "7644d9b8813717edef1bcfc18793311a9ed9aa8c2b875c5c00a3f1c458e1f217",
+        "examples/state/render.json": "dfc0d096ba10aa706be59f5d37db6a6935e164e71547dc64928e7cc859bda1be",
+        "examples/state/semantics.json": "c26c0bc807e08f9602b738eb5f2ac1aa5cc3e128de95a49f9e28fc9febfeca31",
+        "examples/state/source.diagram.json": "64323a03e30f969e1cc4c870410df53a4bea7c697156bacc343ff6c37e1cbcab"
+      },
+      "visual_review": {
+        "excalidraw": {
+          "status": "reviewed",
+          "reviewer": "author-agent",
+          "date": "2026-10-16",
+          "observations": "4 状态 / 4 转移；提交与退回各保留原方向及标签；发布后归档。",
+          "limits": "作者目视核对当前 PNG；未验证编辑后重排、字体跨机一致性或对比度标准。"
+        },
+        "drawio": {
+          "status": "reviewed",
+          "reviewer": "author-agent",
+          "date": "2026-10-16",
+          "observations": "4 状态 / 4 转移；提交与退回各保留原方向及标签；发布后归档。",
+          "limits": "作者目视核对当前 PNG；未验证编辑后重排、字体跨机一致性或对比度标准。"
+        }
+      }
+    }
+  ],
+  "maintenance": {
+    "date": "2026-10-16",
+    "note": "分组标题留白更新后，重新导出并目检 4 份文档/投影与 2 份分区样例；6 份开放配色产物未变。624 项回归包含 12 份既有 fit 可编辑输出兼容检查。",
+    "delivery_paths": "2026-10-16：仅更新 CLI 默认输出路径和文件组织；新增 .source 约定，渲染函数与既有产物不变。路径回归及两后端原有回归通过；未重复渲染或更改目检结论。",
+    "export_padding": "2026-10-16：Excalidraw 默认留白 32→80；私有成品已官方重导出并目检。公开样例保留此前审查的导出边距，未重新导出，不表示采用新默认。原生图与渲染实现未变。",
+    "on_demand_exports": "2026-10-16：默认原生交付，新增按已有格式同步；SVG-only 跳过 PNG。648 项回归中 647 通过、1 可选图标库缺失跳过；临时公开样例完成实际 SVG-only、新文字同步、显式新增 PNG 与官方 SVG 检查。现有公开产物未变、未重导出，不冒充新目检。",
+    "drawio_and_mermaid": {
+      "date": "2026-10-16",
+      "note": "新增 Mermaid 文本/官方语法/按需导出；draw.io 压缩页回读、名义留白 80、显式图片页码及 PDF 全页。公开历史样例未重绘，哈希更新是脚本审查记录，不宣称旧截图已用新参数生成。",
+      "validation": "665 tests: 664 passed, 1 optional library skipped. Temporary official Mermaid architecture/flow/state/dependency/regions and special-character samples rendered; draw.io region/stacked and compressed multipage exports exercised. Stacked draw.io official SVG check passed. Source-only / SVG-only / refresh-existing paths exercised.",
+      "limits": "Mermaid owns layout; four spec types only. State unsupported fields and icon/rank/pin rejected. Native XML geometry checks do not support arbitrary nested editor transforms."
+    },
+    "long_text": {
+      "date": "2026-10-16",
+      "note": "长说明自适应扩宽、段落间距与转义；Mermaid 显式换行及图后说明区。历史公开产物保留旧版卡片排版，未重新渲染；冻结回归继续对比业务节点和连线，新增卡片行为测试。",
+      "validation": "670 tests: 669 passed, 1 optional library skipped. Private 28-node/38-edge sample rendered in temporary files with official Mermaid 11.12.0 and draw.io 31.4.5; author inspected long notes. draw.io official SVG check passed; non-card XML cells unchanged. Mermaid native SVG notes inspected and HTML-label rendering exercised.",
+      "limits": "整图适应窗口仍可能字号偏小；不证明复杂图无交叉。Mermaid 宿主可能覆盖配置。"
+    }
+  },
+  "variants": [
+    {
+      "name": "document-versus-slide",
+      "source": "project-authored fictional example",
+      "files": {
+        "examples/presentation/README.md": "8b1062d7e462bef0eb222f1741bd43e3e5206ece1fff36436f3a4a10064dc843",
+        "examples/presentation/document-drawio-check.json": "d956ddc05e961701b9d05788a410373ed94c19a771d02bb9700290419b151a3f",
+        "examples/presentation/document-drawio-export.json": "3f3bef3a09a3da9faf31a2cae953f0b525d9a4dae61f122ee7ae795a3d1253b5",
+        "examples/presentation/document-drawio.png": "11c5a355ae918905d9ea99c44a1f0324365bd2fcceeffe3b0d59903f16966f6a",
+        "examples/presentation/document-drawio.svg": "9948b3e5e1c8f3ca5879852e0d4ee5959d8423e00308cb25d55a3850f2354be4",
+        "examples/presentation/document-excalidraw-check.json": "380d850e34b2c20af767e8eb9a13aeffd7f0a2db573601015f9ecb72d27d22f7",
+        "examples/presentation/document-excalidraw-export.json": "a4eb35e36f1c3b636660d9791acaf28dd5e749fb4e560aecf6d69debc9cb8324",
+        "examples/presentation/document-excalidraw.png": "2589262593f856b424bc8aeb42840eb87a7736ba512db24e5742d2bdfbd9abd1",
+        "examples/presentation/document-excalidraw.svg": "234855a015bfd41e1c947c7c807314f58c39db79dff767f5d1af0c22a3d21f44",
+        "examples/presentation/document.drawio": "8a0f7a9e53dc3d7964337a998086a7a855dc68a6edd373c03ab2b13ec3f82e6b",
+        "examples/presentation/document.excalidraw": "3d365ab21cb61afd6da413e26eab95e46aa88816c54f9b6065068e119502b8c3",
+        "examples/presentation/render-occlusion-regressions.json": "de64e1c5dfc3af7ad7d769c41f65279009aca9e4e869ebff0a454659206af0d4",
+        "examples/presentation/render-regressions.json": "50e6b3462374217519364634d2d50b13392f5e1a1e1f5c319b77fee784981d5e",
+        "examples/presentation/slide-drawio-check.json": "fe1baf631fcf0908886522bcad921c7e7d85b669d496dcded6a9cabfcedf1453",
+        "examples/presentation/slide-drawio-export.json": "4115901d26a24fc0189d8643aff119b87772c88bd8134a5da6728173b90aa24e",
+        "examples/presentation/slide-drawio.png": "b62168762c63c27a9f8f6e636d10e9bdc983cb6918378a75f365edd08df53fc8",
+        "examples/presentation/slide-drawio.svg": "1a18fc0b0cde2c410e8e8fe2b7aadd4f18b4a95a7e689a566fd8891c8d4d39b1",
+        "examples/presentation/slide-excalidraw-check.json": "15115dc6f09dd112b20152da55159c4ed9ea5c512d85d0bd1f0034fe39542ce8",
+        "examples/presentation/slide-excalidraw-export.json": "a096a98870196d7ef95ad2918e0fc12823298929a0ebee970fdfad528c5e61ba",
+        "examples/presentation/slide-excalidraw.png": "28915164289cdffce1cb2c7dcc0da41122449ec58454a5af804596a857b2c31e",
+        "examples/presentation/slide-excalidraw.svg": "78a4775e5b110980235ad0a59346486627f655260251102584c75fe2053aa5ec",
+        "examples/presentation/slide.drawio": "4346bc9d689877df1de5a298cdf0c2555ad701f6dbc73217b5b1234cd024e906",
+        "examples/presentation/slide.excalidraw": "b748501cce9a06d84bfc27092aae709b61638139385a181c2ad17acd3dbd011a",
+        "examples/presentation/source.diagram.json": "0d2a6adb808c0754de9646749362db473cd1dbe098c43a13e6414bbca791ba1b"
+      },
+      "renders": [
+        {
+          "preset": "doc-wide",
+          "backend": "excalidraw",
+          "artifact": "examples/presentation/document.excalidraw",
+          "svg": "examples/presentation/document-excalidraw.svg",
+          "png": "examples/presentation/document-excalidraw.png",
+          "check": "examples/presentation/document-excalidraw-check.json",
+          "visual_review": "reviewed",
+          "reviewer": "author-agent",
+          "observations": "分组标题内边距增加后复核当前官方 PNG；节点、关系和注释完整可见，未见文字遮挡。作者自检，非独立评审。"
+        },
+        {
+          "preset": "doc-wide",
+          "backend": "drawio",
+          "artifact": "examples/presentation/document.drawio",
+          "svg": "examples/presentation/document-drawio.svg",
+          "png": "examples/presentation/document-drawio.png",
+          "check": "examples/presentation/document-drawio-check.json",
+          "visual_review": "reviewed",
+          "reviewer": "author-agent",
+          "observations": "分组标题内边距增加后复核当前官方 PNG；节点、关系和注释完整可见，未见文字遮挡。作者自检，非独立评审。"
+        },
+        {
+          "preset": "slide-16x9",
+          "backend": "excalidraw",
+          "artifact": "examples/presentation/slide.excalidraw",
+          "svg": "examples/presentation/slide-excalidraw.svg",
+          "png": "examples/presentation/slide-excalidraw.png",
+          "check": "examples/presentation/slide-excalidraw-check.json",
+          "visual_review": "reviewed",
+          "reviewer": "author-agent",
+          "observations": "分组标题内边距增加后复核当前官方 PNG；节点、关系和注释完整可见，未见文字遮挡。作者自检，非独立评审。"
+        },
+        {
+          "preset": "slide-16x9",
+          "backend": "drawio",
+          "artifact": "examples/presentation/slide.drawio",
+          "svg": "examples/presentation/slide-drawio.svg",
+          "png": "examples/presentation/slide-drawio.png",
+          "check": "examples/presentation/slide-drawio-check.json",
+          "visual_review": "reviewed",
+          "reviewer": "author-agent",
+          "observations": "分组标题内边距增加后复核当前官方 PNG；节点、关系和注释完整可见，未见文字遮挡。作者自检，非独立评审。"
+        }
+      ]
+    },
+    {
+      "name": "open-project-colors",
+      "source": "Happy Hues palette 14 (referenced colors only); arbitrary seed; project-authored custom design",
+      "files": {
+        "examples/colors/README.md": "57eff154dc3ad20041815766e4d729b27024ac36b94ee7fe27593333a8d656ec",
+        "examples/colors/brand-contrast.json": "4f6746617b13f1ecd639e366ae95ed9f4ed7c27f665ea4588f104c406b21c775",
+        "examples/colors/brand-drawio-check.json": "9d65eee6bac469f1f458a9beb0c7ec9eef9ecf5217bf3c3172d7637ef9bc0eaf",
+        "examples/colors/brand-drawio-export.json": "7b04f33629b457ebfe02b04e1954ca47ff98be0355ac97526a6253eb3d6da8c0",
+        "examples/colors/brand-drawio.png": "f803b3f3f4fc147d0cab03f6b79ec0bebc23be120af825dddf6c753ea50f3b4f",
+        "examples/colors/brand-drawio.svg": "e155d121b76653e6842490bfc72c77a274455b81e90e3444aa6e1b8f939c2a3d",
+        "examples/colors/brand-excalidraw-check.json": "d013cb26b95744e9aded26d88a6182218ead98426978b7d497bde170590162b2",
+        "examples/colors/brand-excalidraw-export.json": "ad084f600a45184cf5f61f9a37a415b9065e2a4faaa662e3afb3abe37e81984c",
+        "examples/colors/brand-excalidraw.png": "8707a8b964e1da705e22e499b3647093f4caf639502a882c65a122e0d23ede90",
+        "examples/colors/brand-excalidraw.svg": "32c5748367bc6e725093edf90df32bf8019c638f8db81dc2c7bb6f5c23a39afa",
+        "examples/colors/brand.colors.json": "8740ed01f9fed9fa8fc0764988c11daeec358e21e40d5279e677ee920436cfcd",
+        "examples/colors/brand.drawio": "f536605194f345f4109d9f0b41567ab06ea135402041dec06390b58dfa81e9ca",
+        "examples/colors/brand.excalidraw": "33c3a970ed1b2d9af2fc174c304dcee259da283a1387437da6feeacae3f56ebf",
+        "examples/colors/comparison.png": "71bdb7a7e928bf1aa9dad4f8a4a07c2b18dd3c9a95d3ad159a595ec161c4b21a",
+        "examples/colors/custom-dark-contrast.json": "62c4fd77368540ecf14bfcc8a868da23555122291f40f4c69c708871a8d3511d",
+        "examples/colors/custom-dark-drawio-check.json": "53b2195bd22febf69b6422315763116a4ef9606f031c36194c626ea5a76242f8",
+        "examples/colors/custom-dark-drawio-export.json": "f178cad726263e4a69340593fde966d96b3fb14ac1d31e79a587470cf9eec4a8",
+        "examples/colors/custom-dark-drawio.png": "a907febbd8dd8d79f2c0186e9a240631d7355022f97053c9afa91e807d37147e",
+        "examples/colors/custom-dark-drawio.svg": "71a713432ef94f4d5cb5d59ef1f4ee03477ca63278d09d7b53e3cb33b5fc7d86",
+        "examples/colors/custom-dark-excalidraw-check.json": "c2d4a791086d98dfc512715e9689afeeb3feb4e29b72718739e3744ca9d0efd3",
+        "examples/colors/custom-dark-excalidraw-export.json": "1391c21ef733a05e258164e4e4320c61eca91256af3fd5c946442085ce1de248",
+        "examples/colors/custom-dark-excalidraw.png": "0e563d05c6d0c5f2072bf805ebe73e53ce02928b932528f4b7850947a1f630d5",
+        "examples/colors/custom-dark-excalidraw.svg": "8291f3cd7b797913b8a925723b28d7e1186dd70cb17dbf131a3b8fffff6115b2",
+        "examples/colors/custom-dark.colors.json": "9fc033a4c494b196c8cbfc2a1ac3d834dc278e5cafdc30b7c9b440e5f4b03b27",
+        "examples/colors/custom-dark.drawio": "da81ee1e0c57cdf3b941f7b7e7d283cd51105cb45d11f033e818012ac2a821a3",
+        "examples/colors/custom-dark.excalidraw": "6bc85c6fd23cb90e344e0f8a2e641686e9b187823d8df81a2abc265b088e6b33",
+        "examples/colors/gallery.html": "1ba929ce5600dbff9b74c15fce5a5c62fde75763df3d7b9cef0ea4a1ae722d09",
+        "examples/colors/source.diagram.json": "4f9a1568017758b03f08972cf2bf4c53a899d91242e342526ca5db8fd3f037eb",
+        "examples/colors/website-contrast.json": "b0415db6f3aa8d0f76dea1d44c5e5ed3c0bec0b237221df2072ff7a8b6251107",
+        "examples/colors/website-drawio-check.json": "1d5be9b3019b9b8cadb07db25c7026ffe4c977bd4247b0942f66d4399231e6fc",
+        "examples/colors/website-drawio-export.json": "82249afe1d7baed0163603158487abd39071328f86a9c73dec4dfe63da767d97",
+        "examples/colors/website-drawio.png": "3b111b10dcdbad52d15d6678c80130065361ef37246bb235a15139f6315ca15d",
+        "examples/colors/website-drawio.svg": "b9da05fecab12d4ca868086b207b1656655f0644e133d739d6aa2020f0e6a23c",
+        "examples/colors/website-excalidraw-check.json": "722db2ece904b3dfe7c3808fbf61f2dd27c43e8c62da7d0c24dbb9870a9ee5e9",
+        "examples/colors/website-excalidraw-export.json": "9261eb16fb62c1e1895eea2a809ba8c3218fe33e76dc6525b3718711a3a51e2e",
+        "examples/colors/website-excalidraw.png": "c52a5468ad0898173af35e2f4edea9e6fc92c6401c4125418e6ddfea59cee1e2",
+        "examples/colors/website-excalidraw.svg": "3223152a2a127dfb60e8b5f0aa1d2681aec70d51f0737b278fc25fcaf2f3d8d4",
+        "examples/colors/website.colors.json": "4b6094318557bfc0f946cebc4e0f3b81cd085327f9e0e9558b6ee51d7eef1bfb",
+        "examples/colors/website.drawio": "5c654af09ed86dafa63149922f973db51e5b7d757aecb1541f8c58bd295815b5",
+        "examples/colors/website.excalidraw": "8c5ad58efc9257f9c763d2ed42940ae3dec3ea9ca896e0dd6b31b08dc0c45622"
+      },
+      "renders": [
+        {
+          "preset": "doc-wide",
+          "backend": "excalidraw",
+          "artifact": "examples/colors/website.excalidraw",
+          "png": "examples/colors/website-excalidraw.png",
+          "svg": "examples/colors/website-excalidraw.svg",
+          "check": "examples/colors/website-excalidraw-check.json",
+          "visual_review": "reviewed",
+          "reviewer": "author-agent",
+          "observations": "四节点、三边、文字完整；普通节点中性，只有订单服务用重点色。目视核对当前官方 PNG，不是独立盲评或完整可访问性证明。 已在走线与注释间距修订后复核当前官方 PNG。"
+        },
+        {
+          "preset": "doc-wide",
+          "backend": "drawio",
+          "artifact": "examples/colors/website.drawio",
+          "png": "examples/colors/website-drawio.png",
+          "svg": "examples/colors/website-drawio.svg",
+          "check": "examples/colors/website-drawio-check.json",
+          "visual_review": "reviewed",
+          "reviewer": "author-agent",
+          "observations": "四节点、三边、文字完整；普通节点中性，只有订单服务用重点色。目视核对当前官方 PNG，不是独立盲评或完整可访问性证明。 已在走线与注释间距修订后复核当前官方 PNG。"
+        },
+        {
+          "preset": "doc-wide",
+          "backend": "excalidraw",
+          "artifact": "examples/colors/brand.excalidraw",
+          "png": "examples/colors/brand-excalidraw.png",
+          "svg": "examples/colors/brand-excalidraw.svg",
+          "check": "examples/colors/brand-excalidraw-check.json",
+          "visual_review": "reviewed",
+          "reviewer": "author-agent",
+          "observations": "四节点、三边、文字完整；普通节点中性，只有订单服务用重点色。目视核对当前官方 PNG，不是独立盲评或完整可访问性证明。 已在走线与注释间距修订后复核当前官方 PNG。"
+        },
+        {
+          "preset": "doc-wide",
+          "backend": "drawio",
+          "artifact": "examples/colors/brand.drawio",
+          "png": "examples/colors/brand-drawio.png",
+          "svg": "examples/colors/brand-drawio.svg",
+          "check": "examples/colors/brand-drawio-check.json",
+          "visual_review": "reviewed",
+          "reviewer": "author-agent",
+          "observations": "四节点、三边、文字完整；普通节点中性，只有订单服务用重点色。目视核对当前官方 PNG，不是独立盲评或完整可访问性证明。 已在走线与注释间距修订后复核当前官方 PNG。"
+        },
+        {
+          "preset": "doc-wide",
+          "backend": "excalidraw",
+          "artifact": "examples/colors/custom-dark.excalidraw",
+          "png": "examples/colors/custom-dark-excalidraw.png",
+          "svg": "examples/colors/custom-dark-excalidraw.svg",
+          "check": "examples/colors/custom-dark-excalidraw-check.json",
+          "visual_review": "reviewed",
+          "reviewer": "author-agent",
+          "observations": "四节点、三边、文字完整；普通节点中性，只有订单服务用重点色。目视核对当前官方 PNG，不是独立盲评或完整可访问性证明。 已在走线与注释间距修订后复核当前官方 PNG。"
+        },
+        {
+          "preset": "doc-wide",
+          "backend": "drawio",
+          "artifact": "examples/colors/custom-dark.drawio",
+          "png": "examples/colors/custom-dark-drawio.png",
+          "svg": "examples/colors/custom-dark-drawio.svg",
+          "check": "examples/colors/custom-dark-drawio-check.json",
+          "visual_review": "reviewed",
+          "reviewer": "author-agent",
+          "observations": "四节点、三边、文字完整；普通节点中性，只有订单服务用重点色。目视核对当前官方 PNG，不是独立盲评或完整可访问性证明。 已在走线与注释间距修订后复核当前官方 PNG。"
+        }
+      ]
+    },
+    {
+      "name": "region-surfaces",
+      "source": "project-authored fictional example",
+      "files": {
+        "examples/regions/README.md": "b4d2d5f7a5534807fa344b0c757b16683b114c8468e794b5fff89f5f9b311389",
+        "examples/regions/diagram-drawio-check.json": "b3f1607343577589327a40e7fb6adcf8c3d22343b08b4ee99cb964a02134016e",
+        "examples/regions/diagram-drawio-export.json": "cce369493fc11a428fc9558120a1e806e93501516130268d887d28455d3c7168",
+        "examples/regions/diagram-drawio.png": "601a05281078573d08ae5e957d01534f5abf486f1cc8ee2a4cfb68dee31c0987",
+        "examples/regions/diagram-drawio.svg": "a836fdc1d2d21e78d7fe04ef8682ee572113122efbdbf66df2c31ed9d8714a0f",
+        "examples/regions/diagram-excalidraw-check.json": "55bbce34383f972d78108a2bdce01db2211490c27b4524de6ff9e8ab7777001d",
+        "examples/regions/diagram-excalidraw-export.json": "9b53b88b9c1a5ccd569dcec1e7fc6d3baaa4b9a36c20db52208a7851b98c74cb",
+        "examples/regions/diagram-excalidraw.png": "bf95743c23b98d0411746416c1fe132a767e132c574d1564c06e757a7c7c94cd",
+        "examples/regions/diagram-excalidraw.svg": "3ab6f92ba31c2c15415044249c4f6c1b2a7754c0d242c015b913e5f686eb14fb",
+        "examples/regions/diagram.drawio": "719fca6635735bdf9fc86bff9ebf8ab39fedaf81ac9bb89a77314abd3b4e72b5",
+        "examples/regions/diagram.excalidraw": "1cf586ff9b6c3fcf032b15031e39309ed4d7887019b0ffeccbe0d7866e261d58",
+        "examples/regions/project.colors.json": "238257dc3897397e8728bfd8a8bc4537e51b6bf7b2b16f8709898f55412b152b",
+        "examples/regions/source.diagram.json": "16f7cc0d40a8f8253c4a0a606228cb77c4f28bec8ef2fc72bc5c5d75304682ed"
+      },
+      "renders": [
+        {
+          "preset": "doc-wide",
+          "backend": "excalidraw",
+          "artifact": "examples/regions/diagram.excalidraw",
+          "png": "examples/regions/diagram-excalidraw.png",
+          "svg": "examples/regions/diagram-excalidraw.svg",
+          "check": "examples/regions/diagram-excalidraw-check.json",
+          "visual_review": "reviewed",
+          "reviewer": "author-agent",
+          "observations": "分组标题内边距增加后复核当前官方 PNG；节点、关系和注释完整可见，未见文字遮挡。作者自检，非独立评审。"
+        },
+        {
+          "preset": "doc-wide",
+          "backend": "drawio",
+          "artifact": "examples/regions/diagram.drawio",
+          "png": "examples/regions/diagram-drawio.png",
+          "svg": "examples/regions/diagram-drawio.svg",
+          "check": "examples/regions/diagram-drawio-check.json",
+          "visual_review": "reviewed",
+          "reviewer": "author-agent",
+          "observations": "分组标题内边距增加后复核当前官方 PNG；节点、关系和注释完整可见，未见文字遮挡。作者自检，非独立评审。"
+        }
+      ]
+    }
+  ]
+}

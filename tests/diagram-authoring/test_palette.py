@@ -392,7 +392,7 @@ class TestDocsDoNotRestateColours(unittest.TestCase):
     # 拦住"文档复述色板"——kind→HEX 表那种）。白名单是精确的、需要理由的。
     ALLOWED_MENTIONS = {"#6E879B", "#7F96A5", "#AAB8C0"}
 
-    def test_no_hex_colours_in_docs(self):
+    def test_no_builtin_color_tables_in_document_prose(self):
         root = SKILL
         offenders = []
         pattern = re.compile(r"#[0-9A-Fa-f]{6}\b")
@@ -403,7 +403,15 @@ class TestDocsDoNotRestateColours(unittest.TestCase):
                 path = os.path.join(base, name)
                 with open(path, encoding="utf-8") as handle:
                     body = handle.read()
+                # Concrete project config / CLI examples need legal HEX values.
+                # Keep the rule against duplicating builtin tables in prose.
+                in_code = False
                 for number, line in enumerate(body.split("\n"), 1):
+                    if line.lstrip().startswith("```"):
+                        in_code = not in_code
+                        continue
+                    if in_code:
+                        continue
                     for match in pattern.findall(line):
                         if match.upper() in {c.upper() for c in self.ALLOWED_MENTIONS}:
                             continue

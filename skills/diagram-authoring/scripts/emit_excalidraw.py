@@ -170,8 +170,8 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
     emphasis = node.get("emphasis", palette.DEFAULT_EMPHASIS)
     # stroke 也要带上 emphasis —— 否则 critical 节点的填充是警示色、
     # 描边却还是基础层级那一档，而线宽又按 emphasis 来，三者对不上。
-    stroke = palette.stroke_for(kind, emphasis)
-    fill = palette.fill_for(kind, emphasis)
+    stroke = palette.stroke_for(kind, emphasis, node["id"])
+    fill = palette.fill_for(kind, emphasis, node["id"])
     stroke_width = palette.emphasis_stroke_width(emphasis)
     elements = shape_elements(shape_id, box.shape, placed, stroke, fill,
                               stroke_width=stroke_width, style=style)
@@ -182,7 +182,7 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
     # 圆柱要下沉一个盖高，否则标题会压在椭圆盖上。
     inner_y, inner_h = text_band(box.shape, placed)
     title_h = len(text.lines) * text.font_size * tm.LINE_HEIGHT
-    detail_h = len(text.detail_lines) * tm.FONT_DETAIL * tm.LINE_HEIGHT
+    detail_h = len(text.detail_lines) * text.detail_font_size * tm.LINE_HEIGHT
     top = inner_y + (inner_h - (title_h + detail_h)) / 2.0
     content_w = text.break_units * text.font_size
 
@@ -215,7 +215,7 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
     label_visible = (max([tm.weighted_units(line) for line in text.lines] or [0.0])
                      * text.font_size)
     detail_visible = (max([tm.weighted_units(line) for line in text.detail_lines] or [0.0])
-                      * tm.FONT_DETAIL)
+                      * text.detail_font_size)
     visible_w = max(label_visible, detail_visible)
     center = placed.x + placed.width / 2.0
     # 有图标时：文字中心右移半个"图标位"，让 (图标 + 间隔 + 可见文字) 整组居中；
@@ -263,10 +263,13 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
                           content_w, text.font_size)]
     if has_detail:
         labels.append(_text_block(detail_id, label_container, text.detail_lines,
-                                  tx, top + title_h, content_w, tm.FONT_DETAIL))
+                                  tx, top + title_h, content_w, text.detail_font_size))
     if node_group:
         for el in labels:
             el["groupIds"] = list(node_group)
+    if palette.has_custom_colors():
+        for label in labels:
+            label["strokeColor"] = palette.text_for(kind, emphasis, node["id"])
     elements += labels
     return elements
 
@@ -405,7 +408,7 @@ def _region_label_x(region: dict, width: float,
 
 
 def region_elements(region: dict, style: dict | None = None,
-                    polylines: list | None = None) -> list[dict]:
+                    polylines: list | None = None, *, presentation=None) -> list[dict]:
     """一个区域 = 圆角矩形（交叉网格填充）+ 顶部居中的标题。
 
     ⚠️ **必须先进 `build_scene` 的 elements 数组。** Excalidraw 的绘制顺序就是
@@ -424,8 +427,8 @@ def region_elements(region: dict, style: dict | None = None,
     if level not in palette.LEVELS:
         raise ValueError(f"区域 {region['id']!r} 的 level 不认识：{level!r}"
                          f"（可用 {sorted(palette.LEVELS)}；未知值判失败，不 fallback）")
-    stroke = palette.frame_stroke(level)      # 退到背景层的颜色，不再和连线撞脸
-    fill = palette.LEVELS[level]["fill"]
+    colors = palette.group_colors(region["id"], level)
+    stroke, fill = colors["stroke"], colors["fill"]
     # 区域的**局部覆盖**：顶层 style 打底，这个区域自己写的轴盖在上面。
     # 用户要过「只让区域用虚线、节点保持实线」—— 全局 style 表达不了这件事。
     resolved = palette.merge_style(palette.resolve_style(style), region.get("style"))
@@ -451,14 +454,17 @@ def region_elements(region: dict, style: dict | None = None,
         text = "\n".join(lines)
         label_id = _eid("region-label", region["id"])
         label_x, dirty = _region_label_x(region, width, polylines)
-        # 底色与边标签同步**常开**（同一个办法，两处一致）：标题是要读的字，
-        # 不论搜到的位置干不干净都垫一枚画布色小牌。`dirty` 仍然返回，
-        # 作为“标题带里没有干净位置”的机器可读标记。
+        label_y = region["label_y"]
+        if L.P.resolve(presentation).preset != "fit":
+            left, label_y, dirty = _load_sibling("readable_routing").place_region_title(region, polylines or [])
+            label_x = left + width / 2
+        # backgroundColor 保留编辑样式，但不是实际遮挡底板的证明。
+        # 官方导出可能忽略文字背景；必须靠位置避让和间隔审查。
         _ = dirty
         elements.append({
             **_base(label_id, "text", label_x - width / 2.0,
-                   region["label_y"], width, height,
-                   palette.LEVELS[level]["stroke"], "transparent",
+                   label_y, width, height,
+                   colors["text"], "transparent",
                    extra={"groupIds": [el_id]}),
             "text": text,
             "fontSize": size,
@@ -470,7 +476,7 @@ def region_elements(region: dict, style: dict | None = None,
             "lineHeight": tm.LINE_HEIGHT,
             "baseline": round(size * BASELINE_RATIO, 2),
         })
-        elements[-1]["backgroundColor"] = palette.CANVAS["background"]
+        elements[-1]["backgroundColor"] = fill if palette.has_custom_colors() else palette.CANVAS["background"]
         elements[-1]["roundness"] = {"type": 3}
     return elements
 
@@ -504,6 +510,51 @@ def _text_block(el_id: str, container_id: str | None, lines: tuple[str, ...],
 
 
 # ── 边：箭头 ────────────────────────────────────────────────
+def visible_edge(edge: dict, placed: dict, boxes: dict) -> dict:
+    """Extend bounding-box ports to diamond/ellipse outlines along the same line.
+
+    This is a rendering adjustment inside the endpoint's own box. Preserve the
+    layout result and the other segments; labels use the adjusted path too.
+    """
+    pts = [list(point) for point in edge["points"]]
+    for index, neighbour, node in ((0, 1, edge["from"]), (-1, -2, edge["to"])):
+        shape = boxes[node].shape
+        if shape not in {"diamond", "ellipse"}:
+            continue
+        box = placed[node]
+        rx, ry = box.width / 2, box.height / 2
+        if rx <= 0 or ry <= 0:
+            continue
+        x, y = pts[index]
+        u, v = (x - box.x - rx) / rx, (y - box.y - ry) / ry
+        # Layout rounds ports to hundredths of a pixel. A point already on the
+        # outline must not jump to the far intersection due to that rounding.
+        outline = abs(u) + abs(v) if shape == "diamond" else math.hypot(u, v)
+        if abs(outline - 1) * min(rx, ry) <= 0.02:
+            continue
+        dx, dy = (x - pts[neighbour][0]) / rx, (y - pts[neighbour][1]) / ry
+        candidates = []
+        if shape == "diamond":
+            for sx, sy in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
+                denominator = sx * dx + sy * dy
+                if abs(denominator) < 1e-12:
+                    continue
+                t = (1 - sx * u - sy * v) / denominator
+                if t >= -1e-9 and abs(abs(u + t * dx) + abs(v + t * dy) - 1) < 1e-7:
+                    candidates.append(max(0, t))
+        else:
+            a, b, c = dx * dx + dy * dy, 2 * (u * dx + v * dy), u * u + v * v - 1
+            discriminant = b * b - 4 * a * c
+            if a > 1e-12 and discriminant >= 0:
+                candidates = [max(0, t) for t in ((-b - math.sqrt(discriminant)) / (2 * a),
+                                                  (-b + math.sqrt(discriminant)) / (2 * a))
+                              if t >= -1e-9]
+        if candidates:
+            t = min(candidates)
+            pts[index] = [round(x + t * dx * rx, 2), round(y + t * dy * ry, 2)]
+    return {**edge, "points": pts}
+
+
 def arrow_element(edge: dict, index: int,
                   style: dict | None = None) -> dict:
     pts = edge["points"]
@@ -704,14 +755,14 @@ def label_position(pts: list, width: float, height: float,
 
     返回 `(x, y, 需要底色吗)`。
 
-    `keepouts` 是**节点矩形**（`(x, y, w, h)` 四元组，按面积重叠判，不是轮廓）。
+    `keepouts` 是**节点矩形**（`(left, top, right, bottom)`，按面积重叠判，不是轮廓）。
     压到节点比压到线严重得多 —— 线从字上过去
     还看得清，字压在框上就分不清这行字属于谁了。所以打分时节点按 `NODE_WEIGHT` 计权，
     「最不脏」的兜底会优先避开框（实测：五层架构那张里「上传 / 建 job」正好压在
     apps/api 框里 —— 就是因为节点和线同权，兜底选了一个压框但没压线的位置）。
 
-    全都不干净时返回 `True`：调用方会给文字铺一个**底色**，让“被穿过看不清”
-    在结构上不可能发生，而不是继续挪到一个一样脏的地方。
+    全都不干净时返回 `True`，表示仍有冲突；不能依赖文字 backgroundColor
+    遮住连线，真实导出可能并不绘制该背景。
     """
     obstacles = obstacles or [list(pts)]
     keepouts = keepouts or []
@@ -755,7 +806,7 @@ def label_position(pts: list, width: float, height: float,
 
 
 def edge_label_element(edge: dict, index: int, obstacles: list | None = None,
-                       keepouts: list | None = None) -> dict | None:
+                       keepouts: list | None = None, *, presentation=None) -> dict | None:
     """边标签：一个独立的文字元素，位置由 `label_position` 搜出来。
 
     刻意**不**绑到箭头上 —— 箭头标签在 Excalidraw 里有自己的定位规则，
@@ -764,32 +815,35 @@ def edge_label_element(edge: dict, index: int, obstacles: list | None = None,
     `obstacles` 传**所有**边的折线（不只是自己那条），`keepouts` 传**节点矩形** ——
     前者撞上就不好读，后者撞上就更糟：分不清这行字属于谁。
     """
+    ctx = L.P.resolve(presentation)
     label = edge.get("label")
     if not label:
         return None
-    width = round(tm.weighted_units(label) * tm.FONT_DETAIL, 2)
-    height = round(tm.FONT_DETAIL * tm.LINE_HEIGHT, 2)
+    width = round(tm.weighted_units(label) * ctx.detail, 2)
+    height = round(ctx.detail * tm.LINE_HEIGHT, 2)
     x, y, needs_backdrop = label_position(edge["points"], width, height,
                                           obstacles, keepouts)
+    if ctx.preset != "fit":
+        x, y, needs_backdrop = _load_sibling("readable_routing").place_label(
+            edge["points"], width, height, obstacles or [edge["points"]],
+            [(a, b, c-a, d-b) for a, b, c, d in (keepouts or [])])
     el_id = _eid("elabel", f"{edge['from']}-{edge['to']}", index)
     el = _base(el_id, "text", x, y, width, height,
                palette.CANVAS["text"], "transparent", extra={"roundness": None})
-    # **底色常开**：每个标签都垫一枚画布色小牌。
-    # 以前只在“搜不到干净位置”时才铺，但“线从字旁边掠过”在密集图上同样难读；
-    # 常开后线到字跟前断开，任何位置都读得清。`needs_backdrop` 保留在返回值里，
-    # 只是“这个位置被穿过”的机器可读标记（测试与预览用它）。
+    # 保留文字背景样式供编辑器使用；不承诺官方导出会绘制底板。
+    # 清晰度依靠上面的几何避让，剩余冲突由 scene 间隔审查报告。
     el["backgroundColor"] = palette.CANVAS["background"]
     el["roundness"] = {"type": 3}
     el.update({
         "text": label,
-        "fontSize": tm.FONT_DETAIL,
+        "fontSize": ctx.detail,
         "fontFamily": palette.CANVAS["font_family"],
         "textAlign": "center",
         "verticalAlign": "top",
         "containerId": None,
         "originalText": label,
         "lineHeight": tm.LINE_HEIGHT,
-        "baseline": round(tm.FONT_DETAIL * BASELINE_RATIO, 2),
+        "baseline": round(ctx.detail * BASELINE_RATIO, 2),
         "strokeWidth": 1,
     })
     return el
@@ -830,7 +884,7 @@ OPEN_VIEW = (1400.0, 800.0)
 OPEN_MARGIN = (60.0, 110.0, 50.0)
 
 
-def title_element(title: str | None) -> dict | None:
+def title_element(title: str | None, *, presentation=None) -> dict | None:
     """图标题：内容上方居中的自由文字。
 
     与节点文字不同，标题是**不绑定容器**的自由文字（`containerId = None`）——
@@ -838,12 +892,13 @@ def title_element(title: str | None) -> dict | None:
     宽度用**实际行宽**而不是断行档位：档位是给容器用的，标题按档位宽算会
     把一个两字标题撑成 240px，白占画布。
     """
+    ctx = L.P.resolve(presentation)
     if not title:
         return None
-    box = tm.measure(title, "", font_size=tm.FONT_TITLE)
+    box = tm.measure(title, "", font_size=ctx.title)
     lines = box.lines
-    width = max(tm.weighted_units(line) for line in lines) * tm.FONT_TITLE
-    height = len(lines) * tm.FONT_TITLE * tm.LINE_HEIGHT
+    width = max(tm.weighted_units(line) for line in lines) * ctx.title
+    height = len(lines) * ctx.title * tm.LINE_HEIGHT
     text = "\n".join(lines)
     return {
         "id": _eid("diagram-title", title),
@@ -873,14 +928,14 @@ def title_element(title: str | None) -> dict | None:
         "locked": False,
         "index": None,
         "text": text,
-        "fontSize": tm.FONT_TITLE,
+        "fontSize": ctx.title,
         "fontFamily": palette.CANVAS["font_family"],
         "textAlign": "center",
         "verticalAlign": "top",
         "containerId": None,
         "originalText": text,
         "lineHeight": tm.LINE_HEIGHT,
-        "baseline": round(tm.FONT_TITLE * BASELINE_RATIO, 2),
+        "baseline": round(ctx.title * BASELINE_RATIO, 2),
     }
 
 
@@ -889,13 +944,14 @@ def title_element(title: str | None) -> dict | None:
 # 这里只负责把排好的卡落成 Excalidraw 元素。
 
 
-def card_elements(laid: list[dict], level: str = "tint") -> list[dict]:
+def card_elements(laid: list[dict], level: str = "tint", *, presentation=None) -> list[dict]:
     """卡片 = 便签风矩形（虚线框 + 极轻填充）+ 标题 + 条目。
 
     与区域同一条规矩：挂 `groupIds`（装饰件都挂组号）；文字**不绑容器**
     （卡片不是可拖址的节点，自由文字的位置我们自己算得准）。
     认节点看 id 前缀（`node-`），不看有没有组号。
     """
+    ctx = L.P.resolve(presentation)
     if level not in palette.LEVELS:
         level = "tint"
     if not laid:
@@ -915,44 +971,46 @@ def card_elements(laid: list[dict], level: str = "tint") -> list[dict]:
         ty = card["y"] + L.CARD_PAD_Y
         if card["title_lines"]:
             text = "\n".join(card["title_lines"])
-            w = max(tm.weighted_units(l) for l in card["title_lines"]) * tm.FONT_NODE
-            h = len(card["title_lines"]) * tm.FONT_NODE * tm.LINE_HEIGHT
+            w = max(tm.weighted_units(l) for l in card["title_lines"]) * ctx.node
+            h = len(card["title_lines"]) * ctx.node * tm.LINE_HEIGHT
             elements.append({
                 **_base(_eid("card-title", gid), "text", tx, ty, round(w, 2),
-                        round(h, 2), palette.LEVELS[level]["stroke"],
+                        round(h, 2), palette.text_for_level(level),
                         "transparent", extra={"groupIds": [gid], "roundness": None}),
                 "text": text, "originalText": text,
-                "fontSize": tm.FONT_NODE,
+                "fontSize": ctx.node,
                 "fontFamily": palette.CANVAS["font_family"],
                 "textAlign": "left", "verticalAlign": "top",
                 "containerId": None, "lineHeight": tm.LINE_HEIGHT,
-                "baseline": round(tm.FONT_NODE * BASELINE_RATIO, 2),
+                "baseline": round(ctx.node * BASELINE_RATIO, 2),
                 "strokeWidth": 1,
             })
             ty += h + L.CARD_PAD_Y
         if card["item_lines"]:
             text = "\n".join(card["item_lines"])
-            w = max(tm.weighted_units(l) for l in card["item_lines"]) * tm.FONT_DETAIL
+            w = max(tm.weighted_units(l) for l in card["item_lines"]) * ctx.detail
             # 行距用卡片段位（CARD_ITEM_LINE_HEIGHT），与 card_rows 算高度同一个数
-            h = len(card["item_lines"]) * tm.FONT_DETAIL * L.CARD_ITEM_LINE_HEIGHT
+            h = len(card["item_lines"]) * ctx.detail * L.CARD_ITEM_LINE_HEIGHT
             elements.append({
                 **_base(_eid("card-items", gid), "text", tx, ty, round(w, 2),
-                        round(h, 2), palette.CANVAS["text"],
+                        round(h, 2), (palette.text_for_level(level) if palette.has_custom_colors() else palette.CANVAS["text"]),
                         "transparent", extra={"groupIds": [gid], "roundness": None}),
                 "text": text, "originalText": text,
-                "fontSize": tm.FONT_DETAIL,
+                "fontSize": ctx.detail,
                 "fontFamily": palette.CANVAS["font_family"],
                 "textAlign": "left", "verticalAlign": "top",
                 "containerId": None, "lineHeight": L.CARD_ITEM_LINE_HEIGHT,
-                "baseline": round(tm.FONT_DETAIL * BASELINE_RATIO, 2),
+                "baseline": round(ctx.detail * BASELINE_RATIO, 2),
                 "strokeWidth": 1,
             })
     return elements
 
 
 def build_scene(spec: dict, result, boxes: dict,
-                icon_lookup=None, icon_height=None) -> dict:
+                icon_lookup=None, icon_height=None, *, presentation=None) -> dict:
+    ctx = L.P.resolve(presentation)
     elements: list[dict] = []
+    rendered_edges = [visible_edge(edge, result.placed, boxes) for edge in result.edges]
     by_id = {n["id"]: n for n in spec.get("nodes", [])}
     # 四组样式轴解析一次，透传给每个元素（未知值在 resolve_style 里就抛错了）
     style = palette.resolve_style(spec.get("style"))
@@ -963,9 +1021,10 @@ def build_scene(spec: dict, result, boxes: dict,
     # 区域**第一个**进数组：它是背景，后进会盖住节点（见 region_elements）。
     # 区域标题要在标题带里避开连线，所以这里就得把折线算出来 —— 区域虽然画在最前，
     # 但折线本来就是 `result.edges` 里的现成数据（绝对坐标），不必等箭头那一步。
-    region_polylines = [list(edge["points"]) for edge in result.edges]
-    for region in L.region_boxes(spec, result.placed, boxes):
-        elements += region_elements(region, style, region_polylines)
+    region_polylines = [list(edge["points"]) for edge in rendered_edges]
+    regions = L.region_boxes(spec, result.placed, boxes, presentation=ctx)
+    for region in regions:
+        elements += region_elements(region, style, region_polylines, presentation=ctx)
     # 区域标题也是要读的字，而它不是节点、也不是连线 —— 以前没有任何标签避让它。
     # 用户截图里的那处鸿就是：两条边的“同步调用”压在一个区域标题「探针与门禁」上。
     region_title_boxes = [(e["x"], e["y"], e["x"] + e["width"], e["y"] + e["height"])
@@ -974,7 +1033,7 @@ def build_scene(spec: dict, result, boxes: dict,
     arrows_out: dict[str, list[str]] = {nid: [] for nid in by_id}
     arrows_in: dict[str, list[str]] = {nid: [] for nid in by_id}
     arrow_specs: list[tuple[dict, str]] = []
-    for i, edge in enumerate(result.edges):
+    for i, edge in enumerate(rendered_edges):
         eid = _eid("edge", f"{edge['from']}-{edge['to']}", i)
         arrows_out.setdefault(edge["from"], []).append(eid)
         arrows_in.setdefault(edge["to"], []).append(eid)
@@ -1007,7 +1066,9 @@ def build_scene(spec: dict, result, boxes: dict,
     # 标签搜索于是一直在躲不存在的障碍：它返回的位置在自己眼里是干净的，
     # 落到图上却压在真线上（实测某条边被压 19 个采样点）。
     # 这就是 P3“标签压线”反复修不掉的根因。
-    polylines = [list(edge["points"]) for edge in result.edges]
+    polylines = [list(edge["points"]) for edge in rendered_edges]
+    if ctx.preset != "fit":
+        polylines += _load_sibling("readable_routing").frame_lines(regions)
     # 节点框单独传给标签搜索（`keepouts`），**不混进 `polylines`**：压到框比压到线
     # 严重得多，打分时要分别计权（NODE_WEIGHT）。只算**真节点** —— 虚节点是布局
     # 内部的东西，不画出来，不该把标签赶走。
@@ -1024,12 +1085,12 @@ def build_scene(spec: dict, result, boxes: dict,
         elements.append(arrow_element(edge, i, style))
         if not L.shows_edge_label(edge, detail_level):
             continue                      # executive：摘要里不堆边标签
-        label = edge_label_element(edge, i, polylines, label_keepouts)
+        label = edge_label_element(edge, i, polylines, label_keepouts, presentation=ctx)
         if label is None:
             auto = edge_kind_label(edge, detail_level)
             if auto:
                 label = edge_label_element({**edge, "label": auto}, i, polylines,
-                                           label_keepouts)
+                                           label_keepouts, presentation=ctx)
         if label:
             elements.append(label)
             pad = LABEL_GAP / 2.0
@@ -1039,16 +1100,16 @@ def build_scene(spec: dict, result, boxes: dict,
 
     # 结论卡片（可选）：排在内容下方 —— 先于标题落位，标题居中时把卡片也算进去。
     left, top, right, bottom = scene_bounds(elements) if elements else (0, 0, 0, 0)
-    elements += card_elements(L.card_rows(spec, left, right, bottom))
+    elements += card_elements(L.card_rows(spec, left, right, bottom, presentation=ctx), presentation=ctx)
 
     # 图标题最后加：它要按已排好的内容来居中，而它自己**不参与**布局。
     # 放的位置是“内容顶边往上 TITLE_GAP”，所以不需要把别的元素往下挪 ——
     # 标题落到 y 为负的地方没关系：下面会把视图滚到内容左上角（见 OPEN_MARGIN_*）。
-    title = title_element(spec.get("title"))
+    title = title_element(spec.get("title"), presentation=ctx)
     if title is not None and elements:
         left, top, right, _bottom = scene_bounds(elements)
         title["x"] = round(left + (right - left) / 2.0 - title["width"] / 2.0, 2)
-        title["y"] = round(top - TITLE_GAP - title["height"], 2)
+        title["y"] = round(top - ctx.title_gap - title["height"], 2)
         elements.append(title)
 
     # ── 打开时停在哪儿：**必须自己写** ──
@@ -1238,7 +1299,7 @@ def icon_contrast_issues(spec: dict, lookup: dict) -> list:
 
 def emit(spec: dict, *, params=None, library: str | None = None,
          icon_height: float | None = None, icon_full: bool = False,
-         quality: str = "standard"
+         quality: str = "standard", preset: str = "fit", colors=None
          ) -> tuple[dict, Any, Any, list]:
     """跑完整条流水线并返回场景。**校验有阻塞项就不出图。**
 
@@ -1260,13 +1321,19 @@ def emit(spec: dict, *, params=None, library: str | None = None,
     # `visual` 是视觉方向（旧字段 `theme` 已废弃）；`mood` 是**用户的原话**，
     # 用于 §19"用户明确指定风格时优先用户意图"。
     palette.set_context(spec.get("mood"))
-    palette.use_direction(spec.get("visual"), diagram_type=spec.get("type"))
+    palette.use_backend("excalidraw")
+    palette.use_direction(spec.get("visual"), diagram_type=spec.get("type"), mood=spec.get("mood"))
+    if colors is not None:
+        palette.use_colors(colors, spec=spec)
+        palette.check_pattern_text(spec)
 
     # 图标必须在算盒子**之前**解析出来 —— 它会影响节点尺寸（第一个外部尺寸来源）
     lookup, icon_sizes, icon_heights = load_icons(spec, library, icon_height,
                                                   icon_full)
-    boxes = L.boxes_from_spec(spec, icon_sizes)
-    result, outcome, attempts = _check_layout().layout_with_retry(spec, boxes, params)
+    ctx = L.P.resolve(preset)
+    boxes = L.boxes_from_spec(spec, icon_sizes, presentation=ctx)
+    result, outcome, attempts = _check_layout().layout_with_retry(spec, boxes, ctx.layout_params(params),
+                                                                  **({"presentation": ctx} if preset != "fit" else {}))
     extra = icon_readability_issues(spec, lookup or {}, icon_height)
     if extra:
         outcome = _check_layout().Outcome(issues=[*outcome.issues, *extra])
@@ -1275,9 +1342,20 @@ def emit(spec: dict, *, params=None, library: str | None = None,
     if outcome.blocking:
         return {}, result, outcome, attempts
     icon_lookup = (lambda name: lookup.get(name)) if lookup else None
-    return (build_scene(spec, result, boxes, icon_lookup,
-                        icon_heights or icon_height),
-            result, outcome, attempts)
+    scene = build_scene(spec, result, boxes, icon_lookup,
+                        icon_heights or icon_height, presentation=ctx)
+    if preset != "fit":
+        spacing = _load_sibling("readable_routing").assess_scene(scene, L)
+        if spacing["findings"]:
+            outcome.issues.append(_check_layout().Issue(
+                "readability", False, "连线与注释",
+                f"{len(spacing['findings'])} 处近线或文字安全间隔不足，需目视复核",
+                advice="调整关系走线或视图范围；不要用背景遮盖后声称问题已消失。",
+                evidence=spacing))
+        review = _load_sibling("check_presentation")
+        assessment = review.assess(review.excalidraw(json.dumps(scene)), preset)
+        L.P.add_findings(assessment, outcome, _check_layout().Issue)
+    return scene, result, outcome, attempts
 
 
 def _check_layout():
@@ -1328,13 +1406,15 @@ def _delivery_receipt(out_path: str, spec_path: str, spec_bytes: bytes,
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="规格 → .excalidraw（plain JSON）")
     ap.add_argument("spec", help="*.diagram.json")
-    ap.add_argument("-o", "--out", help="输出路径（默认与规格同名，后缀 .excalidraw）")
+    ap.add_argument("-o", "--out", help="输出路径（.source/name.diagram.json → 上级 name.excalidraw；其他输入只换后缀）")
     ap.add_argument("--stdout", action="store_true", help="打到标准输出，不写文件")
     ap.add_argument("--library", help="*.excalidrawlib（规格里用到 icon 时才需要）")
     ap.add_argument("--icon-height", type=float,
                     help="强制图标高度（默认按每个节点自身高度算，见 references/icons.md）")
     ap.add_argument("--icon-full", action="store_true",
                     help="保留素材自带的文字（默认只取图形：节点自己已经有标签了）")
+    ap.add_argument("--colors", help="项目配色 JSON；任意色值和角色/节点分配，与 visual 独立")
+    ap.add_argument("--preset", choices=L.P.NAMES, default="fit", help="生成字号与间距场景；fit 保持旧默认")
     ap.add_argument("--quality", choices=("standard", "showcase"), default="standard",
                     help="showcase=交付档：结构类软项升级为阻塞，有残留就不出图")
     ap.add_argument("--json", action="store_true", help="附带机器可读回执（结构化诊断）")
@@ -1352,12 +1432,12 @@ def main(argv: list[str] | None = None) -> int:
         scene, result, outcome, attempts = emit(spec, library=args.library,
                                                 icon_height=args.icon_height,
                                                 icon_full=args.icon_full,
-                                                quality=args.quality)
+                                                quality=args.quality, preset=args.preset, colors=args.colors)
     except SpecError as exc:
         print(str(exc), file=sys.stderr)
         return 1
-    except ValueError as exc:
-        print(f"布局失败：{exc}", file=sys.stderr)
+    except (ValueError, OSError) as exc:
+        print(f"生成失败：{exc}", file=sys.stderr)
         return 1
     except KeyError as exc:
         print(f"规格里有个值不认识：{exc}", file=sys.stderr)
@@ -1375,12 +1455,15 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(receipt, ensure_ascii=False, indent=2), file=sys.stderr)
         return 1
 
+    for issue in outcome.issues:
+        if issue.check == "presentation":
+            print(f"观看检查：{issue}", file=sys.stderr)
     payload = json.dumps(scene, ensure_ascii=False, indent=2)
     if args.stdout:
         print(payload)
         return 0
 
-    out = args.out or os.path.splitext(args.spec)[0] + ".excalidraw"
+    out = args.out or _load_sibling("output_paths").default_output(args.spec, ".excalidraw")
     try:
         _atomic_write(out, payload + "\n")
     except OSError as exc:

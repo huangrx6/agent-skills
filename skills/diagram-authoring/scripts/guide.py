@@ -1,24 +1,8 @@
 #!/usr/bin/env python3
-"""图型场景路由器 —— 「这段描述该画成哪种图」的机械判据。
+"""按表达意图、图型信号推荐起手方案。推荐不是事实判断。
 
-## 为什么做成命令而不是 SKILL.md 里的一张表
-
-类型判断目前写在 SKILL.md 的策略表里，靠模型对照执行。做成命令的收益：
-
-- **判据可执行**：打分表在脚本里，同一句话永远得到同一个推荐 —— 模型对照表格
-  「自己挑」没有这个保证；
-- **低上下文**：模型拿不准时跑一条命令，不用把整张表读进上下文；
-- **输出即起手**：推荐里带 include 清单与起手 prompt 骨架，直接接规格书写。
-
-## 打分不是判断
-
-每个类型有一组（中英）信号词与权重；命中最多的类型胜出，**平分或全零时不硬选**，
-而是把最像的几个列出来让用户挑 —— 与「先让用户挑主题」同一条哲学：
-宁可多问一句，不替用户做他没说的事。
-
-用法：
-    python3 scripts/guide.py "下单后先校验库存，库存够就调支付网关，失败回购物车"
-    python3 scripts/guide.py "Kafka topics 与消费者组的血缘" --json
+语义模式优先；多个模式命中时保留候选，由作者结合上下文选择。
+只有无法从材料消除且影响产物的歧义才询问用户。不按关键词删改内容。
 """
 
 from __future__ import annotations
@@ -43,6 +27,7 @@ def _load_sibling(name: str):
 
 
 L = _load_sibling("layout")
+A = _load_sibling("authoring")
 
 # ── 场景目录 ────────────────────────────────────────────────
 # signals: (词, 权重)。中英混排，全小写匹配；权重刻画「这个词出现时它有多像这个类型」。
@@ -57,7 +42,7 @@ SCENARIOS: dict[str, dict] = {
             ("微服务", 8), ("microservice", 8),
         ],
         "question": "系统里有什么、彼此怎么连接？",
-        "include": ["6~12 个核心组件", "一条主路径", "外部依赖", "边界（用 groups 圈）",
+        "include": ["本次问题必需的核心组件（不设硬性数量上限）", "一条主路径", "外部依赖", "边界（用 groups 圈）",
                     "支撑细节放 cards，不堆节点"],
     },
     "flow": {
@@ -69,7 +54,7 @@ SCENARIOS: dict[str, dict] = {
         ],
         "question": "一件事按什么顺序发生、在哪里分岔？",
         "include": ["一条主路径（其余分支从最近的节点出发）", "判断/分支用 diamond 形状",
-                    "异常路径用 critical 区域圈出来", "每步一句动词短语"],
+                    "异常动作与恢复入口；仅真实边界才用分组", "每步一句动词短语"],
     },
     "dependency": {
         "signals": [
@@ -79,7 +64,7 @@ SCENARIOS: dict[str, dict] = {
         ],
         "question": "谁依赖谁、层级怎么叠？",
         "include": ["一个节点 = 一个模块/包", "边只表达「依赖」一种语义",
-                    "层级深的用 rank 固定", "循环依赖会断环处理，如实标注"],
+                    "确有层级约束时用 rank", "循环依赖保留原方向，布局内部临时断环"],
     },
     "state": {
         "signals": [
@@ -89,7 +74,7 @@ SCENARIOS: dict[str, dict] = {
         ],
         "question": "一个东西会经历哪些状态、怎么流转？",
         "include": ["一个节点 = 一个状态（不是动作）", "边写触发事件",
-                    "终态/失败态用 emphasis 标", "回边是常态，别怕环"],
+                    "终止/失败语义写清标签；emphasis 只表达阅读重点", "支持不同节点间回边，暂不支持自环"],
     },
     "network": {
         "signals": [
@@ -127,7 +112,7 @@ def score(scenario: str) -> list[tuple[str, int]]:
     return ranked
 
 
-def recommend(scenario: str) -> dict:
+def _recommend_type(scenario: str) -> dict:
     """推荐一个图型；分不出胜负时如实说「这几个都像」。"""
     ranked = score(scenario)
     top_name, top_score = ranked[0]
@@ -148,8 +133,43 @@ def recommend(scenario: str) -> dict:
         "include": entry["include"],
         "why": (f"命中信号词 {len(SCENARIOS[top_name]['signals'])} 组里得分最高（{top_score} 分）"
                 if len(tied) == 1 else
-                f"{('、'.join(tied))} 同分（{top_score}）—— 这几个类型都像，挑一个："),
+                f"{('、'.join(tied))} 同分（{top_score}）—— 这几个类型都像，结合材料选择："),
     }
+
+
+def recommend(scenario: str, *, pattern: str | None = None,
+              audience: str = "mixed", preset: str = "doc-inline") -> dict:
+    if pattern is not None and pattern not in A.PATTERNS:
+        raise ValueError(f"未知表达模式：{pattern}")
+    if audience not in A.AUDIENCES or preset not in A.PRESETS:
+        raise ValueError("未知受众或输出场景")
+    text = scenario.lower()
+    unsupported = [name for name, signals in {
+        "sequence": ("时序图", "sequence diagram"),
+        "swimlane": ("泳道图", "swimlane"),
+        "er": ("er 图", "er图", "实体关系图", "er diagram"),
+    }.items() if any(signal in text for signal in signals)]
+    rec = _recommend_type(scenario)
+    matches = [name for name, entry in A.PATTERNS.items()
+               if any(signal in text for signal in entry["signals"])]
+    selected = pattern or (matches[0] if len(matches) == 1 else None)
+    if selected:
+        entry = A.PATTERNS[selected]
+        rec.update(recommended=entry["type"], candidates=[entry["type"]],
+                   direction=L.DIRECTION_FOR_TYPE[entry["type"]],
+                   question=entry["question"], include=list(entry["required"]),
+                   why=f"表达模式：{entry['name']}；须对照实际材料确认。",
+                   avoid=entry["avoid"])
+    if unsupported:
+        rec.update(recommended=None, candidates=[],
+                   why="请求含当前生成器尚不支持的专用图型；不能把普通节点图冒充该图型。")
+    rec.update(pattern=selected, pattern_candidates=matches,
+               unsupported_types=unsupported, audience=audience,
+               audience_guidance=A.AUDIENCES[audience], preset=preset,
+               display_target=dict(A.PRESETS[preset]),
+               type_reference="references/type-guides.md",
+               semantic_reference="references/semantic-patterns.md" if selected or matches else None)
+    return rec
 
 
 def starter_prompt(rec: dict, scenario: str) -> str:
@@ -158,16 +178,21 @@ def starter_prompt(rec: dict, scenario: str) -> str:
     include = "\n".join(f"  - {item}" for item in rec.get("include", []))
     return (f"用 {name} 画：{scenario}\n"
             f"要包含：\n{include}\n"
-            f"规格里只写结构（节点/边/分组），不写坐标、颜色、字号 —— 布局由脚本算。")
+            f"先明确读者要理解的问题；intent 可记录 question/audience/pattern。\n"
+            f"受众：{rec.get('audience', 'mixed')}；观看场景：{rec.get('preset', 'doc-inline')}。\n"
+            "规格不写坐标、颜色、字号；生成后运行语义检查和场景可读性检查。")
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="场景 → 图型推荐（信号词打分，不硬选）")
     ap.add_argument("scenario", help="用一句话描述你要画什么")
     ap.add_argument("--json", action="store_true", help="机器可读输出")
+    ap.add_argument("--pattern", choices=tuple(A.PATTERNS))
+    ap.add_argument("--audience", choices=tuple(A.AUDIENCES), default="mixed")
+    ap.add_argument("--preset", choices=tuple(A.PRESETS), default="doc-inline")
     args = ap.parse_args(argv)
 
-    rec = recommend(args.scenario)
+    rec = recommend(args.scenario, pattern=args.pattern, audience=args.audience, preset=args.preset)
     if args.json:
         print(json.dumps({"scenario": args.scenario, **rec,
                           "starter_prompt": starter_prompt(rec, args.scenario)},
@@ -175,6 +200,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     print(f"场景：{args.scenario}")
+    print(f"观看目标：{args.preset}；受众：{args.audience}。{rec['audience_guidance']}")
+    if rec["pattern_candidates"]:
+        print("表达模式候选：" + "、".join(rec["pattern_candidates"]))
+    if rec.get("avoid"):
+        print("注意：" + rec["avoid"])
     if rec["recommended"]:
         print(f"推荐图型：{rec['recommended']}（默认方向 {rec['direction']}）")
         print(f"它回答的问题：{rec['question']}")

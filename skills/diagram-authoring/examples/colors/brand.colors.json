@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "name": "单色起步 · 紫色焦点",
+  "source": "seed #7255B8; hue offsets [135, 205]",
+  "rationale": "从任意紫色主色出发，伴随色作为可选候选；本图只用主色突出订单服务，其余保持中性。",
+  "canvas": "#FCFAFF",
+  "ink": "#292436",
+  "accent": "#7255B8",
+  "critical": "#C44343",
+  "swatches": {
+    "companion-1": "#B88B55",
+    "companion-2": "#72B855"
+  },
+  "by_kind": {},
+  "by_node": {},
+  "strength": {
+    "normal": 0.15,
+    "primary": 0.32,
+    "surface": 0.025
+  }
+}

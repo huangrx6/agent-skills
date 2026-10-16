@@ -1,0 +1,62 @@
+{
+  "type": "dependency",
+  "visual": "editorial",
+  "style": {
+    "fill": "solid",
+    "line": "straight"
+  },
+  "title": "业务模块依赖契约与存储适配器",
+  "intent": {
+    "question": "业务模块依赖哪些组件？",
+    "audience": "engineer",
+    "pattern": "dependency-impact"
+  },
+  "nodes": [
+    {
+      "id": "app",
+      "label": "订单业务",
+      "kind": "service",
+      "emphasis": "primary"
+    },
+    {
+      "id": "contract",
+      "label": "接口契约",
+      "kind": "plain"
+    },
+    {
+      "id": "adapter",
+      "label": "存储适配器",
+      "kind": "service"
+    },
+    {
+      "id": "driver",
+      "label": "数据库驱动",
+      "kind": "plain"
+    }
+  ],
+  "edges": [
+    {
+      "from": "app",
+      "to": "contract",
+      "label": "依赖"
+    },
+    {
+      "from": "app",
+      "to": "adapter",
+      "label": "依赖"
+    },
+    {
+      "from": "adapter",
+      "to": "driver",
+      "label": "依赖"
+    }
+  ],
+  "cards": [
+    {
+      "title": "方向约定",
+      "items": [
+        "箭头由依赖方指向被依赖方；不表示请求时序。"
+      ]
+    }
+  ]
+}

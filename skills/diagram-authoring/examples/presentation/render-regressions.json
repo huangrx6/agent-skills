@@ -1,0 +1,201 @@
+{
+  "verification": "author-run real Chrome negative cases; no independent evaluation",
+  "clipped_fixed_canvas": {
+    "status": "failed",
+    "basis": "browser-rendered-official-svg",
+    "preset": "slide-16x9",
+    "findings": [
+      {
+        "code": "render/canvas-clipping",
+        "message": "实际文字或图形超出 SVG 画布",
+        "evidence": {
+          "labels": [
+            "确认接单",
+            "登记等待"
+          ],
+          "graphics": 10
+        }
+      }
+    ],
+    "limits": [
+      "未识别每个汉字的实际回退字体或缺字方框",
+      "未证明节点内裁切、遮挡与箭头语义方向正确",
+      "只检查指定 SVG；不证明同名 PNG 或其他页一致",
+      "箭头检查适配本工具的官方导出结构，未支持任意外部 SVG"
+    ],
+    "measurements": {
+      "canvas": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 720
+      },
+      "texts": 8,
+      "min_viewing_px": 23.39,
+      "fonts": [
+        {
+          "family": "Helvetica",
+          "available": true
+        }
+      ]
+    },
+    "source_sha256": "6ca0c49c515b12e0542b2c474a516bbed83480d028458682288334c1d2935faf",
+    "svg_sha256": "ab3ebea2468406b34bf1ce029cd6675c95aa5ae84b0171410fb9403b61f63911"
+  },
+  "fixed_canvas_after_repair": {
+    "status": "pass",
+    "basis": "browser-rendered-official-svg",
+    "preset": "slide-16x9",
+    "findings": [],
+    "limits": [
+      "未识别每个汉字的实际回退字体或缺字方框",
+      "未证明节点内裁切、遮挡与箭头语义方向正确",
+      "只检查指定 SVG；不证明同名 PNG 或其他页一致",
+      "箭头检查适配本工具的官方导出结构，未支持任意外部 SVG"
+    ],
+    "measurements": {
+      "canvas": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 720
+      },
+      "texts": 8,
+      "min_viewing_px": 23.39,
+      "fonts": [
+        {
+          "family": "Helvetica",
+          "available": true
+        }
+      ]
+    },
+    "source_sha256": "6ca0c49c515b12e0542b2c474a516bbed83480d028458682288334c1d2935faf",
+    "svg_sha256": "69f305deae53270060c59091ca42239582eb65521a9fc206692197f9870c45a0"
+  },
+  "injected_failures": {
+    "missing-font": {
+      "status": "failed",
+      "basis": "browser-rendered-official-svg",
+      "preset": "slide-16x9",
+      "findings": [
+        {
+          "code": "render/font-unavailable",
+          "message": "声明字体不可用或加载失败，存在字体替换",
+          "evidence": {
+            "families": [
+              "DeliberatelyMissingDiagramFont"
+            ],
+            "failed_faces": []
+          }
+        }
+      ],
+      "limits": [
+        "未识别每个汉字的实际回退字体或缺字方框",
+        "未证明节点内裁切、遮挡与箭头语义方向正确",
+        "只检查指定 SVG；不证明同名 PNG 或其他页一致",
+        "箭头检查适配本工具的官方导出结构，未支持任意外部 SVG"
+      ],
+      "measurements": {
+        "canvas": {
+          "x": 0,
+          "y": 0,
+          "width": 1280,
+          "height": 720
+        },
+        "texts": 8,
+        "min_viewing_px": 23.39,
+        "fonts": [
+          {
+            "family": "DeliberatelyMissingDiagramFont",
+            "available": false
+          }
+        ]
+      },
+      "source_sha256": "6ca0c49c515b12e0542b2c474a516bbed83480d028458682288334c1d2935faf",
+      "svg_sha256": "cf50ebc3151741b92c2a8b6d6ac33468d758dd08be18c23a09962abe7f5e39aa"
+    },
+    "missing-arrowhead": {
+      "status": "failed",
+      "basis": "browser-rendered-official-svg",
+      "preset": "slide-16x9",
+      "findings": [
+        {
+          "code": "render/arrow-inventory",
+          "message": "导出箭头或箭头头部路径不完整",
+          "evidence": {
+            "expected": 3,
+            "path_counts": [
+              2,
+              3,
+              3
+            ]
+          }
+        }
+      ],
+      "limits": [
+        "未识别每个汉字的实际回退字体或缺字方框",
+        "未证明节点内裁切、遮挡与箭头语义方向正确",
+        "只检查指定 SVG；不证明同名 PNG 或其他页一致",
+        "箭头检查适配本工具的官方导出结构，未支持任意外部 SVG"
+      ],
+      "measurements": {
+        "canvas": {
+          "x": 0,
+          "y": 0,
+          "width": 1280,
+          "height": 720
+        },
+        "texts": 8,
+        "min_viewing_px": 23.39,
+        "fonts": [
+          {
+            "family": "Helvetica",
+            "available": true
+          }
+        ]
+      },
+      "source_sha256": "6ca0c49c515b12e0542b2c474a516bbed83480d028458682288334c1d2935faf",
+      "svg_sha256": "2d47abc6f2bf9c685694af678806232ea37275acdc37c65ddecf7bcc21ea435c"
+    },
+    "missing-label": {
+      "status": "failed",
+      "basis": "browser-rendered-official-svg",
+      "preset": "slide-16x9",
+      "findings": [
+        {
+          "code": "render/label-missing",
+          "message": "导出缺少可见文字",
+          "evidence": {
+            "labels": {
+              "接收订单": 1
+            }
+          }
+        }
+      ],
+      "limits": [
+        "未识别每个汉字的实际回退字体或缺字方框",
+        "未证明节点内裁切、遮挡与箭头语义方向正确",
+        "只检查指定 SVG；不证明同名 PNG 或其他页一致",
+        "箭头检查适配本工具的官方导出结构，未支持任意外部 SVG"
+      ],
+      "measurements": {
+        "canvas": {
+          "x": 0,
+          "y": 0,
+          "width": 1280,
+          "height": 720
+        },
+        "texts": 7,
+        "min_viewing_px": 23.39,
+        "fonts": [
+          {
+            "family": "Helvetica",
+            "available": true
+          }
+        ]
+      },
+      "source_sha256": "6ca0c49c515b12e0542b2c474a516bbed83480d028458682288334c1d2935faf",
+      "svg_sha256": "d1eee17c15d35e222579324861eee6dc52edfb37d6a4c8af2c8f2deffa6eac42"
+    }
+  }
+}

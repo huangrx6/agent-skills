@@ -1,0 +1,12 @@
+{
+  "excalidraw": {
+    "returncode": 0,
+    "quality": "showcase",
+    "log": "✓ examples/architecture/diagram.excalidraw  （4 个节点 / 3 条边 / 18 个元素 / 交叉 0）\n── 交付回执 ──\n确定性校验: 通过（13/13 项，档位 showcase）\n自研预览渲染: 未验证（官方导出 dev-tools/export_excalidraw.py，或预览 dev-tools/preview.py，或在 Excalidraw 里打开核对）\n感知审查: pending（校验全绿 ≠ 图讲清楚了；须人眼看真实渲染）\n规格 sha256: c943278cb2a73234…  产物 sha256: c42793d7d5ddf819…\n"
+  },
+  "drawio": {
+    "returncode": 0,
+    "quality": "showcase",
+    "log": "✓ 已写出 examples/architecture/diagram.drawio（4 个节点 / 3 条边 / 50 行 XML，配色 classic，档位 showcase）\n── 交付回执 ──\n确定性校验: 通过（档位 showcase）\n自研预览渲染: 未验证（需 check_drawio 结构自检已过；目视请在 draw.io 里打开核对）\n感知审查: pending（须人眼看真实渲染）\n规格 sha256: c943278cb2a73234…  产物 sha256: 3cbde37a5c37f929…\n"
+  }
+}

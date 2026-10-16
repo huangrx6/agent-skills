@@ -1,0 +1,60 @@
+{
+  "type": "architecture",
+  "title": "订单从提交到保存",
+  "visual": "editorial",
+  "style": {
+    "fill": "solid",
+    "line": "straight",
+    "corners": "round"
+  },
+  "intent": {
+    "question": "订单如何从入口到数据库？",
+    "audience": "mixed"
+  },
+  "nodes": [
+    {
+      "id": "web",
+      "label": "用户入口",
+      "kind": "client",
+      "detail": "提交订单"
+    },
+    {
+      "id": "api",
+      "label": "订单服务",
+      "kind": "service",
+      "detail": "校验请求",
+      "emphasis": "primary"
+    },
+    {
+      "id": "queue",
+      "label": "事件队列",
+      "kind": "async",
+      "detail": "异步处理"
+    },
+    {
+      "id": "store",
+      "label": "订单库",
+      "kind": "data",
+      "detail": "保存结果"
+    }
+  ],
+  "edges": [
+    {
+      "from": "web",
+      "to": "api",
+      "label": "请求"
+    },
+    {
+      "from": "api",
+      "to": "queue",
+      "kind": "async",
+      "label": "发布事件"
+    },
+    {
+      "from": "queue",
+      "to": "store",
+      "kind": "data",
+      "label": "写入"
+    }
+  ]
+}

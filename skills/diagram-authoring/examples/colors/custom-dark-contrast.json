@@ -1,0 +1,434 @@
+{
+  "status": "pass",
+  "basis": "resolved-solid-color-pairs",
+  "checks": [
+    {
+      "subject": "neutral:text",
+      "foreground": "#EDF3EF",
+      "background": "#182429",
+      "minimum": 4.5,
+      "ratio": 14.108,
+      "passed": true
+    },
+    {
+      "subject": "neutral:boundary-0",
+      "foreground": "#7E8788",
+      "background": "#182429",
+      "minimum": 3,
+      "ratio": 4.314,
+      "passed": true
+    },
+    {
+      "subject": "neutral:boundary-1",
+      "foreground": "#7E8788",
+      "background": "#1F2B30",
+      "minimum": 3,
+      "ratio": 3.946,
+      "passed": true
+    },
+    {
+      "subject": "neutral:boundary-2",
+      "foreground": "#7E8788",
+      "background": "#182429",
+      "minimum": 3,
+      "ratio": 4.314,
+      "passed": true
+    },
+    {
+      "subject": "surface-boundary:text",
+      "foreground": "#EDF3EF",
+      "background": "#182429",
+      "minimum": 4.5,
+      "ratio": 14.108,
+      "passed": true
+    },
+    {
+      "subject": "surface-boundary:boundary-0",
+      "foreground": "#7E8788",
+      "background": "#182429",
+      "minimum": 3,
+      "ratio": 4.314,
+      "passed": true
+    },
+    {
+      "subject": "surface-boundary:boundary-1",
+      "foreground": "#7E8788",
+      "background": "#1F2B30",
+      "minimum": 3,
+      "ratio": 3.946,
+      "passed": true
+    },
+    {
+      "subject": "surface-boundary:boundary-2",
+      "foreground": "#7E8788",
+      "background": "#182429",
+      "minimum": 3,
+      "ratio": 4.314,
+      "passed": true
+    },
+    {
+      "subject": "primary:text",
+      "foreground": "#EDF3EF",
+      "background": "#48403F",
+      "minimum": 4.5,
+      "ratio": 8.972,
+      "passed": true
+    },
+    {
+      "subject": "primary:boundary-0",
+      "foreground": "#F3A38F",
+      "background": "#182429",
+      "minimum": 3,
+      "ratio": 7.895,
+      "passed": true
+    },
+    {
+      "subject": "primary:boundary-1",
+      "foreground": "#F3A38F",
+      "background": "#1F2B30",
+      "minimum": 3,
+      "ratio": 7.222,
+      "passed": true
+    },
+    {
+      "subject": "primary:boundary-2",
+      "foreground": "#F3A38F",
+      "background": "#48403F",
+      "minimum": 3,
+      "ratio": 5.021,
+      "passed": true
+    },
+    {
+      "subject": "critical:text",
+      "foreground": "#EDF3EF",
+      "background": "#42333A",
+      "minimum": 4.5,
+      "ratio": 10.569,
+      "passed": true
+    },
+    {
+      "subject": "critical:boundary-0",
+      "foreground": "#FF7685",
+      "background": "#182429",
+      "minimum": 3,
+      "ratio": 6.184,
+      "passed": true
+    },
+    {
+      "subject": "critical:boundary-1",
+      "foreground": "#FF7685",
+      "background": "#1F2B30",
+      "minimum": 3,
+      "ratio": 5.656,
+      "passed": true
+    },
+    {
+      "subject": "critical:boundary-2",
+      "foreground": "#FF7685",
+      "background": "#42333A",
+      "minimum": 3,
+      "ratio": 4.632,
+      "passed": true
+    },
+    {
+      "subject": "surface:text",
+      "foreground": "#EDF3EF",
+      "background": "#1F2B30",
+      "minimum": 4.5,
+      "ratio": 12.905,
+      "passed": true
+    },
+    {
+      "subject": "surface:boundary",
+      "foreground": "#7E8788",
+      "background": "#1F2B30",
+      "minimum": 3,
+      "ratio": 3.946,
+      "passed": true
+    },
+    {
+      "subject": "sea-glass:text",
+      "foreground": "#EDF3EF",
+      "background": "#223438",
+      "minimum": 4.5,
+      "ratio": 11.549,
+      "passed": true
+    },
+    {
+      "subject": "sea-glass:boundary-0",
+      "foreground": "#80C9C2",
+      "background": "#182429",
+      "minimum": 3,
+      "ratio": 8.352,
+      "passed": true
+    },
+    {
+      "subject": "sea-glass:boundary-1",
+      "foreground": "#80C9C2",
+      "background": "#1F2B30",
+      "minimum": 3,
+      "ratio": 7.64,
+      "passed": true
+    },
+    {
+      "subject": "sea-glass:boundary-2",
+      "foreground": "#80C9C2",
+      "background": "#223438",
+      "minimum": 3,
+      "ratio": 6.837,
+      "passed": true
+    },
+    {
+      "subject": "gold:text",
+      "foreground": "#EDF3EF",
+      "background": "#2D3431",
+      "minimum": 4.5,
+      "ratio": 11.333,
+      "passed": true
+    },
+    {
+      "subject": "gold:boundary-0",
+      "foreground": "#E7C278",
+      "background": "#182429",
+      "minimum": 3,
+      "ratio": 9.36,
+      "passed": true
+    },
+    {
+      "subject": "gold:boundary-1",
+      "foreground": "#E7C278",
+      "background": "#1F2B30",
+      "minimum": 3,
+      "ratio": 8.563,
+      "passed": true
+    },
+    {
+      "subject": "gold:boundary-2",
+      "foreground": "#E7C278",
+      "background": "#2D3431",
+      "minimum": 3,
+      "ratio": 7.52,
+      "passed": true
+    },
+    {
+      "subject": "accent:text",
+      "foreground": "#EDF3EF",
+      "background": "#2E3133",
+      "minimum": 4.5,
+      "ratio": 11.643,
+      "passed": true
+    },
+    {
+      "subject": "accent:boundary-0",
+      "foreground": "#F3A38F",
+      "background": "#182429",
+      "minimum": 3,
+      "ratio": 7.895,
+      "passed": true
+    },
+    {
+      "subject": "accent:boundary-1",
+      "foreground": "#F3A38F",
+      "background": "#1F2B30",
+      "minimum": 3,
+      "ratio": 7.222,
+      "passed": true
+    },
+    {
+      "subject": "accent:boundary-2",
+      "foreground": "#F3A38F",
+      "background": "#2E3133",
+      "minimum": 3,
+      "ratio": 6.516,
+      "passed": true
+    },
+    {
+      "subject": "critical:text",
+      "foreground": "#EDF3EF",
+      "background": "#2F2C32",
+      "minimum": 4.5,
+      "ratio": 12.223,
+      "passed": true
+    },
+    {
+      "subject": "critical:boundary-0",
+      "foreground": "#FF7685",
+      "background": "#182429",
+      "minimum": 3,
+      "ratio": 6.184,
+      "passed": true
+    },
+    {
+      "subject": "critical:boundary-1",
+      "foreground": "#FF7685",
+      "background": "#1F2B30",
+      "minimum": 3,
+      "ratio": 5.656,
+      "passed": true
+    },
+    {
+      "subject": "critical:boundary-2",
+      "foreground": "#FF7685",
+      "background": "#2F2C32",
+      "minimum": 3,
+      "ratio": 5.358,
+      "passed": true
+    },
+    {
+      "subject": "sea-glass:primary:text",
+      "foreground": "#EDF3EF",
+      "background": "#2F484B",
+      "minimum": 4.5,
+      "ratio": 8.685,
+      "passed": true
+    },
+    {
+      "subject": "sea-glass:primary:boundary-0",
+      "foreground": "#80C9C2",
+      "background": "#182429",
+      "minimum": 3,
+      "ratio": 8.352,
+      "passed": true
+    },
+    {
+      "subject": "sea-glass:primary:boundary-1",
+      "foreground": "#80C9C2",
+      "background": "#1F2B30",
+      "minimum": 3,
+      "ratio": 7.64,
+      "passed": true
+    },
+    {
+      "subject": "sea-glass:primary:boundary-2",
+      "foreground": "#80C9C2",
+      "background": "#2F484B",
+      "minimum": 3,
+      "ratio": 5.142,
+      "passed": true
+    },
+    {
+      "subject": "gold:primary:text",
+      "foreground": "#EDF3EF",
+      "background": "#46473A",
+      "minimum": 4.5,
+      "ratio": 8.398,
+      "passed": true
+    },
+    {
+      "subject": "gold:primary:boundary-0",
+      "foreground": "#E7C278",
+      "background": "#182429",
+      "minimum": 3,
+      "ratio": 9.36,
+      "passed": true
+    },
+    {
+      "subject": "gold:primary:boundary-1",
+      "foreground": "#E7C278",
+      "background": "#1F2B30",
+      "minimum": 3,
+      "ratio": 8.563,
+      "passed": true
+    },
+    {
+      "subject": "gold:primary:boundary-2",
+      "foreground": "#E7C278",
+      "background": "#46473A",
+      "minimum": 3,
+      "ratio": 5.572,
+      "passed": true
+    },
+    {
+      "subject": "accent:primary:text",
+      "foreground": "#EDF3EF",
+      "background": "#48403F",
+      "minimum": 4.5,
+      "ratio": 8.972,
+      "passed": true
+    },
+    {
+      "subject": "accent:primary:boundary-0",
+      "foreground": "#F3A38F",
+      "background": "#182429",
+      "minimum": 3,
+      "ratio": 7.895,
+      "passed": true
+    },
+    {
+      "subject": "accent:primary:boundary-1",
+      "foreground": "#F3A38F",
+      "background": "#1F2B30",
+      "minimum": 3,
+      "ratio": 7.222,
+      "passed": true
+    },
+    {
+      "subject": "accent:primary:boundary-2",
+      "foreground": "#F3A38F",
+      "background": "#48403F",
+      "minimum": 3,
+      "ratio": 5.021,
+      "passed": true
+    },
+    {
+      "subject": "critical:primary:text",
+      "foreground": "#EDF3EF",
+      "background": "#4B363D",
+      "minimum": 4.5,
+      "ratio": 9.855,
+      "passed": true
+    },
+    {
+      "subject": "critical:primary:boundary-0",
+      "foreground": "#FF7685",
+      "background": "#182429",
+      "minimum": 3,
+      "ratio": 6.184,
+      "passed": true
+    },
+    {
+      "subject": "critical:primary:boundary-1",
+      "foreground": "#FF7685",
+      "background": "#1F2B30",
+      "minimum": 3,
+      "ratio": 5.656,
+      "passed": true
+    },
+    {
+      "subject": "critical:primary:boundary-2",
+      "foreground": "#FF7685",
+      "background": "#4B363D",
+      "minimum": 3,
+      "ratio": 4.319,
+      "passed": true
+    },
+    {
+      "subject": "edge",
+      "foreground": "#98A0A0",
+      "background": "#182429",
+      "minimum": 3,
+      "ratio": 5.948,
+      "passed": true
+    },
+    {
+      "subject": "edge",
+      "foreground": "#98A0A0",
+      "background": "#1F2B30",
+      "minimum": 3,
+      "ratio": 5.441,
+      "passed": true
+    },
+    {
+      "subject": "canvas:text",
+      "foreground": "#EDF3EF",
+      "background": "#182429",
+      "minimum": 4.5,
+      "ratio": 14.108,
+      "passed": true
+    }
+  ],
+  "adjustments": [],
+  "limits": [
+    "不检查透明度、图标像素、纹理或色觉缺陷；不代表审美或完整无障碍验收"
+  ]
+}

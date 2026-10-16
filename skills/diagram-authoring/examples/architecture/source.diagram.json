@@ -1,0 +1,62 @@
+{
+  "type": "architecture",
+  "visual": "editorial",
+  "style": {
+    "fill": "solid",
+    "line": "straight"
+  },
+  "title": "订单请求通过服务写入数据库",
+  "intent": {
+    "question": "订单请求在哪里处理和保存？",
+    "audience": "mixed"
+  },
+  "nodes": [
+    {
+      "id": "client",
+      "label": "Web 客户端",
+      "kind": "client"
+    },
+    {
+      "id": "gateway",
+      "label": "API 入口",
+      "kind": "service",
+      "group": "core"
+    },
+    {
+      "id": "orders",
+      "label": "订单服务",
+      "kind": "service",
+      "emphasis": "primary",
+      "group": "core"
+    },
+    {
+      "id": "db",
+      "label": "订单库",
+      "kind": "data",
+      "group": "core"
+    }
+  ],
+  "edges": [
+    {
+      "from": "client",
+      "to": "gateway",
+      "label": "HTTPS"
+    },
+    {
+      "from": "gateway",
+      "to": "orders",
+      "label": "提交订单"
+    },
+    {
+      "from": "orders",
+      "to": "db",
+      "label": "持久化"
+    }
+  ],
+  "groups": [
+    {
+      "id": "core",
+      "label": "订单系统"
+    }
+  ]
+}

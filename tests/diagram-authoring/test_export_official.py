@@ -25,6 +25,9 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+import contextlib
+import io
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # 测试住在仓库顶层 `tests/<skill>/`（刻意不在 skill 目录里，理由见同目录其它测试）。
@@ -122,6 +125,25 @@ class TestDefaultPadding(unittest.TestCase):
             X.main(["不存在的场景.excalidraw", "-o", "x.png"])
         self.assertEqual(X.DEFAULT_PADDING, seen.get("padding"),
                          "命令行默认留白必须取自同一个常量（两处写死会漂）")
+
+    def test_svg_only_cli_does_not_request_png(self):
+        with patch.object(X, 'export', return_value={'ok': True, 'outputs': {'svg': 'x.svg'}}) as render:
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(X.main(['x.excalidraw', '--svg', 'x.svg']), 0)
+        self.assertEqual(render.call_args.args, ('x.excalidraw', None, 'x.svg'))
+
+    def test_requested_formats_control_browser_work(self):
+        page = X._inject_scene(X.PAGE_TEMPLATE, SCENE, 1, 80, want_png=False, want_svg=True)
+        self.assertIn('var WANT_PNG = false, WANT_SVG = true;', page)
+        self.assertIn('if (WANT_PNG)', page)
+        self.assertIn('if (WANT_SVG)', page)
+        self.assertNotIn('__WANT_', page)
+
+    def test_nonfinite_scale_and_negative_padding_fail_before_browser(self):
+        with patch.object(X, 'find_browser', side_effect=AssertionError('browser started')):
+            for options in ({'scale': float('nan')}, {'scale': float('inf')}, {'padding': -1}, {'padding': float('inf')}):
+                with self.subTest(options=options):
+                    self.assertEqual(X.export('missing.excalidraw', 'out.png', None, **options)['stage'], 'input')
 
 
 class TestReceipts(unittest.TestCase):
@@ -243,9 +265,9 @@ class TestCanvasBox(unittest.TestCase):
                                        "center": [110.0, 70.0], "fit": 1.0})
         self.assertIn('width="400"', out)
         self.assertIn('height="400"', out)
-        self.assertIn('viewBox="-90 -130 400 400"', out, "按内容中心居中")
+        self.assertIn('viewBox="-68 -118 400 400"', out, "按官方 SVG 自身坐标中心居中，而非源场景中心")
         # 背景板要跟着长大，否则扩出来的地方是透明的，和 PNG 那条路对不上
-        self.assertIn('<rect x="-90" y="-130" width="400" height="400" fill="#FBFAF2"/>', out)
+        self.assertIn('<rect x="-68" y="-118" width="400" height="400" fill="#FBFAF2"/>', out)
 
     def test_svg_patch_refuses_a_structure_it_cannot_read(self):
         """官方包换了 SVG 结构 → 宁可报错，也不要默默给一张比例不对的图。"""

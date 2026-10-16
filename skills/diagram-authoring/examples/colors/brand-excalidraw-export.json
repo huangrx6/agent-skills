@@ -1,0 +1,6 @@
+{
+  "ok": false,
+  "stage": "page",
+  "message": "导出异常: Failed to fetch dynamically imported module: https://cdn.jsdelivr.net/npm/@excalidraw/utils@0.1.5/+esm",
+  "browser": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+}

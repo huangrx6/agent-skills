@@ -1,0 +1,54 @@
+{
+  "type": "flow",
+  "visual": "editorial",
+  "style": {
+    "fill": "solid",
+    "line": "straight"
+  },
+  "title": "库存校验决定接单或等待",
+  "intent": {
+    "question": "库存不足时如何处理？",
+    "audience": "mixed"
+  },
+  "nodes": [
+    {
+      "id": "request",
+      "label": "接收订单",
+      "kind": "client"
+    },
+    {
+      "id": "check",
+      "label": "库存充足？",
+      "kind": "plain",
+      "shape": "diamond",
+      "emphasis": "primary"
+    },
+    {
+      "id": "accept",
+      "label": "确认接单",
+      "kind": "service"
+    },
+    {
+      "id": "wait",
+      "label": "登记等待",
+      "kind": "async"
+    }
+  ],
+  "edges": [
+    {
+      "from": "request",
+      "to": "check",
+      "label": "校验"
+    },
+    {
+      "from": "check",
+      "to": "accept",
+      "label": "充足"
+    },
+    {
+      "from": "check",
+      "to": "wait",
+      "label": "不足"
+    }
+  ]
+}

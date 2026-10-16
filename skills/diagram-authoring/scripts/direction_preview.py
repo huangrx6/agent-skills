@@ -1,13 +1,7 @@
 #!/usr/bin/env python3
-"""把几个视觉方向画成一张并排的对照图 —— 给用户**挑方向用**的。
+"""按需把旧 Excalidraw 画法放在同一张可编辑对照图中。
 
-## 为什么需要它
-
-主题名（`soft-light` / `clean-light` / `dark`）说明不了什么 —— 用户要看了才知道喜不喜欢。
-以前的做法是"模型替用户选一个然后生成"，于是经常生成完才发现颜色不是他要的，
-再改一次的成本比先看一眼高得多。
-
-**用法**：出图之前跑一次，把生成的文件给用户看，让他挑；他指定了就照做。
+仅在用户需要比较时运行，不作为出图前置步骤。任意配色使用 color_design.py。
 
     python3 scripts/direction_preview.py -o /tmp/directions.excalidraw
     # 然后在 Obsidian 或 excalidraw.com 里打开
@@ -88,7 +82,6 @@ def build(directions: list[str] | None = None) -> dict:
     for index, direction in enumerate(names):
         with palette.direction_context(direction):
             scene, _placed, outcome, _ = emit.emit(dict(SAMPLE))
-            canvas = palette.CANVAS["background"]
             width = scene["appState"].get("width", 0) or _span(
                 scene["elements"], "x", "width")
             height = scene["appState"].get("height", 0) or _span(
@@ -136,6 +129,8 @@ def _namespace(elements: list[dict], direction: str) -> list[dict]:
     for element in elements:
         copy = dict(element)
         copy["id"] = mapping[element["id"]]
+        if copy.get("groupIds"):
+            copy["groupIds"] = [f"{direction}--{group}" for group in copy["groupIds"]]
         if copy.get("containerId"):
             copy["containerId"] = mapping.get(copy["containerId"], copy["containerId"])
         if copy.get("frameId"):

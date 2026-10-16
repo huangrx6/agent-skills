@@ -1,0 +1,71 @@
+{
+  "type": "network",
+  "visual": "editorial",
+  "style": {
+    "fill": "solid",
+    "line": "straight"
+  },
+  "title": "四个对等节点的已知消息连接",
+  "intent": {
+    "question": "哪些节点存在消息连接？",
+    "audience": "engineer"
+  },
+  "nodes": [
+    {
+      "id": "a",
+      "label": "节点 A",
+      "kind": "service",
+      "emphasis": "primary"
+    },
+    {
+      "id": "b",
+      "label": "节点 B",
+      "kind": "service"
+    },
+    {
+      "id": "c",
+      "label": "节点 C",
+      "kind": "service"
+    },
+    {
+      "id": "d",
+      "label": "节点 D",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "a",
+      "to": "b",
+      "label": "消息"
+    },
+    {
+      "from": "b",
+      "to": "c",
+      "label": "消息"
+    },
+    {
+      "from": "c",
+      "to": "d",
+      "label": "消息"
+    },
+    {
+      "from": "d",
+      "to": "a",
+      "label": "消息"
+    },
+    {
+      "from": "a",
+      "to": "c",
+      "label": "消息"
+    }
+  ],
+  "cards": [
+    {
+      "title": "阅读约定",
+      "items": [
+        "箭头表示消息方向；图中距离不代表网络延迟。"
+      ]
+    }
+  ]
+}

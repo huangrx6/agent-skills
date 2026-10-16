@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "outputs": {
+    "png": "examples/presentation/slide-excalidraw.png",
+    "svg": "examples/presentation/slide-excalidraw.svg"
+  },
+  "browser": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "engine": "official @excalidraw/utils exportToBlob/exportToSvg",
+  "size": {
+    "width": 1280,
+    "height": 720
+  },
+  "requested": {
+    "width": 1280,
+    "height": 720
+  },
+  "content_scale": 1.041667
+}

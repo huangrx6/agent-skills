@@ -5,7 +5,7 @@
 
 ## 可运行示例
 
-以下 JSON 可保存为 `system.diagram.json`，两个后端均可生成：
+以下 JSON 可保存为 `system.diagram.json`，Excalidraw、draw.io 和 Mermaid flowchart 均可生成：
 
 ```json
 {
@@ -32,6 +32,7 @@
 
 | 字段 | 含义 |
 | --- | --- |
+| `intent` | 可选表达意图对象，见下节；不改变标签、布局或可见信息 |
 | `type`（必填） | `architecture` / `dependency` / `flow` / `state` / `mindmap` / `network` |
 | `nodes`（必填） | 非空节点数组 |
 | `title` | 图标题，字符串 |
@@ -44,8 +45,15 @@
 | `mood` | 用户的视觉意图短句，辅助自动选方向/方案 |
 | `style` | 样式轴对象，见下表 |
 
-`architecture` / `dependency` 默认 LR；`flow` / `state` 默认 TB。
+`architecture` / `state` 默认 LR；`dependency` / `flow` 默认 TB。
 `mindmap` 用径向布局，`network` 用力导向布局。不能把算法名写成 type。
+
+## 表达意图（可选）
+
+`intent` 仅接受 `question`（非空读者问题）、`audience`（engineer/mixed/executive）、
+`pattern`（capacity/lifecycle/recovery/boundary/decomposition/dependency-impact）。
+可省略整个对象或其中字段；未知键与非法值报错。它不含画布/字号，不自动修改任何图形内容。
+模式说明见 [表达模式](semantic-patterns.md)。受众与顶层 detail 独立。
 
 ## 节点、边和分组
 
@@ -114,3 +122,5 @@ python3 scripts/check_layout.py system.diagram.json --quality showcase --json
 
 校验只查本契约与布局模型；源材料真实性、图是否讲清楚及应用重排后的效果还需复核。
 字段与默认值以 `validate_spec.py`、`palette.py`、`shapes.py`、`layout.py` 为准。
+
+Mermaid 转换复用本结构契约，但不用布局坐标；支持范围、形状近似与明确拒绝的约束见 [Mermaid 后端](mermaid-backend.md)。

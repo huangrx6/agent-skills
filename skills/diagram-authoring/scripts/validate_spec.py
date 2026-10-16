@@ -23,7 +23,7 @@ import sys
 # 封闭字段集。加字段要同时改这里和 references/diagram-spec.md —— 这正是设计意图：
 # 让"顺手加一个"变得有摩擦。
 TOP_FIELDS = {"type", "title", "direction", "detail", "groups", "nodes", "edges",
-              "visual", "mood", "style", "cards"}
+              "visual", "mood", "style", "cards", "intent"}
 GROUP_FIELDS = {"id", "label", "level", "style", "description"}
 NODE_FIELDS = {"id", "label", "kind", "shape", "emphasis", "icon", "group",
                "detail", "rank", "pin"}
@@ -64,6 +64,7 @@ def _load_sibling(name: str):
     return module
 
 
+authoring = _load_sibling("authoring")
 _palette = _load_sibling("palette")
 KINDS = _palette.KINDS
 
@@ -161,6 +162,20 @@ def validate(spec: dict) -> Issues:
                              or spec["detail"] not in DETAIL_LEVELS):
         issues.error("BAD_DETAIL", "$.detail",
                      f"detail 只允许 {sorted(DETAIL_LEVELS)}")
+
+    # Intent records semantic decisions, never pixel-level presentation settings.
+    if "intent" in spec:
+        intent = spec["intent"]
+        if not isinstance(intent, dict):
+            issues.error("BAD_INTENT", "$.intent", "intent 必须是对象")
+        else:
+            _check_fields(intent, {"question", "audience", "pattern"}, "$.intent", issues)
+            for key, value in intent.items():
+                if key in {"question", "audience", "pattern"} and (not isinstance(value, str) or not value.strip()):
+                    issues.error("BAD_INTENT_VALUE", f"$.intent.{key}", "必须是非空字符串")
+            for key, choices in (("audience", authoring.AUDIENCES), ("pattern", authoring.PATTERNS)):
+                if key in intent and isinstance(intent[key], str) and intent[key] not in choices:
+                    issues.error("BAD_INTENT_VALUE", f"$.intent.{key}", f"只允许 {sorted(choices)}")
 
     # style：四组样式轴。未知的轴、未知的取值都报错 —— 与颜色同一条规矩。
     _check_style(spec.get("style"), "$.style", issues)

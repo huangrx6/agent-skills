@@ -1,25 +1,10 @@
 #!/usr/bin/env python3
-"""把五套 drawio 配色方案做成一页一套的 **预览文件** —— 给用户**挑风格用**的。
+"""按需比较旧 draw.io 画法的多页预览；不是必经选题步骤。
 
-## 为什么需要它（和 `direction_preview.py` 同一个理由）
-
-方案名（`classic` / `engineering` / `print` …）说明不了什么 —— 用户要看了才知道喜不喜欢。
-由模型替用户选一个然后出图，经常是出完才发现"不是我想要的那个专业感"，改一次的成本
-比先看一眼高得多。
-
-**用法**：用户**没指定风格**时，出图之前跑一次，把生成的文件给他，他在**底部页签**上
-一页页切着挑；挑完再照他选的那套出正式图。
+用户未指定风格时可由作者选择。项目自由配色见 color_design.py 和
+references/color-design.md；此脚本保留旧方案的字体、圆角与箭头对照。
 
     python3 scripts/scheme_preview.py -o /tmp/schemes.drawio
-    # 然后在 draw.io / app.diagrams.net 里打开，切页签看
-
-**为什么用"多页"而不是像 Excalidraw 那样并排几块**：draw.io 的页签是原生能力，
-而**每页可以有自己的底色** —— Excalidraw 那边只能整个文件一个底色，所以它得给深色
-面板手工铺一块底矩形（见 `direction_preview.py` 文档里那个坑）。多页顺手绕开了它，
-而且页签名直接就是方案名。
-
-五页用的是**同一张样例图**（同一组节点、同一种布局，只有配色不同）—— 不然"哪个更好看"
-会被内容和版式的差异盖住。
 """
 
 from __future__ import annotations

@@ -1,0 +1,32 @@
+{
+  "status": "pass",
+  "basis": "browser-rendered-official-svg",
+  "preset": "slide-16x9",
+  "findings": [],
+  "limits": [
+    "未识别每个汉字的实际回退字体或缺字方框",
+    "内部裁切仅检查矩形 overflow；不检查任意 clipPath/mask 或形状内文字安全区",
+    "重叠按文字包围盒，遮挡按后绘制不透明 SVG 填充采样；不覆盖图像、滤镜、透明叠层或所有字形像素",
+    "未证明箭头语义方向正确",
+    "只检查指定 SVG；不证明同名 PNG 或其他页一致",
+    "箭头检查适配本工具的官方导出结构，未支持任意外部 SVG"
+  ],
+  "measurements": {
+    "canvas": {
+      "x": 0,
+      "y": 0,
+      "width": 1347,
+      "height": 680
+    },
+    "texts": 12,
+    "min_viewing_px": 19.01,
+    "fonts": [
+      {
+        "family": "Helvetica",
+        "available": true
+      }
+    ]
+  },
+  "source_sha256": "4346bc9d689877df1de5a298cdf0c2555ad701f6dbc73217b5b1234cd024e906",
+  "svg_sha256": "1a18fc0b0cde2c410e8e8fe2b7aadd4f18b4a95a7e689a566fd8891c8d4d39b1"
+}

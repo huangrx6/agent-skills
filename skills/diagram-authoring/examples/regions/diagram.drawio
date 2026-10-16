@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="diagram-authoring" agent="diagram-authoring" version="24.0.0" type="device">
+  <diagram id="c7a61a620339" name="分区底色帮助识别处理层次">
+        <mxGraphModel dx="800" dy="600" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="826" background="#FFFFFF" math="0" shadow="0">
+          <root>
+        <mxCell id="0" />
+        <mxCell id="2" value="区域与标题（锁定）" parent="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="region-entry" value="" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;locked=1;movable=0;resizable=0;editable=0;fillColor=#E7EDF2;strokeColor=#7C8289;strokeWidth=1;dashed=0" vertex="1" parent="2">
+          <mxGeometry x="24.0" y="106.6" width="272.0" height="218.8" as="geometry" />
+        </mxCell>
+        <mxCell id="region-label-entry" value="接入区" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;locked=1;movable=0;resizable=0;editable=0;fontColor=#28333D;fontSize=20;fontFamily=Helvetica" vertex="1" parent="2">
+          <mxGeometry x="36.0" y="124.6" width="60.0" height="28.0" as="geometry" />
+        </mxCell>
+        <mxCell id="region-process" value="" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;locked=1;movable=0;resizable=0;editable=0;fillColor=#E0EBE5;strokeColor=#7C8289;strokeWidth=1;dashed=0" vertex="1" parent="2">
+          <mxGeometry x="348.0" y="105.2" width="282.0" height="221.6" as="geometry" />
+        </mxCell>
+        <mxCell id="region-label-process" value="处理区" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;locked=1;movable=0;resizable=0;editable=0;fontColor=#28333D;fontSize=20;fontFamily=Helvetica" vertex="1" parent="2">
+          <mxGeometry x="360.0" y="123.2" width="60.0" height="28.0" as="geometry" />
+        </mxCell>
+        <mxCell id="region-data" value="" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;locked=1;movable=0;resizable=0;editable=0;fillColor=#F4EDDE;strokeColor=#7C8289;strokeWidth=1;dashed=0" vertex="1" parent="2">
+          <mxGeometry x="682.0" y="93.6" width="272.0" height="244.8" as="geometry" />
+        </mxCell>
+        <mxCell id="region-label-data" value="数据区" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;locked=1;movable=0;resizable=0;editable=0;fontColor=#28333D;fontSize=20;fontFamily=Helvetica" vertex="1" parent="2">
+          <mxGeometry x="694.0" y="111.6" width="60.0" height="28.0" as="geometry" />
+        </mxCell>
+        <UserObject id="n-api" label="接入服务&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;接收请求&lt;/span&gt;" tooltip="接收请求" node_id="api" kind="service" group="entry" emphasis="normal" level="neutral">
+          <mxCell style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7C8289;strokeWidth=2;fontSize=16;fontFamily=Helvetica;fontColor=#28333D" vertex="1" parent="1">
+          <mxGeometry x="58.0" y="198.6" width="204.0" height="92.8" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject id="n-worker" label="处理服务&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;校验与计算&lt;/span&gt;" tooltip="校验与计算" node_id="worker" kind="service" group="process" emphasis="primary" level="accent">
+          <mxCell style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#C2D3DE;strokeColor=#356B91;strokeWidth=3;fontSize=17;fontFamily=Helvetica;fontColor=#28333D" vertex="1" parent="1">
+          <mxGeometry x="382.0" y="197.2" width="214.0" height="95.6" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject id="n-store" label="结果库&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;保存结果&lt;/span&gt;" tooltip="保存结果" node_id="store" kind="data" group="data" emphasis="normal" level="neutral">
+          <mxCell style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=12;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7C8289;strokeWidth=2;fontSize=16;fontFamily=Helvetica;fontColor=#28333D" vertex="1" parent="1">
+          <mxGeometry x="716.0" y="185.6" width="204.0" height="118.8" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="e-0" value="任务" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#7E858B;strokeWidth=1;dashed=0;fontColor=#28333D;fontSize=12;fontFamily=Helvetica;labelBackgroundColor=#FFFFFF;exitX=1.0;exitY=0.5;exitPerimeter=1;entryX=0.0;entryY=0.5;entryPerimeter=1" edge="1" source="n-api" target="n-worker" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="0.0" y="-18.4" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e-1" value="保存" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#7E858B;strokeWidth=1;dashed=0;fontColor=#28333D;fontSize=12;fontFamily=Helvetica;labelBackgroundColor=#FFFFFF;exitX=1.0;exitY=0.5;exitPerimeter=1;entryX=0.0;entryY=0.5;entryPerimeter=1" edge="1" source="n-worker" target="n-store" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="0.0" y="-18.4" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="diagram-title" value="分区底色帮助识别处理层次" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;locked=1;movable=0;resizable=0;fontColor=#28333D;fontSize=24;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="345.0" y="24.0" width="288.0" height="33.6" as="geometry" />
+        </mxCell>
+          </root>
+        </mxGraphModel>
+  </diagram>
+</mxfile>

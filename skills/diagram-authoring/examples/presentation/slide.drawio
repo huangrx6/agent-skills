@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="diagram-authoring" agent="diagram-authoring" version="24.0.0" type="device">
+  <diagram id="b9f6ffdb9f16" name="订单服务校验后保存数据">
+        <mxGraphModel dx="800" dy="600" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="826" background="#FFFFFF" math="0" shadow="0">
+          <root>
+        <mxCell id="0" />
+        <mxCell id="2" value="区域与标题（锁定）" parent="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="region-core" value="" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;locked=1;movable=0;resizable=0;editable=0;fillColor=#E9EFFD;strokeColor=#CDD0D4;strokeWidth=1;dashed=0" vertex="1" parent="2">
+          <mxGeometry x="406.0" y="92.8" width="770.0" height="266.0" as="geometry" />
+        </mxCell>
+        <mxCell id="region-label-core" value="订单处理边界" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;locked=1;movable=0;resizable=0;editable=0;fontColor=#374151;fontSize=24;fontFamily=Helvetica" vertex="1" parent="2">
+          <mxGeometry x="418.0" y="112.0" width="144.0" height="33.6" as="geometry" />
+        </mxCell>
+        <UserObject id="n-api" label="API 入口&lt;br&gt;&lt;span style=&quot;font-size:20px&quot;&gt;接收订单&lt;/span&gt;" tooltip="接收订单" node_id="api" kind="service" emphasis="normal" level="neutral">
+          <mxCell style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#374151;strokeWidth=2;fontSize=24;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="24.0" y="212.6" width="276.0" height="99.2" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject id="n-order" label="订单服务&lt;br&gt;&lt;span style=&quot;font-size:20px&quot;&gt;校验必要字段&lt;/span&gt;" tooltip="校验必要字段" node_id="order" kind="service" group="core" emphasis="primary" level="accent">
+          <mxCell style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#E0E9FC;strokeColor=#2563EB;strokeWidth=3;fontSize=25;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="440.0" y="211.2" width="286.0" height="102.0" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject id="n-db" label="订单库&lt;br&gt;&lt;span style=&quot;font-size:20px&quot;&gt;保存订单记录&lt;/span&gt;" tooltip="保存订单记录" node_id="db" kind="data" group="core" emphasis="normal" level="neutral">
+          <mxCell style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=12;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#374151;strokeWidth=2;fontSize=24;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="866.0" y="199.6" width="276.0" height="125.2" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="e-0" value="提交订单" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;fontSize=20;fontFamily=Helvetica;labelBackgroundColor=#FFFFFF;exitX=1.0;exitY=0.5;exitPerimeter=1;entryX=0.0;entryY=0.5;entryPerimeter=1" edge="1" source="n-api" target="n-order" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="-17.5" y="-24.0" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e-1" value="持久化" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;fontSize=20;fontFamily=Helvetica;labelBackgroundColor=#FFFFFF;exitX=1.0;exitY=0.5;exitPerimeter=1;entryX=0.0;entryY=0.5;entryPerimeter=1" edge="1" source="n-order" target="n-db" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="0.0" y="-24.0" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="card-0" value="&lt;span style=&quot;font-size:24px&quot;&gt;&lt;b&gt;阅读重点&lt;/b&gt;&lt;/span&gt;&lt;br&gt;• 入口接收，服务校验，数据库保存。" style="rounded=1;arcSize=8;dashed=1;html=1;align=left;verticalAlign=top;spacingLeft=24;spacingTop=9;fillColor=#E9EFFD;strokeColor=#CDD0D4;strokeWidth=1;fontSize=20;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="360.0" y="390.8" width="480.0" height="119.6" as="geometry" />
+        </mxCell>
+        <mxCell id="diagram-title" value="订单服务校验后保存数据" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;locked=1;movable=0;resizable=0;fontColor=#374151;fontSize=32;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="424.0" y="24.0" width="352.0" height="44.8" as="geometry" />
+        </mxCell>
+          </root>
+        </mxGraphModel>
+  </diagram>
+</mxfile>

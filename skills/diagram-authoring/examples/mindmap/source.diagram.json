@@ -1,0 +1,60 @@
+{
+  "type": "mindmap",
+  "visual": "editorial",
+  "style": {
+    "fill": "solid",
+    "line": "straight"
+  },
+  "title": "质量审查覆盖事实、结构与呈现",
+  "intent": {
+    "question": "图的质量审查包含哪些方面？",
+    "audience": "mixed",
+    "pattern": "decomposition"
+  },
+  "nodes": [
+    {
+      "id": "root",
+      "label": "图的质量",
+      "kind": "plain",
+      "emphasis": "primary"
+    },
+    {
+      "id": "facts",
+      "label": "事实依据",
+      "kind": "plain"
+    },
+    {
+      "id": "structure",
+      "label": "关系结构",
+      "kind": "plain"
+    },
+    {
+      "id": "visual",
+      "label": "呈现可读性",
+      "kind": "plain"
+    },
+    {
+      "id": "direction",
+      "label": "箭头方向",
+      "kind": "plain"
+    }
+  ],
+  "edges": [
+    {
+      "from": "root",
+      "to": "facts"
+    },
+    {
+      "from": "root",
+      "to": "structure"
+    },
+    {
+      "from": "root",
+      "to": "visual"
+    },
+    {
+      "from": "structure",
+      "to": "direction"
+    }
+  ]
+}

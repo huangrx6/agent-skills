@@ -39,6 +39,15 @@ TP = _load("direction_preview_under_test", "direction_preview.py")
 
 class TestThemePreview(unittest.TestCase):
 
+    def test_groups_are_isolated_between_panels_without_changing_input(self):
+        elements = [{'id': 'node-a', 'groupIds': ['pair', 'section']},
+                    {'id': 'label-a', 'groupIds': ['pair', 'section'], 'containerId': 'node-a'}]
+        left, right = TP._namespace(elements, 'left'), TP._namespace(elements, 'right')
+        self.assertEqual(left[0]['groupIds'], left[1]['groupIds'])
+        self.assertFalse(set(left[0]['groupIds']) & set(right[0]['groupIds']))
+        self.assertEqual(elements[0]['groupIds'], ['pair', 'section'])
+        self.assertEqual(left[1]['containerId'], left[0]['id'])
+
     @classmethod
     def setUpClass(cls):
         cls.scene = TP.build()

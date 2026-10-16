@@ -1,0 +1,59 @@
+{
+  "type": "state",
+  "visual": "editorial",
+  "style": {
+    "fill": "solid",
+    "line": "straight"
+  },
+  "title": "审核退回草稿，通过后发布",
+  "intent": {
+    "question": "内容如何审核、退回和发布？",
+    "audience": "mixed",
+    "pattern": "lifecycle"
+  },
+  "nodes": [
+    {
+      "id": "draft",
+      "label": "草稿",
+      "kind": "plain"
+    },
+    {
+      "id": "review",
+      "label": "审核中",
+      "kind": "service",
+      "emphasis": "primary"
+    },
+    {
+      "id": "published",
+      "label": "已发布",
+      "kind": "plain"
+    },
+    {
+      "id": "archived",
+      "label": "已归档",
+      "kind": "plain"
+    }
+  ],
+  "edges": [
+    {
+      "from": "draft",
+      "to": "review",
+      "label": "提交"
+    },
+    {
+      "from": "review",
+      "to": "draft",
+      "label": "退回修改"
+    },
+    {
+      "from": "review",
+      "to": "published",
+      "label": "审核通过"
+    },
+    {
+      "from": "published",
+      "to": "archived",
+      "label": "归档"
+    }
+  ]
+}

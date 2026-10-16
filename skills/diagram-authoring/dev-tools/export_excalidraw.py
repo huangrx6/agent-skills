@@ -6,7 +6,7 @@
 `dev-tools/preview.py` 是我们自己的布局模型画出来的**近似图** —— 它看不见渲染器差异，
 手绘质感、字体、箭头样式都是假的。这个工具走的是**官方路线**：
 
-    场景 JSON → 官方 @excalidraw/utils（UMD）→ exportToBlob / exportToSvg → PNG / SVG
+    场景 JSON → 官方 @excalidraw/utils（ESM）→ exportToBlob / exportToSvg → PNG / SVG
 
 `@excalidraw/utils` 是 Excalidraw 官方发布的包（0.1.4 起只发 ESM）；官方没有 CLI，
 浏览器外能拿到的"官方导出"就是它暴露的 `exportToBlob` / `exportToSvg` / `exportToCanvas`。
@@ -17,8 +17,8 @@
 ## 环境要求（这是 dev-tools，不在核心链路的零依赖承诺内）
 
 - Chrome / Chromium / Edge / Brave 之一（自动探测，或 `--browser` / 环境变量
-  `EXCALIDRAW_EXPORT_BROWSER` 指定）；首次使用需要**联网**拉取官方 UMD 包。
-- 导出用的字体由 Excalidraw 官方包自带并嵌入产物，本机不需要装字体。
+  `EXCALIDRAW_EXPORT_BROWSER` 指定）；首次使用需要**联网**拉取官方 ESM 包。
+- 字体依赖导出包和系统回退；不能承诺所有中文字体都嵌入，需核对实际字形。
 
 ## 实测到的官方 API 形状（0.1.5）
 
@@ -38,9 +38,9 @@ await utils.exportToSvg ({ data: { elements, appState, files }, config: { paddin
   `appState.exportPadding` **被忽略** —— 设 32 与不设，PNG 都是 3282×1895；
   换成 `config.padding: 32` 才是 3410×2023（正好多 2×32 图内单位）。而两个官方默认
   不一样：**PNG 默认 0（贴边）、SVG 默认 10**，所以不显式传就会贴着边框。
-  本工具**默认给 32**：图内节点自己的内边距是 22~24，外面比里面还紧就显局促。
-  `export_drawio.py` 的目标与它一致（最紧一边 ≈32 图内单位），但数值取 48 —— 官方
-  那边分得不均（实测右/下只拿到 0.69×B），那是它的事，不是这里的。
+  本工具**默认给 80**：32 在大型架构图缩小观看时仍显局促，增加成品四周的呼吸空间。
+  `--padding` 可覆盖；自然尺寸导出只扩图片边界，不移动节点或缩小内容。
+  React 包文档的 `exportPadding` 是导出选项，不是 appState 字段；不要混用两套 API。
   背景由 `appState.viewBackgroundColor` 决定。
 - 0.1.5 的导出里**没有** `restoreElements`，只有 `exportToBlob/exportToSvg/
   exportToCanvas/exportToClipboard/getCommonBounds/MIME_TYPES`。
@@ -49,7 +49,7 @@ await utils.exportToSvg ({ data: { elements, appState, files }, config: { paddin
 
     python3 dev-tools/export_excalidraw.py x.excalidraw -o x.png
     python3 dev-tools/export_excalidraw.py x.excalidraw -o x.png --svg x.svg --scale 2
-    python3 dev-tools/export_excalidraw.py x.excalidraw --stdout-status --json
+    python3 dev-tools/export_excalidraw.py x.excalidraw --svg x.svg --json
 
 退出码：0 = 成功；1 = 官方导出在页面里失败（详见 --json 的 message）；
 2 = 环境 不满足（找不到浏览器 / 场景读不了）。
@@ -61,6 +61,7 @@ import argparse
 import base64
 import glob
 import json
+import math
 import os
 import re
 import shutil
@@ -74,10 +75,9 @@ import tempfile
 # 它会把依赖一起打包好，浏览器里直接 import 即可。实测版本与可用导出见文件头注释。
 CDN = "https://cdn.jsdelivr.net/npm/@excalidraw/utils@0.1.5/+esm"
 VIRTUAL_TIME_BUDGET_MS = 20000   # 页面里导出是异步的；给 Chrome 足够的虚拟时间
-# 默认留白（场景单位，会随 --scale 一起放大）。官方默认 10 —— 导出来内容紧贴边框、
-# 像被框卡住；图内节点自己的内边距是 22~24，外面比里面还紧就不自然。
-# export_drawio.py 的默认留白取同一个数，两个后端的产物观感一致。
-DEFAULT_PADDING = 32
+# 默认留白（场景单位，会随 --scale 一起放大）。这是本工具的默认值，
+# 不是官网导出窗口的设置；自然尺寸按内容包围盒向四周各扩展此距离。
+DEFAULT_PADDING = 80
 
 # ── 画布：固定宽高 / 固定比例 ──────────────────────────────────
 # 用户要的是"导出的图能控制宽高比，或者固定的宽高"。实测（2026-09-17，0.1.5）：
@@ -148,8 +148,10 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
   }
   try {
     var utils = await import("__CDN__");
-    if (typeof utils.exportToBlob !== "function") {
-      fail("官方包加载了但没有 exportToBlob；检查 " + "__CDN__");
+    var WANT_PNG = __WANT_PNG__, WANT_SVG = __WANT_SVG__;
+    if ((WANT_PNG && typeof utils.exportToBlob !== "function") ||
+        (WANT_SVG && typeof utils.exportToSvg !== "function")) {
+      fail("官方包缺少所需导出函数；检查 " + "__CDN__");
       return;
     }
     var scene = JSON.parse(document.getElementById("excalidraw-scene").textContent);
@@ -195,6 +197,10 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
       if (bh && !bw) { bw = bh * natW / natH; }
       // 容纳系数：1 = 内容保持原大小（比例模式实测就是 1，即“只加白不放大”）
       var fit = Math.min((bw - 2 * pad) / cw, (bh - 2 * pad) / ch);
+      if (!(fit > 0) || !Number.isFinite(fit)) {
+        fail("目标画布小于两侧留白，请增大宽高或减小 padding");
+        return;
+      }
       // 官方 PNG 把内容缩放到 (画布 − 2×padding) 里 → 传进去的是“画布 ÷ scale”
       pngConfig.width = bw / SCALE;
       pngConfig.height = bh / SCALE;
@@ -205,6 +211,7 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
     }
     document.getElementById("out-box").textContent = JSON.stringify(plan || {});
 
+    if (WANT_PNG) {
     var pngB64 = await utils.exportToBlob({
       data: data,
       // PNG 的倍率在 config.scale（实测：appState.exportScale 对 PNG 无效、
@@ -221,12 +228,15 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
       });
     });
     document.getElementById("out-png").textContent = pngB64;
+    }
+    if (WANT_SVG) {
     var svg = await utils.exportToSvg({
       data: data,
       config: { padding: __PADDING__ },
     });
     var svgText = new XMLSerializer().serializeToString(svg);
     document.getElementById("out-svg").textContent = btoa(unescape(encodeURIComponent(svgText)));
+    }
     status.textContent = "ok";
     status.setAttribute("data-state", "ok");
   } catch (err) {
@@ -304,7 +314,16 @@ def patch_svg_canvas(svg_text: str, plan: dict) -> str:
     和 PNG 那条路对不上。
     """
     buw, buh = plan["box_units_w"], plan["box_units_h"]
-    cx, cy = plan["center"]
+    # Official SVG translates scene coordinates into its own padded viewBox.
+    # Using the source scene's center here crops content with negative origins.
+    match = re.search(r'<svg\b[^>]*\bviewBox="([^"]+)"', svg_text)
+    if not match:
+        raise ValueError("官方 SVG 缺少 viewBox")
+    try:
+        ox, oy, ow, oh = map(float, match.group(1).split())
+    except ValueError as exc:
+        raise ValueError("官方 SVG viewBox 不合法") from exc
+    cx, cy = ox + ow / 2, oy + oh / 2
     vx, vy = cx - buw / 2, cy - buh / 2
 
     def fmt(v) -> str:                    # 局部小格式化（:g 会写出 3410.44 这种）
@@ -337,7 +356,7 @@ def patch_svg_canvas(svg_text: str, plan: dict) -> str:
 
 
 def _inject_scene(page: str, scene: dict, scale: float, padding: int,
-                  box: dict | None = None) -> str:
+                  box: dict | None = None, *, want_png=True, want_svg=True) -> str:
     scene_json = json.dumps(scene, ensure_ascii=False)
     scene_json = scene_json.replace("</", "<\\/")   # 防止 </script> 提前闭合
     # scale/padding/box 在 export() 里已经转换并守卫过，这里只做字符串替换（不抛异常）
@@ -346,6 +365,8 @@ def _inject_scene(page: str, scene: dict, scale: float, padding: int,
             .replace("__SCENE_JSON__", scene_json)
             .replace("__SCALE__", repr(scale))
             .replace("__PADDING__", repr(padding))
+            .replace("__WANT_PNG__", json.dumps(bool(want_png)))
+            .replace("__WANT_SVG__", json.dumps(bool(want_svg)))
             .replace("__BOX__", json.dumps(box or {}, ensure_ascii=False)))
 
 
@@ -372,15 +393,17 @@ def export(scene_path: str, png_path: str | None, svg_path: str | None,
         scale = float(scale)
         padding = int(padding)
         box = parse_box(width, height, aspect)
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, OverflowError) as exc:
         return {"ok": False, "stage": "input", "message": f"scale/padding/宽高比例不合法：{exc}"}
-    if scale <= 0:
-        return {"ok": False, "stage": "input", "message": f"scale 要大于 0，收到 {scale!r}"}
+    if not math.isfinite(scale) or scale <= 0 or padding < 0:
+        return {"ok": False, "stage": "input", "message": "scale 必须为有限正数，padding 必须非负"}
     try:
         with open(scene_path, encoding="utf-8") as fh:
             scene = json.load(fh)
     except (OSError, json.JSONDecodeError) as exc:
         return {"ok": False, "stage": "input", "message": f"场景读不了：{exc}"}
+    if not png_path and not svg_path:
+        return {"ok": False, "stage": "input", "message": "至少指定一个 PNG 或 SVG 输出路径"}
 
     exe = find_browser(browser)
     if not exe:
@@ -392,7 +415,8 @@ def export(scene_path: str, png_path: str | None, svg_path: str | None,
         html_path = os.path.join(td, "export.html")
         try:
             with open(html_path, "w", encoding="utf-8") as fh:
-                fh.write(_inject_scene(PAGE_TEMPLATE, scene, scale, padding, box))
+                fh.write(_inject_scene(PAGE_TEMPLATE, scene, scale, padding, box,
+                                       want_png=bool(png_path), want_svg=bool(svg_path)))
         except OSError as exc:
             return {"ok": False, "stage": "output",
                     "message": f"写不了临时导出页：{exc}"}
@@ -476,10 +500,10 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Excalidraw 官方导出（真实渲染 PNG/SVG）")
     ap.add_argument("scene", help="*.excalidraw 场景文件")
     ap.add_argument("-o", "--out", help="PNG 输出路径（默认与场景同名 .png）")
-    ap.add_argument("--svg", help="同时导出 SVG 到这个路径")
+    ap.add_argument("--svg", help="SVG 输出路径；未指定 -o 时只导出 SVG")
     ap.add_argument("--scale", type=float, default=2.0, help="导出倍率（默认 2）")
     ap.add_argument("--padding", type=int, default=DEFAULT_PADDING,
-                    help=f"内容四周留白，场景单位（默认 {DEFAULT_PADDING}；官方默认 10 = 贴边）")
+                    help=f"内容四周留白，场景单位（本工具默认 {DEFAULT_PADDING}；随 scale 放大）")
     ap.add_argument("--width", help="最终宽度（像素；内容容纳缩放、居中、背景补满）")
     ap.add_argument("--height", help="最终高度（像素；同上）")
     ap.add_argument("--aspect", help="画布比例，如 16:9 / 4:3 / 1:1（往比例不够的那轴加白，内容不裁不拉）")
@@ -487,7 +511,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", action="store_true", help="输出机器可读回执")
     args = ap.parse_args(argv)
 
-    out = args.out or os.path.splitext(args.scene)[0] + ".png"
+    # Explicit --svg without -o requests SVG only. No-format CLI calls remain
+    # an intentional request to export PNG for backward compatibility.
+    out = args.out or (None if args.svg else os.path.splitext(args.scene)[0] + ".png")
     receipt = export(args.scene, out, args.svg, browser=args.browser,
                      scale=args.scale, padding=args.padding,
                      width=args.width, height=args.height, aspect=args.aspect)

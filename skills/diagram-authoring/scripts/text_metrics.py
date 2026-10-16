@@ -310,6 +310,9 @@ class TextBox:
     # emit 写元素时若自己再算一遍（比如写死 FONT_NODE），重点节点的字就还是小的。
     font_size: float = FONT_NODE
     forced_breaks: tuple[str, ...] = field(default_factory=tuple)
+    detail_font_size: float = FONT_DETAIL
+    padding_x: float = PADDING_X
+    padding_y: float = PADDING_Y
 
     @property
     def overflowed(self) -> bool:
@@ -321,7 +324,9 @@ class TextBox:
         return any(weighted_units(l) > self.break_units + 1e-6 for l in self.lines)
 
 
-def measure(label: str, detail: str = "", *, font_size: float = FONT_NODE) -> TextBox:
+def measure(label: str, detail: str = "", *, font_size: float = FONT_NODE,
+            detail_font_size: float = FONT_DETAIL, padding_x: float = PADDING_X,
+            padding_y: float = PADDING_Y) -> TextBox:
     """由文字推容器尺寸。
 
     **档位由标题与说明一起决定**（两者都折算成节点字号的等效长度，取最大值）。
@@ -337,7 +342,7 @@ def measure(label: str, detail: str = "", *, font_size: float = FONT_NODE) -> Te
     """
     label_units = weighted_units(label)
     # 折算到标题字号才能比较"谁更长"：说明是 12px，同样的字符数占的位置更小
-    detail_units_as_node = (weighted_units(detail) * FONT_DETAIL / font_size
+    detail_units_as_node = (weighted_units(detail) * detail_font_size / font_size
                             if detail else 0.0)
     class_name, break_units = size_class_for(max(label_units, detail_units_as_node))
     # 用**均衡**断行（不是贪心）：行数一样，但末行不会只剩一两个字。
@@ -345,18 +350,19 @@ def measure(label: str, detail: str = "", *, font_size: float = FONT_NODE) -> Te
     # 用户截图里那个孤零零的 `.` 也是同一回事。
     lines, forced_label = wrap_balanced(label, break_units)
     # 同一条像素宽度 = break_units × font_size；说明字号小，能放的单位数按比例多
-    detail_units = break_units * font_size / FONT_DETAIL
+    detail_units = break_units * font_size / detail_font_size
     detail_lines, forced_detail = (wrap_balanced(detail, detail_units)
                                   if detail else ([], []))
 
-    width = break_units * font_size + 2 * PADDING_X
+    width = break_units * font_size + 2 * padding_x
     line_total = len(lines) + (len(detail_lines) if detail_lines else 0)
-    height = line_total * font_size * LINE_HEIGHT + 2 * PADDING_Y
+    height = line_total * font_size * LINE_HEIGHT + 2 * padding_y
 
     return TextBox(
         size_class=class_name,
         break_units=break_units,
         font_size=font_size,
+        detail_font_size=detail_font_size, padding_x=padding_x, padding_y=padding_y,
         lines=tuple(lines),
         detail_lines=tuple(detail_lines),
         width=width,

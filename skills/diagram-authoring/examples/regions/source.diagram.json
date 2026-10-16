@@ -1,0 +1,61 @@
+{
+  "type": "architecture",
+  "title": "分区底色帮助识别处理层次",
+  "direction": "LR",
+  "style": {
+    "fill": "solid",
+    "line": "straight",
+    "corners": "round"
+  },
+  "groups": [
+    {
+      "id": "entry",
+      "label": "接入区"
+    },
+    {
+      "id": "process",
+      "label": "处理区"
+    },
+    {
+      "id": "data",
+      "label": "数据区"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "api",
+      "label": "接入服务",
+      "kind": "service",
+      "group": "entry",
+      "detail": "接收请求"
+    },
+    {
+      "id": "worker",
+      "label": "处理服务",
+      "kind": "service",
+      "group": "process",
+      "detail": "校验与计算",
+      "emphasis": "primary"
+    },
+    {
+      "id": "store",
+      "label": "结果库",
+      "kind": "data",
+      "group": "data",
+      "detail": "保存结果"
+    }
+  ],
+  "edges": [
+    {
+      "from": "api",
+      "to": "worker",
+      "label": "任务"
+    },
+    {
+      "from": "worker",
+      "to": "store",
+      "label": "保存",
+      "kind": "data"
+    }
+  ]
+}

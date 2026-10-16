@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import html
 import importlib.util
 import json
 import os
@@ -191,7 +192,7 @@ class Frame:
 
 
 def node_cell(node: dict, placed, box, detail_level: str | None,
-              frame: Frame) -> str:
+              frame: Frame, *, presentation=None) -> str:
     """一个节点 = 一个 `<UserObject>` 包着一个 mxCell（形状与文字都在里面）。
 
     文字用**我们量好的折行**（见 `label_value`）；`detail` 行按 layout 那份判据决定
@@ -221,12 +222,20 @@ def node_cell(node: dict, placed, box, detail_level: str | None,
         # 不像 Excalidraw 那样单独一块小字。见 references/drawio-backend.md。
         lines += list(text.detail_lines)
 
+    label = label_value(lines)
+    if shown_detail and L.P.resolve(presentation).preset != "fit":
+        # Explicit presets use the measured secondary font, including wrapping.
+        size = round(text.detail_font_size * knobs['font_scale'])
+        label = (label_value(text.lines) + '&lt;br&gt;'
+                 + f'&lt;span style=&quot;font-size:{size}px&quot;&gt;'
+                 + label_value(text.detail_lines) + '&lt;/span&gt;')
     parts = [_shape_style(shape_name, knobs), "whiteSpace=wrap", "html=1",
-             f"fillColor={palette.fill_for(kind, emphasis)}",
-             f"strokeColor={palette.stroke_for(kind, emphasis)}",
+             f"fillColor={palette.fill_for(kind, emphasis, node["id"])}",
+             f"strokeColor={palette.stroke_for(kind, emphasis, node["id"])}",
              f"strokeWidth={EMPHASIS_STROKE_WIDTH.get(emphasis, 2)}",
              f"fontSize={round(text.font_size * knobs['font_scale'])}",
              f"fontFamily={knobs['font_family']}"]
+    parts += _font_colors(palette.text_for(kind, emphasis, node["id"]))
     if shapes.stroke_style_for(shape_name) == "dashed":
         parts.append("dashed=1")
     cell_style = ";".join(part for part in parts if part)
@@ -234,7 +243,7 @@ def node_cell(node: dict, placed, box, detail_level: str | None,
     geometry = _rect_geometry(frame.x(placed.x), frame.y(placed.y),
                               placed.width, placed.height)
     return _user_object(
-        f"n-{node['id']}", label_value(lines),
+        f"n-{node['id']}", label,
         # tooltip 拿 `detail`，但**档位说了不画就不放** —— `detail: executive`
         # 是用户对信息量的明示，不能从悬停里把它漏出去（声明了就得算数）。
         # 没 detail 时**不写 tooltip 属性**：那样 drawio 悬停会显示自定义属性
@@ -284,7 +293,7 @@ def _user_object(cell_id: str, label: str, *, tooltip: str, props: dict[str, str
 
 
 def region_cells(region: dict, style: dict | None, frame: Frame,
-                 parent: str = "1") -> list[str]:
+                 parent: str = "1", *, polylines=None, presentation=None) -> list[str]:
     """一个区域 = 背景矩形 + 一个居中的标题 cell。
 
     标题用 `layout` 算好的那几样（折行 / 尺寸 / 位置），**不在这里重新量一遂** ——
@@ -299,6 +308,7 @@ def region_cells(region: dict, style: dict | None, frame: Frame,
                         f"（可用 {sorted(palette.LEVELS)}；未知值判失败，不 fallback）")
     knobs = palette.knobs()
     resolved = palette.merge_style(palette.resolve_style(style), region.get("style"))
+    colors = palette.group_colors(region["id"], level)
     # 圆角/虚实都走 palette 那两个解析器，判据与 Excalidraw 后端**逐字一致**：
     # 区域在那边默认是圆的（`corners: shape` → 形状默认 `{"type": 3}`），
     # 只有显式 `corners: sharp` 才是直角。第一版我硬写了 `rounded=0`，等于把默认值改掉。
@@ -311,8 +321,8 @@ def region_cells(region: dict, style: dict | None, frame: Frame,
         "whiteSpace=wrap", "html=1",
         # 锁定：区域框是背景，拖歪了整张图就散了。`locked` 是 mxGraph 的样式键。
         "locked=1", "movable=0", "resizable=0", "editable=0",
-        f"fillColor={palette.LEVELS[level]['fill']}",
-        f"strokeColor={palette.frame_stroke(level)}",
+        f"fillColor={colors['fill']}",
+        f"strokeColor={colors['stroke']}",
         "strokeWidth=1",
         f"dashed={'1' if dashed else '0'}",
     ])
@@ -327,16 +337,19 @@ def region_cells(region: dict, style: dict | None, frame: Frame,
             "locked=1", "movable=0", "resizable=0", "editable=0",
             # 标题的颜色走**层级描边色**（和 Excalidraw 后端同一个取值），
             # 不加粗 —— 那边的视觉重量来自字号（20，比节点大一步）与颜色，不是粗体。
-            f"fontColor={palette.LEVELS[level]['stroke']}",
+            f"fontColor={colors['text']}",
             f"fontSize={round(region.get('label_size', L.REGION_LABEL_SIZE) * knobs['font_scale'])}",
             f"fontFamily={knobs['font_family']}",
         ])
         width = region["label_width"]
+        label_x, label_y = region["label_x"] - width / 2.0, region["label_y"]
+        if L.P.resolve(presentation).preset != "fit":
+            label_x, label_y, _ = _load_sibling("readable_routing").place_region_title(region, polylines or [])
         cells.append(_cell(
             f"region-label-{region['id']}", label_value(list(region["label_lines"])),
             label_style,
-            _rect_geometry(frame.x(region["label_x"] - width / 2.0),
-                           frame.y(region["label_y"]), width,
+            _rect_geometry(frame.x(label_x),
+                           frame.y(label_y), width,
                            region["label_height"]),
             parent=parent))
     return cells
@@ -401,7 +414,7 @@ def edge_kind_label(edge: dict, level: str | None) -> str | None:
 
 
 def edge_cell(edge: dict, index: int, placed: dict,
-              detail_level: str | None, frame: Frame) -> str:
+              detail_level: str | None, frame: Frame, *, presentation=None, label_offset=None) -> str:
     src, dst, (ex, ey), (nx, ny), inner = edge_path(edge, placed)
     kind = edge.get("kind") or palette.DEFAULT_EDGE_KIND
     spec = palette.EDGE_KINDS.get(kind, palette.EDGE_KINDS[palette.DEFAULT_EDGE_KIND])
@@ -415,15 +428,18 @@ def edge_cell(edge: dict, index: int, placed: dict,
         f"strokeWidth={knobs.get('edge_width') or EDGE_STROKE_WIDTH}",
         f"dashed={'1' if spec['style'] == 'dashed' else '0'}",
     ]
+    style_parts += _font_colors(palette.CANVAS["text"])
     if label:
-        style_parts += [f"fontSize={round(12 * (knobs.get('font_scale') or 1.0))}",
+        style_parts += [f"fontSize={round(L.P.resolve(presentation).detail * (knobs.get('font_scale') or 1.0))}",
                         f"fontFamily={knobs['font_family']}",
                         f"labelBackgroundColor={palette.CANVAS['background']}"]
     else:
         style_parts.append("noLabel=1")
     style_parts += [
-        f"exitX={round(ex, 4)}", f"exitY={round(ey, 4)}", "exitPerimeter=0",
-        f"entryX={round(nx, 4)}", f"entryY={round(ny, 4)}", "entryPerimeter=0",
+        # Layout ports use bounding boxes. Project them to the actual shape's
+        # outline so diamond/ellipse connections do not float in empty space.
+        f"exitX={round(ex, 4)}", f"exitY={round(ey, 4)}", "exitPerimeter=1",
+        f"entryX={round(nx, 4)}", f"entryY={round(ny, 4)}", "entryPerimeter=1",
     ]
     if inner:
         moved = [frame.point(point) for point in inner]
@@ -433,6 +449,12 @@ def edge_cell(edge: dict, index: int, placed: dict,
                     f'<Array as="points">{points}</Array></mxGeometry>')
     else:
         geometry = '<mxGeometry relative="1" as="geometry" />'
+    if label_offset is not None:
+        offset = f'<mxPoint x="{round(label_offset[0], 2)}" y="{round(label_offset[1], 2)}" as="offset" />'
+        if inner:
+            geometry = geometry.replace('</mxGeometry>', offset + '</mxGeometry>')
+        else:
+            geometry = '<mxGeometry relative="1" as="geometry">' + offset + '</mxGeometry>'
 
     return _cell(f"e-{index}", label_value([label]) if label else "", ";".join(style_parts),
                  geometry, vertex=False, edge=True,
@@ -449,33 +471,35 @@ def content_bounds(result: Any, regions: list[dict]) -> tuple[float, float, floa
             max(r[0] + r[2] for r in rects), max(r[1] + r[3] for r in rects))
 
 
-def title_rect(title: str | None, bounds: tuple[float, float, float, float]
+def title_rect(title: str | None, bounds: tuple[float, float, float, float], *, presentation=None
                ) -> tuple[float, float, float, float] | None:
-    """图标题的矩形：居中于内容上方，离内容顶边 `L.TITLE_GAP`。
+    """图标题的矩形：居中于内容上方，离内容顶边 `ctx.title_gap`。
 
     **与 Excalidraw 后端同一条算法、同一个常数、同一份字号**（见 `layout.TITLE_GAP`）。
     标题不参与布局，y 可以是负的。
     """
+    ctx = L.P.resolve(presentation)
     if not title:
         return None
-    box = tm.measure(title, "", font_size=tm.FONT_TITLE)
+    box = tm.measure(title, "", font_size=ctx.title)
     lines = list(box.lines)
-    width = max([tm.weighted_units(line) for line in lines] or [0.0]) * tm.FONT_TITLE
-    height = len(lines) * tm.FONT_TITLE * tm.LINE_HEIGHT
+    width = max([tm.weighted_units(line) for line in lines] or [0.0]) * ctx.title
+    height = len(lines) * ctx.title * tm.LINE_HEIGHT
     left, top, right = bounds[0], bounds[1], bounds[2]
     return (left + (right - left) / 2.0 - width / 2.0,
-            top - L.TITLE_GAP - height, width, height)
+            top - ctx.title_gap - height, width, height)
 
 
 def title_cell(title: str, rect: tuple[float, float, float, float],
-               frame: Frame) -> str:
+               frame: Frame, *, presentation=None) -> str:
     """标题是一个**自由文字** cell（不属于任何形状）。
 
     ⚠️ 必须画在画布上，不能只写进 `<diagram name=...>` —— 那只是页签的名字，
     导出的 PNG/PDF 上根本没有它。跨后端一致性测试就是这么发现本文件漏了标题的：
     Excalidraw 侧 6/6 张图都有标题，drawio 侧一张都没有。
     """
-    box = tm.measure(title, "", font_size=tm.FONT_TITLE)
+    ctx = L.P.resolve(presentation)
+    box = tm.measure(title, "", font_size=ctx.title)
     knobs = palette.knobs()
     style = ";".join([
         "text", "html=1", "align=center", "verticalAlign=middle",
@@ -483,7 +507,7 @@ def title_cell(title: str, rect: tuple[float, float, float, float],
         # 锁住：标题是 chrome，被拖歪了很难发现（但保持可编辑 —— 改字是正当需求）
         "locked=1", "movable=0", "resizable=0",
         f"fontColor={palette.CANVAS['text']}",
-        f"fontSize={round(tm.FONT_TITLE * (knobs.get('font_scale') or 1.0))}",
+        f"fontSize={round(ctx.title * (knobs.get('font_scale') or 1.0))}",
         f"fontFamily={knobs['font_family']}",
     ])
     return _cell("diagram-title", label_value(list(box.lines)), style,
@@ -491,65 +515,95 @@ def title_cell(title: str, rect: tuple[float, float, float, float],
                                 rect[2], rect[3]))
 
 
-def card_cells(laid: list[dict], knobs: dict) -> list[str]:
+def card_cells(laid: list[dict], knobs: dict, frame: Frame | None = None, *, presentation=None) -> list[str]:
     """结论卡片 → drawio 单元格（圆角虚线框，标题加粗 + 条目列表）。
 
     几何（行/列/尺寸）来自 `layout.card_rows` —— 与 Excalidraw 后端**同一份推导**，
     这边只做序列化。标题用 `&lt;b&gt;` 加粗：`html=1` 下与 `&lt;br&gt;` 同一套机制。
     """
+    ctx = L.P.resolve(presentation)
     cells: list[str] = []
     for card in laid:
-        lines = [f"&lt;b&gt;{escape_xml(l)}&lt;/b&gt;" for l in card["title_lines"]]
-        lines += [escape_xml(l) for l in card["item_lines"]]
+        # Two encoding layers: plain text inside HTML, then HTML inside XML.
+        title = '<br>'.join(html.escape(l) for l in card['title_lines'])
+        items = '<br>'.join(html.escape(l) for l in card['item_lines'])
+        size = round(ctx.node * (knobs.get('font_scale') or 1.0))
+        content = (f'<div style="text-align:left;white-space:nowrap;">'
+                   f'<div style="font-size:{size}px;line-height:{tm.LINE_HEIGHT};'
+                   f'margin-bottom:{L.CARD_PAD_Y}px;"><b>{title}</b></div>'
+                   f'<div style="line-height:{L.CARD_ITEM_LINE_HEIGHT};">{items}</div></div>')
         style = ";".join([
             "rounded=1", "arcSize=8", "dashed=1", "html=1",
             "align=left", "verticalAlign=top",
-            f"spacingLeft={round(L.CARD_PAD_X)}", f"spacingTop={round(L.CARD_PAD_Y / 2)}",
+            f"spacingLeft={round(L.CARD_PAD_X)}", f"spacingRight={round(L.CARD_PAD_X)}",
+            f"spacingTop={round(L.CARD_PAD_Y)}", f"spacingBottom={round(L.CARD_PAD_Y)}",
             f"fillColor={palette.LEVELS['tint']['fill']}",
             f"strokeColor={palette.frame_stroke('tint')}",
             "strokeWidth=1",
-            f"fontSize={round(tm.FONT_DETAIL * (knobs.get('font_scale') or 1.0))}",
+            f"fontSize={round(ctx.detail * (knobs.get('font_scale') or 1.0))}",
             f"fontFamily={knobs['font_family']}",
+            *_font_colors(palette.text_for_level("tint")),
         ])
-        cells.append(_cell(f"card-{card['index']}", "&lt;br&gt;".join(lines), style,
-                           _rect_geometry(card["x"], card["y"],
+        cells.append(_cell(f"card-{card['index']}", escape_xml(content), style,
+                           _rect_geometry(frame.x(card["x"]) if frame else card["x"],
+                                          frame.y(card["y"]) if frame else card["y"],
                                           card["width"], card["height"])))
     return cells
 
 
 def build_page(spec: dict, result: Any, boxes: dict,
-               detail_level: str | None = None) -> str:
+               detail_level: str | None = None, *, presentation=None) -> str:
     """一页 = 一个 `<diagram>` 块（含它自己的 mxGraphModel）。
 
     页尺寸与背景都是**每页各算**的 —— 多页文件里每张图的宽高差很远，
     共用一套页尺寸会让每页都留一大片空白。
     """
+    ctx = L.P.resolve(presentation)
     style = palette.resolve_style(spec.get("style"))
     level = detail_level if detail_level is not None else spec.get("detail", L.DEFAULT_DETAIL)
-    regions = L.region_boxes(spec, result.placed, boxes)
+    regions = L.region_boxes(spec, result.placed, boxes, presentation=ctx)
     title = spec.get("title")
     bounds = content_bounds(result, regions)
-    rect = title_rect(title, bounds)
-    cards = L.card_rows(spec, bounds[0], bounds[2], bounds[3])
+    rect = title_rect(title, bounds, presentation=ctx)
+    cards = L.card_rows(spec, bounds[0], bounds[2], bounds[3], presentation=ctx)
     card_rects = [(c["x"], c["y"], c["width"], c["height"]) for c in cards]
     frame = Frame(result, regions,
                   [r for r in ([rect] if rect else []) + card_rects if r])
 
     by_id = {node["id"]: node for node in spec.get("nodes", [])}
+    lines = [e["points"] for e in result.edges]
+    router = _load_sibling("readable_routing") if ctx.preset != "fit" else None
+    keepouts = [(p.x, p.y, p.width, p.height) for p in result.real_nodes().values()]
+    if router:
+        for region in regions:
+            if region.get("label"):
+                x, y, _ = router.place_region_title(region, lines)
+                keepouts.append((x, y, region["label_width"], region["label_height"]))
+        label_lines = lines + router.frame_lines(regions)
     body: list[str] = []
     # 区域先进：drawio 里**后面的元素压在前面的上面**，所以背景必须先写。
     for region in regions:
-        body += region_cells(region, style, frame, parent=REGION_LAYER)
+        body += region_cells(region, style, frame, parent=REGION_LAYER,
+                             polylines=lines, presentation=ctx)
     for node_id, placed in result.placed.items():
         if node_id not in by_id:
             continue          # 虚节点（为折线插入的），drawio 里不需要画出来
-        body.append(node_cell(by_id[node_id], placed, boxes[node_id], level, frame))
+        body.append(node_cell(by_id[node_id], placed, boxes[node_id], level, frame, presentation=ctx))
     for index, edge in enumerate(result.edges):
-        body.append(edge_cell(edge, index, result.placed, level, frame))
-    body += card_cells(cards, palette.knobs())
+        offset = None
+        label = edge_label(edge, level)
+        if router and label:
+            size = ctx.detail * (palette.knobs().get("font_scale") or 1.0)
+            width, height = tm.weighted_units(label) * size, size * tm.LINE_HEIGHT
+            x, y, _ = router.place_label(edge["points"], width, height, label_lines, keepouts)
+            centre = router.path_midpoint(edge["points"])
+            offset = (x + width / 2 - centre[0], y + height / 2 - centre[1])
+            keepouts.append((x, y, width, height))
+        body.append(edge_cell(edge, index, result.placed, level, frame, presentation=ctx, label_offset=offset))
+    body += card_cells(cards, palette.knobs(), frame, presentation=ctx)
     if rect and title:
         # 标题最后加：和 Excalidraw 侧一样画在最上层（它是 chrome，不是内容）
-        body.append(title_cell(title, rect, frame))
+        body.append(title_cell(title, rect, frame, presentation=ctx))
 
     page_width = max(PAGE_WIDTH, frame.width + PAGE_PAD * 2)
     page_height = max(PAGE_HEIGHT, frame.height + PAGE_PAD * 2)
@@ -593,9 +647,17 @@ def build_model(spec: dict, result: Any, boxes: dict,
     return build_file([build_page(spec, result, boxes, detail_level)])
 
 
+def _font_colors(color: str) -> list[str]:
+    # Light legacy diagrams preserve their serialized defaults. Custom designs
+    # and legacy dark schemes must explicitly color all text, including edges.
+    if palette.has_custom_colors() or palette.relative_luminance(palette.CANVAS["background"]) < .2:
+        return [f"fontColor={color}"]
+    return []
+
+
 def emit_page(spec: dict, *, params: dict | None = None, scheme: str | None = None,
               seeds: dict[str, str] | None = None,
-              quality: str = "standard") -> tuple[str, Any, Any, list]:
+              quality: str = "standard", preset: str = "fit", colors=None) -> tuple[str, Any, Any, list]:
     """跑完整条流水线并返回 XML。**校验有阻塞项就不出图。**
 
     顺序与 Excalidraw 后端**逐条一致**（validate → layout → check → 落笔）：
@@ -613,8 +675,12 @@ def emit_page(spec: dict, *, params: dict | None = None, scheme: str | None = No
 
     # **选后端 = 选画法**：Excalidraw 走方向系统（手绘 + 植物/杂志…那五套），
     # drawio 走自己的配色方案（4 个种子色 + 交付件配比）。两者共用的是**语义档位**。
+    if colors is not None and seeds:
+        raise ValueError("--colors 与 --seed 不同时使用；请在项目配色文件内修改颜色")
     palette.use_backend("drawio", scheme=scheme, mood=spec.get("mood"),
                         visual=spec.get("visual"), seeds=seeds)
+    if colors is not None:
+        palette.use_colors(colors, spec=spec)
 
     icons_used = [n["id"] for n in spec.get("nodes", []) if n.get("icon")]
     if icons_used:
@@ -623,22 +689,28 @@ def emit_page(spec: dict, *, params: dict | None = None, scheme: str | None = No
             "内置 sigil 与素材库图标目前只在 Excalidraw 后端可用；"
             "先用 Excalidraw 后端出这张图，或者把 icon 去掉。")
 
-    boxes = L.boxes_from_spec(spec)
+    ctx = L.P.resolve(preset)
+    boxes = L.boxes_from_spec(spec, presentation=ctx)
     result, outcome, attempts = _load_sibling("check_layout").layout_with_retry(
-        spec, boxes, params)
+        spec, boxes, ctx.layout_params(params), **({"presentation": ctx} if preset != "fit" else {}))
     # showcase 升级在调参之后（与 Excalidraw 后端同一条语义）。
     outcome = outcome.promote(quality)
     if outcome.blocking:
         return "", result, outcome, attempts
-    return build_page(spec, result, boxes), result, outcome, attempts
+    page = build_page(spec, result, boxes, presentation=ctx)
+    if preset != "fit":
+        review = _load_sibling("check_presentation")
+        assessment = review.assess(review.drawio(build_file([page])), preset)
+        L.P.add_findings(assessment, outcome, _load_sibling("check_layout").Issue)
+    return page, result, outcome, attempts
 
 
 def emit(spec: dict, *, params: dict | None = None, scheme: str | None = None,
          seeds: dict[str, str] | None = None,
-         quality: str = "standard") -> tuple[str, Any, Any, list]:
+         quality: str = "standard", preset: str = "fit", colors=None) -> tuple[str, Any, Any, list]:
     """单份规格 → 整个 `.drawio` 文件（一页）。多份请用 `build_file` 拼。"""
     page, result, outcome, attempts = emit_page(spec, params=params, scheme=scheme,
-                                                seeds=seeds, quality=quality)
+                                                seeds=seeds, quality=quality, preset=preset, colors=colors)
     return (build_file([page]) if page else ""), result, outcome, attempts
 
 
@@ -664,13 +736,15 @@ def main(argv: list[str] | None = None) -> int:
         description="规格 → .drawio（不压缩的 mxGraph XML；多份规格 = 多页）")
     ap.add_argument("spec", nargs="+",
                     help="一份或多份 *.diagram.json（多份 = 一个文件多页）")
-    ap.add_argument("-o", "--out", help="输出路径（单份时默认与规格同名，后缀 .drawio）")
+    ap.add_argument("-o", "--out", help="输出路径（单份 .source/name.diagram.json → 上级 name.drawio；其他输入只换后缀）")
     ap.add_argument("--scheme",
                     help="配色方案（默认 " + palette.DEFAULT_SCHEME + "）；可选："
                          + "、".join(palette.available_schemes()))
     ap.add_argument("--seed", action="append", metavar="键=#RRGGBB",
                     help="在选定方案之上改种子色，可重复：canvas / ink / accent / critical。"
                          "例如 --seed accent=#0B5FFF")
+    ap.add_argument("--colors", help="项目配色 JSON；覆盖 scheme 的颜色，保留其字体与线型")
+    ap.add_argument("--preset", choices=L.P.NAMES, default="fit", help="生成字号与间距场景；fit 保持旧默认")
     ap.add_argument("--quality", choices=("standard", "showcase"), default="standard",
                     help="showcase=交付档：结构类软项升级为阻塞，有残留就不出图")
     ap.add_argument("--stdout", action="store_true", help="打到标准输出，不写文件")
@@ -701,8 +775,8 @@ def main(argv: list[str] | None = None) -> int:
         try:
             page, _result, outcome, attempts = emit_page(spec, scheme=args.scheme,
                                                          seeds=seeds,
-                                                         quality=args.quality)
-        except (SpecError, KeyError) as exc:
+                                                         quality=args.quality, preset=args.preset, colors=args.colors)
+        except (SpecError, KeyError, ValueError, OSError) as exc:
             print(f"{path}：{exc}", file=sys.stderr)
             return 1
         if outcome.blocking:
@@ -711,6 +785,9 @@ def main(argv: list[str] | None = None) -> int:
             for issue in outcome.issues:
                 print(f"  - {issue}", file=sys.stderr)
             return 1
+        for issue in outcome.issues:
+            if issue.check == "presentation":
+                print(f"观看检查：{issue}", file=sys.stderr)
         pages.append(page)
         node_total += len(spec.get("nodes", []))
         edge_total += len(spec.get("edges", []))
@@ -729,7 +806,7 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write(xml)
         return 0
 
-    out = args.out or (os.path.splitext(args.spec[0])[0] + ".drawio")
+    out = args.out or _load_sibling("output_paths").default_output(args.spec[0], ".drawio")
     try:
         _atomic_write(out, xml)
     except OSError as exc:
@@ -738,7 +815,7 @@ def main(argv: list[str] | None = None) -> int:
     nodes = node_total
     page_note = f"{len(pages)} 页 / " if len(pages) > 1 else ""
     print(f"✓ 已写出 {out}（{page_note}{nodes} 个节点 / {edge_total} 条边 / "
-          f"{len(xml.splitlines())} 行 XML，配色 {args.scheme or palette.DEFAULT_SCHEME}，"
+          f"{len(xml.splitlines())} 行 XML，配色 {args.colors or args.scheme or palette.DEFAULT_SCHEME}，"
           f"档位 {args.quality}）")
     # 三档声明（与 Excalidraw 后端同一条语义）：确定性校验 / 自研预览 / 感知审查。
     import hashlib
@@ -748,7 +825,11 @@ def main(argv: list[str] | None = None) -> int:
     print("感知审查: pending（须人眼看真实渲染）")
     spec_bytes = b""
     try:
-        spec_bytes = b"".join(open(p, "rb").read() for p in args.spec)
+        parts = []
+        for path in args.spec:
+            with open(path, "rb") as handle:
+                parts.append(handle.read())
+        spec_bytes = b"".join(parts)
     except OSError:
         pass          # 规格文件已被移动/删除：回执里就不给哈希，不影响交付本身
     if spec_bytes:

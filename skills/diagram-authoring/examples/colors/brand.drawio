@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="diagram-authoring" agent="diagram-authoring" version="24.0.0" type="device">
+  <diagram id="7a42d48bbdc6" name="订单从提交到保存">
+        <mxGraphModel dx="800" dy="600" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1383" pageHeight="826" background="#FCFAFF" math="0" shadow="0">
+          <root>
+        <mxCell id="0" />
+        <mxCell id="2" value="区域与标题（锁定）" parent="0" />
+        <mxCell id="1" parent="0" />
+        <UserObject id="n-web" label="用户入口&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;提交订单&lt;/span&gt;" tooltip="提交订单" node_id="web" kind="client" emphasis="normal" level="neutral">
+          <mxCell style="ellipse;whiteSpace=wrap;html=1;fillColor=#FCFAFF;strokeColor=#8C8894;strokeWidth=2;fontSize=16;fontFamily=Helvetica;fontColor=#292436" vertex="1" parent="1">
+          <mxGeometry x="24.0" y="93.6" width="288.5" height="131.24" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject id="n-api" label="订单服务&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;校验请求&lt;/span&gt;" tooltip="校验请求" node_id="api" kind="service" emphasis="primary" level="accent">
+          <mxCell style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#D0C5E8;strokeColor=#7255B8;strokeWidth=3;fontSize=17;fontFamily=Helvetica;fontColor=#292436" vertex="1" parent="1">
+          <mxGeometry x="432.5" y="111.42" width="214.0" height="95.6" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject id="n-queue" label="事件队列&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;异步处理&lt;/span&gt;" tooltip="异步处理" node_id="queue" kind="async" emphasis="normal" level="neutral">
+          <mxCell style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FCFAFF;strokeColor=#8C8894;strokeWidth=2;fontSize=16;fontFamily=Helvetica;fontColor=#292436" vertex="1" parent="1">
+          <mxGeometry x="766.5" y="109.82" width="268.89" height="98.8" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject id="n-store" label="订单库&lt;br&gt;&lt;span style=&quot;font-size:12px&quot;&gt;保存结果&lt;/span&gt;" tooltip="保存结果" node_id="store" kind="data" emphasis="normal" level="neutral">
+          <mxCell style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=12;whiteSpace=wrap;html=1;fillColor=#FCFAFF;strokeColor=#8C8894;strokeWidth=2;fontSize=16;fontFamily=Helvetica;fontColor=#292436" vertex="1" parent="1">
+          <mxGeometry x="1155.39" y="99.82" width="204.0" height="118.8" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="e-0" value="请求" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#7D7A86;strokeWidth=1;dashed=0;fontColor=#292436;fontSize=12;fontFamily=Helvetica;labelBackgroundColor=#FCFAFF;exitX=1.0;exitY=0.5;exitPerimeter=1;entryX=0.0;entryY=0.5;entryPerimeter=1" edge="1" source="n-web" target="n-api" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="0.0" y="-18.4" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e-1" value="发布事件" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#7D7A86;strokeWidth=1;dashed=1;fontColor=#292436;fontSize=12;fontFamily=Helvetica;labelBackgroundColor=#FCFAFF;exitX=1.0;exitY=0.5;exitPerimeter=1;entryX=0.0;entryY=0.5;entryPerimeter=1" edge="1" source="n-api" target="n-queue" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="0.0" y="-18.4" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="e-2" value="写入" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#7D7A86;strokeWidth=1;dashed=0;fontColor=#292436;fontSize=12;fontFamily=Helvetica;labelBackgroundColor=#FCFAFF;exitX=1.0;exitY=0.5;exitPerimeter=1;entryX=0.0;entryY=0.5;entryPerimeter=1" edge="1" source="n-queue" target="n-store" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="0.0" y="-18.4" as="offset" /></mxGeometry>
+        </mxCell>
+        <mxCell id="diagram-title" value="订单从提交到保存" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;locked=1;movable=0;resizable=0;fontColor=#292436;fontSize=24;fontFamily=Helvetica" vertex="1" parent="1">
+          <mxGeometry x="595.7" y="24.0" width="192.0" height="33.6" as="geometry" />
+        </mxCell>
+          </root>
+        </mxGraphModel>
+  </diagram>
+</mxfile>

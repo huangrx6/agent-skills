@@ -1,11 +1,12 @@
 # Excalidraw 后端
 
 ```sh
-python3 scripts/emit_excalidraw.py system.diagram.json -o system.excalidraw --quality showcase
+python3 scripts/emit_excalidraw.py .source/system.diagram.json --quality showcase
 ```
 
 输出标准 `.excalidraw` JSON，可在 Excalidraw 或支持该格式的 Obsidian 插件中编辑。
-不生成插件专用的压缩 `.excalidraw.md`。输出默认在 spec 同目录，不自动写 vault。
+不生成插件专用的压缩 `.excalidraw.md`。直接位于 `.source/` 的输入默认在上级生成 `system.excalidraw`；
+其他输入保留同目录换最后后缀的旧规则，`-o` 始终优先。不自动写 vault。目录约定见 [文件组织](delivery-files.md)。
 
 ## 编辑边界
 
@@ -20,12 +21,24 @@ python3 scripts/emit_excalidraw.py system.diagram.json -o system.excalidraw --qu
 
 ## 官方导出
 
+仅在用户需要图片或刷新已有图片时执行；一般通过 [同步导出](delivery-files.md) 保存并沿用参数。
+
 ```sh
-python3 dev-tools/export_excalidraw.py system.excalidraw -o system.png --svg system.svg --scale 2
+diagram_check_dir=$(mktemp -d)
+python3 dev-tools/export_excalidraw.py system.excalidraw -o system.png --svg "$diagram_check_dir/system.svg" --scale 2
+# 以下为不同观看尺寸的替代命令，不需要全部执行：
 python3 dev-tools/export_excalidraw.py system.excalidraw -o system.png --width 1600 --height 900
 python3 dev-tools/export_excalidraw.py system.excalidraw -o system.png --aspect 16:9
 ```
 
+仅指定 `--svg system.svg` 而不指定 `-o` 时只生成 SVG；只指定 `-o system.png` 时只生成 PNG。
+需要两者时同时传入；不要为了交付 SVG 先多写一张 PNG。命令直接调用且两者都未指定仍按旧接口导出 PNG，
+这是显式调用导出器的行为，不能作为默认制作步骤。SVG 可用于 [实际渲染检查](output-presets.md)。
+本工具的 PNG/SVG 四周默认各留 **80 图内单位**，可用 `--padding` 调整。
+自然尺寸导出以内容包围盒为基准扩边，节点位置和字号不变；倍率 2 时每边约 160 输出像素。
+不把浏览器视口大小当作导出边界，也不通过添加可见背景框来撑大图片。
+固定宽高时，增大留白会减少内容可用面积，需要重新核对观看字号。
+这属于本工具的导出参数，不是承诺官网普通导出窗口提供同名设置。
 需要受支持浏览器（可用 `--browser` 指定），加载官方 JS 包需要网络。
 工具调用官方 `exportToBlob` / `exportToSvg`；它提供真实渲染证据，仍不替代目视审查，
 也不能保证与所有未来版本的在线编辑器完全一致。
@@ -43,7 +56,7 @@ PNG 尺寸从产物读取；SVG 画布由工具修改根节点/背景以满足�
 ## 预览与官网编辑
 
 ```sh
-python3 dev-tools/preview.py system.excalidraw preview.png
+python3 dev-tools/preview.py system.excalidraw "$diagram_check_dir/preview.png"
 python3 scripts/open_excalidraw_com.py system.excalidraw
 ```
 

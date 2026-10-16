@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "outputs": {
+    "png": "examples/colors/website-excalidraw.png",
+    "svg": "examples/colors/website-excalidraw.svg"
+  },
+  "browser": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "engine": "official @excalidraw/utils exportToBlob/exportToSvg",
+  "size": {
+    "width": 1399,
+    "height": 264
+  }
+}
