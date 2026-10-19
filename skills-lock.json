@@ -1,5 +1,11 @@
 {
   "skills": {
+    "cosmic-function-point-splitter": {
+      "computedHash": "94941316d6466e448598293545605609a56a86ea72423c80e397842458cfe708",
+      "skillPath": "skills/cosmic-function-point-splitter/SKILL.md",
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github"
+    },
     "deck-authoring": {
       "computedHash": "79901cb24a9f5ca3a58434db96215b58ff2976fb71e8b58d8fde23017edde7ff",
       "skillPath": "skills/deck-authoring/SKILL.md",
