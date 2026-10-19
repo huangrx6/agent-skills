@@ -36,6 +36,7 @@ class Coverage:
     claimed: int = 0
     uncovered: list[dict] = field(default_factory=list)
     dangling: list[str] = field(default_factory=list)
+    ownership_issues: list[str] = field(default_factory=list)
     pages: int = 0
     pages_with_endpoints: int = 0
     empty_pages: list[dict] = field(default_factory=list)
@@ -44,7 +45,7 @@ class Coverage:
 
     @property
     def ok(self) -> bool:
-        return not self.uncovered and not self.dangling
+        return not self.uncovered and not self.dangling and not self.ownership_issues
 
     @property
     def page_ratio(self) -> float:
@@ -66,7 +67,8 @@ def load(path: str | Path) -> Inventory:
     except (OSError, ValueError) as exc:
         raise SystemExit(f"无法读取清单 {path}：{exc}") from None
     _require(isinstance(raw, dict), f"{path} 顶层必须是对象")
-    _require(raw.get("version") == VERSION, f"{path} 的 version 必须为 {VERSION}")
+    _require(type(raw.get("version")) is int and raw["version"] == VERSION,
+             f"{path} 的 version 必须为 {VERSION}")
     endpoints = raw.get("endpoints")
     _require(isinstance(endpoints, list) and bool(endpoints), f"{path} 的 endpoints 必须是非空列表")
     ids = set()
@@ -91,28 +93,31 @@ def load(path: str | Path) -> Inventory:
         refs = page.get("endpoints", [])
         _require(isinstance(refs, list), f"pages[{index}].endpoints 必须是数组")
         for ref in refs:
-            _require(ref in ids, f"pages[{index}] 引用了不存在的接口 {ref}")
+            _require(isinstance(ref, str) and ref in ids, f"pages[{index}] 引用了不存在的接口 {ref}")
     return Inventory(source=str(raw.get("source", "")), endpoints=endpoints, pages=pages)
 
 
 def coverage(spec: dict, inventory: Inventory) -> Coverage:
     known = {item["id"] for item in inventory.endpoints}
-    claimed_by = {item["id"]: item["process"] for item in inventory.endpoints if item.get("process")}
+    process_ids = {process['id'] for process in spec.get('processes', [])}
+    claimed_by = {item['id']: {item['process']} if item.get('process') else set()
+                  for item in inventory.endpoints}
     for process in spec.get("processes", []):
         for endpoint in process.get("evidence", []):
-            if endpoint in claimed_by and claimed_by[endpoint] != process["id"]:
-                # 两侧都声明了不同的过程：不能悄悄选一个，进悬空证据由人工裁决。
-                claimed_by[endpoint] = f"!冲突:{claimed_by[endpoint]}/{process['id']}"
-            else:
-                claimed_by[endpoint] = process["id"]
+            claimed_by.setdefault(endpoint, set()).add(process['id'])
 
     result = Coverage(endpoints=len(inventory.endpoints), pages=len(inventory.pages))
     result.dangling = sorted({ref for process in spec.get("processes", [])
                               for ref in process.get("evidence", []) if ref not in known})
     found = Counter()
     for item in inventory.endpoints:
-        owner = claimed_by.get(item["id"], "")
-        if owner and not owner.startswith("!"):
+        owners = claimed_by.get(item["id"], set())
+        unknown = owners - process_ids
+        if unknown:
+            result.ownership_issues.append(f"{item['id']} 引用了不存在的过程：{', '.join(sorted(unknown))}")
+        if len(owners) > 1:
+            result.ownership_issues.append(f"{item['id']} 过程归属冲突：{', '.join(sorted(owners))}")
+        if len(owners) == 1 and not unknown:
             result.claimed += 1
             found[item["id"]] = 1
         else:
@@ -143,6 +148,7 @@ def as_dict(result: Coverage) -> dict:
         "claimed": result.claimed,
         "uncovered": result.uncovered,
         "dangling": result.dangling,
+        "ownership_issues": result.ownership_issues,
         "pages": result.pages,
         "pages_with_endpoints": result.pages_with_endpoints,
         "empty_pages": result.empty_pages,
@@ -158,6 +164,9 @@ def render(result: Coverage) -> str:
         lines.append("")
         lines.append("悬空证据（规格引用了清单里不存在的接口）：")
         lines += [f"- {item}" for item in result.dangling]
+    if result.ownership_issues:
+        lines += ["", "接口过程归属需核实："]
+        lines += [f"- {item}" for item in result.ownership_issues]
     if result.uncovered:
         lines.append("")
         lines.append("未覆盖接口（请确认是范围外、重复，还是漏拆）：")
@@ -171,6 +180,9 @@ def render(result: Coverage) -> str:
         lines.append("无接口的页面（纯前端页或漏提取，需逐个判断）：")
         lines += [f"- {page['id']} {page.get('name', '')} {page.get('evidence', '')}"
                   for page in result.empty_pages]
+    if result.unclaimed_pages:
+        lines += ["", "有接口但均未被过程认领的页面："]
+        lines += [f"- {page['id']} {page.get('name', '')}" for page in result.unclaimed_pages]
     if result.pages and result.page_ratio < 0.9:
         lines.append("")
         lines.append(f"！素材可能不完整：有接口的页面只占 {result.page_ratio:.0%}，"

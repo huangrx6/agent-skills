@@ -151,7 +151,9 @@ def _measurement(rows: list[builder.Row], spec: dict) -> list[str]:
         if key == "conventions" and isinstance(value, dict):
             for name, text in value.items():
                 lines.append(f"- 约定·{name}：{text}")
-        elif key != "functional_users":
+        elif key == "functional_users":
+            lines.append(f"- functional_users：{'、'.join(value)}")
+        else:
             lines.append(f"- {key}：{value}")
     return lines
 
@@ -178,6 +180,8 @@ def _unconfirmed(rows: list[builder.Row]) -> int:
 def command_build(args: argparse.Namespace) -> int:
     report_path = args.selfcheck or str(args.output) + ".selfcheck.md"
     conflict = _path_conflict({"规格": args.spec, "模板": args.template,
+                               "接口清单": args.inventory,
+                               "术语表": args.glossary if isinstance(args.glossary, str) else None,
                                "拆分表": args.output, "来源报告": report_path})
     if conflict:
         return _fail(conflict)
@@ -225,7 +229,9 @@ def command_build(args: argparse.Namespace) -> int:
 
 
 def command_report(args: argparse.Namespace) -> int:
-    conflict = _path_conflict({"规格": args.spec, "报告": args.output})
+    conflict = _path_conflict({"规格": args.spec, "接口清单": args.inventory,
+                               "术语表": args.glossary if isinstance(args.glossary, str) else None,
+                               "报告": args.output})
     if conflict:
         return _fail(conflict)
     spec = _load(args)
@@ -260,6 +266,9 @@ def command_audit(args: argparse.Namespace) -> int:
 
 
 def command_coverage(args: argparse.Namespace) -> int:
+    conflict = _path_conflict({"规格": args.spec, "接口清单": args.inventory, "报告": args.output})
+    if conflict:
+        return _fail(conflict)
     spec = spec_module.load(args.spec)
     inventory = inventory_module.load(args.inventory)
     result = inventory_module.coverage(spec, inventory)
@@ -295,10 +304,11 @@ def command_normalize(args: argparse.Namespace) -> int:
         return 0
     if not args.output:
         return _fail("--write 需要同时指定 -o 输出文件；不会覆盖原表")
-    conflict = _path_conflict({"原表": source, "输出": args.output})
+    conflict = _path_conflict({"原表": source, "输出": args.output,
+                               "术语表": args.glossary if isinstance(args.glossary, str) else None})
     if conflict:
         return _fail(conflict)
-    written = write_normalized(source, args.output, changes)
+    written = write_normalized(source, args.output, changes, args.sheet)
     print(f"\n已写出：{written}（{len(changes)} 处改写，其余内容、合并与样式原样保留）")
     return 0
 
@@ -322,6 +332,13 @@ def normalize_changes(source: Path, sheet_name: str | None,
             if glossary:
                 targets += [("group", "数据组", row.group), ("attrs", "数据属性", row.attrs)]
             for key, label, text in targets:
+                column = layout.get(key)
+                if not column or not _writable_cell(worksheet, row.excel_row, column):
+                    continue
+                cell = worksheet.cell(row.excel_row, column)
+                if cell.data_type == "f" or not isinstance(cell.value, str):
+                    continue
+                text = cell.value
                 new = style.rewrite_description(text, row.move, row.func) if key == "desc" else text
                 if glossary:
                     new, _ = style.replace_english(new, glossary)
@@ -332,14 +349,17 @@ def normalize_changes(source: Path, sheet_name: str | None,
         workbook.close()
 
 
-def write_normalized(source: Path, output: str | Path, changes: list[tuple[int, str, str, str]]) -> Path:
+def write_normalized(source: Path, output: str | Path, changes: list[tuple[int, str, str, str]],
+                     sheet_name: str | None = None) -> Path:
     """复制原表后只改目标单元格，避免 insert/delete_rows 破坏合并单元格。"""
     target = Path(output)
+    for row, label, _old, new in changes:
+        sheet.validate_cell_text(new, f"第 {row} 行 {label}")
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, target)
     openpyxl = sheet._openpyxl()
     workbook = openpyxl.load_workbook(target)
-    template = sheet.inspect(target)
+    template = sheet.inspect(target, sheet_name)
     worksheet = workbook[template.sheet_name]
     labels = {"子过程描述": "desc", "数据组": "group", "数据属性": "attrs"}
     columns = {label: template.layout[key] for label, key in labels.items() if key in template.layout}
@@ -420,7 +440,8 @@ def read_existing_table(path: str, sheet_name: str | None = None) -> list[builde
             group=txt('group', r), attrs=txt('attrs', r),
             excel_row=r, declared_cfp=cell('cfp', r, raw=True),
             status=txt('status', r) or 'unverified', source=txt('source', r),
-            object=txt('object', r), repeat_reason=txt('repeat_reason', r))
+            object=txt('object', r), repeat_reason=txt('repeat_reason', r),
+            op=txt('op', r), op_note=txt('op_note', r), evidence=txt('evidence', r))
         if not any(cell(k, r) not in (None, '') for k in ('move', 'desc', 'group', 'attrs')):
             row.read_issues.append(f"无法识别为数据移动的非空行 第 {r} 行：需核实是否为缺损过程或汇总行")
         rows.append(row)
@@ -473,10 +494,10 @@ def selfcheck_report(rows: list[builder.Row], summary: dict, issues: list[str], 
     lines += ["## 一致性提示", ""]
     lines += [f"- {safe(hint)}" for hint in (hints or [])] or ["- 无。句式与排序的本地惯例未发现偏离。"]
     lines += ["", "## 逐项来源与计量依据", "",
-              "| 过程编号 | op | 功能过程 | 状态 | 触发事件 | 功能用户 | 移动 | 兴趣对象 | 数据组 | 属性 | 来源 | 接口证据 | 重复移动理由 |",
-              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+              "| 过程编号 | op | 操作依据 | 功能过程 | 状态 | 触发事件 | 功能用户 | 移动 | 兴趣对象 | 数据组 | 属性 | 来源 | 接口证据 | 重复移动理由 |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for r in rows:
-        lines.append('| ' + ' | '.join(safe(v) for v in (r.process_id, r.op or '', r.func, r.status, r.event,
+        lines.append('| ' + ' | '.join(safe(v) for v in (r.process_id, r.op or '', r.op_note, r.func, r.status, r.event,
                      r.user, r.move, r.object, r.group, r.attrs, r.source or '待核实',
                      r.evidence or '—', r.repeat_reason)) + ' |')
     lines += ["", "## 待处理问题", ""]

@@ -1,7 +1,7 @@
 {
   "skills": {
     "cosmic-function-point-splitter": {
-      "computedHash": "94941316d6466e448598293545605609a56a86ea72423c80e397842458cfe708",
+      "computedHash": "e488d748ad0d108329c97e658dae384f747c11411466e12438888e156cd6ffbe",
       "skillPath": "skills/cosmic-function-point-splitter/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"

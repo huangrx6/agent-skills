@@ -178,6 +178,26 @@ class TestGates(BuildOptionsCase):
         self.assertEqual(run("build", path, "-o", output)[0], 0)
         self.assertEqual(run("audit", output, "--strict")[0], 0, "骨架示例没有提示")
 
+    def test_操作依据及证据往返保持且严格检查一致(self):
+        value = copy.deepcopy(cosmic.STARTER_SPEC)
+        value['processes'][0]['evidence'] = ['api-address-create']
+        path = self.write_spec(value)
+        output = self.output()
+        self.assertEqual(run('build', path, '-o', output)[0], 0)
+        row = cosmic.read_existing_table(output)[0]
+        self.assertEqual(row.op, 'insert')
+        self.assertEqual(row.op_note, value['processes'][0]['op_note'])
+        self.assertEqual(row.evidence, 'api-address-create')
+        value['processes'][0].pop('op_note')
+        self.write_spec(value)
+        self.assertEqual(run('build', path, '-o', output)[0], 0)
+        self.assertEqual(run('check', path, '--strict')[0], 1)
+        self.assertEqual(run('audit', output, '--strict')[0], 1)
+        workbook = openpyxl.load_workbook(output)
+        active(workbook).cell(2, sheet.inspect(output).layout['op'], '未知标签')
+        workbook.save(output); workbook.close()
+        self.assertEqual(run('audit', output, '--strict')[0], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

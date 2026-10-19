@@ -41,7 +41,8 @@ HEADER_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 TRACE_LABELS = {"process_id": "过程编号", "status": "核实状态", "source": "需求依据",
-                "object": "兴趣对象", "repeat_reason": "重复移动理由"}
+                "object": "兴趣对象", "repeat_reason": "重复移动理由",
+                "op": "操作类型", "op_note": "操作依据", "evidence": "接口证据"}
 HEADER_ALIASES.update({key: (label,) for key, label in TRACE_LABELS.items()})
 
 HEADER_LABELS = {
@@ -86,7 +87,7 @@ MOVE_VALUES = ("E", "R", "W", "X")
 # 合并策略：这些逻辑字段按什么区间合并。
 MERGE_WHOLE_TABLE = ("l1",)
 MERGE_BY_MODULE = ("l2", "l3")
-MERGE_BY_PROCESS = ("event", "func", "reuse", "cfp")
+MERGE_BY_PROCESS = ("event", "func", "reuse", "cfp", "op", "op_note", "evidence")
 
 
 @dataclass
@@ -401,13 +402,18 @@ def _validate_export_text(rows: list[Row], template: Template, user_format: str 
             if logical not in template.layout or not isinstance(value, str):
                 continue
             location = f"功能过程 {row.process_id or row.func!r} 的 {HEADER_LABELS[logical]}（{logical}）"
-            if len(value) > 32767:
-                raise SystemExit(f"无法写出：{location}有 {len(value)} 个字符，超过 Excel 单元格 32767 字符上限；请缩短原文，不会自动截断")
-            for char in value:
-                code = ord(char)
-                if ((code < 0x20 and char not in '\t\n\r')
-                        or 0xD800 <= code <= 0xDFFF or code in (0xFFFE, 0xFFFF)):
-                    raise SystemExit(f"无法写出：{location}含 Excel XML 不支持的字符 U+{code:04X}；请修正原文")
+            validate_cell_text(value, location)
+
+
+def validate_cell_text(value: str, location: str) -> None:
+    """生成与原表改写共用同一文本限制，失败时尚未改动输出。"""
+    if len(value) > 32767:
+        raise SystemExit(f"无法写出：{location}有 {len(value)} 个字符，超过 Excel 单元格 32767 字符上限；请缩短原文，不会自动截断")
+    for char in value:
+        code = ord(char)
+        if ((code < 0x20 and char not in '\t\n\r')
+                or 0xD800 <= code <= 0xDFFF or code in (0xFFFE, 0xFFFF)):
+            raise SystemExit(f"无法写出：{location}含 Excel XML 不支持的字符 U+{code:04X}；请修正原文")
 
 
 def _text_lines(text: str, width: float, font_size: float) -> int:

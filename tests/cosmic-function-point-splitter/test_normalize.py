@@ -93,7 +93,7 @@ class NormalizeTests(unittest.TestCase):
         self.assertIn("4 处改写", out)
         self.assertEqual(self.descs(self.table)[0], LEGACY[2])
         self.assertEqual(self.descs(output), [
-            "输入地址新增请求", "读取地址信息", "保存地址信息", "返回地址新增结果",
+            "输入地址新增请求", "读取地址数据", "保存地址数据", "返回地址新增结果",
         ])
         self.assertEqual(run("audit", output)[0], 0)
 
@@ -145,6 +145,44 @@ class NormalizeTests(unittest.TestCase):
         code, out, _err = run("normalize", output)
         self.assertEqual(code, 0)
         self.assertIn("没有需要改写", out)
+
+    def test_指定工作表写回同一张表(self):
+        workbook = openpyxl.load_workbook(self.table)
+        first = active(workbook)
+        first.title = '保留表'
+        selected = workbook.copy_worksheet(first)
+        selected.title = '目标表'
+        selected['G2'] = '接收退款申请请求并校验输入数据'
+        workbook.save(self.table); workbook.close()
+        output = os.path.join(self.dir, 'selected.xlsx')
+        self.assertEqual(run('normalize', self.table, '--sheet', '目标表', '-o', output, '--write')[0], 0)
+        workbook = openpyxl.load_workbook(output)
+        self.assertEqual(workbook['保留表']['G2'].value, LEGACY[2])
+        self.assertEqual(workbook['目标表']['G2'].value, '输入退款申请请求')
+        workbook.close()
+
+    def test_公式和未识别的业务文字原样保留(self):
+        workbook = openpyxl.load_workbook(self.table)
+        worksheet = active(workbook)
+        worksheet['G2'] = '=IF(TRUE,"Download","ID")'
+        worksheet['G3'] = '  读取查询查询记录\n并保留原文  '
+        workbook.save(self.table); workbook.close()
+        output = os.path.join(self.dir, 'formulas.xlsx')
+        self.assertEqual(run('normalize', self.table, '-o', output, '--write', '--glossary')[0], 0)
+        workbook = openpyxl.load_workbook(output)
+        self.assertEqual(active(workbook)['G2'].value, '=IF(TRUE,"Download","ID")')
+        self.assertEqual(active(workbook)['G2'].data_type, 'f')
+        self.assertEqual(active(workbook)['G3'].value, '  读取查询查询记录\n并保留原文  ')
+        workbook.close()
+
+    def test_术语改写超限不覆盖已有输出(self):
+        glossary = Path(self.dir) / 'glossary.json'
+        glossary.write_text(json.dumps({'map': {'地址': '字' * 32768}}))
+        output = Path(self.dir) / 'existing.xlsx'
+        output.write_bytes(b'existing')
+        self.assertEqual(run('normalize', self.table, '-o', str(output), '--write',
+                             '--glossary', str(glossary))[0], 1)
+        self.assertEqual(output.read_bytes(), b'existing')
 
 
 if __name__ == "__main__":

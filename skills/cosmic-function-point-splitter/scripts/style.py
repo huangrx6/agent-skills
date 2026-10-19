@@ -27,10 +27,10 @@ DATA = Path(__file__).with_name("glossary.json")
 # 旧模板句：这些是实测被要求重写的写法，不影响移动本身的成立。
 LEGACY = (
     (re.compile(r"^接收(.+?)请求(?:并校验输入数据)?$"), "E"),
-    (re.compile(r"^从数据存储读取(.+?)(?:数据)?$"), "R"),
-    (re.compile(r"^读取数据库中(.+?)(?:数据)?$"), "R"),
-    (re.compile(r"^将(.+?)数据写入数据存储$"), "W"),
-    (re.compile(r"^保存变更后的(.+?)数据$"), "W"),
+    (re.compile(r"^从数据存储读取(.+)$"), "R"),
+    (re.compile(r"^读取数据库中(.+)$"), "R"),
+    (re.compile(r"^将(.+)写入数据存储$"), "W"),
+    (re.compile(r"^保存变更后的(.+)$"), "W"),
     (re.compile(r"^向用户返回(.+?)(?:结果|数据)$"), "X"),
 )
 LEGACY_HINTS = (
@@ -40,15 +40,6 @@ LEGACY_HINTS = (
 # 同一词连续出现通常来自拼接（「查询查询」「数据数据」）。
 DOUBLED = re.compile(r"(数据|查询|信息|请求|结果|记录|统计|配置|采集|导入|导出|新增|修改|删除)\1")
 WORD = re.compile(r"[A-Za-z][A-Za-z0-9]*")
-
-DELETE_WORDS = ("删除", "移除", "撤销", "撤回", "退订", "取消", "清除", "清理",
-                "解绑", "作废", "回收", "退款", "下架", "卸载")
-UPDATE_WORDS = ("修改", "变更", "更新", "调整", "恢复", "暂停", "续期", "续费", "归档",
-                "回滚", "停用", "启用", "已读", "重置", "切换", "迁移", "克隆", "确认",
-                "通过", "驳回", "完成", "重试", "分配", "维护", "设置", "处理", "执行",
-                "批量", "标记", "上架", "发布", "下线", "轮换", "置顶", "排序", "保存",
-                "登记", "导入")
-
 
 def load_glossary(path: str | Path | bool | None = None) -> dict:
     try:
@@ -72,9 +63,8 @@ def load_glossary(path: str | Path | bool | None = None) -> dict:
     return data
 
 
-def _w_verb(op: str | None, name: str = "") -> str:
-    text = f"{ops.OPS[op].label if op in ops.OPS else ''}{name}"
-    if any(word in text for word in DELETE_WORDS):
+def _w_verb(op: str | None) -> str:
+    if op == "delete":
         return "删除"
     if op in ("update", "enable", "publish", "up", "pass", "import"):
         return "更新"
@@ -101,7 +91,7 @@ def clean(text: str) -> str:
 
 
 def rewrite_description(text: str, move: str, name: str = "") -> str:
-    """把常见旧句式改成简洁动宾式；无法识别时返回清理后的原文。"""
+    """只替换已识别的句式外壳；不根据过程名猜删除，不裁剪业务对象。"""
     value = (text or "").strip()
     if not value:
         return value
@@ -111,22 +101,18 @@ def rewrite_description(text: str, move: str, name: str = "") -> str:
         match = pattern.match(value)
         if not match:
             continue
-        obj = match.group(1).strip().rstrip("的")
+        obj = match.group(1)
         if move == "E":
-            return clean(f"输入{obj}请求")
+            return f"输入{obj}请求"
         if move == "R":
-            return clean(f"读取{obj}信息")
+            return f"读取{obj}"
         if move == "W":
             if value.startswith("保存变更后的"):
-                return clean(f"更新{obj}信息")
-            core = obj
-            for word in DELETE_WORDS:
-                core = core.replace(word, "")
-            core = core.replace("标记已读", "已读标记").strip("的数据") or obj
-            return clean(f"{_w_verb(None, name)}{core}信息")
+                return f"更新{obj}"
+            return f"保存{obj}"
         if move == "X":
-            return clean(f"返回{obj}结果") if value.endswith("结果") else clean(f"返回{obj}数据")
-    return clean(value)
+            return f"返回{obj}结果" if value.endswith("结果") else f"返回{obj}数据"
+    return text
 
 
 def legacy_hits(text: str) -> list[str]:

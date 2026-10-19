@@ -91,6 +91,9 @@ def op_hints(rows: list[Row]) -> list[str]:
         first = block[0]
         if not first.op:
             continue
+        if first.op not in ops.OPS:
+            hints.append(f"未知操作标签 {first.op}：{first.func}，请核对操作词表")
+            continue
         expected = ops.default_moves(first.op)
         actual = tuple(row.move for row in block)
         if expected and actual != expected and not first.op_note:

@@ -1,12 +1,12 @@
 # 标准与参考来源
 
-核对日期：2026-10-15。规则优先采用 COSMIC 官方手册；工具示例和研究仅供实现参考。
+核对日期：2026-10-19。规则优先采用 COSMIC 官方手册；工具示例和研究仅供实现参考。
 本 skill 的自动校验覆盖部分结构规则，不声称实现全部规范或获得认证。
 
 | 来源 | 用途 |
 | --- | --- |
 | [COSMIC 官方计量流程](https://cosmic-sizing.org/cosmic-sizing/intro/measurement-process/) | 度量策略、映射、计量三个阶段；解释为何先确定边界和功能用户 |
-| [COSMIC v5.0 手册合集，2024-09 文件](https://cosmic-sizing.org/wp-content/uploads/2022/11/Combination-of-Parts-v5.0-Sep-2024.pdf) | Part 1 规则 10—15：过程、数据组和移动；尤其核查唯一性与实例重复 |
+| [COSMIC v5.0 手册合集，2024-09 文件](https://cosmic-sizing.org/wp-content/uploads/2022/11/Combination-of-Parts-v5.0-Sep-2024.pdf) | Part 1 规则 10—15：过程、数据组和移动；尤其核查唯一性与实例重复；Part 3c §2.3.2、§2.6 核对控制命令与错误/确认消息 |
 | [COSMIC v5.0 第一部分中文手册，2020-05](https://cosmic-sizing.org/wp-content/uploads/2020/09/COSMIC%E5%BA%A6%E9%87%8F%E6%89%8B%E5%86%8CV5.0-part-1-%E5%8E%9F%E5%88%99%E3%80%81%E5%AE%9A%E4%B9%89%E4%B8%8E%E8%A7%84%E5%88%99.pdf) | 中文术语；第 3 章范围与边界、第 4 章映射。引用时注明版本，不按网页抓取日期判断版本 |
 | [ScopeMaster 官方 API：Requirements](https://help.scopemaster.com/article/49-requirements) | 借鉴需求、兴趣对象、逐项数据移动与质量提示的可追溯结构；不是标准定额 |
 | [COSMIC 官网介绍 CosMet 研究](https://cosmic-sizing.org/2026/04/30/31737/) | 采用独立专家基准与解释性评估；论文效果不能视作本 skill 的测试成绩 |

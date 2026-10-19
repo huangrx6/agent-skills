@@ -22,7 +22,7 @@ python3 skills/cosmic-function-point-splitter/scripts/cosmic.py normalize 已有
 
 模板可省略，工作表自动探测，可用 `--sheet` 指定。build 自动生成 `.selfcheck.md` 来源报告，
 可用 `--selfcheck` 改路径。init 示例默认为待核实，需填写真实项目依据。
-表格与报告须使用不同路径，且不能覆盖输入规格或模板；已有输出可正常重新生成。
+表格与报告须使用不同路径，不能覆盖输入规格、模板、接口清单或自定义术语表；已有输出可正常重新生成。
 
 ## 行为
 
@@ -41,6 +41,7 @@ python3 skills/cosmic-function-point-splitter/scripts/cosmic.py normalize 已有
   新过程不继承上一过程的名称、用户或触发事件；公式不自动求值。
 - normalize 只改子过程描述（`--glossary` 时也改数据组/属性），复制原表后改单元格，
   保留合并与其他工作表；默认干跑，`--write` 需另给 `-o`，不会覆盖原表。
+- 表内保留操作类型、操作依据与接口证据，生成和回读审计使用同一份依据。
 - 表格没有过程编号时按模块与名称分组，同名相邻过程无法可靠区分。
 - 模板只复用基础布局与样式，新建单 sheet；不复制标题内容、辅助表和复杂格式。
   详见 [模板行为](references/templates.md)。

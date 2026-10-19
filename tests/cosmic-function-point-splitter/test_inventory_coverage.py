@@ -83,6 +83,40 @@ class CoverageTests(unittest.TestCase):
         result = inventory_module.coverage(spec.load(self.spec_path), inventory_module.load(inventory_path))
         self.assertEqual(result.claimed, 1)
 
+    def test_不存在的过程不能冒充已覆盖(self):
+        value = payload()
+        for item in value['endpoints']:
+            item['process'] = 'FP-不存在'
+        path = self._write('orphan.json', value)
+        result = inventory_module.coverage(spec.load(self.spec_path), inventory_module.load(path))
+        self.assertEqual(result.claimed, 0)
+        self.assertFalse(result.ok)
+        self.assertEqual(len(result.ownership_issues), 3)
+        rendered = inventory_module.render(result)
+        self.assertIn('不存在的过程', rendered)
+        self.assertIn('有接口但均未被过程认领的页面', rendered)
+        self.assertEqual(run('coverage', self.spec_path, path)[0], 1)
+
+    def test_输出报告不能覆盖清单和规格及其链接(self):
+        for source in (self.spec_path, self.inventory_path):
+            original = Path(source).read_bytes()
+            alias = Path(self.dir) / 'alias.json'
+            alias.symlink_to(source)
+            for output in (source, str(alias)):
+                self.assertEqual(run('coverage', self.spec_path, self.inventory_path, '-o', output)[0], 1)
+                self.assertEqual(Path(source).read_bytes(), original)
+            alias.unlink()
+
+    def test_build和report保护新增辅助输入(self):
+        glossary = self._write('glossary.json', {'map': {}})
+        original = {path: Path(path).read_bytes() for path in (glossary, self.inventory_path)}
+        for protected in original:
+            for command in ('build', 'report'):
+                with self.subTest(command=command, path=protected):
+                    self.assertEqual(run(command, self.spec_path, '-o', protected,
+                                         '--inventory', self.inventory_path, '--glossary', glossary)[0], 1)
+                    self.assertEqual(Path(protected).read_bytes(), original[protected])
+
     def test_两侧声明不同过程时不自动选一个(self):
         value = payload()
         value['endpoints'][0]['process'] = 'FP-999'

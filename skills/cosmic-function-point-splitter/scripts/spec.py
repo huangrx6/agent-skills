@@ -105,7 +105,8 @@ def load_from_dict(value: object) -> dict:
         _require(p['user'] in spec['measurement']['functional_users'], f"{p['id']} 功能用户未在 measurement 声明")
         _require(p.get('status') in ('confirmed', 'unverified'), f"{p['id']} status 必须为 confirmed/unverified")
         if p.get('op') is not None:
-            _require(p['op'] in ops.OPS, f"{p['id']} op 不在词表里：{p['op']}；允许值 {sorted(ops.OPS)}")
+            _require(isinstance(p['op'], str) and p['op'] in ops.OPS,
+                     f"{p['id']} op 不在词表里：{p['op']}；允许值 {sorted(ops.OPS)}")
         if p.get('op_note') is not None:
             _require(_text(p['op_note']), f"{p['id']}.op_note 必须是非空字符串")
         if p.get('evidence') is not None:

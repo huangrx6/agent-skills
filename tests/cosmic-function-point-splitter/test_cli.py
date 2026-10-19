@@ -246,7 +246,8 @@ class TestInspectCli(CliTestCase):
         self.assertEqual(headers[:4], ["二级模块", "三级模块", "功能过程", "数据移动类型"])
         self.assertIn("CFP", headers, "缺的必填列应被追加")
         self.assertEqual(headers[4:], ["一级模块", "功能用户", "触发事件", "子过程描述",
-                                       "数据组", "数据属性", "CFP", "过程编号", "核实状态", "需求依据", "兴趣对象", "重复移动理由"])
+                                   "数据组", "数据属性", "CFP", "过程编号", "核实状态", "需求依据", "兴趣对象", "重复移动理由",
+                                   "操作类型", "操作依据", "接口证据"])
         # 复用度是常量列，模板没有就不追加
         self.assertNotIn("复用度", headers)
 

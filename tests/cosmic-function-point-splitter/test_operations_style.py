@@ -108,9 +108,9 @@ class TestStyle(unittest.TestCase):
     def test_旧模板句改写(self):
         cases = [
             ('接收订单保存请求并校验输入数据', 'E', '输入订单保存请求'),
-            ('从数据存储读取订单数据', 'R', '读取订单信息'),
-            ('将订单数据写入数据存储', 'W', '保存订单信息'),
-            ('保存变更后的订单数据', 'W', '更新订单信息'),
+            ('从数据存储读取订单数据', 'R', '读取订单数据'),
+            ('将订单数据写入数据存储', 'W', '保存订单数据'),
+            ('保存变更后的订单数据', 'W', '更新订单数据'),
             ('向用户返回订单结果', 'X', '返回订单结果'),
         ]
         for old, move, expected in cases:
@@ -118,7 +118,17 @@ class TestStyle(unittest.TestCase):
                 self.assertEqual(style.rewrite_description(old, move), expected)
 
     def test_我的不会被删掉(self):
-        self.assertEqual(style.rewrite_description('从数据存储读取我的待办数据', 'R'), '读取我的待办信息')
+        self.assertEqual(style.rewrite_description('从数据存储读取我的待办数据', 'R'), '读取我的待办数据')
+
+    def test_改写不由业务名推断删除或截断对象(self):
+        for old, name, expected in (
+            ('将退款申请数据写入数据存储', '退款申请新增', '保存退款申请数据'),
+            ('将订单数据写入数据存储', '订单取消', '保存订单数据'),
+            ('将元数据写入数据存储', '元数据修改', '保存元数据'),
+            ('将目的地数据写入数据存储', '目的地新增', '保存目的地数据'),
+        ):
+            with self.subTest(old=old):
+                self.assertEqual(style.rewrite_description(old, 'W', name), expected)
 
     def test_连续重复词被收敛(self):
         self.assertEqual(style.clean('查询查询请求'), '查询请求')
