@@ -50,10 +50,6 @@ HERE = Path(__file__).resolve().parent
 _browser_spec = importlib.util.spec_from_file_location("_deck_browser", HERE / "browser.py")
 browser = importlib.util.module_from_spec(_browser_spec)
 _browser_spec.loader.exec_module(browser)
-try:
-    CHROME = browser.find_chrome()
-except RuntimeError:
-    CHROME = ""
 
 
 def _connect():

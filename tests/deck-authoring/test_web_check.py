@@ -25,7 +25,7 @@ checker = load("web_check")
 compiler = load("web_deck")
 try:
     checker._connect()
-    HAS_BROWSER = Path(checker.CHROME).is_file()
+    HAS_BROWSER = True
 except RuntimeError:
     HAS_BROWSER = False
 

@@ -143,7 +143,17 @@ RASTER_EXT = (".png", ".jpg", ".jpeg")
 # 0.45 把它们干净分开。
 DARK_PAPER_LUMINANCE = 0.45
 
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+def _browser():
+    """浏览器发现统一走 browser.py；这里不硬编码平台路径。"""
+    if "browser" in sys.modules:
+        return sys.modules["browser"]
+    spec = importlib.util.spec_from_file_location("browser", os.path.join(HERE, "browser.py"))
+    if spec is None or spec.loader is None:
+        raise SystemExit("✗ 加载不了 browser.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["browser"] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def _deckio():
@@ -332,10 +342,13 @@ def rasterize(logo_path: str, width_px: float, height_px: float) -> str:
       在 235 宽的窗口里右边直接**被截掉**。两个毛病都不会报错，只会默默地丑。
     所以改成先包一层 HTML、把图显成**目标的宽高**，再按 2 倍截。
     """
-    if not os.path.isfile(CHROME):
+    try:
+        chrome = _browser().find_chrome()
+    except RuntimeError as exc:
         raise SystemExit(
-            f"✗ logo 是矢量格式，原生 PPTX 需要位图，但找不到 Chrome 去栅格化：{CHROME}\n"
-            f"  两条路：装 Chrome，或把 logo 换成 PNG（HTML / PDF 用 SVG 没问题）")
+            f"✗ logo 是矢量格式，原生 PPTX 需要位图，但找不到 Chrome 去栅格化：{exc}\n"
+            f"  两条路：装 Chrome（或用 DECK_CHROME 指定），或把 logo 换成 PNG"
+            f"（HTML / PDF 用 SVG 没问题）") from exc
     # 走 deckio.as_number（数字解析的收口点）而不是裸 int()/round()：
     # 量不到尺寸时要**报出来**，不能悄悄拿一个默认值去栅格化（那会出来一张糊的或空的图）。
     w = _deckio().as_number(width_px, "logo 的渲染宽度")
@@ -356,7 +369,7 @@ def rasterize(logo_path: str, width_px: float, height_px: float) -> str:
         f"img{{display:block;width:{w:.0f}px;height:{h:.0f}px;object-fit:contain}}</style>"
         f"<img src='{uri}'>")
     subprocess.run(
-        [CHROME, "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
+        [chrome, "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
          "--force-device-scale-factor=2", "--default-background-color=00000000",
          f"--window-size={w:.0f},{h:.0f}", f"--screenshot={out_path}",
          pathlib.Path(page).as_uri()],

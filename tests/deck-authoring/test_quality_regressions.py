@@ -22,7 +22,11 @@ def load(name):
     return module
 
 
-check, measure = load("check"), load("measure")
+check, measure, browser = load("check"), load("measure"), load("browser")
+try:
+    CHROME = browser.find_chrome()
+except RuntimeError:
+    CHROME = ""
 collision = check.layout_mod.collision
 
 
@@ -130,7 +134,7 @@ class TestQualityContracts(unittest.TestCase):
         self.assertEqual(collision.violations(collision.build_boxes(els), frozenset()), [])
 
 
-@unittest.skipUnless(os.path.isfile(measure.CHROME), "Chrome is required")
+@unittest.skipUnless(os.path.isfile(CHROME), "Chrome is required")
 class TestBrowserQuality(unittest.TestCase):
     def render_minimal_skin(self, skin=""):
         render = check.render_mod

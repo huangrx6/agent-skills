@@ -28,7 +28,15 @@ module_spec = importlib.util.spec_from_file_location("_chart_regression_render",
 render = importlib.util.module_from_spec(module_spec)
 sys.modules[module_spec.name] = render
 module_spec.loader.exec_module(render)
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+_browser_spec = importlib.util.spec_from_file_location(
+    "_chart_regression_browser", ROOT / "skills/deck-authoring/scripts/browser.py")
+browser = importlib.util.module_from_spec(_browser_spec)
+sys.modules[_browser_spec.name] = browser
+_browser_spec.loader.exec_module(browser)
+try:
+    CHROME = browser.find_chrome()
+except RuntimeError:
+    CHROME = ""
 COLORS = {"primary": "#0033CC", "secondary": "#0A0A0A",
           "background": "#FFFFFF", "text": "#0A0A0A"}
 SERIES = [

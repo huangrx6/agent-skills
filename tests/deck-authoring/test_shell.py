@@ -55,7 +55,6 @@ os.environ.setdefault("DECK_BRANDS",
 SCRIPTS = os.path.join(SKILL, "scripts")
 TOKENS = os.path.join(FIXTURES_DIR, "styles", "swiss-grid", "style.json")
 DEMO = os.path.join(FIXTURES_DIR, "demo.spec.json")
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 
 def _load(name: str, path: str):
@@ -66,6 +65,12 @@ def _load(name: str, path: str):
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+try:
+    CHROME = _load("_shell_browser", os.path.join(SCRIPTS, "browser.py")).find_chrome()
+except RuntimeError:
+    CHROME = ""
 
 
 # 探针在 load 后**同步**跑完并把结果塞进 <pre>。同步是重点：靠 rAF 会被

@@ -17,7 +17,14 @@ sys.modules[spec.name] = animate
 spec.loader.exec_module(animate)
 
 
-@unittest.skipUnless(Path(animate.CHROME).is_file(), "需要 Chrome")
+def _has_chrome() -> bool:
+    try:
+        return Path(animate.browser.find_chrome()).is_file()
+    except RuntimeError:
+        return False
+
+
+@unittest.skipUnless(_has_chrome(), "需要 Chrome")
 class ExportReadiness(unittest.TestCase):
     def test_capture_waits_for_delayed_chart_promise(self):
         with tempfile.TemporaryDirectory() as tmp:
