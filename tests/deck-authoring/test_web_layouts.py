@@ -83,8 +83,9 @@ class TestWebLayouts(unittest.TestCase):
         self.assertEqual(before["footer"], after["footer"])
         self.assertLessEqual(after["copy"]["bottom"], after["body"]["bottom"] - 32)
         self.assertAlmostEqual(after["footer"]["y"] - after["body"]["bottom"], 48)
-        self.assertEqual(result["titleSize"], "40px")
-        self.assertEqual(result["bodySize"], "24px")
+        # Presentation-scale baseline: 64 / 26, not the old 40 / 24 document scale.
+        self.assertEqual(result["titleSize"], "64px")
+        self.assertEqual(result["bodySize"], "26px")
         self.assertEqual(result["copyPosition"], "static")
         self.assertEqual(result["footerPosition"], "static")
 
@@ -128,7 +129,6 @@ class TestWebLayouts(unittest.TestCase):
         """)
         self.assertTrue(result["exceeds"], "The checker must be able to reject an overfull page")
         self.assertEqual(result["before"], result["after"])
-        self.assertEqual(result["after"], "24px")
         self.assertEqual(result["overflow"], "visible")
         self.assertLess(result["footerY"], 900)
         self.assertEqual(result["pageHeight"], 900)
@@ -140,7 +140,7 @@ class TestWebLayouts(unittest.TestCase):
             footer: getComputedStyle(document.querySelector('.deck-footer')).fontSize,
             readingLimit: getComputedStyle(document.querySelector('.deck-copy')).maxWidth};
         """)
-        self.assertEqual(result, {'body': '24px', 'caption': '20px', 'footer': '16px', 'readingLimit': '760px'})
+        self.assertEqual(result, {'body': '26px', 'caption': '20px', 'footer': '16px', 'readingLimit': '820px'})
 
 
 if __name__ == "__main__":

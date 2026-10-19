@@ -13,6 +13,10 @@ description: >-
 把材料做成适合观众、读得清楚且有视觉表达的演示。新项目以自由 HTML 为主路线；
 内容、风格与素材保留在项目中，工具负责稳定播放、检查和导出，不替作者决定构图。
 
+审美是设计判断，不是检查通过。完整新稿先过 [审美闸门](references/design-review.md)：
+至少三张 hero pages 连看成立、第一眼有明确焦点、尺度有跳级、图像承担解释、有一个 signature move；
+至少两轮回看、major 清零，再扩展全套。检查通过只说明对应技术范围。
+
 ## 开始制作前：先判断是否需要交互
 
 **新稿或整体重做默认先选视觉参考，再看真实样页，最后扩展整套。** 先执行本节，不能读完制作资料就直接写全稿。
@@ -56,10 +60,10 @@ description: >-
 ## 设计与制作
 
 1. **按问题拆讲。** 根据观众、目标、观看条件核实事实，按 [内容理解](references/content-intelligence.md) 确定每页要回答的问题、视觉解释和细节去向。没有明确页数限制时，内容过多优先增加页数，不沿用旧稿页数或把文档章节直接塞进一页；比较所需的共同信息保持同屏。
-2. **把已选参考转成真实页面。** 按入口约定推进交互；查看内容页而不只看封面，用真实材料试排，字体、配色和构图一起判断。作者找到参考并写进记录不代表用户选中了它。
-3. **让图本身呈现内容。** 先选择能看清关系的表达，再安排文字；矩阵、流程、剖面、时间轴、标注截图或完整信息图都可以成为页面主体，图不只是段落旁的插画。标签与条件就近放置，移除图已表达的复述；过渡页与参考页按实际用途处理。按 [配图流程](references/images.md) 分清生成素材、精确绘图和文字层，设计背景、交付 image-brief.md 并接好图位，默认由用户出图。
-4. **用真实字形和实际画面实现。** 按 [排印](references/typography-and-space.md) 与 [字体接入](references/fonts.md) 确定标题、正文及中英混排，用真实长标题、段落、数字和图标签试排。按 [构图](references/composition-principles.md) 和 [布局计算](references/layout-technology.md) 量取图文与间距；待图阶段也检查容量。需要运动时分别编排 [转场、页内讲解和静态输出](references/animation.md)，不能把外部应用的效果名当成本播放器能力。
-5. **让整套一致且适应内容。** 延续已确定的视觉特征，各页按任务安排主角、密度与位置；信息比较可以同构，内容变化也可以改变组织。反馈落实到具体范围，更新相关页面并回看。局部修订无需重走整套设计流程。
+2. **把已选参考转成真实页面。** 先在项目记录里写一句视觉命题：观众与场景、2–3 个参考 move、字体/颜色/网格/图像/材质、一个 signature move、反目标。再做至少三张 hero pages（封面、最难讲的内容页、signature page），在目标观看尺寸按 [审美闸门](references/design-review.md) 至少回看两轮；major 未清零不扩全套。作者找到参考并写进记录不代表用户选中了它。
+3. **让图本身呈现内容。** 先选择能看清关系的表达，再安排文字；矩阵、流程、剖面、时间轴、标注截图或完整信息图都可以成为页面主体，图不只是段落旁的插画。裁切、出血、蒙版、双色调和拼贴要服务解释，不能只做统一调色；标签与条件就近放置，移除图已表达的复述。按 [配图流程](references/images.md) 分清生成素材、精确绘图和文字层，设计背景、交付 image-brief.md 并接好图位，默认由用户出图。
+4. **用真实字形和实际画面实现。** 按 [排印](references/typography-and-space.md)、[视觉 craft](references/visual-craft.md) 与 [字体接入](references/fonts.md) 确定标题、正文及中英混排，用真实长标题、段落、数字和图标签试排；尺度、行长和字重按关系试排，不把一张字号表当处方。按 [构图](references/composition-principles.md) 和 [布局计算](references/layout-technology.md) 量取图文与间距；待图阶段也检查容量。需要运动时分别编排 [转场、页内讲解和静态输出](references/animation.md)，不能把外部应用的效果名当成本播放器能力。
+5. **让整套一致且适应内容。** 延续已确定的视觉特征，各页按任务安排主角、密度与位置；一个 signature move 重复 2–5 次，但不每页出现。信息比较可以同构，内容变化也可以改变组织。反馈落实到具体范围，更新相关页面并回看。局部修订无需重走整套设计流程。
 
 已有明确品牌与用户选择持续有效；整体重做的历史排除范围见 [资料边界](references/refined-workflow.md#重新制作与资料边界)。
 
@@ -82,6 +86,7 @@ description: >-
 python3 scripts/image_handoff.py --handoff /path/to/image-plan.json --html /path/to/source.html
 python3 scripts/web_deck.py /path/to/source.html -o /path/to/deck.html --image-plan /path/to/image-plan.json
 python3 scripts/web_check.py /path/to/deck.html --json /path/to/draft.check.json
+python3 scripts/design_signals.py /path/to/deck.html --json /path/to/design-signals.json
 # 用户回填后再运行资源/版面检查与导出：
 python3 scripts/web_deck.py /path/to/source.html -o /path/to/deck.html --image-plan /path/to/image-plan.json --check
 python3 scripts/shots.py /path/to/deck.html --out-dir /path/to/pages --count N
@@ -92,17 +97,19 @@ python3 scripts/shots.py /path/to/deck.html --out-dir /path/to/pages --count N
 待图检查仍会因缺失资源返回失败，但会继续测量页面；逐页处理实际越界，不把资源失败当作跳过布局检查的理由。
 只有约定待生成的图片可留待回填，字体、脚本及其他资源错误仍须处理；报告未测出页面时不能声称容量已验证。
 `--check` 保存浏览器报告：硬错误退出 1；需复核的重叠、遮挡等退出 2；普通字号提醒不默认阻塞。
-处理真实问题后复测，不能靠隐藏内容、缩成小字或改角色标记换取通过。报告是资源与几何检查，不能给美感打分。
+`design_signals.py` 读取完成态帧，报告字号/字体/颜色/对齐/留白/图像/行长/卡片等可观测信号；
+它是审稿提醒，不是分数，也不替代截图目检。处理真实问题后复测，不能靠隐藏内容、缩成小字或改角色标记换取通过。
 
-按 [视觉审稿](references/visual-quality.md) 看整套缩略图、逐页目标观看尺寸和所需最终格式：
+按 [视觉审稿](references/visual-quality.md) 与 [审美闸门](references/design-review.md) 看整套缩略图、逐页目标观看尺寸和所需最终格式：
 
+- 三张 hero pages 是否各自成立、连看有亲缘；signature move 是否真的出现且不过量。
 - 内容主次、解释与证据是否清楚，中文换行、表格和辅助文字是否好读。
 - 图片与背景是否服务本页，主体和文字是否避让，裁切与生成瑕疵是否处理。
 - 连续内容页是否有合理节奏，实际导出是否保留字体、图像、数据和页数。
 
 按“焦点与关系 → 构图与留白 → 排印与素材 → 细节”处理当前最明显的问题，修后看新图；
-无需凑审稿轮次。生成全部截图不等于已经看过；含动效还需实际播放。
-检查器不能覆盖全部像素遮挡、字体回退或互动状态；素材或共享 CSS 变化后重验受影响页面。
+完整新稿的 hero pages 至少回看两轮，但轮次不是目标，major 清零和证据才是。生成全部截图不等于已经看过；含动效还需实际播放。
+检查器不能覆盖全部像素遮挡、字体回退或互动状态；`design_signals` 只是信号，不是审美结论。素材或共享 CSS 变化后重验受影响页面。
 
 交付用户需要的格式及可复现的源文件、素材和字体说明。只在核对资源可移植性后称“离线”或“单文件”。
 简述实际完成的视觉/格式检查、图片或提示词位置，以及仍待处理的素材或提醒；缺图、未验证导出不得写成完成。

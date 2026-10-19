@@ -14,7 +14,11 @@
 用户反馈按实际影响范围修订；单页小改不需要重新探索风格。
 
 参考提取与设计落实见 [视觉语言](references/visual-language.md)，制作衔接见 [项目记录](references/refined-workflow.md)。
-排印与装饰都可以形成气质，数据、条件与证据保持准确。检查通过只说明对应技术范围，不证明审美完成。
+完整新稿的扩展条件、hero pages 与审稿证据见 [审美闸门](references/design-review.md)；
+尺度、网格、色彩、图像、材质和反 slop 的具体杠杆见 [视觉 craft](references/visual-craft.md)。
+需要校准“做到什么程度”时，用 [审美校准基准](benchmarks/visual-review/README.md) 的 brief、证据要求和八轴人审；
+它不提供可复制的风格样张。排印与装饰都可以形成气质，数据、条件与证据保持准确。
+检查通过只说明对应技术范围，不证明审美完成。
 
 新稿或整体重做默认先问视觉参考，再展示真实内容样页，收到反馈后扩展整套。
 交互条件统一见 [制作入口](SKILL.md#开始制作前先判断是否需要交互)，参考网站见 [选择入口](references/visual-language.md#新稿的参考选择入口)。
@@ -36,7 +40,8 @@ skill 是给模型的工作指令，不会自行注册弹窗。宿主有提问�
 完整新稿必须设计功能配图、封面与内页背景；流程、机制、对象与证据通过视觉表达分担文字。
 按讲解问题控制单页内容，没有页数上限时优先拆页；默认逐页寻找有用的视觉表达，可将对象插图、精确标签和连线组合，
 不把长文原样挤在图片旁。矩阵、流程、标注截图或信息图可以直接成为正文；封面也可以由排印或图形构成，
-不固定左标题右插画。普通屏幕骨架采用更克制的字号起点，投影与特殊风格按实际观看条件调整。
+不固定左标题右插画。骨架采用演示尺度起点（标题 64 / 正文 26），封面与陈述页有更大的展示档；
+密集阅读页可下调，投影与特殊风格按实际观看条件调整。
 默认交付 `image-brief.md`：每张图包含使用页、完整提示词、尺寸比例、保存目录与文件名；
 HTML 预先接好图位，用户自行生成图片放入指定目录后刷新预览。只有明确委托直接生图时才执行生成。
 图片回填后检查主体、裁切、文字避让与风格，再更新导出；不绑定供应商，缺图稿标明待素材。
@@ -72,6 +77,7 @@ GIF 使用 Pillow；MP4 编码目前限 macOS，另需 `swiftc` 与系统 AVFoun
 ```bash
 python3 scripts/web_deck.py /path/to/source.html -o /path/to/deck.html --image-plan /path/to/image-plan.json
 python3 scripts/web_check.py /path/to/deck.html --json /path/to/draft.check.json
+python3 scripts/design_signals.py /path/to/deck.html --json /path/to/design-signals.json
 # 用户回填图片后，再检查与导出：
 python3 scripts/web_deck.py /path/to/source.html -o /path/to/deck.html --image-plan /path/to/image-plan.json --check
 python3 scripts/shots.py /path/to/deck.html --out-dir /path/to/pages --count N
@@ -82,7 +88,8 @@ python3 scripts/pptx_native.py --png-dir /path/to/pages -o /path/to/deck.pptx
 `web_deck.py` 注入播放器与布局辅助，不替作者选风格、拆内容或自动缩字。
 `--check` 运行 Chrome 检查并保存 `deck.check.json`：硬错误退出 1，需复核的重叠、遮挡等退出 2；
 字号等启发式提醒不默认阻塞。报告通过只代表检查范围内无未处理项，不能证明好看。
-自由 HTML 使用 `web_check.py`，不适用 spec 的 `check.py`。
+`design_signals.py` 读取完成态帧，报告字号/字体/颜色/对齐/留白/图像/行长/卡片等信号；
+它是审稿提醒，不是分数，也不替代截图目检。自由 HTML 使用 `web_check.py`，不适用 spec 的 `check.py`。
 待图阶段也检查文字与图位容量：约定缺图仍会报资源失败，逐页测量的越界则先处理，不能把缺图报告说成全部通过。
 
 播放器使用方向键或 PageUp / PageDown 翻页、R 重播、F 全屏；没有常驻底部控制栏。

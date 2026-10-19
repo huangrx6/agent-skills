@@ -384,6 +384,18 @@ class TestWebCheckBrowser(unittest.TestCase):
         self.assertEqual(checker.exit_code(report), 0)
         self.assertEqual(checker.exit_code(report, strict=True), 2)
 
+    def test_kicker_uses_the_auxiliary_threshold_in_a_valid_layout(self):
+        content = ('<p class="deck-block">A concise main explanation.</p>'
+                   '<p class="deck-kicker" style="font-size:15px">PROJECT LABEL</p>')
+        report = self.inspect([capacity_page(content)], CAPACITY_STYLE)
+        small = {issue["role"]: issue for issue in report["pages"][0]["issues"]
+                 if issue["code"] == "small-text"}
+        self.assertIn("caption", small)
+        self.assertEqual(small["caption"]["threshold"], 16)
+        self.assertNotIn("text", small)
+        self.assertNotIn("body-min-font", self.codes(report))
+        self.assertEqual(checker.exit_code(report), 0)
+
     def test_auxiliary_class_names_do_not_lower_advisory_thresholds_in_legacy_or_invalid_layouts(self):
         report = self.inspect([
             '<p class="deck-caption" style="font-size:18px">Legacy caption.</p>'

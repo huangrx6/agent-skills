@@ -765,6 +765,29 @@
         "SKILL.md",
         "references/refined-workflow.md"
       ]
+    },
+    {
+      "id": 76,
+      "prompt": "先不要铺十页。我想先看到这套 deck 的视觉主张，再决定要不要继续。材料我发你了，风格还没定。",
+      "expected_output": "先识别这是完整新稿且尚无已选风格：按制作入口提出可回答的参考问题或取得自主委托，不先批量生成十页。随后在项目记录写一句视觉命题（观众与场景、2–3 个参考 move、字体/颜色/网格/图像/材质、一个 signature move、反目标），用实际材料做三张 hero pages：封面、最难讲的内容页、signature page。在目标观看尺寸连续审看，至少两轮 before/after，major 清零后再扩展；不以风格套餐、假标题、占位图或检查通过代替视觉判断。",
+      "files": [
+        "SKILL.md",
+        "references/design-review.md",
+        "references/visual-craft.md",
+        "references/refined-workflow.md"
+      ]
+    },
+    {
+      "id": 77,
+      "prompt": "这版没有溢出、也没有框，但还是很像一份文档/模板。标题、正文、卡片都差不多重。帮我提升审美，不要只换颜色。",
+      "expected_output": "先看实际页面和源文件，不以几何通过或“无框”证明完成。按审美闸门的八轴定位问题：第一眼焦点、标题/正文尺度、网格与对齐、留白节奏、色彩角色、图像整合、排印和跨页亲缘；可运行 design_signals 读取字号/字体/颜色/对齐/留白/图像/行长/卡片等信号，但把它当提醒而非分数。优先改焦点、尺度和构图，再处理排印与素材；至少两轮 before/after，检查修改是否解决原问题且未引入新问题。不机械缩字、删内容、加装饰或统一换色。",
+      "files": [
+        "SKILL.md",
+        "references/design-review.md",
+        "references/visual-craft.md",
+        "references/visual-quality.md",
+        "scripts/design_signals.py"
+      ]
     }
   ]
 }

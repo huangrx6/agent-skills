@@ -52,7 +52,7 @@
 
 使用分区辅助结构时，可用 `.deck-block` 标记阅读组，`.deck-caption` 标记图注。标记反映真实用途，
 不为消除提示改变内容角色。是否需要图注或主要文字、同屏多少组内容，由当前页面决定。
-骨架默认正文 24px、标题 40px，可通过项目 CSS 调整。`data-viewing="screen"` 的 24px 与 `room` 的 28px 是
+骨架默认正文 26px、标题 64px；封面与陈述页分别使用 `cover`、`statement` 的展示档，可通过项目 CSS 调整。`data-viewing="screen"` 的 24px 与 `room` 的 28px 是
 可读性提醒起点，不是强制下限；还要按真实字体、行长、观看距离检查。默认不限制块数；
 需要项目预算时，`.deck-body` 可声明正整数 `data-max-blocks`，超过该明确预算才列为待审。
 正文可用区扣除实际 CSS 底部 padding，默认 48px，可调整，不另设硬下限。
@@ -136,6 +136,10 @@ python3 scripts/animate.py /path/to/deck.html -o /path/to/deck.mp4
 检查前后 HTML 不同或文件消失时，以 `input-changed` 硬失败。该哈希不包含外链 CSS、字体和图片，
 这些资源变更后也要重新验收，不能仅凭 HTML 哈希相同复用旧报告。
 几何检查不验证用户是否选过风格、是否满足配图要求或审美质量，交付时分别核对。
+
+`scripts/design_signals.py` 另读完成态帧，报告字阶、字体家族、色彩数量、对齐轴、留白、
+图像面积、行长、等宽卡片和连续页轮廓等可观测信号。它是审稿提醒，不是审美分数；
+逐条判断是否成立，不能为了清零机械改值。扩展条件与证据要求见 [审美闸门](design-review.md)。
 
 ## 真实验收
 

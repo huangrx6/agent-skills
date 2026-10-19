@@ -1,9 +1,15 @@
-/* Layout primitives, not a visual theme. Override the --deck-* properties per project.
+/* Layout primitives and a presentation-scale type baseline, not a visual theme.
+ * Override the --deck-* properties per project.
  * The named header/body/footer regions are informed by Slidev's layout mechanism:
  * https://github.com/slidevjs/slidev/blob/main/packages/client/layouts/two-cols-header.vue
  * This is original native CSS; it neither imports nor requires Slidev.
  * Normal flow is a starting point. Recompose, adjust readable typography, or
  * split content as needed; never hide required content to clear overflow.
+ *
+ * The default scale is a *presentation* baseline (title 64 / body 26 on a
+ * 1600×900 canvas), not a document baseline. For dense reading, lower the
+ * tokens; for a poster, raise them. The starter is deliberately neutral in
+ * color and typeface: scale, grid and spacing are craft, not a style menu.
  */
 .deck-page {
   box-sizing: border-box;
@@ -14,18 +20,18 @@
   height: 900px;
   padding: var(--deck-pad-top, 88px) var(--deck-pad-inline, 112px) var(--deck-pad-bottom, 56px);
   font-family: var(--deck-body-font, system-ui, sans-serif);
-  font-size: var(--deck-body-size, 24px);
+  font-size: var(--deck-body-size, 26px);
   line-height: var(--deck-body-leading, 1.6);
   color: var(--deck-text, #181818);
   background: var(--deck-background, #fff);
 }
 .deck-page *, .deck-page *::before, .deck-page *::after { box-sizing: border-box; }
-.deck-page :is(.deck-header, .deck-body, .deck-footer, .deck-copy, .deck-block, .deck-media) { min-width: 0; }
-.deck-page .deck-header { display: grid; gap: 12px; align-content: start; }
+.deck-page :is(.deck-header, .deck-body, .deck-footer, .deck-copy, .deck-block, .deck-media, .deck-main, .deck-aside) { min-width: 0; }
+.deck-page .deck-header { display: grid; gap: 14px; align-content: start; }
 .deck-page .deck-header h1, .deck-page .deck-header h2 {
   margin: 0;
   font-family: var(--deck-display-font, inherit);
-  font-size: var(--deck-title-size, 40px);
+  font-size: var(--deck-title-size, 64px);
   font-weight: var(--deck-title-weight, 500);
   line-height: 1.2;
   text-wrap: balance;
@@ -40,21 +46,25 @@
 }
 .deck-page .deck-copy {
   display: grid; align-content: start; gap: var(--deck-content-gap, 28px);
-  max-width: var(--deck-reading-width, 760px);
+  max-width: var(--deck-reading-width, 820px);
+  text-wrap: pretty;
 }
 .deck-page .deck-block { margin: 0; overflow-wrap: break-word; }
 .deck-page .deck-copy > *, .deck-page .deck-caption { margin: 0; }
 .deck-page .deck-copy h2, .deck-page .deck-copy h3 {
-  font-size: var(--deck-subtitle-size, 28px);
+  font-family: var(--deck-display-font, inherit);
+  font-size: var(--deck-subtitle-size, 32px);
   font-weight: var(--deck-title-weight, 500);
   line-height: 1.2;
+  text-wrap: balance;
 }
 .deck-page .deck-copy ul, .deck-page .deck-copy ol { padding-inline-start: 1.25em; }
-.deck-page .deck-copy li + li { margin-top: 0.4em; }
+.deck-page .deck-copy li + li { margin-top: 0.45em; }
 .deck-page .deck-caption, .deck-page .deck-footer {
   font-size: var(--deck-caption-size, 18px);
   line-height: 1.5;
   color: var(--deck-muted, #5b5b5b);
+  text-wrap: pretty;
 }
 .deck-page .deck-footer {
   font-size: var(--deck-footer-size, 16px);
@@ -64,15 +74,118 @@
   gap: var(--deck-content-gap, 24px);
 }
 .deck-page .deck-footer > * { margin: 0; min-width: 0; }
+
+/* ── Type utilities ───────────────────────────────────────────────────────
+ * Scale contrast is the main lever a document lacks. These classes let the
+ * author choose a role without prescribing a typeface or a fixed page style.
+ */
+.deck-page .deck-display {
+  font-family: var(--deck-display-font, inherit);
+  font-size: var(--deck-display-size, 112px);
+  font-weight: var(--deck-title-weight, 500);
+  line-height: 1.18;
+  letter-spacing: var(--deck-display-tracking, 0);
+  text-wrap: balance;
+}
+.deck-page .deck-lead {
+  font-size: var(--deck-lead-size, 32px);
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+.deck-page .deck-kicker {
+  font-size: var(--deck-kicker-size, 16px);
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--deck-muted, #5b5b5b);
+}
+.deck-page .deck-quiet { color: var(--deck-muted, #5b5b5b); }
+.deck-page .deck-nums { font-variant-numeric: tabular-nums; }
+.deck-page .deck-measure { max-width: var(--deck-reading-width, 820px); }
+
+/* ── Composition primitives ───────────────────────────────────────────────
+ * These are relationships, not a layout menu. Delete or override them; the
+ * page still has to make its own hierarchy and focal point.
+ */
+.deck-page .deck-rule {
+  width: 100%;
+  height: 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--deck-rule, currentColor);
+  opacity: var(--deck-rule-opacity, 0.28);
+}
+.deck-page .deck-panel {
+  padding: var(--deck-panel-pad, 32px);
+  background: var(--deck-panel, rgba(0, 0, 0, 0.045));
+}
+.deck-page .deck-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: var(--deck-grid-gap, 24px);
+  align-items: start;
+}
+.deck-page .deck-span-3 { grid-column: span 3; }
+.deck-page .deck-span-4 { grid-column: span 4; }
+.deck-page .deck-span-5 { grid-column: span 5; }
+.deck-page .deck-span-6 { grid-column: span 6; }
+.deck-page .deck-span-7 { grid-column: span 7; }
+.deck-page .deck-span-8 { grid-column: span 8; }
+.deck-page .deck-span-9 { grid-column: span 9; }
+.deck-page .deck-span-12 { grid-column: span 12; }
+.deck-page .deck-bleed {
+  width: auto;
+  margin-inline: calc(var(--deck-pad-inline, 112px) * -1);
+}
+.deck-page .deck-overlap { display: grid; }
+.deck-page .deck-overlap > * { grid-area: 1 / 1; }
+.deck-page .deck-rail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 280px);
+  gap: var(--deck-rail-gap, 40px);
+  align-items: start;
+}
+.deck-page .deck-aside { align-self: start; }
+
+/* ── Region-role variants ─────────────────────────────────────────────────
+ * The contract still needs one header, one body and one footer. These
+ * variants change emphasis and placement; they do not add new page types.
+ */
+.deck-page[data-layout="cover"] > .deck-header h1 {
+  font-size: var(--deck-display-size, 112px);
+  line-height: 1.18;
+  letter-spacing: var(--deck-display-tracking, 0);
+  max-width: 12em;
+}
+.deck-page[data-layout="cover"] > .deck-body { align-content: end; }
+.deck-page[data-layout="cover"] > .deck-body .deck-copy { max-width: 760px; }
+.deck-page[data-layout="statement"] > .deck-body { align-content: center; }
+.deck-page[data-layout="statement"] > .deck-body .deck-copy { max-width: 1180px; }
+.deck-page[data-layout="statement"] > .deck-body .deck-block {
+  font-size: var(--deck-statement-size, 52px);
+  line-height: 1.24;
+  text-wrap: balance;
+}
+.deck-page[data-layout="split"] > .deck-body {
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-content: stretch;
+  column-gap: var(--deck-split-gap, 64px);
+}
+.deck-page[data-layout="split"] > .deck-body > .deck-main { grid-column: 1; grid-row: 1; }
+.deck-page[data-layout="split"] > .deck-body > .deck-aside { grid-column: 2; grid-row: 1; }
+
+/* Image-led pages: give the image a clear majority rather than a near-even split. */
 .deck-page[data-layout="image-right"] > .deck-body,
 .deck-page[data-layout="image-left"] > .deck-body {
-  grid-template-columns: minmax(0, var(--deck-copy-track, 0.9fr)) minmax(0, var(--deck-image-track, 1.1fr));
+  grid-template-columns: minmax(0, var(--deck-copy-track, 0.9fr)) minmax(0, var(--deck-image-track, 1.2fr));
   grid-template-rows: minmax(0, 1fr);
   align-content: stretch;
   column-gap: var(--deck-region-gap, 48px);
 }
 .deck-page[data-layout="image-left"] > .deck-body {
-  grid-template-columns: minmax(0, var(--deck-image-track, 1.1fr)) minmax(0, var(--deck-copy-track, 0.9fr));
+  grid-template-columns: minmax(0, var(--deck-image-track, 1.2fr)) minmax(0, var(--deck-copy-track, 0.9fr));
 }
 .deck-page[data-layout="image-left"] > .deck-body > .deck-media { grid-column: 1; grid-row: 1; }
 .deck-page[data-layout="image-left"] > .deck-body > .deck-copy { grid-column: 2; grid-row: 1; }
@@ -92,5 +205,4 @@
   object-fit: contain;
   object-position: var(--deck-image-position, center);
 }
-.deck-page[data-layout="statement"] > .deck-body,
 .deck-page[data-layout="chapter"] > .deck-body { align-content: center; }

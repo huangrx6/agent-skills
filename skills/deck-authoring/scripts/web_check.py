@@ -24,7 +24,7 @@ recommendation for default screen viewing, or 28px for data-viewing="room".
 Text size, authored scaling, caption-only content and unmarked semantic units
 are non-blocking advisories. They remain subject to all geometric checks.
 Default small-type advisories distinguish auxiliary roles in a valid .deck-page:
-captions use 16px and footers use 14px. Other text keeps the 24px advisory. An
+captions/kickers use 16px and footers use 14px. Other text keeps the 24px advisory. An
 explicit --min-font overrides these advisory thresholds for every role, while
 the body viewing-context recommendation remains an independent advisory.
 """
@@ -166,7 +166,7 @@ window.__webCheckCollect = function(slide, options) {
         right:br.right-px('borderRightWidth')-px('paddingRight'),bottom:br.bottom-px('borderBottomWidth')-bottomReserve};
       usable.width=Math.max(0,usable.right-usable.left);usable.height=Math.max(0,usable.bottom-usable.top);
       const bodyRuns=runs.filter(run=>body.contains(run.el));
-      const primary=bodyRuns.filter(run=>!run.el.closest('.deck-caption'));
+      const primary=bodyRuns.filter(run=>!run.el.closest('.deck-caption, .deck-kicker'));
       const blocks=Array.from(body.querySelectorAll('.deck-block')).filter(el=>{
         const outer=el.parentElement.closest('.deck-block');
         return visible(el)&&!el.closest('.deck-caption')&&(!outer||!body.contains(outer));
@@ -304,7 +304,7 @@ window.__webCheckCollect = function(slide, options) {
     if(typeRegions&&[typeRegions.header,typeRegions.body,typeRegions.footer].some(region=>region.contains(run.el))){
       if(typeRegions.footer.contains(run.el))role='footer';
       else {
-        const caption=run.el.closest('.deck-caption');
+        const caption=run.el.closest('.deck-caption, .deck-kicker');
         if(caption&&typeRegions.page.contains(caption))role='caption';
       }
     }
