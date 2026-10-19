@@ -4,36 +4,41 @@
     {
       "id": 1,
       "prompt": "帮我做一份十页的产品复盘 deck，做成苹果发布会那种感觉。",
-      "expected_output": "先整理观众、核心结论与每页证据；风格词不足以明确构图时，按同一份代表内容做三版临时真实预览，同时展示字体、构图、密度与配色。已有明确选择或获授权自主决定时沿用，不重复确认。没有内置成品风格，风格放 deck 项目的 styles/<名>/。spec 只写语义与内容；依次校验 spec、色板、资源、实际渲染，再看缩略图和关键页。保留 HTML 源，交付用户需要的格式。",
+      "expected_output": "先整理已有观众、材料与证据，把苹果发布会作为用户给定的参考方向；实际查看相关作品，提取适合本次复盘的主次、图像处理与观看节奏。普通制作请求允许作者根据材料决定字体、色彩与构图，用真实内容代表页检查后继续制作，不把字体或配色尚未选定变成逐项审批。只有用户明确要求先选或先确认时保留该范围。HTML体验优先选自由HTML，核对排印、主题相关主视觉和入场；不默认三套候选，不复制发布会外壳，不把十页机械做成相同列表。素材按项目约束选择，保留事实、源文件与素材，实际渲染及目标格式验收；原生可编辑PPTX需求选结构化路线。",
       "files": [
         "SKILL.md",
         "references/style-architecture.md",
-        "references/planning.md"
+        "references/planning.md",
+        "references/web-composition.md",
+        "references/refined-workflow.md",
+        "references/composition-principles.md"
       ]
     },
     {
       "id": 2,
       "prompt": "标题字号我想大一点，120px。",
-      "expected_output": "可以实现120px，但写在 style.json 的 type 档位，不在内容spec新增字号字段；页级用 titleTier 选择。说明共享档位的影响，核对该页层级和换行。大标题并非内页一律禁止，连续多页无正文层级才需要调整。",
+      "expected_output": "沿用当前路线实现 120px，并核对层级、换行和实际观看尺寸。自由 HTML 在项目 CSS 中设置；结构化路线写入 style.json 的 type 档位，页级用 titleTier 选择，不在内容 spec 新增字号字段。修改共享档位前说明影响。大标题并非内页一律禁止。",
       "files": [
         "references/style-architecture.md",
-        "references/validation.md"
+        "references/validation.md",
+        "references/web-composition.md"
       ]
     },
     {
       "id": 3,
       "prompt": "对比度 4.5 太严了，能不能降到 3.5 让更多色板能用？",
-      "expected_output": "保持实际文字的可读性门槛；查文字、实际背景与祖先 opacity，调整文字色或背景。text 可显式指定，不强制通过双墨派生。ink.py 验声明色板，check.py 再验品牌合并后的实际DOM。当前所有文字保守采用4.5，minLarge尚未按字号放宽。",
+      "expected_output": "保持实际文字可读性，检查文字、真实背景与祖先 opacity，调整文字色或背景，不能只放松阈值让门禁通过。结构化路线可显式指定 text，由 ink.py 验声明色板、check.py 验品牌合并后的 DOM；当前检查保守采用 4.5，minLarge 尚未按字号放宽。自由 HTML 需在浏览器核对实际颜色与透明度，旧 spec 检查器不适用，不能声称它已验证自由 HTML。",
       "files": [
         "references/validation.md",
         "references/style-architecture.md",
-        "references/color.md"
+        "references/color.md",
+        "references/web-composition.md"
       ]
     },
     {
       "id": 4,
       "prompt": "PPTX 里的字我等下发给你的时候现场改，你先做。",
-      "expected_output": "用户已明确要改字，直接选择原生PPTX路径，不要求重新二选一。采用实测字号、对齐、行距与图片裁切；说明字体仅记录名字，CSS效果可能不同，最终需在目标宿主回读。combo当前不支持原生导出，应明确告知并提供保真预览，不能静默更换图形。",
+      "expected_output": "用户已明确要现场改字，直接选择结构化 spec + 项目风格及原生 PPTX 导出，不要求重新二选一，也不先做任意 DOM/CSS 再承诺自动变成可编辑文字。采用实测字号、对齐、行距与图片裁切；说明字体仅记录名字，CSS 效果可能不同，最终需在目标宿主回读。combo 当前不支持原生导出，应明确告知并提供保真预览，不能静默更换图形。",
       "files": [
         "references/delivery-formats.md"
       ]
@@ -41,120 +46,724 @@
     {
       "id": 5,
       "prompt": "标题颜色我想用 #FF48B0（粉红），醒目一点。",
-      "expected_output": "在风格的colorSets或skin里实现标题配色，不在spec写HEX。先核对粉色在实际背景上的可读性；达标则可用，不虚称主色天然不能当文字色。不达标时调整明度、背景或强调方式，保持用户的粉色意图。",
+      "expected_output": "沿用当前路线实现标题粉色：自由 HTML 写项目 CSS；结构化路线写 colorSets 或 skin，不在内容 spec 写 HEX。先核对粉色在实际背景上的可读性；达标则可用，不虚称主色天然不能当文字色。不达标时调整明度、背景或强调方式，保持用户的粉色意图。",
       "files": [
         "references/validation.md",
-        "references/color.md"
+        "references/color.md",
+        "references/web-composition.md"
       ]
     },
     {
       "id": 6,
       "prompt": "这个 deck 不要孔版风，做个普通的现代简约风。",
-      "expected_output": "按现代简约方向设计，明确程度不足时才做三版代表页比较；方向已选则继续，不再强制配色确认。没有内置成品风格，但可复用经过验证的结构组件与token接口。中性系统字体可以是合理设计选择，需保证实际加载和交付可移植性。",
+      "expected_output": "保留现代简约偏好，风格标签不足以替代具体参考。若没有用户选中的作品或直接完成授权，先提出带实际参考入口的选择问题并等待；无提问工具时用文字提问并结束本轮。收到参考后以真实内容展示样页，按用户反馈扩展；不得自行搜索后宣告选定。已认可样页、明确自主完成授权及局部编辑不重复询问。项目 CSS 承载字体、图解与空间关系，不只换底色；不拆成字体和配色审批链。",
       "files": [
         "SKILL.md",
-        "references/style-architecture.md"
+        "references/style-architecture.md",
+        "references/web-composition.md",
+        "references/refined-workflow.md",
+        "references/composition-principles.md",
+        "references/visual-language.md",
+        "references/fonts.md"
       ]
     },
     {
       "id": 7,
       "prompt": "这页的三个季度数字我想用柱状图，一眼看出涨幅。",
-      "expected_output": "使用type:chart、chart:bar和data:[{label,value}]，visual声明kind:data与ratio。title保留数据集名，可用message写真实结论；单位与来源清楚。不要手算柱高，不为了美观改数据。emphasis可标类别；annotations暂未实现，非空会拦截，改用caption。",
+      "expected_output": "保留真实季度数字、单位、来源与涨幅基准，不为美观改数据。选择可准确绘制和导出的柱状图实现，SVG、Canvas或结构化原生图表均可按当前路线和用户约束采用，核对比例、基线、标签与真实绘制结果。无需把准确数据图表交给生图模型重画，生成图片不能当计算依据。用户要求可编辑原生图表时选择结构化路线并验证导出能力；项目明确限制素材来源或禁SVG时遵守该约束并说明可行实现。",
       "files": [
         "references/charts.md",
-        "references/validation.md"
+        "references/validation.md",
+        "references/web-composition.md"
       ]
     },
     {
       "id": 8,
       "prompt": "配图我自己用 AI 出，你把要什么图告诉我就行。",
-      "expected_output": "尊重用户自行生成素材的分工。image_source.py --brief会按实际图位输出image-brief.md和assets/requests中的v2合同；填写真实内容提示词后交给用户。回填时按合同路径存放，--check核对所有复用图位的二维有效清晰度。真实截图/结构图优先保真或结构化制作，不强制生图。",
+      "expected_output": "尊重用户自行生成素材的分工。自由HTML依据实际图位编写完整image-plan.json，用image_handoff.py --brief交付逐图提示词、负面约束、比例/尺寸/焦点、文件名与落盘路径；源HTML预接相同路径，用户回填后--check、重新渲染和目检。不得交付含待填写占位符的提示词或伪造图片。技术关系先核实，再精确写入提示词，不要求模型猜。已约定由用户生成的图位不能擅自换成程序图或取消，但该分工不自动禁止项目其他适合使用SVG、图表或真实截图的部分。缺少必要图片只能标为待素材草稿。结构化项目可沿用image_source.py的v2合同。",
       "files": [
         "references/images.md",
-        "SKILL.md"
+        "SKILL.md",
+        "references/web-composition.md"
       ]
     },
     {
       "id": 9,
       "prompt": "用我们公司的 logo 和品牌色，署名写 © 2026 某某科技。",
-      "expected_output": "在deck项目的brands/<name>/brand.json登记可信logo、反白版、footer和可选colorSets/fonts，deck.brand接入。先用已有资产，缺必要信息才问。validate_spec、compile与check统一用品牌合并主题，品牌新增colorSet能从任意cwd正确解析。logo位置仍由风格决定。",
+      "expected_output": "先用用户提供或可信的 logo 与品牌资料，缺必要信息才问。自由 HTML 在项目素材和 CSS 中接入 logo、品牌色及署名，实际验收反白与裁切；结构化路线在 brands/<name>/brand.json 登记 logo、反白版、footer 和可选 colorSets/fonts，以 deck.brand 接入，由 validate_spec、compile、check 统一使用合并主题。不要为了自由 HTML 额外制造品牌 spec 合同；logo 位置由构图决定。",
       "files": [
         "references/brand-assets.md",
-        "SKILL.md"
+        "SKILL.md",
+        "references/web-composition.md"
       ]
     },
     {
       "id": 10,
       "prompt": "这份 deck 每一页看起来都差不多，能不能换换排法？",
-      "expected_output": "先判断重复是否阻碍叙事；按内容关系换结构而非机械轮换。图文和双栏可用--candidates比较，--picks/--pick或显式layout选择。自造布局由skin CSS实现。候选分数只是几何启发，必须目检；不得为了错落而拆散本应直接对比的数据。",
+      "expected_output": "先看连续内容页及源文件，指出同构出现在哪里，例如相同页头占比、等重编号栏、重复的图文比例或相同阅读路径；结合信息关系重组主焦点、尺度、组间空间和证据位置。变化应服务解释、比较、论证或转场，同屏比较需要稳定尺度时保持对应结构；不机械轮换模板、换色或强迫每页不同。HTML效果优先时可使用DOM/CSS Grid、SVG、图表或适合的图像素材，遵守项目素材限制。用户未要求先确认时直接修订，再看实际连续页面与观看尺寸，说明哪处变化解决了什么问题。已有结构化项目可用布局候选；候选分数不能证明美观。",
       "files": [
         "SKILL.md",
-        "references/layout-system.md"
+        "references/layout-system.md",
+        "references/web-composition.md",
+        "references/refined-workflow.md",
+        "references/composition-principles.md"
       ]
     },
     {
       "id": 11,
       "prompt": "图我自己出太慢了，我配了 MiniMax 的 key，你能直接生成吗？",
-      "expected_output": "用户已明确授权生成且有后端时，先--brief并填写内容准确的prompt，再--generate、--check，无须为同一动作重复确认。未配置后端或仍有占位符时明确停止并给出可执行步骤；不得编造图或调用空模板。已有文件与缓存按脚本规则复用；最终按真实图位核对清晰度与裁切。",
+      "expected_output": "用户已有明确生成授权时不重复确认；仍应使用当前环境实际可用且适用的生图能力，不能因为提到 key 就假装后端已可调用。沿用结构化素材合同的项目可 --brief、填写准确 prompt，再按可用后端 --generate、--check；自由 HTML 则按实际素材槽位生成并验收，不伪造 spec。缺少必要后端或仍有占位符时说明具体缺项，不编造图；最终核对实际图位清晰度、焦点及裁切。",
       "files": [
         "references/images.md",
-        "SKILL.md"
+        "SKILL.md",
+        "references/web-composition.md"
       ]
     },
     {
       "id": 12,
       "prompt": "风格就沿用上次选好的暖灰色，直接做，不用再问我。",
-      "expected_output": "沿用选择，先做密集内容/图表/图文代表页并自主校验；不强制重做三方向，不再次等待同一授权。",
+      "expected_output": "沿用已选视觉语言与当前制作路线，先做密集内容、图表或图文代表页并自主校验；不强制重做三方向、不再次等待同一授权。暖灰配色不意味着全篇只能使用一种构图。沿用暖灰的授权仅在已有选择范围内，不据此擅自换成另一个候选或混合两个未确认方向。",
       "files": [
         "SKILL.md",
-        "references/style-architecture.md"
+        "references/style-architecture.md",
+        "references/web-composition.md"
       ]
     },
     {
       "id": 13,
       "prompt": "把这三组指标放一张趋势图，必须一组都不少。",
-      "expected_output": "line/area使用完整series，数据实测保留全部标记；验证图形而不只检查canvas。不能只取series[0]。若用户选不支持的多系列图形，应明确说明并保留数据。",
+      "expected_output": "保留三组完整数据并核对每组真实绘制的标记和图例，不能只取 series[0] 或仅检查 canvas 存在。结构化路线的 line/area 使用完整 series；自由 HTML 使用的数据和绘图结果也必须完整对应。若所选图形或目标导出格式不支持该组合，应明确说明并保留数据。",
       "files": [
         "references/charts.md",
-        "scripts/render.py"
+        "scripts/render.py",
+        "references/web-composition.md"
       ]
     },
     {
       "id": 14,
       "prompt": "这份报告是现场投影讲的，如何确保后排看得清？",
-      "expected_output": "deck.delivery写live，按实际尺寸和远距离场景核对标题正文图例来源。优先压缩文案、分组拆页和扩大有效图位，不靠机械缩字通过。字号建议是人工设计下限提示，最终看真实预览。",
+      "expected_output": "按实际投影尺寸和远距离场景检查标题、正文、图例及来源，优先压缩文案、分组拆页和扩大有效图位，不靠机械缩字通过。结构化路线写 deck.delivery:live；自由 HTML 在项目 CSS 中实现适合现场的排印并做真实预览。字号建议是设计提示，不能把旧 check.py 的通过作为自由 HTML 后排可读的证据。",
       "files": [
         "references/visual-quality.md",
-        "scripts/check.py"
+        "scripts/check.py",
+        "references/web-composition.md"
       ]
     },
     {
       "id": 15,
       "prompt": "生成都成功了，但是导出的几页像是空白，能直接给客户吗？",
-      "expected_output": "停止交付，检查资源就绪、图表Promise和失败标记、缺失manifest内容、祖先裁切与透明度。真实文字重叠不能因同组豁免。最终格式打开验证，不拿返回0当完整性证据。",
+      "expected_output": "停止交付，先检查资源就绪、图表 Promise 和失败标记、内容可见性、祖先裁切与透明度；结构化路线另核对 manifest，自由 HTML 对照源内容与浏览器实测，不伪称具备 manifest 门禁。检查入场完成态与打印状态，实际打开最终格式核对每页，不拿脚本返回 0 当完整性证据。",
       "files": [
         "references/validation.md",
-        "references/delivery-formats.md"
+        "references/delivery-formats.md",
+        "references/web-composition.md"
       ]
     },
     {
       "id": 16,
       "prompt": "只要五页内部说明，材料就在这里，风格你决定，直接开始制作。",
-      "expected_output": "根据现有材料完成简洁页序规划并制作真实代表页，用户授权自行决定时自主推进。中间规划可用页序表，不强制生成或交付 content.json、storyline.json、pageplan.json；这些不是当前脚本支持的输入合同。最终使用合法 spec、项目风格和用户所需交付物，仍完成事实、渲染与视觉检查。",
+      "expected_output": "根据材料完成简洁页序规划并制作真实代表页，用户授权自行决定时自主推进。规划可用页序表，不强制生成 content.json、storyline.json、pageplan.json。按交付要求选择路线：自由 HTML 保留源文件、项目 CSS 与素材；结构化路线保留合法 spec 和项目风格。完成事实、渲染与视觉检查，不能把所有内部说明一律套成标题加小字列表。",
       "files": [
         "SKILL.md",
         "references/planning.md",
-        "references/pipeline.md"
+        "references/pipeline.md",
+        "references/web-composition.md"
       ]
     },
     {
       "id": 17,
       "prompt": "在配置里加上 approvedThemes 和 motion_intent，再让图表的折线自动逐段长出来。",
-      "expected_output": "先说明实际支持范围：brand 的闭合字段不含 approvedThemes，spec 没有 motion_intent；当前 G2 关闭内部动画，只有图表容器入场。不能把未实现字段写进配置后声称功能已生效。根据用户目标明确采用当前可交付效果或另行界定实现工作，验证真实效果后才交付。",
+      "expected_output": "先区分用户要求与实际路线能力：结构化 brand 没有 approvedThemes，spec 没有 motion_intent；当前 G2 关闭内部动画，不能写进配置后宣称折线逐段生长已生效。自由 HTML 的 data-reveal 也只提供 fade/rise/wipe，不自动逐段绘制任意路径。说明当前可交付效果，或明确实现可重复 seek 的自定义绘制并验证完成态、减弱动画和导出；不能用不存在字段冒充功能。",
       "files": [
         "references/brand-assets.md",
         "references/animation.md",
-        "references/charts.md"
+        "references/charts.md",
+        "references/web-composition.md"
+      ]
+    },
+    {
+      "id": 18,
+      "prompt": "这份新品发布会用 HTML 演示，PPTX 只要外观一致。想要像高级网页一样有主视觉、排版和动效，别再给我三种颜色的同一张列表。",
+      "expected_output": "采用自由HTML，不为已明确的PPTX外观要求再次提问。实际查看与新品材料相关的作品，提取可迁移的图文关系、背景和阅读节奏，用本项目真实中文内容形成代表页；字体、色彩和素材可在同一页共同试排，不增加逐项批准流程。主视觉与产品特点有关，不能只套大标题、抽象光球或三种颜色的相同清单。保留密集证据与必要条件，在实际观看尺寸检查主次、语义断行和有作用的留白。素材遵守项目要求，不伪造截图或数据；缺生图能力交完整提示词与回填路径。实现有阅读作用的动效并保持稳定完成态，实际播放；最终贴图PPTX从已验收逐页PNG导出。",
+      "files": [
+        "SKILL.md",
+        "references/web-composition.md",
+        "references/composition-principles.md",
+        "references/typography-and-space.md",
+        "references/delivery-formats.md",
+        "references/refined-workflow.md"
+      ]
+    },
+    {
+      "id": 19,
+      "prompt": "自由 HTML 这页标题用 left:50%; translate:-50% 16px 居中，加 data-reveal=\"rise\" 后别在最后一帧跳。配图原来有 clip-path，也想加 wipe。",
+      "expected_output": "保留作者已有定位和裁切：当前运行时遇到非 none 的独立 translate 将 rise 降级为淡入，已有 clip-path 将 wipe 降级为淡入；若确实需要位移或揭示，将 reveal 放到不占用这些属性的独立包裹元素。真实浏览器比较中间、临近完成及完成态的坐标和裁切，并来回 seek 验证可复现；不覆盖百分比 translate 或在末帧突然恢复几何，也不只靠静帧宣布动画稳定。",
+      "files": [
+        "references/web-composition.md",
+        "assets/web-runtime.js",
+        "scripts/web_deck.py"
+      ]
+    },
+    {
+      "id": 20,
+      "prompt": "做一份技术方案，HTML 能看就行，交付的 PowerPoint 必须能现场改文字和柱状图数值。不要用整页图片糊弄。",
+      "expected_output": "直接选择结构化 spec 与原生 PPTX 路线，使用支持的文字和原生柱状图，保留完整真实数据；不默认走自由 HTML，也不以贴图 PPTX 代替已明确的编辑需求。结合该路线实际能力设计有层级的构图，说明任意 CSS 效果不能保证一致；在目标 PPTX 宿主验证文字与图表的可编辑性、内容完整性及外观，不能仅凭文件扩展名声称可编辑。",
+      "files": [
+        "SKILL.md",
+        "references/style-architecture.md",
+        "references/charts.md",
+        "references/delivery-formats.md"
+      ]
+    },
+    {
+      "id": 21,
+      "prompt": "这个模型不能生成图片，先把技术介绍做出来，图片我让另一个模型出，放目录就能用。",
+      "expected_output": "尊重图片由另一模型生成的分工，不把已计划的图片静默取消或冒充已完成。技术配图先核实关系，再把节点、方向、分组与禁止新增的内容写入精确提示词；概念图说明视觉任务与构图。每个图位提供完整正向/负面提示词、比例/尺寸与路径，自由HTML可用image_handoff.py输出brief并预接img路径。用户回填后验真实文件、尺寸、实际裁切和技术关系。缺必要图片时不称完成；这项生成分工不构成通用禁SVG规则，其他素材仍按项目约束选择。",
+      "files": [
+        "SKILL.md",
+        "references/images.md",
+        "references/web-composition.md"
+      ]
+    },
+    {
+      "id": 22,
+      "prompt": "HTML生成成功了，可是两行标题压住副标题，目录末项被截掉，蓝色节点里的字也看不清。",
+      "expected_output": "检查实际HTML与截图，运行web_check.py定位文本Range相交与裁切。优先用正常流或合适Grid让长标题后的内容自动让位；deck-page是可用机制，不是必须复制的模板。目录可重组或拆页，不隐藏末项；核对节点文字在真实背景上的可读性。现有SVG可直接修复文字和布局，不因skill默认要求而替换成生成图；只有该项目明确禁SVG时才按项目要求更换形式。真实越界、裁切与资源错误不可豁免，重叠/遮挡待审项修复后复测，并检查演示中间态。几何、审美、事实和播放稳定分别验收。",
+      "files": [
+        "references/web-composition.md",
+        "references/visual-quality.md",
+        "scripts/web_check.py"
+      ]
+    },
+    {
+      "id": 23,
+      "prompt": "先做三版让我选，要有配图。A/B/C都出完了，C技术内容比较清楚，但风格我还没选定，继续把候选完善好给我看。",
+      "expected_output": "结合用户明确未选定风格且要求继续完善候选的范围，修掉候选中的溢出并呈现同一代表材料的可打开预览，说明推荐与取舍，再等待具体选择；期间继续独立事实核对和素材准备。不能自行把C或混合A/C记录为选定，也不展开整份C版。按要求保留配图，素材方式遵守项目约定；约定生成配图但无后端时交完整提示词并标明待素材，不能取消配图。三版和等待选择来自本次明确要求，不扩展成通用数量或审批要求。",
+      "files": [
+        "SKILL.md",
+        "references/planning.md",
+        "references/images.md"
+      ]
+    },
+    {
+      "id": 24,
+      "prompt": "这份是技术架构PPT，但我已经说过要概念配图。你不能出图就给我提示词，不能自己决定不要图。",
+      "expected_output": "落实用户明确要求的概念配图，先说明图像承担的视觉任务，不能因技术主题取消。技术关系先查项目证据，准确的架构图按项目允许的工具制作；若用户同时要求架构图也由生图模型生成，则把已核实节点、方向与分组写入提示词。不能生成概念图时提供image-plan与完整提示词、文件名、比例、尺寸、负面约束、回填路径，并在HTML引用。缺必要图片明确pending，不能把生成图当事实截图，也不能把本项目概念配图要求扩大为所有新作禁SVG或强制生图。",
+      "files": [
+        "SKILL.md",
+        "references/images.md"
+      ]
+    },
+    {
+      "id": 25,
+      "prompt": "播放器只有5页，页脚写28，旧检查报告通过了，可是另一个agent还在继续写，能说全部检查过吗？",
+      "expected_output": "不能。先识别正在变化的局部版本、计划总数和真实生成页数，报告状态只对具体输入版本有效；审查以稳定快照记录时间和哈希，不覆盖并发制作文件或宣称任务已结束。核对失败/待审/小字提示与实际截图，不把几何通过当用户选型、配图到位或审美通过。最终渲染后重验，静态页脚按真实产物页数，不写未完成总数为交付数。",
+      "files": [
+        "SKILL.md",
+        "references/web-composition.md"
+      ]
+    },
+    {
+      "id": 26,
+      "prompt": "坚决不用 SVG，架构图也只让生图模型生成。当前模型不能生图，你先把可交接的部分做好。",
+      "expected_output": "按已知节点、分组、方向、禁止新增关系编写逐图完整提示词，复杂总图分成章节局部图；同时给出比例、像素、图位、固定路径与验收要求。运行 image_handoff --brief，HTML img 接好相同路径，缺图明确待素材，不画 SVG/Canvas 或程序转 PNG。新编译启用 --raster-only，生成图回填后逐项复核技术关系；不能声称脚本能证明图片来自模型。",
+      "files": [
+        "SKILL.md",
+        "references/images.md",
+        "scripts/web_deck.py"
+      ]
+    },
+    {
+      "id": 27,
+      "prompt": "这一页七个流程阶段，还要放每个阶段的技术、版本号、代码，挤满了。请按章节慢慢讲，不要缩字。",
+      "expected_output": "遵守用户按章节慢慢讲、不缩字的要求，区分总览、阶段解释、例子与完整清单；根据内容关系设计各页，复杂阶段可继续拆开。版本和长代码保留可追溯去向，影响判断的信息仍放在相关解释附近。页数随解释需要增加，不强行保留一页或只把七栏机械截成两页。可以使用deck-page机制或其他合适布局，浏览器实测真实正文空间、块数与字号。没有默认三块或1–6范围，只有显式data-max-blocks正整数预算被实际超过才产生块数review；即使未声明预算，实际拥挤、溢出和遮挡也必须修复。",
+      "files": [
+        "references/planning.md",
+        "references/layout-technology.md",
+        "scripts/web_check.py"
+      ]
+    },
+    {
+      "id": 28,
+      "prompt": "有没有别人已经实现的布局技术，GitHub 找找看，不想再手算每个坐标。",
+      "expected_output": "查官方仓库与文档，区分 Slidev 布局组件/命名区域、reveal 播放缩放、Pretext 字体度量、Paged.js 印刷分页的能力与限制。当前优先用原生 Grid 的真实流式分区和浏览器测量，说明是否实际接入第三方依赖，不能把参考机制说成安装了库；禁 SVG 时不默认选使用 inlineSVG 的 Marp。任何框架都不能代替内容组织与审美检查，附可验证来源。",
+      "files": [
+        "references/layout-technology.md",
+        "assets/web-layouts.css"
+      ]
+    },
+    {
+      "id": 29,
+      "prompt": "标题改成三行之后正文又贴页脚了，你不是说能算位置吗？",
+      "expected_output": "检查源文件真实布局；若使用deck-page，Grid按标题实际高度、外边距、间距和页脚计算正文空间；自建布局同样核对实际矩形。长标题会减少正文容量，不能神奇增加画布。浏览器等字体图片就绪后测量内容与页脚关系，按内容重组、调整合理间距或拆页，不能隐藏溢出或把正文标成caption掩盖问题。没有通用32px底部下限，声明的空间意图与实际可读性分别核对。报告该版本的实测矩形并复核截图。",
+      "files": [
+        "references/layout-technology.md",
+        "scripts/web_check.py",
+        "assets/layout-starter.html"
+      ]
+    },
+    {
+      "id": 30,
+      "prompt": "新生成的三版还是丑，正文28px、页脚24px，五层技术挤在一页。我要适当字号和留白。",
+      "expected_output": "先看实际候选与源文件，指出正文、页脚和各层内容正在争夺哪些空间，而非只认定字号不够大。按材料决定总览、重点解释与证据的去向，保留事实和影响结论的条件；不把一页一图一结论或固定章节顺序变成通用要求。结合观看场景调整正文与辅助字的重量、阅读列和组间空白，让主焦点清楚，不能只扩大外边距或按空白率、固定块数评分。对相同材料重做可比较的真实预览，落实发现后再看新截图；素材方式按项目要求。原任务明确要求用户选方向时保留选择环节，否则自主修复并完成。",
+      "files": [
+        "SKILL.md",
+        "references/typography-and-space.md",
+        "references/planning.md"
+      ]
+    },
+    {
+      "id": 31,
+      "prompt": "为了通过检查，我把data-max-blocks写成5，再放一个能decode的占位PNG，这算完成候选了吧？",
+      "expected_output": "不能仅凭这两点称完成。data-max-blocks=\"5\"本身是合法的正整数声明，不会仅因声明为5就违规，也没有默认三块或1–6的预算范围；实际块数超过5才产生块数review，未超量仍需按实际画面检查密度和可读性。PNG能解码只证明文件可读，占位图不能冒充完成的配图或成品候选。按项目约定回填真实合格素材；需要生成图片时生成或交完整提示词，缺必要素材只能标为草稿。核对最终版本、实际截图、事实、资源与遮挡，不为消除真实溢出而修改预算。",
+      "files": [
+        "references/web-composition.md",
+        "scripts/web_check.py",
+        "references/images.md"
+      ]
+    },
+    {
+      "id": 32,
+      "prompt": "我提供的这份项目参考，排印、配色和图文方向都认可，按这个方向做新的培训演示。材料有七个步骤，每步都有规则、例子和例外。HTML优先。",
+      "expected_output": "实际查看用户提供的参考，在有可读源文件且与复用范围相关时检查实现；迁移已认可的排印分工、空间关系与视觉方向，在项目内记录选择。根据培训内容重新安排七步骤的规则、例子与例外，决定总览、并列比较或逐步解释的页序；影响判断的例外保留在相关页，完整材料有去向。不能从参考的页数、列数或配图题材倒推内容。素材按培训主题和项目要求制作，参考图片不能自动充作新项目资产。沿用用户已确定的方向，不强迫重新搜灵感或再选风格；核对实际字体覆盖与观看尺寸，渲染并检查最终产物。",
+      "files": [
+        "references/refined-workflow.md",
+        "references/composition-principles.md",
+        "references/typography-and-space.md"
+      ]
+    },
+    {
+      "id": 33,
+      "prompt": "我想比这三套样例更有创意，但要保持一样清楚、精致。主题是海洋生态，先让我选方向。",
+      "expected_output": "尊重用户先选方向的范围，实际查看与海洋生态相关的外部作品，展示可见画面、原作品直链以及可迁移的构图、图像和阅读关系；可用真实内容的轻量样张让差异可判断，不把深浅底色或换色当作不同方向。不自动生产固定数量的全套候选，也不把作者推荐记作用户认可；方向未选时继续独立事实与素材准备。选定方向后按该范围制作，除非另有要求，不追加逐项字体、配色审批。从旧样例只保留用户认可的质量特点，素材与事实依项目要求，图像应服务海洋主题。",
+      "files": [
+        "references/refined-workflow.md",
+        "references/composition-principles.md",
+        "references/images.md"
+      ]
+    },
+    {
+      "id": 34,
+      "prompt": "不要让我在A/B/C里选，也不要复制这几套。我想要针对这次内容原创设计，仍然精致、留白合理。",
+      "expected_output": "从本次内容、观众与观看场景发展新的视觉出发点，实际查看相关参考并把可用关系转成真实内容试排。拒绝A/B/C和旧模板不产生额外审批要求；根据已有信息决定字体、色彩与构图，完成代表页、审稿和后续制作，只对会改变结果且无法推断的关键缺项提问。检查主焦点、组间空间、图像与主题的关系，以及连续页节奏，不用固定字体、配色、页数、空白率或图像公式定义精致。发现具体画面问题后修订并重新看图，保留事实、素材约束和真实交付状态。",
+      "files": [
+        "SKILL.md",
+        "references/refined-workflow.md",
+        "references/web-composition.md",
+        "references/composition-principles.md"
+      ]
+    },
+    {
+      "id": 35,
+      "prompt": "把这份馆藏介绍做成一份精致、布局合适的HTML演示，直接做就好。可以使用我提供的文物照片和SVG地图，有些页纯文字，有些页需要多图对照；不要为了模板固定页数。",
+      "expected_output": "按用户“直接做就好”的明确授权完成原创设计，不强迫用户先选候选、不限定A/B/C、固定三套四页、章节顺序或每页一图一结论。使用用户提供且可用的照片与SVG地图，核实来源、说明与地图关系，不默认启用--raster-only或要求全部重生成。可自建适合内容的布局，layout-starter仅为可选分区机制，不是成品视觉模板。根据观看条件与角色设计字号和留白，minBodyFontRecommended只作非阻塞建议；没有默认三块、1–6预算范围或32px底部下限。若显式data-max-blocks为正整数，仅实际超过该预算才产生块数review，不能拿条数代替审美判断。实际渲染检验层级、阅读路径、多图比较和空间关系，修复真实裁切、越界、遮挡、资源失败及事实错误，并回读最终交付格式。",
+      "files": [
+        "SKILL.md",
+        "README.md",
+        "references/refined-workflow.md",
+        "references/web-composition.md",
+        "scripts/web_check.py"
+      ]
+    },
+    {
+      "id": 36,
+      "prompt": "第一页可以，但后面都是大框套小段文字，标题又长又大。七行表格的文字贴着上边框。把内容页也做得灵活、精致。",
+      "expected_output": "先查看实际内容页和源文件，不以封面或几何通过证明全篇合格。检查长解释是否与大标题同字号，提炼短主题并把必要条件、证据下沉到说明，不能删事实或写死标题字数。定位容器的height/min-height、flex-grow、fr、stretch以及表格自身高度：区分正文可用区域与可见卡片表面，让不需等高的内容自然取高，按语义决定边框是否必要。七行紧凑比较表采用均衡上下padding与vertical-align:middle；若是Grid/Flex仿表格，在相应单元格实现对齐，不拿text-align当垂直居中。以实际多行行项和整张表的画面复核。保持全篇视觉语言，按关系采用适合的排印、比较、图文或局部重点，不机械换皮、加框或增加晃动。检查连续内容页与实际观看尺寸。",
+      "files": [
+        "SKILL.md",
+        "references/visual-quality.md",
+        "references/typography-and-space.md",
+        "references/layout-technology.md"
+      ]
+    },
+    {
+      "id": 37,
+      "prompt": "这个价格比较页的三张卡代表三个互斥方案，需要等高便于横向比较。下一页是长段合同说明表，要求对齐首行。",
+      "expected_output": "保留有明确比较含义的等高卡片，以及长段说明单元格的首行对齐。框线不是通用禁令，middle也不是所有表格的全局覆盖。调整卡内信息层次、对应项目位置和内距，使对照易读；长段表采用top并保证上下留距。真实检查而非按卡片个数、边框数量或留白率打分；不能把用户明确设计需求当成无作用大框删掉。",
+      "files": [
+        "references/visual-quality.md",
+        "references/typography-and-space.md",
+        "references/layout-technology.md"
+      ]
+    },
+    {
+      "id": 38,
+      "prompt": "请保持这套已经选好的风格，但是内容讲得生动一点。别给我每页换颜色、换字体，或者所有元素一块儿飞进来。",
+      "expected_output": "保持已选字族、色彩与对齐逻辑，按信息关系改变主次、尺度、阅读路径和页面节奏；可通过问题与例子、整体与局部、证据与结论推进，不要求固定页型轮换或每页都有主图。检查封面之后的连续内容页，而不只挑一张漂亮样图。需要动效时按阅读步骤编排，保持稳定可读与可复现导出；生动不等于强制增加运动，素材方式遵从项目约束。",
+      "files": [
+        "references/refined-workflow.md",
+        "references/visual-quality.md",
+        "references/animation.md"
+      ]
+    },
+    {
+      "id": 39,
+      "prompt": "现在没有溢出、没有框，还是很乱。标题、副标题、三条小标题和底部总结都在重复同一句话。",
+      "expected_output": "检查实际画面与文案分工，合并没有新增信息的重复强调，保留必要事实与限定，让情境、判断、证据承担不同作用。主张、数字和辅助说明的视觉重量应与含义对应，不给无分析意义的数量造大指标，也不只缩小全部内容或扩大外边距。实施具体修订后重新截图，比较同页及相邻内容页的阅读入口、组间空间和节奏；指出实际改善及尚未解决的问题。只写审稿意见、重新运行检查器或声称无框均不能算完成修改。",
+      "files": [
+        "references/visual-quality.md",
+        "references/refined-workflow.md"
+      ]
+    },
+    {
+      "id": 40,
+      "prompt": "帮我做一份面向投资人的海洋生态演示，HTML优先，风格还没想好。先从godly.design之类找灵感，我们一步一步选。",
+      "expected_output": "实际浏览用户给的库及具体作品，查看真实画面，展示有差异且适合主题的参考、作品直链、借鉴点与演示适配方法。不能只列首页或凭搜索摘要称看过。按用户一步一步选的要求先讨论参考特点，未答复不替用户选定，也不先做三套完整deck或同时问大量字体色值。认可后用真实中文和实际内容样张推进其仍希望参与的选择；字体与颜色可以在样张中一起判断，不强制拆为更多审批轮次。记录已定与待定范围，继续可独立完成的事实工作。",
+      "files": [
+        "SKILL.md",
+        "references/refined-workflow.md"
+      ]
+    },
+    {
+      "id": 41,
+      "prompt": "参考和字体已经选好了。之前给过中国色、Happy Hues、Color Hunt，这次配色请真用起来，先让我看看。",
+      "expected_output": "沿用已选参考与字体，读取用户提供的配色源并打开相关具体色板或应用页，记录可验证链接、名称/编号与可见色值。以相同字体和材料展示角色明确的应用样张，解释与参考相比的调整并询问色彩倾向。不重启风格或字体选择，不只列HEX和首页，不把自选颜色事后冒称来自网站；对比度与实际背景仍须检查。",
+      "files": [
+        "references/color.md",
+        "references/refined-workflow.md"
+      ]
+    },
+    {
+      "id": 42,
+      "prompt": "参考A的构图可以，但不要它的绿色；字体我还没选，先别做整套。",
+      "expected_output": "只把构图记为已认可，绿色记为否决；遵守先别做整套，在认可构图范围内展示实际中文排印与必要配色的代表样张，说明取舍供用户判断。不得默认继承A的绿色、扩展全套或把作者推荐当成用户认可；也不强制新增字体后颜色的固定审批顺序。已有构图不重复问，落实用户后续选定范围再推进。",
+      "files": [
+        "SKILL.md",
+        "references/refined-workflow.md",
+        "references/typography-and-space.md"
+      ]
+    },
+    {
+      "id": 43,
+      "prompt": "按我们刚才说的从参考网站找灵感，网站现在打不开，你只有搜索结果里的名字和几句介绍。",
+      "expected_output": "明确尚未看到实际画面，不编造字体、颜色、动效或以名称声称已审过。寻找可访问的作品或用户已有可见参考，继续可独立进行的内容核实和实际样张准备；参考动效需实际播放，静态图只能说明可见状态。若此前明确约定由用户选方向，保留该范围等待可判断材料和决定；普通找灵感不自动产生审批要求，可基于真实可见依据提出并实现适合内容的方向。不能把网站异常变成回收旧模板或冒称看过参考的理由。",
+      "files": [
+        "references/refined-workflow.md"
+      ]
+    },
+    {
+      "id": 44,
+      "prompt": "重新梳理，完全重新生成项目讲解文档，不要看历史内容。每个节点用的技术、链路中使用的技术、处理流程等等，都要讲清楚。其他的根据技能的规则进行。/deck-authoring",
+      "expected_output": "从当前源码、配置、依赖与现行事实资料核实节点、技术和关键链路，不读取旧演示、截图、样式或旧选型记录作为新稿依据。普通重做请求允许根据当前材料自主发展设计；实际查看相关可见参考，提取空间、排印或阅读关系，在难处理的真实内容上试排并继续制作，不以缺少逐项字体配色批准为由停工。无需先盘点完整项目或锁死总页数，内容与代表页可迭代推进。按技术关系保留限定、来源和解释，检查连续页重点与留白；只有用户明确要求先确认时才等待指定范围。评价可见设计结果、修订和事实完整性，不要求特定网站、固定参考数量或固定提问措辞。",
+      "files": [
+        "SKILL.md",
+        "references/refined-workflow.md",
+        "references/content-intelligence.md",
+        "references/composition-principles.md"
+      ]
+    },
+    {
+      "id": 45,
+      "prompt": "项目里还留着上一轮的演示HTML、截图、CSS和已选风格brief，源码与现行技术文档也在。这轮请从头重做项目讲解，不看旧稿，也不要沿用以前的设计。/deck-authoring",
+      "expected_output": "区分当前事实资料与用户排除的历史设计资产；保留旧文件，但不打开、复制、渲染或混搭旧deck、截图、样式及已选风格brief，也不继承旧风格批准。可查通用布局、排印与工具机制文档，从本次主题和实际可见的新参考发展设计并制作真实内容代表页。用户没有要求先选方向时自主推进，不新增字体配色审批；外部作品不可见则说明范围并寻找可见替代，不退回旧模板冒充新参考。重新安排阅读路径、主题素材与连续页节奏，按实际渲染问题修订。",
+      "files": [
+        "SKILL.md",
+        "references/refined-workflow.md",
+        "references/composition-principles.md"
+      ]
+    },
+    {
+      "id": 46,
+      "prompt": "前面已经说过：不要SVG，所有配图只用生图模型生成；HTML效果优先，PPTX保留外观即可。现在把项目讲解完全重新生成，不看历史内容。/deck-authoring",
+      "expected_output": "重新核实内容并重建审美方向，同时保留已明确的素材、无SVG和外观交付约束，不重复询问是否需要原生可编辑PPTX。外部网页用于视觉研究，不能把其SVG、截图或现成视觉资产充作本项目配图，也不用Canvas或程序转PNG规避限制。根据本轮实际可见参考和材料自主试排；只有先前明确约定先确认方向时才等待该范围，不能因重做代选旧风格或添加新的审批链。按主题和图位生成图片；无生成能力或由用户另行生成时交完整提示词、比例尺寸和固定回填路径，缺图标为待素材。启用项目要求的raster-only，验收完整画面、播放及外观一致的贴图PPTX；这些限制不扩为其他项目默认规则。",
+      "files": [
+        "SKILL.md",
+        "references/refined-workflow.md",
+        "references/images.md",
+        "references/delivery-formats.md",
+        "references/composition-principles.md"
+      ]
+    },
+    {
+      "id": 47,
+      "prompt": "我们已经选好参考方向、字体和颜色，继续做这份篇幅较长的技术讲解演示。此前说好了逐步看效果。",
+      "expected_output": "沿用已定事项，不重复选风格；先完成并展示覆盖真实内容风险的代表内容页，落实图像任务，按反馈修订后扩展。不能以用户已选字体配色、生成器方便或节省时间为由，先写完整套再挑几张自审。代表页数量与结构由内容决定；若用户明确委托自主完成则自主试排和修订，不额外增加等待。",
+      "files": [
+        "SKILL.md",
+        "references/refined-workflow.md",
+        "references/images.md"
+      ]
+    },
+    {
+      "id": 48,
+      "prompt": "我希望演示有模型生成的配图，你不能生图也没关系，输出详细提示词，我交给其他模型。现在 HTML 都是文字，也没有 img 标签。",
+      "expected_output": "把生图配图与提示词视为明确任务，不以尚无img元素或技术主题证明无需图片。结合真实内容和所选视觉方向规划必要图像，写完整提示词、负面约束、用途、目标尺寸/比例和确定文件路径，生成可独立使用的提示词文档；在制作范围内连接真实图位并标明待素材，缺图不报成品。审查或方案任务尚未改源时说明未接入，不能承诺直接放图即可显示。无需强迫每页配图，也不在用户只要求交接时自行付费生图。",
+      "files": [
+        "references/images.md",
+        "scripts/image_handoff.py"
+      ]
+    },
+    {
+      "id": 49,
+      "prompt": "检查器显示24页只有24条small-text提示，应该全是页码吧？整套PNG也已经生成了，可以说逐页审稿通过吗？",
+      "expected_output": "查看聚合提示中的count、fontSizeDistribution和正文样本，不能把每页一条汇总当成一个小字元素，也不按CSS命名把流程说明降为辅助标签。在真实播放尺寸核对正文；大量必要说明偏小就重组、拆讲或改变阅读路径，不能靠底部留白、补事实条或机械通过宣称美观。PNG生成不等于目检，准确说明已审页与版本；实际查看未审页面，修复后复核受影响页，再报告完成范围。",
+      "files": [
+        "scripts/web_check.py",
+        "references/visual-quality.md",
+        "references/typography-and-space.md"
+      ]
+    },
+    {
+      "id": 50,
+      "prompt": "图片已经放进目录，帮我确认可以交了。计划里的封面图应出现在第1、4页，但前面改过页序。",
+      "expected_output": "同时校验真实文件和HTML实际引用的页码与路径，使用image_handoff.py --check PLAN --html HTML；有文件但未接入或错页不能报ready。检查浏览器中的可见性、裁切和文字避让，重新导出受影响格式；静态接入通过不能代替视觉验收。",
+      "files": [
+        "scripts/image_handoff.py",
+        "references/images.md"
+      ]
+    },
+    {
+      "id": 51,
+      "prompt": "做一份介绍陶瓷修复的线上演示，设计你来决定。我会自己生图，先给我能直接用的详细提示词和目录。",
+      "expected_output": "从修复工艺、材料和观看用途形成主题相关的视觉出发点，按信息关系组织内容，不机械套技术报告、固定三选一或全套双栏。完成真实内容试排与可见范围内的审稿；输出可单独复制的逐图提示词、比例、路径与接入状态，缺图明确为待素材稿，不伪称完整审美验收。",
+      "files": [
+        "references/composition-principles.md",
+        "references/images.md"
+      ]
+    },
+    {
+      "id": 52,
+      "prompt": "我把skill装到Linux了，Chrome不在Mac路径，也没有图像生成API。还能做HTML、配图提示词和PPTX吗？",
+      "expected_output": "按实际安装路径运行依赖诊断并使用DECK_CHROME或PATH的本机浏览器；不要求购买生图服务。说明Python依赖、浏览器和所选导出工具，执行可用能力并交外部生图提示词；MP4的当前macOS限制不扩大为HTML/PPTX不可用。目标平台实际渲染未验证时不宣称跨平台全部通过。",
+      "files": [
+        "README.md",
+        "scripts/browser.py",
+        "scripts/image_handoff.py"
+      ]
+    },
+    {
+      "id": 53,
+      "prompt": "前面你问了视觉方向、场景、格式和页数。现在你可以看图了，你自己看下先。分享给别人自读，先交HTML，页数看内容。",
+      "expected_output": "根据答复更新桌面自读、HTML和按内容定页数，实际查看现有图片，给出能在画面上定位的设计判断与适合材料的方向；不只重复视觉方向问题或等待用户逐项批准字体颜色。先看图的要求应先完成，可在已有任务范围内推进真实内容试排，不声称未查看的素材已合格。若更早明确约定由用户选方向或先确认样张，仍保留该指定范围，不能把看图能力扩大为已经选定。素材来源、图像与文字关系及运动取舍随内容判断，已有约束不重复问。",
+      "files": [
+        "SKILL.md",
+        "references/refined-workflow.md",
+        "references/composition-principles.md"
+      ]
+    },
+    {
+      "id": 54,
+      "prompt": "24页HTML编译0错误，源码没有img、data-reveal或自定义动画，也没有image-brief.md。用户之前想要生图配图和动效，可以直接交付吗？",
+      "expected_output": "识别缺失的承诺，不能以播放器含R键、已截图或0错误证明完整。制作实际图像任务与提示词交接，接好约定路径；实现有阅读作用的运动并验证播放、减弱动画与完成态。素材待回填则交草稿及提示词，明确状态；原有几何warning仍需实际阅读复核。",
+      "files": [
+        "SKILL.md",
+        "scripts/web_deck.py",
+        "references/images.md",
+        "references/animation.md"
+      ]
+    },
+    {
+      "id": 55,
+      "prompt": "这份纯文字诗歌演示，明确不要配图也不要任何动画。编译Source coverage是0图片、0reveal，要补齐才能交吗？",
+      "expected_output": "尊重明确纯文字静态要求，不添加图片、动画或无用提示词文档。解释库存数字不是失败或审美分数；按文字排印、留白、节奏、实际观看和要求的导出验证交付。",
+      "files": [
+        "SKILL.md",
+        "scripts/web_deck.py",
+        "references/visual-quality.md"
+      ]
+    },
+    {
+      "id": 56,
+      "prompt": "把这份植物标本研究做成中文演示。照片里有叶脉、手写采集标签和比例尺，都需要保留；我想要有设计感和呼吸感，别套一排同样的卡片。",
+      "expected_output": "实际查看照片和研究材料，从叶脉细节、标本尺度、采集信息等真实内容发展图像与排印关系，明确哪一处图像支持哪一项理解。裁切或局部放大时保留比例尺、标签和必要上下文，不能为好看隐藏证据或用生成图替代真实标本。用焦点与安静区域、整体与局部、主说明与边注组织空间，不强制不对称、固定空白比例或每页同一主视觉。普通制作自主推进，使用实际中文与连续内容页检查重点、留白和阅读路径，发现问题落实到可见修订。",
+      "files": [
+        "references/composition-principles.md",
+        "references/typography-and-space.md",
+        "references/images.md",
+        "references/visual-quality.md"
+      ]
+    },
+    {
+      "id": 57,
+      "prompt": "这份试验结果有完整数据表、样本量、误差说明和两个例外，不能删。现在看着挤，但我不想靠超大标题和小字表格装极简，请重新设计。",
+      "expected_output": "先辨认观众要比较的关系与支持结论的证据，实际查看原页和材料。保留数据、样本量、误差与例外；影响结论的限定紧邻对应判断。可重分列宽、改变重点与辅助信息的重量、建立组间空间或按问题拆成连贯页面，完整数据仍有清楚可读的去向。不能通过删行、弱化关键限定、缩小核心文字或机械扩大外边距制造留白，也不把所有标题与指标等权放大。以目标观看尺寸复核真实表格、相邻页节奏和修改结果，不用空白率或版式数量验收。",
+      "files": [
+        "references/content-intelligence.md",
+        "references/composition-principles.md",
+        "references/typography-and-space.md",
+        "references/visual-quality.md"
+      ]
+    },
+    {
+      "id": 58,
+      "prompt": "我想借鉴 taste-skill 的审美判断，但我们品牌已经规定紫色渐变、圆角信息卡和宋体标题；这些要保留。能不能让它更有品位，别直接抄成另一个网站？",
+      "expected_output": "实际读取用户指定的参考skill，区分可迁移的判断方法与它面向网页的风格偏好；保留本项目明确的品牌、圆角和宋体要求，不把某个字族、渐变、颜色或卡片列为全局禁令。将参考转为演示的主题依据、主焦点、空间关系、图片处理和连续页节奏，使用实际中文与真实材料试排。审美变量或数量只可表达方向，不能声称调高数值自动提高品位；也不为追求不同破坏比较关系、可读性或证据。根据实际截图定位问题、实施修订并复看，呈现可观察的改善而非复制网页外壳或新增固定风格菜单。",
+      "files": [
+        "SKILL.md",
+        "references/refined-workflow.md",
+        "references/composition-principles.md",
+        "references/typography-and-space.md",
+        "references/visual-quality.md"
+      ]
+    },
+    {
+      "id": 59,
+      "prompt": "这几页讲同一个请求从接收、排队到执行和返回的状态变化，想要灵动一点；后面还有两种机制的并列比较。不要把正文一直晃来晃去。",
+      "expected_output": "核实请求状态、转移条件与比较关系，让同一对象在连续页面或阶段中保持可追踪的身份与方位；用局部展开、重心变化或必要的状态揭示帮助理解，不把灵动等同于所有元素错峰飞入。顺序过程按实际因果组织，两个比较对象同步可见以保留共同尺度；正文落定后稳定，重要信息不依赖hover或持续移动才出现。按项目图像和格式约束实现，实际检查初始、中间、完成、减弱动画及静态导出状态，不能仅因有reveal属性就宣布体验完成。",
+      "files": [
+        "references/composition-principles.md",
+        "references/animation.md",
+        "references/web-composition.md",
+        "references/visual-quality.md"
+      ]
+    },
+    {
+      "id": 60,
+      "prompt": "沿用这份培训材料，给我两种有依据的风格方向。不要只换背景色，也不要默认我会选上次的米白宋体；我想看到各自适合什么、牺牲什么。",
+      "expected_output": "根据受众、观看条件、真实材料和品牌推导方向，用同一段内容比较排印、重心、图像处理或阅读路径的实质差别，保留同一组事实。说明适用条件和实际取舍，不将行业标签绑定固定色系，不凭最近成功作品决定新主题。用户要求看方向时交可比较样张，按本次选型范围等待；不额外拆成字体、色彩审批链。",
+      "files": [
+        "references/refined-workflow.md",
+        "references/composition-principles.md"
+      ]
+    },
+    {
+      "id": 61,
+      "prompt": "布局和字体我已经满意，只想比较两种配色。品牌橙色必须保留，图里绿色表示成功、红色表示故障。也需要一张深底章节页。",
+      "expected_output": "比较配色时保留原构图、字体和事实，以实际页面比较颜色的角色、面积与可读性；保留品牌橙色，可调整其背景/强调用途，不让它与状态色混淆。成功和故障跨页保持一致含义并有文字或符号支持。深底重新配文字、局部表面和强调值，核对实际组合，不机械反相。对比度记录说明检查方法和覆盖范围，不把自由HTML的web_check通过当成颜色验收。",
+      "files": [
+        "references/color.md",
+        "references/refined-workflow.md"
+      ]
+    },
+    {
+      "id": 62,
+      "prompt": "这份图表从两个类别增加到七个类别，其中另一张图表现围绕零点的正负偏差。请把它们融入原来的演示配色，保留真实截图的颜色。",
+      "expected_output": "区分无序类别与以真实零点为基准的偏差，选择容易辨认的类别色和合适的发散关系；直接标签、符号或线型辅助辨认，避免无限轮换主次色或只用红绿表达。保持同一类别跨页含义，新系列与背景下重新检查，必要时调整图表组织。真实截图保留证据色，通过周边表面和布局协调；不染色截图，不把品牌色板强行当作适用于所有数据的色阶。",
+      "files": [
+        "references/color.md",
+        "references/visual-quality.md"
+      ]
+    },
+    {
+      "id": 63,
+      "prompt": "我给了几张风格画廊截图，是让你改进这个通用 PPT skill。主题那么多，不要给我总结成几种套餐，也不用另换一个主题做三套样张。",
+      "expected_output": "把任务识别为通用创作方法改进。研究用户给出的实际参考与实现，区分参考检索、视觉描述、项目设计和渲染导出。支持任意参考、开放主题与相容的特征组合，不建立行业到固定模板的必选映射，不擅自另选主题继续批量样张。改进应落实到简洁的指导与实现能力边界；样张不是新的默认风格，不将规则和风格数量当作审美效果证明。",
+      "files": [
+        "SKILL.md",
+        "references/visual-language.md",
+        "references/refined-workflow.md"
+      ]
+    },
+    {
+      "id": 64,
+      "prompt": "这份技术材料想借鉴参考里的纸面质感、细线和大字，但配色沿用我们的品牌，也不需要国风插画。不要退回普通双栏清单。",
+      "expected_output": "实际看参考并辨认用户要保留的特征，结合原技术材料形成项目视觉关系，不因技术主题套深蓝模板，也不因纸面参考加入竹子、山水等未要求的意象。将材质、线条、大字和品牌色落实到构图，装饰可承担气质与节奏，不要求逐一表达数据；关键技术关系与证据保持准确。用原内容检验实际渲染和导出，密集页面可让装饰退让，不借另一主题的漂亮封面证明成功。",
+      "files": [
+        "references/visual-language.md",
+        "references/composition-principles.md",
+        "references/visual-quality.md"
+      ]
+    },
+    {
+      "id": 65,
+      "prompt": "用这些技术材料制作 HTML 演示，版面要有设计感，配图由我根据你给的 Markdown 自己生成，再放进指定文件夹。现在还没有图片。请完成待配图稿。",
+      "expected_output": "在正文布局前判断适合用图的页面，按实际内容设计图位，不默认技术内容只需 CSS 方框，也不规定每页必须有图。实际保存 image-plan.json 并生成 image-brief.md，每张图提供可独立复制的完整提示词、使用页、目的、尺寸比例、安全区、透明要求和准确的相对保存路径。HTML 使用同一目标路径并保留有尺寸的图位；检查绑定，明确素材尚缺，不声称资源或最终视觉验收完成。不调用生图工具，不以工具可用或不可用决定是否交 Markdown，不用聊天建议或只有 JSON 代替文件。回填后刷新核对裁切和显示，再重新导出；只有用户明确委托才执行生成。",
+      "files": [
+        "SKILL.md",
+        "references/images.md",
+        "references/web-composition.md",
+        "scripts/image_handoff.py"
+      ]
+    },
+    {
+      "id": 66,
+      "prompt": "旧演示我已经删了，这次整体重新设计。仓库 docs/diagrams 里有一张旧架构图的 colors.json，名字叫纸面批注，但它不是品牌规范。请重新做整套演示，功能配图由我按 Markdown 生成。",
+      "expected_output": "读取技术事实不继承旧图的色板、字体或隐喻；不把仓库存在的局部样式或此前 AI 记录当成用户确认的品牌。重新依据本轮参考、受众、功能图与背景建立配色，不随机轮换模板。完整新稿规划封面主视觉/背景以及各内页背景，解释页的图承担关系而非只放一张装饰封面；实际保存计划、生成配图 Markdown 并接好图位，通过交接检查后交待配图稿。不得自行声明不新增生成配图而绕过要求。",
+      "files": [
+        "SKILL.md",
+        "references/refined-workflow.md",
+        "references/visual-language.md",
+        "references/color.md",
+        "references/images.md"
+      ]
+    },
+    {
+      "id": 67,
+      "prompt": "把这份机制、调用过程、分支条件与结果对照材料做成演示，必须配图，首页和内页也要设计背景。图片由我自己生成。请减少大段文字，不要把文字做进图片就说是配图。",
+      "expected_output": "以图承担对象、结构、方向、并行、状态或对照关系；完整提示词明确必需对象和准确关系，精确标签与数值可由 HTML/SVG 保持可编辑。保留判断与必要条件，将被图解释的长段改为对应短注，完整细节保留到可读去向。封面设计主视觉、背景和标题安全区，内容页背景服务焦点，不能只用重复纯色、装饰线或壁纸充数。实际交付配图 Markdown、计划与图位，不调用生图工具；文档与绑定检查通过仅表示交接可用，明确仍待图片和最终视觉审阅。",
+      "files": [
+        "SKILL.md",
+        "references/images.md",
+        "references/visual-quality.md",
+        "scripts/image_handoff.py"
+      ]
+    },
+    {
+      "id": 68,
+      "prompt": "这份技术演示每页字太多。输入类型、分流规则、输出契约和场景全挤在一页，下一页是五层架构加模块全集和装配说明。页数不限，希望每页尽量有配图，节点可以有小插图；图片我按 Markdown 自己生成。请重排内容。",
+      "expected_output": "先按观众问题重分讲解，允许增加页数，不沿用旧页数或仅将文字缩小。以带对象插图和精确标签的分支、路径或结构关系分担说明，标签与条件贴近对应节点，不再保留旁边同义长文。输入与路由、输出用途、参考映射按需要拆讲；层次与装配细节按完整问题安排，不机械规定页数或将并行改为串行。逐页考虑有效视觉，允许过渡和参考页采用简洁排印，复用图像无需为页数重复生成。保全必要事实和条件的可读去向，实际保存配图 Markdown 并接好图位，不执行生图。",
+      "files": [
+        "SKILL.md",
+        "references/content-intelligence.md",
+        "references/images.md"
+      ]
+    },
+    {
+      "id": 69,
+      "prompt": "标题和正文都偏大偏粗，想在电脑上看得精致、利落一些。能小就别太大，但不要变成小字文档，也别往空出来的地方继续塞内容。",
+      "expected_output": "在实际屏幕观看尺寸检查字形、行长和字重，收敛标题和重复小标题的视觉重量，适当减小字号并保留清晰层级。新增骨架的屏幕默认不是强制下限或所有风格的模板，项目覆盖保持有效；小字建议不是迫使作者放大所有文字的命令。内容过多仍拆讲，字号调整得到的空间用于视觉与组间呼吸，不用固定留白率判断精致。",
+      "files": [
+        "references/typography-and-space.md",
+        "assets/web-layouts.css",
+        "references/visual-quality.md"
+      ]
+    },
+    {
+      "id": 70,
+      "prompt": "配图还没生成，HTML 已接好图位，底部还有一段说明。请先检查布局；上次你填临时图片跑通过，然后删了图片，却还说最终稿全部检查通过。",
+      "expected_output": "对当前实际 HTML 运行布局检查，缺图会返回资源失败但逐页测量仍执行。核对实际测到的页数，检查图位、图注、正文、补充说明、间距与页脚的整体容量，处理越界和遮挡；若字体或脚本失败先处理，不据无页面数据宣布布局通过。临时素材只用于隔离测量副本且说明范围，不进入交付目录。检查报告与最终 HTML 和外链资源状态一致，删除或回填图片后重查，即使 HTML 哈希未变。待图稿明确缺图，资源失败不能改报通过；不能看图时视觉审稿保持未完成。",
+      "files": [
+        "SKILL.md",
+        "references/layout-technology.md",
+        "references/web-composition.md",
+        "references/visual-quality.md",
+        "scripts/web_check.py"
+      ]
+    },
+    {
+      "id": 71,
+      "prompt": "用现在的 skill 重新做一下这份旧的演示文稿。",
+      "expected_output": "这是整体重做请求，不是自主选风格授权。即使旧 AI design.md 或被删除的历史稿有一套样式，也不能当成用户已确认。首轮在全面读库和写全稿前提出带作品或网站入口的参考选择问题，允许链接、截图、帮找参考或委托直接完成；没有提问工具则文字提问并结束本轮。未收到回复不定主题、不下载字体、不写全套 HTML，也不因无法访问某网站自行选定其他方向。",
+      "files": [
+        "SKILL.md",
+        "references/visual-language.md",
+        "references/refined-workflow.md"
+      ]
+    },
+    {
+      "id": 72,
+      "prompt": "风格还没定，你先推荐几个让我选。当前环境没有提问弹窗工具。",
+      "expected_output": "展示适合当前材料的可见参考及来源，说明差别并用普通文字发出选择问题，结束本轮等回复。推荐不等于采用，不调用不存在的 ask_question，不用 shell input 等待，不安装插件，不自选第一项后生成整套。",
+      "files": [
+        "SKILL.md",
+        "references/visual-language.md"
+      ]
+    },
+    {
+      "id": 73,
+      "prompt": "你已经问我选参考，但提问工具返回取消或空答。",
+      "expected_output": "保留尚未选择的状态，改用普通文字问题并等待下一轮；不把取消、空答、工具报错、超时或预选项当成选择，也不以继续推进为由套用推荐主题。",
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "id": 74,
+      "prompt": "就按刚才那张海报的黑白留白做，红色不要。先给我看一下实际内容。",
+      "expected_output": "沿用已选构图及明确排除的红色，不重问主题。用项目真实开场和代表内容做可见样页，显示实际中文与中英字形、图解和空间关系，等待样页反馈；不只交色值说明，不先写完整全稿再称为样页。",
+      "files": [
+        "SKILL.md",
+        "references/visual-language.md",
+        "references/refined-workflow.md"
+      ]
+    },
+    {
+      "id": 75,
+      "prompt": "刚才的样页可以，就按这个继续。",
+      "expected_output": "将当前样页与反馈作为已确定依据，扩展整套；不重新询问主题或每项字体颜色。连续页按讲解任务变化并检查，而非逐页复制样页结构。继续只沿用当前已认可范围，不恢复已否决方向。",
+      "files": [
+        "SKILL.md",
+        "references/refined-workflow.md"
       ]
     }
   ]

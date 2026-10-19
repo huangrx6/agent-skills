@@ -22,7 +22,6 @@ import io
 import json
 import math
 import os
-import math
 import random
 import re
 import shlex
@@ -126,7 +125,7 @@ MINIMAX_MODEL_DEFAULT = "image-01"
 # （比例本来就不阻塞交付：渲染层按槽位裁切/留边，见 check_images 的说明）。
 MINIMAX_RATIOS = ((1, 1), (16, 9), (4, 3), (3, 2), (2, 3), (3, 4), (9, 16), (21, 9))
 MINIMAX_TIMEOUT = 180
-# 提示词里没填的空（见 FILL）：中文用 〈…〉、英文用 <…> —— 两种都要拦，
+# 提示词里没填的主体：中文用 〈…〉、英文用 <…> —— 两种都要拦，
 # 否则"没填的模板"会原样发给模型（发出去就是花真钱买一张模板画）。
 PLACEHOLDER_RE = re.compile(r"〈[^〉]*〉|<[^<>]*>")
 
@@ -240,8 +239,7 @@ def resolve(prompt: str, colors: dict, size: tuple[int, int], out: str,
         # 缓存命中即可信：key 里已经含 prompt + 色板 + 尺寸，同一把 key 就是同一张图。
         # 照片本来就有千百种颜色，拿"只在色板三角形内"去量它只会把好图判死
         # （v4 删掉制版后处理时这道判据就该一起删）—— 色彩约束由 --brief 的提示词承担。
-        cached = Image.open(path).convert("RGB")
-        cached.save(out)
+        _save_image_copy(path, out)
         print(f"✓ 命中缓存（{os.path.basename(path)}）→ {out}")
         return "cache"
     if provider_cmd:
@@ -262,12 +260,40 @@ def resolve(prompt: str, colors: dict, size: tuple[int, int], out: str,
     # 没有制版处理这一层（双色调 / 半调网点都不做）—— 图片按原样使用。
     # 想要版画质感就在出图提示词里要（`--brief` 的构图/负空间字段），而不是
     # 在交付链里做一道后处理：后处理会让"check 说合规、交付图却不一样"。
-    image = Image.open(path).convert("RGB")
-    image.save(path)
-    image.save(out)
+    _save_image_copy(path, out)
     print(f"✓ 已写出 {out}（来源：{_provider_label(provider_cmd)}，已缓存为 "
           f"{os.path.basename(path)}）")
     return "generated"
+
+
+def _save_image_copy(source: str, target: str) -> None:
+    """Keep provider pixels, including transparency, when copying a cached image."""
+    with Image.open(source) as image:
+        has_alpha = image.mode in ("RGBA", "LA") or "transparency" in image.info
+        converted = image.convert("RGBA" if has_alpha else "RGB")
+        if has_alpha and converted.getchannel("A").getextrema()[1] == 0:
+            raise SystemExit("✗ 图片完全透明，没有可见内容，不能作为完成素材")
+        if has_alpha and os.path.splitext(target)[1].lower() in (".jpg", ".jpeg"):
+            if converted.getchannel("A").getextrema()[0] < 255:
+                raise SystemExit("✗ 透明图片不能写成 JPEG；请将图片文件名改为 PNG 或 WebP")
+            converted = converted.convert("RGB")
+        converted.save(target)
+
+
+def _has_transparency(path: str) -> bool:
+    try:
+        with Image.open(path) as image:
+            return image.convert("RGBA").getchannel("A").getextrema()[0] < 255
+    except (OSError, ValueError):
+        return False
+
+
+def _is_fully_transparent(path: str) -> bool:
+    try:
+        with Image.open(path) as image:
+            return image.convert("RGBA").getchannel("A").getextrema()[1] == 0
+    except (OSError, ValueError):
+        return False
 
 
 
@@ -294,10 +320,7 @@ BRIEF_SCALE = 2
 # 差得多的（> 5%）仍然是阻塞项：那道门的本意是"别拿缩略图当大图"。
 SIZE_TOLERANCE = 0.05
 
-# 推荐的画面比例（照片类槽位）。选 3:2 而不是 16:9 或 1:1：
-#   · `.imgwrap` 宽 640px，旁边是 820px 的文字栏 —— 太宽会让图显得像背景条
-#   · 高度要能塞进正文带（页脚之上），1:1 的 640px 高会顶到页脚
-#   · 3:2 是相机原生比例，出图的人最容易拿到
+# Legacy renderer fallback. Actual contracts use measured slot geometry.
 BRIEF_ASPECT = (3, 2)
 
 
@@ -347,16 +370,35 @@ def _slot_geometry(spec_path: str, style: str | None) -> tuple[dict, str]:
             continue
         box = [e for e in measured.get("elements", [])
                if e.get("slide") == i and e.get("role") == "image"]
+        image_box = box[0] if box else None
+        hero_overlay = False
+        if slide.get("layout") == "hero" and image_box:
+            for element in measured.get("elements", []):
+                if (element.get("slide") != i or element.get("role") != "title"
+                        or element.get("hiddenBy") or element.get("opacity", 1) == 0):
+                    continue
+                left = max(element.get("x", 0), image_box.get("x", 0))
+                top = max(element.get("y", 0), image_box.get("y", 0))
+                right = min(element.get("x", 0) + element.get("w", 0),
+                            image_box.get("x", 0) + image_box.get("w", 0))
+                bottom = min(element.get("y", 0) + element.get("h", 0),
+                             image_box.get("y", 0) + image_box.get("h", 0))
+                hero_overlay = hero_overlay or (right > left and bottom > top)
+        visual = slide.get("visual") if isinstance(slide.get("visual"), dict) else {}
         info["slides"][i] = {
             "title": slide.get("title", ""),
             "bullets": slide.get("bullets", []),
             "file": original.get(i, str(slide.get("image", ""))),
-            "box": box[0] if box else None,
+            "box": image_box,
             # 说明文字与版式类型：提示词的「文字」那一栏要用它们说清
             # "画面里不要有字，字由版面排"——这比笼统的负面词有用。
             "caption": slide.get("caption", ""),
             "type": slide.get("type", ""),
-            "variant": slide.get("variant", ""),
+            "layout": slide.get("layout", ""),
+            "visual_note": visual.get("note", ""),
+            "imageBrief": visual.get("imageBrief", {}),
+            # This describes only the legacy renderer's hero contract, not a universal layout.
+            "hero_title_overlay": hero_overlay,
         }
     return (info, style_name)
 
@@ -452,14 +494,11 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None,
         w, h = math.ceil(box["w"] * BRIEF_SCALE), math.ceil(box["h"] * BRIEF_SCALE)
         entry = by_file.setdefault(s["file"], {
             "file": s["file"], "pages": [], "titles": [], "bullets": [],
-            "target_px": [w, h], "aspect": _aspect_box(w, h), "alpha": False,
-            "requirements": [],
+            "target_px": [w, h], "aspect": _aspect_box(w, h),
+            "requirements": [], "imageBrief": {}, "visual_notes": [],
+            "hero_overlay_pages": [],
             "measured": f"实测槽位 {box['w']:.0f}×{box['h']:.0f}px" if box else "",
-            # 「主体 / 场景 / 细节」三栏**故意留空**，交给填的人。
-            # 该页标题**不进**提示词（那是擅自补充事实）：
-            # 条目往往在讲这份 deck 的叙事（"把现场图处理成两色…"），不是在讲画什么。
-            # 规则是"用户未提供且会影响事实准确性的内容不得擅自补充"，所以这里只给
-            # **参考材料**（标题/条目/说明文字），不进提示词。
+            # Page copy is context. Only imageBrief describes what to generate.
             "caption": s.get("caption", ""), "layout": s.get("type", ""),
         })
         # 与 entry["measured"] 同一条规则：取**首次出现**那页的实测值
@@ -467,6 +506,16 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None,
             measured_px[s["file"]] = (box["w"], box["h"]) if box else None
         entry["requirements"].append({"page": page, "width": box["w"], "height": box["h"],
                                       "fit": box.get("objectFit") or "cover"})
+        direction = s.get("imageBrief") or {}
+        for key, value in direction.items():
+            if key in entry["imageBrief"] and entry["imageBrief"][key] != value:
+                raise SystemExit(f"✗ 复用图片 {s['file']} 的 imageBrief.{key} 不一致；"
+                                 "请统一同一素材的要求，或为不同构图使用不同文件名")
+            entry["imageBrief"][key] = value
+        if s.get("visual_note"):
+            entry["visual_notes"].append(str(s["visual_note"]))
+        if s.get("hero_title_overlay"):
+            entry["hero_overlay_pages"].append(page)
         entry["target_px"] = [max(entry["target_px"][0], w), max(entry["target_px"][1], h)]
         entry["aspect"] = _aspect_box(*entry["target_px"])
         entry["pages"].append(page)
@@ -485,381 +534,136 @@ def build_brief(spec_path: str, out_dir: str, style: str | None = None,
     return brief
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# 提示词：按**固定字段顺序**组装，不是把属性堆成一段
-#
-#        主体 → 场景 → 构图 → 镜头 → 光线 → 色彩 → 风格 → 细节 → 文字 → 限制
-#
-# 顺序本身就是信息：先让模型明白「画什么」（主体 / 场景），再明白「怎么画」
-# （构图 / 镜头 / 光线 / 色彩 / 风格），最后是「绝对不能错」（文字 / 限制）。
-# 堆成一段会让"不要细密纹理"这类约束把"主体是什么"淹没 —— 而主体最优先。
-#
-# 据此定下的三条（每一条都对应一类错法）：
-#   · 把"气质"写成一句"观感" → 光和风格混在同一行。现在**拆进各自字段**：
-#     光线只讲光源/方向/质感，风格只讲可执行的视觉语言（规则 8 / 10）。
-#   · 把尺寸与比例写进 prompt 正文 → API 有独立参数的东西写进去只会打架。
-#     现在它们只出现在「参数」栏，明写"不要写进 prompt"（规则 14）。
-#   · 负面词是一堆通用 boilerplate（水印 / 界面截图 / 不要额外人物）→ 限制项
-#     必须与任务相关。现在只留**与这条管线有关**的：色彩与构图要可用的那些
-#     （规则 13）。
-#
-# 冲突时的优先级（规则 12）：用户明确要求 > 主体准确性 > 文字与品牌准确性 >
-# 构图 > 场景 > 光线 > 风格 > 装饰细节。**低优先级的不得破坏高优先级的** ——
-# 这条在本流水线里真的有冲突点：风格的强色相（低优先级）不许破坏
-# "照片本身要能直接用"（构图 / 色彩级），见「风格」那一栏的写法。
-# ═══════════════════════════════════════════════════════════════════════════
-
-# 字段顺序就是优先级顺序，不要调换。
-PROMPT_ORDER = ("主体", "场景", "构图", "镜头", "光线", "色彩", "风格", "细节", "文字", "限制")
-
-# **默认不发**的可选字段。规则 6：镜头参数"只有当镜头信息能明显改善画面时才加入"。
-# 而"这张图需不需要镜头感"是工具判断不了的 —— 给了默认值，它就永远躺在那儿，
-# 等于把"每次都加"当了默认，正好违反规则。所以默认**整行不出现**，需要的人自己插。
-OPTIONAL_FIELDS = ("镜头",)
-LENS_HINT = {
-    "zh": "**要镜头感就自己插一行**，位置在【构图】和【光线】之间，例如："
-          "「平视、85mm、浅景深、对焦主体」/「俯拍、广角、大景深、透视强」/「特写、微距」。"
-          "不写不等于没有镜头，只是这个判断留给看图的人 —— 工具不知道你这张图需不需要它。",
-    "en": "Add a lens line yourself only if it improves the image, between "
-          "Composition and Lighting — e.g. 'eye-level, 85mm, shallow depth of field, "
-          "focus on the subject'.",
-}
-
-# 工具**不知道**、必须由人填的三栏。留空比编一个更负责 —— 规则 7：
-# "用户未提供且会影响事实准确性的内容，不得擅自补充"。
-FILL = {
-    "主体": {
-        "zh": "〈写：是什么、几个、主要特征。别写「好看 / 高级 / 漂亮」这类词〉",
-        "en": "<what it is / how many / key features. No vague words like "
-              "'beautiful', 'premium', 'stunning'>",
-    },
-    "场景": {
-        "zh": "〈写：地点 + 环境氛围（室内/室外、时间、天气）。背景元素要服务于主体〉",
-        "en": "<where + atmosphere (indoor/outdoor, time of day, weather). "
-              "Background elements must serve the subject>",
-    },
-    "细节": {
-        "zh": "〈可选：材质与质感。产品写金属/玻璃/皮革，场景写地面/墙面/环境细节〉",
-        "en": "<optional: materials and texture — metal / glass / leather for "
-              "products, ground / wall / environment detail for scenes>",
-    },
-}
-
-# 气质 → **拆进三个不同字段**。不写风格文献（Massimo Vignelli 那种）：对读文档的人
-# 是背景，对生图模型是噪音 —— 它不知道该把"Vignelli"画成什么样。
-MOOD = {
-    "大胆": {
-        "光线": ("戏剧性高对比、方向明确的**单**光源，阴影深而实",
-                 "dramatic high-contrast single directional light, deep solid shadows"),
-        "色彩": ("高饱和、以深色为主，明暗反差大",
-                 "highly saturated, dark-dominant, strong tonal contrast"),
-        "风格": ("海报式的强对比，形体简洁有力",
-                 "poster-like high contrast, bold simple forms"),
-    },
-    "安静": {
-        "光线": ("均匀柔和的中性日光，没有强烈方向性",
-                 "even soft neutral daylight, no strong directionality"),
-        "色彩": ("低饱和、色调偏灰，近似单色",
-                 "desaturated, greyish, near-monochrome"),
-        "风格": ("克制平静、画面干净不杂",
-                 "restrained, calm, clean and uncluttered"),
-    },
-    "中性": {
-        "光线": ("自然均衡、方向柔和的日常光",
-                 "natural balanced everyday light with soft direction"),
-        "色彩": ("自然中性色，不额外引入色相",
-                 "natural neutral tones, no added hue"),
-        "风格": ("诚实朴素", "plain and honest"),
-    },
-}
+# Image direction is authored in visual.imageBrief. Geometry is measured separately;
+# neither the palette name nor the renderer's layout name selects an artistic medium.
+PROMPT_ORDER = ("用途", "主体", "构图", "主体位置", "文字安全区", "风格", "背景", "限制")
+OPTIONAL_FIELDS = ("用途", "主体位置", "文字安全区", "风格", "背景", "限制")
 
 
-def _mood_row(temperature: str) -> dict:
-    for key, row in MOOD.items():
-        if key in (temperature or ""):
-            return row
-    return MOOD["中性"]
+def _composition_text(slot: dict | str, zh: bool) -> str:
+    # Accept the former string argument for callers; a layout label alone proves no geometry.
+    if not isinstance(slot, dict):
+        slot = {}
+    direction = slot.get("imageBrief") or {}
+    parts = [direction.get("composition", "")]
+    fits = {r.get("fit", "cover") for r in slot.get("requirements", [])}
+    if "cover" in fits:
+        parts.append("图片将按实测图位 cover 裁切，关键主体应保留在可见范围；按声明的主体位置安排构图。"
+                     if zh else "The measured slot uses cover cropping. Keep essential subjects visible at the specified focal position.")
+    if fits & {"contain", "scale-down"}:
+        parts.append("图位采用 contain/scale-down，保留完整画面；不要为并不存在的裁切强行居中主体。"
+                     if zh else "The slot uses contain/scale-down and retains the complete image.")
+    if slot.get("hero_overlay_pages"):
+        parts.append("此素材有一处使用旧结构化 hero 图位，底部标题带会覆盖图片；该区域不要放关键主体，实际覆盖高度以页面渲染为准。"
+                     if zh else "A legacy structured hero slot overlays a title band at the bottom. Keep essential subjects clear of that band; its actual height comes from the rendered slide.")
+    return " ".join(p for p in parts if p) or (
+        "按本次图像用途组织画面；主体位置与文字留白遵循已声明的要求。" if zh else
+        "Compose for this image's purpose and any specified focal position or text-safe area.")
+
+
+def _negative_space_text(slot: dict | str) -> str:
+    if not isinstance(slot, dict):
+        return ""
+    return (slot.get("imageBrief") or {}).get("negativeSpace", "")
 
 
 def _field_values(slot: dict, brief: dict, lang: str) -> list[tuple[str, str]]:
-    """按 PROMPT_ORDER 逐栏给出内容 —— 工具知道的事实，或留给人的空。
-
-    每一栏只讲它该讲的事：构图不谈光线、光线不谈风格。这是"描述顺序统一"能成立的
-    前提；混着写的话顺序就名存实亡了。
-    """
     zh = lang == "zh"
-    palette = brief["colors"]
-    mood = _mood_row(brief["temperature"])
-    primary = palette["primary"]
-    secondary = palette["secondary"]
-    paper = palette["background"]
-    caption = slot.get("caption") or ""
-
-    composition = _composition_text(slot.get("variant") or "", zh=zh)
-    if zh:
-        colour = (f"主色 {primary}、辅色 {secondary}、纸色 {paper}；{mood['色彩'][0]}。"
-                  f"色系控制在 1~3 个；**靠明暗层次而不靠色相**"
-                  f"（图片按原样进产物，不引入色板外的色相）")
-        # 风格那一栏只留"可执行的视觉语言"本身："（可执行的视觉语言）"
-        # 和"优先于任何装饰性的色彩偏好"是**给读者的规则说明**，
-        # 模型会把它当成画面要求 —— 两个读者不能混在一行里。
-        style = (f"纪实摄影；{mood['风格'][0]}；靠**大块明暗和强形状**立住"
-                 f"（照片会被直接用进版式，只有这些能活下来）")
-        # 用户明确禁掉的那件事写在这里：**这一页的信息不许被画进图里**。
-        # 一页的信息（标题/条目/数字/示意）一旦烘进图里，它就同时失去可编辑、
-        # 可搜索、可翻译、可被读屏器读 —— 而"对方要改字"正是本 skill 出原生
-        # PPTX 的理由。图只负责观感。
-        text = ("画面里**不要出现任何文字、字母或数字**，也**不要把这一页的信息画进去**"
-                "（标题、条目、数字、流程示意、界面截图都不算画面内容）—— "
-                "这一页的信息由版面用**真文字**排，图只负责观感；也不要画任何 logo —— "
-                "品牌标识由版面另行叠")
-        if caption:
-            text += f"（这一页的说明文字是「{caption}」，它是**排出来的**，不是画出来的）"
-        limits = ("不要：细线、细密网格或织物纹理、柔和渐变、低对比平光"
-                  "（这四样塞进版式会糊成一团）；不要多个并列主体或重复主体；"
-                  "不要结构变形、过曝、裁切主体；"
-                  "**主体收在画面中心 80% 的区域里**（四周各留出 ≥10% 余量）—— "
-                  "版面会按槽位比例裁切或留边，贴到边上的主体一定会被切掉")
-    else:
-        composition = _composition_text(slot.get("variant") or "", zh=False)
-        colour = (f"primary {primary}, secondary {secondary}, paper {paper}; "
-                  f"{mood['色彩'][1]}. Keep to 1-3 colour families. It ends up as two "
-                  f"families; it must read by TONAL RANGE, not by hue "
-                  f"(the image goes into the deck as-is, so stay inside the palette)")
-        style = (f"documentary photography; {mood['风格'][1]}; it must hold on large "
-                 f"tonal masses and strong shapes (fine texture and thin lines do "
-                 f"not survive being placed in a slide)")
-        text = ("No text, letters or numbers inside the image, and do NOT draw this "
-                "page's information into it (no titles, bullet text, numbers, flow "
-                "diagrams or UI screenshots) — the layout composes the page's "
-                "information as real text; the image only carries look and feel. Do "
-                "not draw any logo either — brand marks are placed by the layout")
-        if caption:
-            text += f" (this page's caption is \u300c{caption}\u300d \u2014 it is composed, " \
-                    f"not drawn)"
-        limits = ("Avoid: thin lines, fine mesh or woven texture, subtle gradients, "
-                  "low-contrast flat light (all four mud up once in the slide); "
-                  "multiple competing or duplicated subjects; structural distortion, "
-                  "blown highlights, a cropped-off subject; "
-                  "keep the subject inside the CENTRAL 80% of the frame (leave a "
-                  "margin of at least 10% on every side) \u2014 the layout crops or "
-                  "letterboxes to the slot, so anything touching the edge gets cut")
-
-    return [
-        ("主体", FILL["主体"][lang]),
-        ("场景", FILL["场景"][lang]),
-        ("构图", composition),
-        ("光线", mood["光线"][0 if zh else 1]),
-        ("色彩", colour),
-        ("风格", style),
-        ("细节", FILL["细节"][lang]),
-        ("文字", text),
-        ("限制", limits),
-    ]
-
-
-def _composition_text(variant: str, zh: bool) -> str:
-    """构图指示按**版式变体**分支（审计发现：写死"只占一栏"对 hero 满幅
-    是反指示 —— md:86 的例外在代码里落空）。"""
-    if variant == "hero":
-        if zh:
-            return ("**满幅主角图**：这张图占满整页版面 —— 它是这一页的主角，不是配图。"
-                    "**页面下方有实心标题条压图**：视觉重心与关键内容放在**上 2/3**，"
-                    "下方留出可被条幅从容覆盖的区域；不需要在图内为文字留白"
-                    "（条是实心底，字排在这上面）。")
-        return ("FULL-BLEED HERO: this image fills the entire page — it IS this "
-                "page's protagonist, not a supporting figure. A solid title bar "
-                "overlays the bottom: keep the visual center of gravity in the "
-                "UPPER two-thirds and leave the lower third calm enough to be "
-                "covered. No text space needed inside the frame (the bar is solid).")
-    if zh:
-        return ("**一个**主体，占画面 60~70%；轮廓干净、主体与背景分离明确；背景干净不杂。"
-                "这张图在版面上**只占一栏** —— 它是配图 / 点缀，**不是整页背景**；"
-                "说明文字排在它旁边的另一栏、**不压在图上**，所以不要在图内为文字留白。")
-    return ("ONE subject filling 60-70% of the frame; clean silhouette, clear "
-            "subject/background separation, uncluttered background. On the slide it "
-            "occupies ONE COLUMN only — it is a supporting image, NOT a full-page "
-            "background. Its caption sits in a SEPARATE column beside it, never "
-            "overlaid, so do NOT reserve space inside the frame for text.")
-
-
-def _negative_space_text(variant: str) -> str:
-    if variant == "hero":
-        return ("满幅图：下方实心标题条压图，关键内容放上 2/3；"
-                "图内不必为文字留白（条是实心底）")
-    return "背景干净不杂；说明文字排在旁边的另一栏、不压在图上，图内不必为文字留白"
+    direction = slot.get("imageBrief") or {}
+    subject = direction.get("subject") or (
+        "〈描述要生成的主体及必要特征；缺少真实证据时请提供原始素材，不编造证据〉" if zh else
+        "<describe the subject and essential features; provide original assets when factual evidence is required>")
+    fields = [("用途", direction.get("purpose", "")), ("主体", subject),
+              ("构图", _composition_text(slot, zh))]
+    focal = direction.get("focal")
+    if focal is not None:
+        fields.append(("主体位置", f"焦点位于画面横向 {focal[0]}%、纵向 {focal[1]}%。" if zh else
+                       f"Place the focal subject at {focal[0]}% horizontally and {focal[1]}% vertically."))
+    fields += [("文字安全区", _negative_space_text(slot)), ("风格", direction.get("style", ""))]
+    if "transparent" in direction:
+        if direction["transparent"]:
+            fields.append(("背景", "输出带真实透明通道的素材，不绘制棋盘格或实心底。" if zh else
+                           "Use a real transparent background, not a drawn checkerboard or solid backdrop."))
+        else:
+            fields.append(("背景", "输出不透明背景；背景内容按本次主体与构图要求。" if zh else
+                           "Use an opaque background appropriate to the specified subject and composition."))
+    if direction.get("avoid"):
+        fields.append(("限制", "；".join(direction["avoid"])))
+    return [(name, value) for name, value in fields if value]
 
 
 def render_prompt(slot: dict, brief: dict, lang: str = "zh") -> str:
-    """带字段名的提示词。字段名本身携带顺序与优先级信息，模型读得懂 ——
-    比把同样的内容写成一段不分层的话更可控。"""
-    lines = []
-    for name, value in _field_values(slot, brief, lang):
-        lines.append(f"【{name}】{value}")
-    return "\n".join(lines)
+    """Preserve authored direction verbatim; translate only generated field guidance."""
+    return "\n".join(f"【{name}】{value}" for name, value in _field_values(slot, brief, lang))
 
 
 def api_params(brief: dict) -> list[str]:
-    """**不进提示词**的那些 —— API 有独立参数，写进 prompt 只会和参数打架。
-
-    规则 14。这里把它们单列出来，并明写"不要写进 prompt"，否则填的人会顺手
-    把尺寸抄回正文里，然后模型既收到参数又收到文字描述，两者冲突时就是随机结果。
-    """
     w, h = brief["target_px"]
-    return [
-        f"尺寸 {w}×{h}px（槽宽 ×2）",
-        f"比例 {brief['aspect']}（按页面上声明的 visual.ratio；没写就是槽位缺省 3:2）",
-        "数量 1 张",
-        "不需要透明通道（整张不透明照片）",
-        "质量 / seed 随意 —— 这张图是外部素材，不参与 deck 的确定性渲染",
-    ]
+    direction = brief.get("imageBrief") or {}
+    transparent = direction.get("transparent")
+    alpha_note = ("需要真实透明通道；选择支持透明输出的后端和 PNG/WebP 格式" if transparent is True else
+                  "不透明背景" if transparent is False else
+                  "透明通道未指定；不预设图片媒介或背景")
+    return [f"尺寸 {w}×{h}px（按所有实测图位 ×{BRIEF_SCALE}）",
+            f"比例 {brief['aspect']}（来自实测尺寸）", "数量 1 张", alpha_note,
+            "质量 / seed 按本次后端与复现需要设置"]
 
 
 def _write_asset_requests(brief: dict, measured_px: dict, requests_dir: str) -> None:
-    """写机读的资产请求：`assets/requests/<槽位id>.json`（槽位 id = spec 里的 image 值）。
-
-    manifest（`render.load_assets`，见 references/images.md）是"图已到位"的登记册；
-    requests 是它的**上游合同**：`--brief` 自动写，人按 prompt 出图，再把选中的文件
-    登记进 manifest —— assetId 就是这里的槽位 id，闭环。请求合同 v2：
-    尺寸合同含 target_px 与 requirements（每个复用图位的尺寸和 fit）。
-    """
+    """Request v2 remains compatible; authored direction fields are optional additions."""
     for slot in brief["slots"]:
-        box = measured_px.get(slot["file"])
+        direction = slot.get("imageBrief") or {}
         note = slot["measured"]
         if slot["caption"]:
-            cap = f"说明文字「{slot['caption']}」由版面排"
-            note = f"{note}；{cap}" if note else cap
+            note += f"；版面说明文字：{slot['caption']}"
         request = {
-            "schemaVersion": 2,
-            "slide": slot["pages"],      # 该槽位用到的页（同图复用多页时全列）
-            "role": slot["layout"],      # 版式 —— 这个槽位在页里的角色
+            "schemaVersion": 2, "slide": slot["pages"], "role": slot["layout"],
             "aspect": round(slot["target_px"][0] / slot["target_px"][1], 3),
-            "target_px": slot["target_px"],
-            "requirements": slot["requirements"],
-            # focal 留空：画面主体是什么工具不知道 —— 与契约 md 的〈…〉同一条规则，
-            # 不许自己编（"用户未提供且会影响事实准确性的内容，不得擅自补充"）。
-            "focal": "",
-            # negative_space 是工具**知道**的那一半：文字不压在图上，图内不必为文字留白。
-            "negative_space": _negative_space_text(slot.get("variant") or ""),
-            "prompt": render_prompt(slot, brief, "zh"),
-            "required": True,            # 版式要图就必须给图（check 的输入门是阻塞级）
-            "note": note,
+            "target_px": slot["target_px"], "requirements": slot["requirements"],
+            "focal": direction.get("focal", ""),
+            "negative_space": _negative_space_text(slot),
+            "prompt": render_prompt(slot, brief, "zh"), "required": True, "note": note,
         }
+        for key in ("purpose", "transparent", "avoid"):
+            if key in direction:
+                request[key] = direction[key]
         deckio.write_json(os.path.join(requests_dir, f"{slot['file']}.json"), request)
 
 
 def write_brief_md(brief: dict, out_path: str) -> str:
-    """契约文档：工具知道的事实 + 给模型的提示词 + 参数栏 + 由人填的空。"""
-    lines = [
-        "# 图片提示词契约",
-        "",
-        f"风格 **{brief['style_label']}**（{brief['temperature']}）· 参考 {brief['reference']}",
-        "",
-        "## 提示词怎么读",
-        "",
-        "每条提示词按**固定字段顺序**给，这个顺序就是优先级：",
-        "",
-        "```text",
-        "主体 → 场景 → 构图 → 镜头 → 光线 → 色彩 → 风格 → 细节 → 文字 → 限制",
-        "```",
-        "",
-        "先「画什么」（主体 / 场景），再「怎么画」（构图 / 光线 / 色彩 / 风格），",
-        "最后是「绝对不能错」（文字 / 限制）。**别把顺序打乱**——堆成一段会让"
-        "「不要细密纹理」这种约束把「主体是什么」淹掉，而主体最优先。",
-        "",
-        "**「镜头」默认不出现**：镜头参数只有在能明显改善画面时才该加，而工具判断不了"
-        "你这张图需不需要它 —— 给了默认值就等于每次都加。要加就自己插一行，位置在"
-        "【构图】与【光线】之间。",
-        "",
-        "打架的时候按这个优先级裁决（左边赢）：",
-        "",
-        "```text",
-        "你的明确要求 > 主体准确 > 文字与品牌准确 > 构图 > 场景 > 光线 > 风格 > 装饰细节",
-        "```",
-        "",
-        "**工具能填的已经填好，剩下的 〈…〉 得你来填**：「主体 / 场景 / 细节」这三栏"
-        "工具读不到（它只看得见 spec 里的文字）——你写什么就是什么，它不会替你编。"
-        "填完把 〈…〉 换掉、按需删掉标了（可选）的行，就是一条可直接发送的完整提示词。",
-        "",
-        "**尺寸 / 比例 / 数量这些不要写进提示词**：生图 API 有独立参数，"
-        "prompt 里再写一遍只会和参数打架。它们单列在每张图的「参数」栏。",
-        "",
-        "**图在版面上只有两种角色**：**配图**（占一栏）或**点缀**（更小）；连背景那种"
-        "大图也不承载这一页的信息。**一页的信息（标题 / 条目 / 数字 / 示意）永远由版面用"
-        "真文字排**，不许烘进图里 —— 烘进去就同时失去可编辑、可搜索、可翻译、可被读屏器"
-        "读这四件事，而「对方要改字」正是这个 skill 能出原生 PPTX 的理由。"
-        "所以**一张图盖住整页是不允许的**（`check.py` 会拦）。",
-        "",
-        "**这些图会进版式与验收链**（色彩要落在风格色板里）——这是为什么提示词里"
-        "反复强调「靠大块明暗和强形状」：靠颜色、细密纹理、细线立住的图会糊成一团。"
-        "「限制」栏里只列与这条管线相关的项，没有通用负面词堆砌。",
-        "",
-        "**出完图存到哪**：与产物（`out.html`）**同一个目录**，文件名逐张见下"
-        "（相对路径的产物挪个目录就会全员裂图，所以要同目录交付）。",
-        "",
-        "---",
-        "",
-    ]
-    for s in brief["slots"]:
-        used = "、".join(f"第 {p} 页" for p in s["pages"])
-        lines += [
-            f"## {used} · {' / '.join(s['titles'])}",
-            "",
-            f"- **文件名**：`{s['file']}`（存到产物同目录，用在 {used}）"
-            f"{'；' + s['measured'] if s['measured'] else ''}",
-            f"- **用途**：配图（版式 `{s['layout'] or 'content-image'}`）"
-            f"{'；说明文字「' + s['caption'] + '」由版面排，**别画进图里**' if s['caption'] else ''}",
-            "- **色彩要落在色板内**：不引入色板外的色相（图片按原样进产物，不再做制版处理）",
-            "",
-            "**工具读得到的参考材料**（是**文字**，不是画面 —— 只帮你回忆这一页在讲什么；"
-            "「主体 / 场景 / 细节」仍然要你填）",
-            "",
-            f"- 标题：{s['titles'][0]}",
-            f"- 条目：{'；'.join(s['bullets'][:4]) or '（这一页没有条目）'}"
-            if s["bullets"] else "- 条目：（无）",
-            "",
-            "**中文提示词** —— 把 〈…〉 换成你的内容，可直接发送",
-            "",
-            "```text",
-            render_prompt(s, brief, "zh"),
-            "```",
-            "",
-            "**English prompt**（多数模型对英文更稳）",
-            "",
-            "```text",
-            render_prompt(s, brief, "en"),
-            "```",
-            "",
-            f"📷 {LENS_HINT['zh']}",
-            "",
-            "**参数**（用 API 参数传，**不要写进 prompt**）",
-            "",
-        ]
-        for item in api_params({**brief, **s}):
-            lines.append(f"- {item}")
+    lines = ["# 图片提示词契约", "",
+             f"项目风格：{brief['style_label']}。风格参考：{brief['reference'] or '未提供'}。", "",
+             f"页面色板参考：{json.dumps(brief['colors'], ensure_ascii=False)}。"
+             "这是页面上下文，不限定照片、插画或证据素材的颜色数量。", "",
+             "用途、主体、构图、风格、焦点、文字安全区与透明要求来自可选的 visual.imageBrief。"
+             "只填写本次需要的项；没有声明的媒介、光线、色彩和背景不自动补成固定风格。", "",
+             "〈…〉或 <…> 是尚未明确的主体，生成前需要填写。页面标题、条目和图注仅作为参考材料，"
+             "不会自动画进图中；确实需要图内文字时，在主体或构图中给出准确文案。"
+             "需要真实截图或事实证据时使用原始素材。", "",
+             "尺寸、比例、数量优先作为后端参数传递，不要写进 prompt 造成冲突；"
+             "后端只接收提示词时应将参数一并提供。焦点和安全区是生图指导，不会自动改写页面 CSS。", ""]
+    for slot in brief["slots"]:
+        direction = slot.get("imageBrief") or {}
+        used = "、".join(f"第 {p} 页" for p in slot["pages"])
+        lines += [f"## {used} · {' / '.join(slot['titles'])}", "",
+                  f"- 文件名：`{slot['file']}`（相对产物目录；{slot['measured']}）",
+                  f"- 用途：{direction.get('purpose') or '未指定；根据本页内容决定图片任务'}",
+                  f"- 内容参考：{'；'.join(slot['bullets']) or '无条目'}",
+                  f"- 标题与图注参考：{' / '.join(slot['titles'])}；{slot.get('caption') or '无图注'}"]
+        if slot.get("visual_notes"):
+            lines.append(f"- 视觉说明参考：{'；'.join(slot['visual_notes'])}")
+        lines += ["", "**中文提示词**", "", "```text", render_prompt(slot, brief, "zh"), "```", "",
+                  "**English prompt**（已填写的主体与风格保持原文；英文说明不等于自动翻译）", "",
+                  "```text", render_prompt(slot, brief, "en"), "```", "", "**参数**", ""]
+        lines += [f"- {item}" for item in api_params({**brief, **slot})]
+        lines += ["", "复用图位："]
+        lines += [f"- 第 {r['page']} 页：{r['width']}×{r['height']}px，{r['fit']}"
+                  for r in slot["requirements"]]
         lines.append("")
-    lines += [
-        "---",
-        "",
-        "出完图之后：",
-        "",
-        "```bash",
-        "python3 scripts/image_source.py --check your.spec.json    # 验尺寸与比例对不对",
-        "python3 scripts/check.py your.spec.json out.html          # 渲完再过校验门",
-        "```",
-        "",
-        "尺寸不对不是「将就一下」的事：**被放大渲染的图一定糊**，而交付前那条提示"
-        "（`check.py` 的放大检查）就是为它准备的。",
-        "",
-        "**还要人眼看三条**（脚本查不出画面内容，只有你能看）：",
-        "",
-        "1. **主体在不在中心 80% 区域内** —— 版面按槽位裁切（照片）或留边（结构图），"
-        "贴边的主体一定被切；",
-        "2. **画面里有没有文字 / 数字** —— 有就重出（这一页的字由版面排）；",
-        "3. **结构图有没有被压扁** —— 结构图的比例写进 `visual.ratio`（如 `4:3`），"
-        "写了就按它留边，别硬塞进 3:2。",
-    ]
-    deckio.write_text(out_path, "\n".join(lines) + "\n")
+    lines += ["生成后运行 `image_source.py --check <spec>`，再检查实际页面与最终导出。", "",
+              "尺寸和透明通道通过不代表画面内容合格。逐图检查：主体及关键细节是否保留；"
+              "文字与结构是否准确；实际裁切、文字安全区和透明边缘是否符合当前页。", ""]
+    deckio.write_text(out_path, "\n".join(lines))
     return out_path
 
 
@@ -916,8 +720,15 @@ def check_images(spec_path: str, out_dir: str, style: str | None = None,
     # 逐页收（同一个文件名用在多页时，报第一个用到它的页号，且只验一次）
     wanted: dict[str, int] = {}
     want_ratio: dict[str, float] = {}
+    transparency: dict[str, bool] = {}
     for page, slide in enumerate(spec.get("deck", {}).get("slides", []), 1):
         name = slide.get("image")
+        visual = slide.get("visual") if isinstance(slide.get("visual"), dict) else {}
+        direction = visual.get("imageBrief") or {}
+        if name and isinstance(direction.get("transparent"), bool):
+            if str(name) in transparency and transparency[str(name)] != direction["transparent"]:
+                return (1, [f"复用图片 {name} 的透明要求不一致"], [])
+            transparency[str(name)] = direction["transparent"]
         if not name or str(name) in wanted:
             continue
         wanted[str(name)] = page
@@ -964,7 +775,21 @@ def check_images(spec_path: str, out_dir: str, style: str | None = None,
         if path.lower().endswith(".svg"):
             notes.append(f"第 {page} 页：`{name}` 是**矢量图**（SVG）—— 不做放大检查"
                          f"（放多大都不糊）；比例按 viewBox {w}×{h} 算")
+            if name in transparency:
+                problems.append(f"第 {page} 页：`{name}` 的 SVG 透明效果需渲染确认，当前栅格透明检查不能认证")
         else:
+            if _is_fully_transparent(path):
+                problems.append(f"第 {page} 页：`{name}` 完全透明，没有可见内容")
+                continue
+            request_path = os.path.join(os.path.dirname(os.path.abspath(spec_path)),
+                                        "assets", "requests", f"{name}.json")
+            if name not in transparency and os.path.isfile(request_path):
+                requirement = deckio.read_json(request_path).get("transparent")
+                if isinstance(requirement, bool):
+                    transparency[name] = requirement
+            if name in transparency and _has_transparency(path) != transparency[name]:
+                requirement = "真实透明通道" if transparency[name] else "不透明背景"
+                problems.append(f"第 {page} 页：`{name}` 不满足声明的{requirement}")
             requirements = []
             for slot in slots:
                 fit = slot.get("objectFit") or "cover"
@@ -1045,10 +870,20 @@ def generate_images(spec_path: str, out_dir: str, style: str | None = None,
     for req_path in reqs:
         name = os.path.basename(req_path)[: -len(".json")]
         target = os.path.join(out_dir, name)
+        request = deckio.read_json(req_path)
+        transparent = request.get("transparent")
+        if "transparent" in request and not isinstance(transparent, bool):
+            blocked.append(f"{name}：transparent 必须是布尔值")
+            continue
         if os.path.isfile(target):
+            if _is_fully_transparent(target):
+                blocked.append(f"{name}：已有文件完全透明，没有可见内容，保留文件供检查")
+                continue
+            if transparent is not None and _has_transparency(target) != transparent:
+                blocked.append(f"{name}：已有文件不满足透明要求，保留文件供检查；请替换合格素材")
+                continue
             notes.append(f"{name}：已存在，跳过（要重出就删掉它）")
             continue
-        request = deckio.read_json(req_path)
         target_px = request.get("target_px")
         if not (isinstance(target_px, list) and len(target_px) == 2
                 and all(isinstance(v, (int, float)) and v > 0 for v in target_px)):
@@ -1066,6 +901,9 @@ def generate_images(spec_path: str, out_dir: str, style: str | None = None,
         aspect = request.get("aspect")
         how = resolve(prompt, colors, size, target, provider_cmd,
                       aspect=aspect if isinstance(aspect, (int, float)) else None)
+        if transparent is not None and _has_transparency(target) != transparent:
+            blocked.append(f"{name}：生成图片不满足透明要求；请换用支持所需背景的后端或提供合格素材")
+            continue
         done.append(f"{name}（{how} → {minimax_ratio(aspect)}）")
     return (1 if blocked else 0, done, notes + blocked)
 

@@ -113,13 +113,14 @@ halftoneDotSize 和 misregistration.blendMode 没有被当前脚本消费，不�
 | `.title` / `.subtitle` | 主标题、副标题 |
 | `.bullets` / `.bullets.small` | 正文列表 |
 | `.col` / `.colTitle` | 双栏与栏标题 |
-| `.tl .label` / `.tl .note` | 时间线节点 |
+| `.tl b` / `.tl em` | 时间线节点名称 / 说明 |
 | `.imgwrap` / `.chartwrap` | 图片与图表区域 |
 | `.chartcap` / `.chartsrc` | 图注、图表来源/单位 |
 | `.footrow` / `.foot` / `.brandfoot` / `.brandlogo` | 页脚与品牌元素 |
 
 render 注入 `--paper`、`--text`、`--accent`、`--accent-2`、`--display`、`--body`、`--viewer`，
 以及全局 `--t-<档名>`、逐元素 `--s-title` / `--s-bullet` 等变量和 grid 的间距变量。
+壳提供 token 驱动的基础字号兜底；皮肤仍可按选择器覆盖。`data-page` 值就是页型名称。
 局部变量使用前确认作用域，或用全局 token 回退，例如：
 
 ```css
@@ -136,7 +137,8 @@ render 注入 `--paper`、`--text`、`--accent`、`--accent-2`、`--display`、`
 
 页脚/品牌元素由壳锚定。避免 `.slide > * {position:relative}` 等通配破坏定位；
 只抬正文层就把选择器收窄到正文容器。若有意移动 chrome，用准确选择器并保持逐页一致。
-壳 CSS 在 skin 后注入，覆盖需看实际选择器优先级，不能仅凭文件先后猜结果。
+样式顺序是基础骨架 → skin → 播放器外壳。字号兜底在基础骨架中；同优先级的 skin 规则可覆盖。
+调整画布或播放控件时还需核对后置的外壳规则，不能仅凭文件先后猜最终结果。
 
 截图、结构图与照片的 object-fit 不应一概相同。需要完整证据用 contain，照片可用 cover 并检查焦点。
 图片/渐变上的文字不能只看 token 对比度，必须审查真实叠层。
@@ -147,8 +149,8 @@ render 注入 `--paper`、`--text`、`--accent`、`--accent-2`、`--display`、`
 再设计封面、正文、图注的层级。接口示例中的 14px 图表标签只适合近距离密集阅读的试排，
 不能直接作为投影稿的默认值。
 
-用最密内容页与最长标题试排，图表最小标签也必须读得清；
-装不下时先收内容、换结构或拆页，最后才换较小档。字体加载/回退会改变换行，
+选择实际代表内容试排，图表最小标签也必须读得清。装不下时可调整排印、重组、去重或拆页，
+以保全内容与目标观看尺寸下可读为准；同屏比较要求不能被拆页破坏。字体加载/回退会改变换行，
 检查浏览器实际用到的字体，并在目标格式中复核。详细字体与嵌入流程见 [fonts.md](fonts.md)。
 
 ## deck.spec.json
@@ -178,8 +180,9 @@ style 与具名 colorSet 必填，不能写 auto；slides 必须非空。deliver
 
 每页共通字段：type、title、role、visual、notes，及兼容字段 color（只能是 overprint）。
 role 的闭合词表见 [planning.md](planning.md)；notes 是讲稿，不占版面。
-visual 的字段为 kind / intent / note / ratio，kind 仅 none/data/evidence_image，
-ratio 是比例字符串；必须与页型和素材意图匹配。
+visual 的字段为 kind / intent / note / ratio / imageBrief，kind 仅 none/data/evidence_image，
+ratio 是比例字符串；必须与页型和素材意图匹配。可选 imageBrief 记录本图用途、主体与生成约束，
+具体字段见 [素材流程](images.md#结构化-spec-的兼容接口)，不改变页面的 CSS 图位。
 
 | type | 该页额外字段 |
 | --- | --- |

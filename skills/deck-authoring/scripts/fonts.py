@@ -673,10 +673,8 @@ def mapping() -> dict:
 def print_map(as_md: bool = False, a_only: bool = False) -> None:
     """字体 ↔ **字感性格**映射表。
 
-    **按本地文件查，不按风格名查** —— 风格名每份 deck 都不同，按名查的那张表会变成
-    菜单（确认门②的方向永远是那几个历史名字）。现在按方向四轴里的「字感」轴查：
-    bold-sans / editorial-serif / poster-heavy / neutral-grotesk /
-    humanist-round / mono-engineering。
+    按本次已认可的排印特征查本地映射，作为中文样张的配字起点。
+    映射类别不限制项目的视觉风格，也不排除表外字体。
 
     `a_only=True` 时只打**严格 A** 那一套 —— 给"没有 license"的人用，
     里面每一款都能下载、安装、嵌进交付物。

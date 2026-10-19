@@ -299,6 +299,80 @@ class TestGenerateFromContract(unittest.TestCase):
             self.assertIn("--check", out)
 
 
+class TestTransparency(unittest.TestCase):
+    def _request_transparency(self, path: str) -> None:
+        with open(path, encoding="utf-8") as fh:
+            request = json.load(fh)
+        request["transparent"] = True
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(request, fh)
+
+    def test_generated_and_cached_pixels_keep_real_transparency(self) -> None:
+        pixels = Image.new("RGBA", (1536, 1024), (30, 80, 120, 0))
+        pixels.putpixel((700, 500), (30, 80, 120, 255))
+        buffer = io.BytesIO()
+        pixels.save(buffer, "PNG")
+        with tempfile.TemporaryDirectory() as tmp, _fake_api(buffer.getvalue()) as (host, seen):
+            spec, name = _deck(tmp)
+            self._request_transparency(_contract(tmp, name, "transparent paper-cut bird"))
+            env = {"MINIMAX_API_KEY": "test-key", "MINIMAX_API_HOST": host}
+            for attempt in range(2):
+                result = _run(spec, env)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                with Image.open(os.path.join(tmp, name)) as image:
+                    self.assertEqual(image.mode, "RGBA")
+                    self.assertEqual(image.getchannel("A").getextrema(), (0, 255))
+                if attempt == 0:
+                    os.remove(os.path.join(tmp, name))
+            self.assertEqual(len(seen), 1)
+
+    def test_opaque_result_cannot_satisfy_transparent_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp, _fake_api() as (host, seen):
+            spec, name = _deck(tmp)
+            self._request_transparency(_contract(tmp, name, "transparent paper-cut bird"))
+            result = _run(spec, {"MINIMAX_API_KEY": "test-key", "MINIMAX_API_HOST": host})
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("不满足透明要求", result.stdout + result.stderr)
+            self.assertEqual(len(seen), 1)
+
+    def test_fully_transparent_result_is_not_accepted_as_an_asset(self) -> None:
+        buffer = io.BytesIO()
+        Image.new("RGBA", (1536, 1024), (30, 80, 120, 0)).save(buffer, "PNG")
+        with tempfile.TemporaryDirectory() as tmp, _fake_api(buffer.getvalue()) as (host, _seen):
+            spec, name = _deck(tmp)
+            self._request_transparency(_contract(tmp, name, "transparent paper-cut bird"))
+            result = _run(spec, {"MINIMAX_API_KEY": "test-key", "MINIMAX_API_HOST": host})
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("没有可见内容", result.stdout + result.stderr)
+            self.assertFalse(os.path.isfile(os.path.join(tmp, name)))
+
+    def test_opaque_rgba_output_can_still_be_delivered_as_jpeg(self) -> None:
+        buffer = io.BytesIO()
+        Image.new("RGBA", (1536, 1024), (30, 80, 120, 255)).save(buffer, "PNG")
+        with tempfile.TemporaryDirectory() as tmp, _fake_api(buffer.getvalue()) as (host, _seen):
+            spec, _name = _deck(tmp)
+            _contract(tmp, "opaque.jpg", "opaque illustration")
+            result = _run(spec, {"MINIMAX_API_KEY": "test-key", "MINIMAX_API_HOST": host})
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            with Image.open(os.path.join(tmp, "opaque.jpg")) as image:
+                self.assertEqual(image.mode, "RGB")
+                self.assertEqual(image.format, "JPEG")
+
+    def test_existing_opaque_asset_is_preserved_and_not_reported_as_valid(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp, _fake_api() as (host, seen):
+            spec, name = _deck(tmp)
+            self._request_transparency(_contract(tmp, name, "transparent paper-cut bird"))
+            output = os.path.join(tmp, name)
+            Image.new("RGB", (1536, 1024), (4, 5, 6)).save(output)
+            with open(output, "rb") as fh:
+                before = fh.read()
+            result = _run(spec, {"MINIMAX_API_KEY": "test-key", "MINIMAX_API_HOST": host})
+            self.assertEqual(result.returncode, 1)
+            with open(output, "rb") as fh:
+                self.assertEqual(fh.read(), before)
+            self.assertEqual(seen, [])
+
+
 class TestNoDoubleSpend(unittest.TestCase):
     """钱是真花的：已出的图不重出、同一提示词重跑命中缓存。"""
 

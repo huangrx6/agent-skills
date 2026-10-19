@@ -1,173 +1,167 @@
 {
- "version": 1,
- "note": "styles 层按**字感性格**查（bold-sans / editorial-serif / poster-heavy / neutral-grotesk / humanist-round / mono-engineering），不再按风格名查 —— 风格名每份 deck 都不同，而且历史名会变成菜单（实测确认门②的方向永远是那几个名字）。配字 = 从方向四轴里的「字感」轴查这张表。",
- "how_to_read": "roles 里的 display/body/numeral 对应版面上的三档字：标题档、正文档、数字档。写 `A / B` 表示 A 优先、装不到就退到 B。",
- "licensed_note": "带 ⓑ 的是清单里授权的 B 级（有署名/地区/禁嵌入等限制）——**要嵌进交付物之前先读条款**；A 级可以直接用。",
- "styles": {
-  "bold-sans": {
-   "label": "响 · 无衬线",
-   "temperature": "大胆 · 直接",
-   "from": "讲台远讲、一屏一个观点的 deck",
-   "roles": {
-    "display": "得意黑 Smiley Sans / 庞门正道标题体",
-    "body": "MiSans / 资源圆体 Resource Han Rounded",
-    "numeral": "得意黑 Smiley Sans"
-   }
-  },
-  "editorial-serif": {
-   "label": "文 · 衬线阅读",
-   "temperature": "克制 · 有纸感",
-   "from": "白皮书 / 研究结论 / 要被反复翻阅的 deck",
-   "roles": {
-    "display": "霞鹜文楷 / 京华老宋体ⓑ / 汇文明朝体（修正版）",
-    "body": "霞鹜文楷 / 汇文明朝体（修正版） / 芫荽 Coriander",
-    "numeral": "霞鹜文楷"
-   }
-  },
-  "poster-heavy": {
-   "label": "海报 · 超粗",
-   "temperature": "响亮 · 数感",
-   "from": "只关心几个大数字的路演 / QBR",
-   "roles": {
-    "display": "阿里妈妈数黑体 / 站酷酷黑 / 庞门正道粗书体",
-    "body": "MiSans / 阿里巴巴普惠体 3.0",
-    "numeral": "阿里妈妈数黑体"
-   }
-  },
-  "neutral-grotesk": {
-   "label": "中性 · 无性格",
-   "temperature": "安静 · 退后",
-   "from": "内容本身够硬、字要完全退后的骨架（网格 / 极简）",
-   "roles": {
-    "display": "MiSans / HarmonyOS Sansⓑ / 阿里巴巴普惠体 3.0 / 资源圆体 Resource Han Rounded",
-    "body": "MiSans / 资源圆体 Resource Han Rounded",
-    "numeral": "MiSans"
-   }
-  },
-  "humanist-round": {
-   "label": "软 · 圆润人文",
-   "temperature": "亲和 · 轻快",
-   "from": "培训 / 工作坊 / 跨部门沟通（观众要凑近看）",
-   "roles": {
-    "display": "猫啃网糖圆体 / 内海字体 NaikaiFont / 站酷庆科黄油体 / 猫啃珠圆体ⓑ",
-    "body": "霞鹜文楷 / 内海字体 NaikaiFont / 资源圆体 Resource Han Rounded / 源泉圆体 GenSenRounded",
-    "numeral": "猫啃网糖圆体 / 站酷庆科黄油体"
-   }
-  },
-  "mono-engineering": {
-   "label": "工 · 等宽",
-   "temperature": "冷静 · 在跑的系统",
-   "from": "技术评审 / 架构决策 / 事故复盘",
-   "roles": {
-    "display": "LXGW WenKai Mono（霞鹜文楷等宽，OFL）/ Menlo",
-    "body": "LXGW WenKai Mono（霞鹜文楷等宽，OFL）/ Menlo",
-    "numeral": "Menlo"
-   }
-  }
- },
- "categories": {
-  "guochao": {
-   "label": "国潮 / 古风 / 东方艺术字",
-   "use": "文化类封面、节庆、酒茶餐饮、非遗/文博 —— 用在**标题档**，正文不要用",
-   "styles": [
-    "editorial-serif"
-   ],
-   "note": "这一层里 B/C 级最多（古籍复刻类常有地区或授权限制），商用前逐款复核"
-  },
-  "brush": {
-   "label": "毛笔 / 行书 / 楷书 / 手写书法",
-   "use": "文化叙事、引言页、品牌署名 —— 大字号单行最好看，多行会乱",
-   "styles": [
-    "editorial-serif"
-   ],
-   "note": "楷体（霞鹜文楷/芫荽）是唯一能扛正文的；草行书只适合短标题"
-  },
-  "trend": {
-   "label": "潮流 / 创意 / 海报标题",
-   "use": "封面主标题、活动主题字、电商大促 —— 只用标题档",
-   "styles": [
-    "bold-sans",
-    "poster-heavy"
-   ],
-   "note": "这一层最'吵'，一页只用一款；和中性正文搭档反差最大"
-  },
-  "cute": {
-   "label": "卡通 / 可爱 / 手绘",
-   "use": "儿童、食品、萌系、生活方式 —— 标题 + 少量强调",
-   "styles": [
-    "humanist-round"
-   ],
-   "note": "清松 1-9 是同一款字的九个变体，选一款用到底比混用更好"
-  },
-  "ecom": {
-   "label": "电商 / 综艺 / 营销海报",
-   "use": "促销数字、价格、倒计时 —— 数字档是主场，配超粗黑标题",
-   "styles": [
-    "poster-heavy",
-    "bold-sans"
-   ],
-   "note": "**数字档优先**：这一层要的是'数字要跳出来'，标题反而可以让位"
-  },
-  "tech": {
-   "label": "科技 / AI / 未来 / 像素",
-   "use": "产品发布、数据面板、开发者内容 —— 正文档为主，像素字只做点缀",
-   "styles": [
-    "neutral-grotesk",
-    "mono-engineering"
-   ],
-   "note": "像素字（Fusion Pixel / 俐方体 / 点阵体）字号必须落在整数倍，否则点会糊"
-  }
- },
- "system_fonts": {
-  "note": "这几个是**系统自带**字体，不是清单里的商免艺术字 —— 列在映射里当回退项。它们跟着操作系统走，所以对方机器上一定有（只是版本/字形可能有差）。",
-  "list": [
-   "Helvetica Neue",
-   "Helvetica",
-   "Arial",
-   "Georgia",
-   "Times New Roman",
-   "Menlo",
-   "Courier New",
-   "Futura",
-   "Songti SC",
-   "Hiragino Sans GB",
-   "Heiti SC"
-  ]
- },
- "a_only": {
-  "note": "**没有 license 也能用的那一套。** 判据是**严格 A**（catalog 里 license 恰好是 \"A\"）—— \"A/B\" 不算：它意味着某个来源标了 A、另一个标了 B，而 B 有署名 / 地区 / 禁商标 / **禁嵌入**等限制。把字体嵌进交付物属于再分发，含糊等于不能用。",
-  "why": "A 级（OFL / 官方明确广泛免费商用）可以下载、安装、**嵌入交付物**。OFL 的唯一硬要求是：**再分发字体文件本身时要带上版权声明与 License 文本** —— 只是用它在文档里排版不受影响，PDF 内嵌子集也是通行做法。",
+  "version": 1,
+  "note": "styles 按排印特征提供可选配字起点。依据本次已认可的参考特点查阅，在真实中文样张中比较字族、字重与尺度；这些类别不是有限风格菜单，也不限制选用表外字体。",
+  "how_to_read": "roles 里的 display/body/numeral 对应版面上的三档字：标题档、正文档、数字档。写 `A / B` 表示 A 优先、装不到就退到 B。",
+  "licensed_note": "带 ⓑ 的是清单里授权的 B 级（有署名/地区/禁嵌入等限制）——**要嵌进交付物之前先读条款**；A 级可以直接用。",
   "styles": {
-   "bold-sans": {
-    "display": "得意黑 Smiley Sans / 庞门正道标题体",
-    "body": "MiSans / 资源圆体 Resource Han Rounded",
-    "numeral": "得意黑 Smiley Sans"
-   },
-   "editorial-serif": {
-    "display": "霞鹜文楷 / 汇文明朝体（修正版）",
-    "body": "霞鹜文楷 / 芫荽 Coriander",
-    "numeral": "霞鹜文楷"
-   },
-   "poster-heavy": {
-    "display": "阿里妈妈数黑体 / 站酷酷黑",
-    "body": "MiSans / 资源圆体 Resource Han Rounded",
-    "numeral": "阿里妈妈数黑体"
-   },
-   "neutral-grotesk": {
-    "display": "MiSans / 资源圆体 Resource Han Rounded",
-    "body": "MiSans / 资源圆体 Resource Han Rounded",
-    "numeral": "MiSans"
-   },
-   "humanist-round": {
-    "display": "猫啃网糖圆体 / 内海字体 NaikaiFont",
-    "body": "内海字体 NaikaiFont / 霞鹜文楷",
-    "numeral": "猫啃网糖圆体"
-   },
-   "mono-engineering": {
-    "display": "LXGW WenKai Mono（霞鹜文楷等宽，OFL）/ Menlo",
-    "body": "LXGW WenKai Mono（霞鹜文楷等宽，OFL）/ Menlo",
-    "numeral": "Menlo"
-   }
+    "bold-sans": {
+      "label": "响 · 无衬线",
+      "temperature": "大胆 · 直接",
+      "from": "需要有力度的短标题；与本项目正文样张一起判断",
+      "roles": {
+        "display": "得意黑 Smiley Sans / 庞门正道标题体",
+        "body": "MiSans / 资源圆体 Resource Han Rounded",
+        "numeral": "得意黑 Smiley Sans"
+      }
+    },
+    "editorial-serif": {
+      "label": "文 · 衬线阅读",
+      "temperature": "笔画对比与收笔特征",
+      "from": "需要有笔画对比的字形；不与任何题材、纸色或背景绑定",
+      "roles": {
+        "display": "霞鹜文楷 / 京华老宋体ⓑ / 汇文明朝体（修正版）",
+        "body": "霞鹜文楷 / 汇文明朝体（修正版） / 芫荽 Coriander",
+        "numeral": "霞鹜文楷"
+      }
+    },
+    "poster-heavy": {
+      "label": "海报 · 超粗",
+      "temperature": "响亮 · 数感",
+      "from": "需要明显字重差异的短语或数字；避免用作长段正文",
+      "roles": {
+        "display": "阿里妈妈数黑体 / 站酷酷黑 / 庞门正道粗书体",
+        "body": "MiSans / 阿里巴巴普惠体 3.0",
+        "numeral": "阿里妈妈数黑体"
+      }
+    },
+    "neutral-grotesk": {
+      "label": "中性 · 无衬线",
+      "temperature": "安静 · 退后",
+      "from": "需要稳定阅读节奏的连续文字；展示字可另选",
+      "roles": {
+        "display": "MiSans / HarmonyOS Sansⓑ / 阿里巴巴普惠体 3.0 / 资源圆体 Resource Han Rounded",
+        "body": "MiSans / 资源圆体 Resource Han Rounded",
+        "numeral": "MiSans"
+      }
+    },
+    "humanist-round": {
+      "label": "软 · 圆润人文",
+      "temperature": "亲和 · 轻快",
+      "from": "需要较柔和轮廓的字形；按实际字号与密度判断",
+      "roles": {
+        "display": "猫啃网糖圆体 / 内海字体 NaikaiFont / 站酷庆科黄油体 / 猫啃珠圆体ⓑ",
+        "body": "霞鹜文楷 / 内海字体 NaikaiFont / 资源圆体 Resource Han Rounded / 源泉圆体 GenSenRounded",
+        "numeral": "猫啃网糖圆体 / 站酷庆科黄油体"
+      }
+    },
+    "mono-engineering": {
+      "label": "工 · 等宽",
+      "temperature": "冷静 · 在跑的系统",
+      "from": "需要字符对齐的标识符与代码；不据此决定全篇字族",
+      "roles": {
+        "display": "LXGW WenKai Mono（霞鹜文楷等宽，OFL）/ Menlo",
+        "body": "LXGW WenKai Mono（霞鹜文楷等宽，OFL）/ Menlo",
+        "numeral": "Menlo"
+      }
+    }
+  },
+  "categories": {
+    "guochao": {
+      "label": "国潮 / 古风 / 东方艺术字",
+      "use": "观察字形结构、笔画对比与长标题表现，不按行业指定",
+      "styles": [
+        "editorial-serif"
+      ]
+    },
+    "brush": {
+      "label": "毛笔 / 行书 / 楷书 / 手写书法",
+      "use": "观察运笔、连笔与字面；按实际正文长度检验可读性",
+      "styles": [
+        "editorial-serif"
+      ]
+    },
+    "trend": {
+      "label": "潮流 / 创意 / 海报标题",
+      "use": "观察轮廓、字重和字符间距；与正文搭配实测",
+      "styles": [
+        "bold-sans",
+        "poster-heavy"
+      ]
+    },
+    "cute": {
+      "label": "卡通 / 可爱 / 手绘",
+      "use": "观察圆角、字面与手绘特征；由本轮参考决定是否采用",
+      "styles": [
+        "humanist-round"
+      ]
+    },
+    "ecom": {
+      "label": "电商 / 综艺 / 营销海报",
+      "use": "观察展示字与数字表现；不将清单分类当作业务场景限制",
+      "styles": [
+        "poster-heavy",
+        "bold-sans"
+      ]
+    },
+    "tech": {
+      "label": "科技 / AI / 未来 / 像素",
+      "use": "观察等宽、点阵或几何特征；点阵字需检查像素缩放",
+      "styles": [
+        "neutral-grotesk",
+        "mono-engineering"
+      ]
+    }
+  },
+  "system_fonts": {
+    "note": "系统字体候选，不保证跨平台安装。使用前检查实际字体，交付前验证目标环境与回退。",
+    "list": [
+      "Helvetica Neue",
+      "Helvetica",
+      "Arial",
+      "Georgia",
+      "Times New Roman",
+      "Menlo",
+      "Courier New",
+      "Futura",
+      "Songti SC",
+      "Hiragino Sans GB",
+      "Heiti SC"
+    ]
+  },
+  "a_only": {
+    "note": "**没有 license 也能用的那一套。** 判据是**严格 A**（catalog 里 license 恰好是 \"A\"）—— \"A/B\" 不算：它意味着某个来源标了 A、另一个标了 B，而 B 有署名 / 地区 / 禁商标 / **禁嵌入**等限制。把字体嵌进交付物属于再分发，含糊等于不能用。",
+    "why": "A 级（OFL / 官方明确广泛免费商用）可以下载、安装、**嵌入交付物**。OFL 的唯一硬要求是：**再分发字体文件本身时要带上版权声明与 License 文本** —— 只是用它在文档里排版不受影响，PDF 内嵌子集也是通行做法。",
+    "styles": {
+      "bold-sans": {
+        "display": "得意黑 Smiley Sans / 庞门正道标题体",
+        "body": "MiSans / 资源圆体 Resource Han Rounded",
+        "numeral": "得意黑 Smiley Sans"
+      },
+      "editorial-serif": {
+        "display": "霞鹜文楷 / 汇文明朝体（修正版）",
+        "body": "霞鹜文楷 / 芫荽 Coriander",
+        "numeral": "霞鹜文楷"
+      },
+      "poster-heavy": {
+        "display": "阿里妈妈数黑体 / 站酷酷黑",
+        "body": "MiSans / 资源圆体 Resource Han Rounded",
+        "numeral": "阿里妈妈数黑体"
+      },
+      "neutral-grotesk": {
+        "display": "MiSans / 资源圆体 Resource Han Rounded",
+        "body": "MiSans / 资源圆体 Resource Han Rounded",
+        "numeral": "MiSans"
+      },
+      "humanist-round": {
+        "display": "猫啃网糖圆体 / 内海字体 NaikaiFont",
+        "body": "内海字体 NaikaiFont / 霞鹜文楷",
+        "numeral": "猫啃网糖圆体"
+      },
+      "mono-engineering": {
+        "display": "LXGW WenKai Mono（霞鹜文楷等宽，OFL）/ Menlo",
+        "body": "LXGW WenKai Mono（霞鹜文楷等宽，OFL）/ Menlo",
+        "numeral": "Menlo"
+      }
+    }
   }
- }
 }

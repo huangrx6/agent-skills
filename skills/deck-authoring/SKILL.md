@@ -1,136 +1,108 @@
 ---
 name: deck-authoring
+license: MIT
 description: >-
-  Create presentation decks from a structural spec with a project-specific visual style,
-  browser previews, and HTML, PDF, PNG, editable or image-based PPTX, and slide videos.
-  Use when the user asks 做一份 deck / 做幻灯片 / 做个 PPT / 把材料做成演示, including a requested visual direction.
-  Keep content separate from style and brand, inspect real rendered pages, and validate exports.
-  Do NOT use for editing an existing PowerPoint file, chart-only deliverables, standalone
-  slide images without deck structure, or multi-shot motion-design films.
+  制作有视觉设计的演示文稿：从材料组织内容，设计 HTML 页面、配图与播放，
+  并导出 PDF、PNG、贴图 PPTX 或逐页视频；已有结构化项目支持有限的原生可编辑 PPTX。
+  触发：做一份演示、做 PPT、把材料做成幻灯片、设计演示风格或配图。
+  不适用于：编辑已有 PowerPoint 文件、只做一张图表或无演示结构的单图、多镜头影视制作。
 ---
 
-# Deck authoring
+# 演示文稿制作
 
-将材料整理成有论证、有节奏的演示，写入项目规格文件，再编译为可演讲的 HTML 与所需格式。
-内容层不写坐标、像素字号或色值；作者在风格层设计排印、配色与构图，浏览器计算真实几何。
-风格仍按每份 deck 自建，放在 **deck 项目**的 `styles/<名>/`，不向 skill 目录写风格或示例资产。
+把材料做成适合观众、读得清楚且有视觉表达的演示。新项目以自由 HTML 为主路线；
+内容、风格与素材保留在项目中，工具负责稳定播放、检查和导出，不替作者决定构图。
 
-## 工作方式
+## 开始制作前：先判断是否需要交互
 
-先明确观众、观看方式、核心结论、页数或时长、交付格式。已有材料足够就推进，缺失事实不要编造。
-用户指定的风格、品牌、授权与前面已经做出的选择持续有效，不重复确认。
+**新稿或整体重做默认先选视觉参考，再看真实样页，最后扩展整套。** 先执行本节，不能读完制作资料就直接写全稿。
+判断依据是用户的实际表达，不是作者自己选出的主题、搜索结果或旧 `design.md`。
 
-- **探索方向**：没有明确方向时，用同一份代表内容做三版真实预览。每版同时体现字体、构图、
-  密度与配色，说明为什么适合本次内容；任意两版至少在两个维度不同，包含构图差异。
-- **已定方向**：沿用选择做代表页，不强制重新选三轮风格和配色。用户授权自行决定时，说明取舍后继续。
-- **内容与视觉一起预览**：页序、每页结论、证据载体与关键页样张放在一起审。
-  优先验证封面、最密内容页、图表页和图文页，再扩展全篇。
-- **素材交接按需要进行**：用户自己出图时交付逐槽位提示词；已有真实素材直接验收；
-  获授权且有可用生图后端时完成生成，不要求用户替工具链搬运提示词。
+| 当前情况 | 下一步 |
+| --- | --- |
+| 没有已选参考，也没有让作者决定风格 | 本轮先提出参考选择问题，等待回答 |
+| 用户已选具体作品、截图、品牌规范或认可了部分页面 | 沿用其认可范围，制作代表样页；不重复问已确定的选择 |
+| 用户明确说“风格你定，直接做完”“不用问，直接做” | 自主选方向、试排和审稿，继续完成整套 |
+| 只改文字、修布局、换图或按已认可样页扩展 | 直接处理本次范围，不重新选主题 |
 
-方向草稿可用临时目录，选定后将风格落在项目中。显式目录路径的调用示例：
+“重新做一下”“用最新 skill”“做得高级一些”“继续”本身不表示已选风格或委托作者选风格。
+“你推荐几种”也不等于授权采用某一种。仅有“简洁、精致、技术感”等形容词时，用可见参考澄清。
+先前明确选择或授权仍然有效；若当前会话没有对应证据，不从旧 AI 设计记录补造用户选择。
 
-```bash
-python3 scripts/render.py spec.json --style /tmp/dir-a -o /tmp/a.html
-python3 scripts/shots.py /tmp/a.html --out-dir /tmp/a-pages --count 2
-```
+**需要选择时，在全面读库、下载字体、写样式或生成全稿之前，先问一个可回答的问题：**
 
-## 内容与视觉
+- 按 [参考选择入口](references/visual-language.md#新稿的参考选择入口) 给少量相关作品或浏览网站，附链接并说明看什么；
+  让用户返回作品链接、截图或偏好，也可选“先帮我找参考”或明确委托自主完成。网站入口本身不算已选作品。
+- 使用当前宿主实际提供的提问工具；没有可用工具时，直接在回复中提问并结束本轮，等用户下一条消息。
+  不调用不存在的 `ask_question`，不通过 shell 的 `read/input` 模拟对话，也不为提问要求安装插件。
+- 异步提问后只做不依赖选择的内容整理；本轮结束仍未收到选择，就保持待回答。
+  取消、空答或工具不可用时改用文字问题；不能把默认选项、等待超时或“先按推荐继续”当成用户选择。
 
-写前读 `references/style-architecture.md` 的契约；内容规划读 `references/content-intelligence.md`
-与 `references/planning.md`。视觉设计和审稿执行 `references/visual-quality.md`。
+**参考明确后，用本项目的开场和有代表性的内容展示真实样页**，让用户看见中英文字形、图文关系和留白；
+默认等用户接受或调整这组样页后再批量制作。只说“你帮我选风格”可由作者提出方向并做样页；
+已明确委托直接完成整套时自行检查样页后继续。样页数量随内容决定，不固定三套主题或必选风格菜单。
+现有认可样页无需再确认；配色、字体、图像和构图在样页里一起判断，不分成多轮表单。
 
-每页一个主要结论，支持它的事实保留来源。页型由信息关系决定，避免全篇只有标题与列表。
-叙事骨架是可调整的工具：决策汇报可结论先行，教学可逐步推导，不用固定顺序代替论证。
+完整新稿或整体重做必须包含功能配图、封面背景与内页背景设计，并交付配图 Markdown 和已接入的图位。
+默认由用户按 Markdown 自行出图回填。只有用户明确要求纯文字或本次仅改局部文字时，才免除相应交付；
+作者不能以“技术题材”“信息密集”“排印路线”或暂无图片自行豁免。
 
-每页决定 `visual`：纯文字 `{"kind":"none"}`，图表 `{"kind":"data","ratio":"3:2"}`，
-素材 `{"kind":"evidence_image","ratio":"3:2"}`。旧 spec 可不写，但新作应显式决定。
+## 选择交付路线
 
-- 数据图表由真实数据生成；不能为了美观删系列、改基准或补数字。
-- 照片、插画、氛围图可用生图；真实截图、品牌素材与项目证据优先保持原貌。
-- 架构与流程用结构化节点和连线制作，核对关系、保留可编辑源。可使用可用的 diagram 工具；
-  本渲染器仍以外部素材接入，不承诺导入后变成原生 PPTX 图形。
-- 截图和信息图优先完整展示；照片可裁切，但要确认焦点。不要把整页标题和正文烤进配图。
+- **新演示、HTML / PDF / PNG / 贴图 PPTX**：读 [HTML 源文件与工具契约](references/web-composition.md)，自行编写 HTML / CSS。内部布局不限页型词表。
+- **已有 spec，或必须原生可编辑 PPTX**：读 [结构化规格](references/style-architecture.md) 和 [兼容制作管线](references/pipeline.md)。只承诺已支持的文字、图片、形状与图表；先验证关键页面的最终导出，任意 HTML/CSS 不能自动保真转换。
+- 用户明确要求可编辑时，不能用整页截图冒充。格式差异和导出命令见 [交付格式](references/delivery-formats.md)；环境与安装见 [README](README.md)。
 
-## 规格与风格
+## 设计与制作
 
-`deck.style`、具名 `deck.colorSet` 必填，`seed` 建议显式写。项目目录就是 spec 所在目录。
-有品牌资产时用 `deck.brand` 接入项目的 `brands/<名>/`；资产须由用户提供或有可信来源。
-观看场景可写 `deck.delivery: live | async | printable`，用于字号提示，不自动改作者的档位。
+1. **按问题拆讲。** 根据观众、目标、观看条件核实事实，按 [内容理解](references/content-intelligence.md) 确定每页要回答的问题、视觉解释和细节去向。没有明确页数限制时，内容过多优先增加页数，不沿用旧稿页数或把文档章节直接塞进一页；比较所需的共同信息保持同屏。
+2. **把已选参考转成真实页面。** 按入口约定推进交互；查看内容页而不只看封面，用真实材料试排，字体、配色和构图一起判断。作者找到参考并写进记录不代表用户选中了它。
+3. **让图本身呈现内容。** 先选择能看清关系的表达，再安排文字；矩阵、流程、剖面、时间轴、标注截图或完整信息图都可以成为页面主体，图不只是段落旁的插画。标签与条件就近放置，移除图已表达的复述；过渡页与参考页按实际用途处理。按 [配图流程](references/images.md) 分清生成素材、精确绘图和文字层，设计背景、交付 image-brief.md 并接好图位，默认由用户出图。
+4. **用真实字形和实际画面实现。** 按 [排印](references/typography-and-space.md) 与 [字体接入](references/fonts.md) 确定标题、正文及中英混排，用真实长标题、段落、数字和图标签试排。按 [构图](references/composition-principles.md) 和 [布局计算](references/layout-technology.md) 量取图文与间距；待图阶段也检查容量。需要运动时分别编排 [转场、页内讲解和静态输出](references/animation.md)，不能把外部应用的效果名当成本播放器能力。
+5. **让整套一致且适应内容。** 延续已确定的视觉特征，各页按任务安排主角、密度与位置；信息比较可以同构，内容变化也可以改变组织。反馈落实到具体范围，更新相关页面并回看。局部修订无需重走整套设计流程。
 
-字号用风格的 `type` 档位，页级用 `titleTier` / `bulletTier` 选择；内容过载先换结构、收短或拆页。
-文字色来自 `colorSets.*.text`；未声明时可用两墨乘色派生。叠印是可选风格机制，不是所有风格的限制。
-`color:"overprint"` 仅保留为旧 spec 的兼容标记；不要在内容层写 HEX。
+已有明确品牌与用户选择持续有效；整体重做的历史排除范围见 [资料边界](references/refined-workflow.md#重新制作与资料边界)。
 
-风格自带 `style.json + skin.css`；契约、CSS 钩子、字体与可选效果见 `references/style-architecture.md`。
-没有内置成品风格。可以复用已经验证的结构组件与 token 接口，每次重新设计视觉表达。
-自造布局可写 `data-layout` 对应 CSS；声明 `layouts` 词表可检查拼写。
+## 图片、背景与播放
 
-## 版式
+图像可以承担主体、证据、背景或透明叠层，与精确的 HTML/SVG 标签和连线组合。解释页要用视觉分担信息，
+只给文字卡换颜色或只有装饰封面不能代替功能配图；图位、裁切与文字安全区一起设计。
 
-| type | 用途 | 布局（`layout`，不写=缺省） |
-| --- | --- | --- |
-| `title` | 封面、章节、单句主张 | — |
-| `content-text` | 结论与解释 | —；按信息量声明字号档 |
-| `content-image` | 图文页 | `visual-right` / `visual-left` / `even` / `visual-wide` / `hero` |
-| `two-column` | 对照或两组信息 | `even` / `lean-left` / `lean-right` / `lean-hard-left` / `lean-hard-right`；至多两栏 |
-| `timeline` | 时间或阶段顺序 | — |
-| `chart` | 数据证据 | `chart` 显式声明 bar / bar-horizontal / line / area / bar-stacked / donut / scatter / combo |
-| `end` | 单句收束 | — |
+保留素材来源，生成图不能冒充真实界面、数据或系统证据。用户禁止 SVG 时启用 `--raster-only`。
+配图 Markdown 必须实际保存，缺图稿标明待素材；文件和尺寸检查不证明图像内容或显示效果合格。
 
-图表详情见 `references/charts.md`。组合图每个系列必须声明 `mark:bar|line`，共用同单位纵轴；
-不支持的导出能力应明确报错。`annotations` 暂不支持，非空时拦截，改用图注或完成实现后再启用。
-`notes` 是逐页讲稿，不参与版面；HTML 按 `S` 显示，投屏时观众也能看到。
-多条行动项使用 `content-text` 并声明 `role:"actions"`；`end` 不接受 bullets。
-装饰是否出现由风格的 `decor.types` 决定，与页型能力分开。
+画面的灵动先由尺度、位置、疏密和页间接续形成。需要运动时读 [播放与动效](references/animation.md)，检查入场过程和完成态；
+播放器控件不等于页面已有动画。导出静帧应完整，减弱动画不丢信息。
 
-## 渲染与验收
+## 渲染、审稿与交付
 
-依赖安装与各格式差异见 `README.md`、`references/delivery-formats.md`。按依赖顺序执行，失败先修：
+完整新稿先完成待配图交接检查；自由 HTML 的源与产物放在同目录，用不同文件名：
 
 ```bash
-python3 scripts/validate_spec.py deck.spec.json
-python3 scripts/ink.py <项目>/styles/<风格>/style.json
-python3 scripts/image_source.py --brief deck.spec.json   # 需要素材合同才跑
-python3 scripts/image_source.py --check deck.spec.json   # 素材回填后
-python3 scripts/render.py deck.spec.json -o deck.html --resolved resolved.deck.json --trace
-python3 scripts/check.py deck.spec.json deck.html
-python3 scripts/shots.py deck.html --out-dir pages --count N
+python3 scripts/image_handoff.py --handoff /path/to/image-plan.json --html /path/to/source.html
+python3 scripts/web_deck.py /path/to/source.html -o /path/to/deck.html --image-plan /path/to/image-plan.json
+python3 scripts/web_check.py /path/to/deck.html --json /path/to/draft.check.json
+# 用户回填后再运行资源/版面检查与导出：
+python3 scripts/web_deck.py /path/to/source.html -o /path/to/deck.html --image-plan /path/to/image-plan.json --check
+python3 scripts/shots.py /path/to/deck.html --out-dir /path/to/pages --count N
 ```
 
-输入校验检查类型、数量、嵌套数据及项目品牌合并后的色板。产物校验看实际颜色、可见性、
-祖先裁切、文字重叠、缺失元素、图表就绪等。实测值不能被声明值替代。
-复杂背景上的文字仍需人工逐页确认；机械通过不等于审美通过。
+`--image-plan` 校验配图 Markdown、计划与图位的交接，允许图片待回填；它不验证审美或背景设计。
+缺少配图计划或 Markdown 不能交作完整新稿。局部编辑或用户明确要求纯文字时可省略该参数。
+待图检查仍会因缺失资源返回失败，但会继续测量页面；逐页处理实际越界，不把资源失败当作跳过布局检查的理由。
+只有约定待生成的图片可留待回填，字体、脚本及其他资源错误仍须处理；报告未测出页面时不能声称容量已验证。
+`--check` 保存浏览器报告：硬错误退出 1；需复核的重叠、遮挡等退出 2；普通字号提醒不默认阻塞。
+处理真实问题后复测，不能靠隐藏内容、缩成小字或改角色标记换取通过。报告是资源与几何检查，不能给美感打分。
 
-交付前看整套缩略图、逐页实际尺寸、最终格式回读。重点看信息完整性、层级、图表语义、
-字体、图片焦点与节奏。新风格至少覆盖密集、稀疏、长标题、图表与双栏内容。
+按 [视觉审稿](references/visual-quality.md) 看整套缩略图、逐页目标观看尺寸和所需最终格式：
 
-`--candidates` 给图文和双栏页出候选；评分只辅助判断，不代表美观。
-`--repair` 只会尝试未显式声明的字号档，不能重写内容或自动拆页；需要修内容时返回规划层。
+- 内容主次、解释与证据是否清楚，中文换行、表格和辅助文字是否好读。
+- 图片与背景是否服务本页，主体和文字是否避让，裁切与生成瑕疵是否处理。
+- 连续内容页是否有合理节奏，实际导出是否保留字体、图像、数据和页数。
 
-## 交付
+按“焦点与关系 → 构图与留白 → 排印与素材 → 细节”处理当前最明显的问题，修后看新图；
+无需凑审稿轮次。生成全部截图不等于已经看过；含动效还需实际播放。
+检查器不能覆盖全部像素遮挡、字体回退或互动状态；素材或共享 CSS 变化后重验受影响页面。
 
-保留 HTML 作为演示与复现源，按用户需求交付所需格式。只有字体和素材都可移植时才称单文件交付。
-
-```bash
-python3 scripts/pdf.py deck.html -o deck.pdf
-python3 scripts/pptx_native.py --png-dir pages -o deck.pptx     # 贴图，外观一致
-python3 scripts/pptx_native.py deck.html -o editable.pptx      # 原生文字与支持的图表
-python3 scripts/fonts.py --embed deck.html -o portable.html  # 本地字体内嵌，素材另核对
-python3 scripts/animate.py deck.html -o deck.mp4
-```
-
-PDF 文字可为矢量，照片与当前 Canvas 图表仍是位图；原生 PPTX 不承诺任意 CSS 效果一致，
-必须在目标宿主回读。输出时带上必要的 spec、styles、assets 与字体说明，不能只验证中间 HTML。
-
-动画见 `references/animation.md`：演示和取帧共用 `paint(si,t)`。内容元素不加墙钟 CSS
-`transition`；动画用独立 `translate` / `scale`，避免覆盖皮肤的 `transform`。
-本工具做逐页演示视频，复杂转场、配乐与多镜头交给视频制作流程。
-
-## 出错时
-
-- 未知字段、错类型、超出支持数量：改规格，不能删掉报错字段后丢内容。
-- 对比度不足：查实际背景和透明度，调整文字或背景；不降低可读性门槛。
-- 越界、文字重叠、裁切：查点名元素和祖先容器，先调整结构与文案；标题可自然换行。
-- 图表 pending/error、丢系列或空图：停止导出，核对图形编码和数据；图例存在不等于图形成功。
-- 字体回退、导出变形：核对真实字体、实测字号、图片裁切与目标格式能力。
+交付用户需要的格式及可复现的源文件、素材和字体说明。只在核对资源可移植性后称“离线”或“单文件”。
+简述实际完成的视觉/格式检查、图片或提示词位置，以及仍待处理的素材或提醒；缺图、未验证导出不得写成完成。

@@ -433,6 +433,15 @@ html,body{margin:0;background:var(--viewer)}
      而且换台机器字形全变。皮肤的显式规则照旧覆盖它。 */
   font-family:var(--body)}
 .pad{padding:132px 84px}
+/* 字号来自风格 token；皮肤可以覆盖，但省略时不能退回浏览器的 16px/UA 标题。
+   不在壳里规定审美尺寸，只接通 compile 已选择的档位。 */
+.title{font-size:var(--s-title,var(--t-small))}
+.subtitle{font-size:var(--s-subtitle,var(--t-subtitle))}
+.bullets{font-size:var(--s-bullet,var(--t-bullet))}
+.colTitle{font-size:var(--s-colTitle,var(--t-colTitle))}
+.tl b{font-size:var(--s-nodeLabel,var(--t-nodeLabel))}
+.tl em{font-size:var(--s-nodeNote,var(--t-nodeNote))}
+.foot{font-size:var(--s-foot,var(--t-foot))}
 /* 标题块：高度是版面几何（每种版式不同），字号由 --s-title 给（来自 type 级数） */
 .titleblock{position:relative;display:block}
 .tb-cover{min-height:158px}
@@ -467,7 +476,7 @@ html,body{margin:0;background:var(--viewer)}
 .herofig .herobar{position:absolute;left:0;right:0;bottom:0;
   padding:18px 30px 18px 0;background:var(--text);color:var(--paper)}
 .herofig .herobar .title{color:var(--paper);
-  font-size:var(--s-colTitle,26px);line-height:1.3;white-space:normal}
+  font-size:var(--s-colTitle,var(--t-colTitle));line-height:1.3;white-space:normal}
 .hero-bullets{margin-top:var(--sp-item)}
 /* hero 流里的图注是**顶层元素**（不在 figure 里，所以拿不到"figure 成员"那条豁免），
    它必须自己满足安全盒：body 下 16 + caption 上 12 = 28 —— --sp-inner(16) 不达标，
@@ -505,11 +514,11 @@ html,body{margin:0;background:var(--viewer)}
 /* 图注 / 图表注：用字号与间距区分层级，保留已验收的文字色，避免透明度削弱对比度。
    皮肤要另说就覆盖这两条（皮肤 CSS 在壳之后，同级即胜）。 */
 .chartcap{margin-top:var(--sp-inner);color:var(--text);
-  font:400 var(--s-caption,16px)/1.5 var(--body)}
+  font:400 var(--s-caption,var(--t-caption))/1.5 var(--body)}
 /* 行内强调（模型写的 `**x**`）：用 span 而不是 b —— 皮肤的 .tl b 会命中裸 b */
 .em{font-weight:700}
 .chartsrc{margin:calc(var(--sp-inner) * -0.5) 0 0;color:var(--text);
-  font:400 var(--s-caption,16px)/1.4 var(--body)}
+  font:400 var(--s-caption,var(--t-caption))/1.4 var(--body)}
 .chartwrap{margin-top:var(--sp-item);width:1432px;padding:var(--sp-item);
   position:relative;box-sizing:border-box}
 /* box-sizing:border-box 必须有：1432 是**含内边距**的栅格宽。content-box 下
@@ -540,7 +549,7 @@ html,body{margin:0;background:var(--viewer)}
    约束**高度**而不是宽度：logo 多是横长条，锁高度才能让宽高比自然展开
    （给宽会有的被拉横、有的被压扁）。 */
 .slide > .brandlogo{position:absolute;right:84px;top:58px;height:56px;width:auto}
-.brandfoot{font:400 var(--s-foot, 14px)/1 var(--body);color:var(--text);
+.brandfoot{font:400 var(--s-foot,var(--t-foot))/1 var(--body);color:var(--text);
   letter-spacing:0.04em}
 """
 
@@ -1524,6 +1533,7 @@ def render_resolved(resolved: dict) -> str:
         # 用属性而不是再加一个元素：安静派风格的构图需要一个字号锚点，但为此往每页
         # 塞一个 div、还得同步进清单和测量层，不值。
         out.append(f'<section class="slide" data-slide="{i}" data-idx="{i:02d}" '
+                   f'data-page="{html.escape(str(kind), quote=True)}" '
                    f'style="--dx:{dx}px;--dy:{dy}px;--rot:{rot}deg">')
         out.append(decor(tokens, seed, i, kind))
         out.append('<div class="pad">')

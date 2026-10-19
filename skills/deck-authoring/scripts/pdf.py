@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from html.parser import HTMLParser
 import importlib.util
 import os
 import re
@@ -37,7 +38,6 @@ def _load_sibling(name: str):
 deckio = _load_sibling("deckio")   # IO 收口：读不到要报清楚，不甩 traceback
 
 
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 # CSS px → PDF pt 的换算（1px = 0.75pt）。
 PX_TO_PT = 0.75
@@ -77,16 +77,33 @@ def inspect(pdf_path: str) -> dict:
             "fonts": fonts, "mediaboxes": [b.strip() for b in boxes]}
 
 
+class _SlideCounter(HTMLParser):
+    """Count section elements, excluding markup inside comments and script/style text."""
+
+    def __init__(self):
+        super().__init__()
+        self.count = 0
+
+    def handle_starttag(self, tag, attrs):
+        classes = dict(attrs).get("class") or ""
+        if tag == "section" and "slide" in re.split(r"[\t\n\f\r ]+", classes):
+            self.count += 1
+
+
 def slide_count(html_path: str) -> int:
-    """数产物里有几页 —— 拿 `<section class="slide">` 当事实来源。"""
-    return len(re.findall(r'<section class="slide"', deckio.read_text(html_path)))
+    """数实际 section.slide 标签；忽略注释与脚本文本，不依赖属性顺序或其他 class。"""
+    parser = _SlideCounter()
+    parser.feed(deckio.read_text(html_path))
+    parser.close()
+    return parser.count
 
 
 def export(html_path: str, out_path: str, timeout: int = 180) -> dict:
     """打印成 PDF，然后验一遍。验不过就抛清楚的话，不留给用户一个坏文件。"""
-    if not os.path.isfile(CHROME):
-        raise SystemExit(f"✗ 找不到 Chrome：{CHROME}\n"
-                         f"  PDF 走的是 Chrome 的打印管线，没有替代品。")
+    try:
+        _load_sibling("browser").find_chrome()
+    except RuntimeError as exc:
+        raise SystemExit(f"✗ {exc}") from exc
     html_path = os.path.abspath(html_path)
     if not os.path.isfile(html_path):
         raise SystemExit(f"✗ 读不到产物：{html_path}")

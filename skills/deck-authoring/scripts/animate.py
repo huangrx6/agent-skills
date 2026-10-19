@@ -65,8 +65,8 @@ def _load_sibling(name: str):
 
 
 deckio = _load_sibling("deckio")
+browser = _load_sibling("browser")
 
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 SWIFT_SRC = os.path.join(HERE, "h264_encode.swift")
 SLIDE_W, SLIDE_H = 1600, 900
 
@@ -133,10 +133,11 @@ async def _capture_async(html: str, out_dir: str, times: list[float], scale: flo
     ws_connect = _ws_connect()
     if ws_connect is None:
         raise RuntimeError("no-websockets")
+    chrome = browser.find_chrome()
     port = 9500 + (os.getpid() % 400)          # 端口跟 PID 走，并行跑不撞
     profile = tempfile.mkdtemp(prefix="deck-cdp-")
     proc = subprocess.Popen(
-        [CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
+        [chrome, "--headless=new", "--disable-gpu", "--hide-scrollbars",
          f"--remote-debugging-port={port}", f"--user-data-dir={profile}", "about:blank"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     frames: list[str] = []

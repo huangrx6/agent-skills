@@ -1,20 +1,5 @@
 #!/usr/bin/env python3
-"""图片提示词契约（`--brief`）与交付验收（`--check`）的验证。
-
-这一层换了一个分工：**脚本写契约与提示词 → 人出图 → 脚本再验一遍**。
-所以要钉的也是这两头：
-
-1. **契约要说得清楚**（文件名 / 尺寸 / 比例 / 透明通道 / 会被怎么处理 / 可粘贴的
-   中英提示词），而且**会说错的地方不能有**：同一张图用在多页时要合并而不是列三遍
-   （否则人会出三张互相覆盖）；提示词里不能出现"给文字留压字空间"（我们的版式里
-   文字在**独立一栏**，不压在图上）。
-2. **验收要有牙，而且不能自己作弊**：`--check` 一旦顺手把占位图造出来，
-   就永远验不出"图还没出"（删掉图之后它会照样报"符合契约"）。
-
-跑法：
-    python3 -m unittest discover -s tests -v
-    python3 tests/deck-authoring/test_image_brief.py
-"""
+"""Image brief direction, measured geometry and actual asset acceptance regressions."""
 
 from __future__ import annotations
 
@@ -60,7 +45,7 @@ deckio = _load("deckio")
 
 
 class TestBrief(unittest.TestCase):
-    """契约内容：该说的都要说到，说错的不能有。"""
+    """Legacy specs retain measured contracts without imposing a photographic style."""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -71,205 +56,119 @@ class TestBrief(unittest.TestCase):
         image_source.write_brief_md(cls.brief, cls.md_path)
         cls.md = deckio.read_text(cls.md_path)
 
-    def test_prompt_asks_for_a_safe_area_around_the_subject(self) -> None:
-        """主体必须留余量 —— 否则裁切/留边一定把它切掉。
-
-        版面按**槽位**裁切（照片 `cover`）或留边（结构图 `contain`），谁也不知道
-        出图时主体贴没贴边；所以约束要写进提示词的【限制】栏（中英都要），
-        并且 brief 末尾再给三条**只能人眼看**的自检。
-        """
+    def test_no_unrequested_medium_color_limit_or_focal_area(self) -> None:
         for slot in self.brief["slots"]:
-            zh = image_source.render_prompt(slot, self.brief, "zh")
-            en = image_source.render_prompt(slot, self.brief, "en")
-            self.assertIn("中心 80%", zh, slot.get("file"))
-            self.assertIn("10%", zh, slot.get("file"))
-            self.assertIn("CENTRAL 80%", en, slot.get("file"))
-            self.assertIn("10%", en, slot.get("file"))
-        for must in ("主体在不在中心 80%", "画面里有没有文字", "结构图有没有被压扁"):
-            self.assertIn(must, self.md, must)
+            for lang in ("zh", "en"):
+                prompt = image_source.render_prompt(slot, self.brief, lang)
+                for phrase in ("纪实摄影", "documentary photography", "1~3", "1-3 colour",
+                               "中心 80%", "CENTRAL 80%", "60~70%", "上 2/3",
+                               "只占一栏", "ONE COLUMN", "不透明照片"):
+                    self.assertNotIn(phrase, prompt)
+                self.assertNotIn("【风格】", prompt)
+                self.assertNotIn("【背景】", prompt)
 
     def test_one_entry_per_filename_not_per_page(self) -> None:
-        """同一个文件名用在多页 → **合并成一条**。
-
-        按页列会让它出现三遍（压测 deck 里 `sample-treated.png` 就用在三页）——
-        人会出三张、互相覆盖。
-        """
         names = [s["file"] for s in self.brief["slots"]]
-        self.assertEqual(len(names), len(set(names)), f"有重复文件名：{names}")
-        used = [s for s in self.brief["slots"] if len(s["pages"]) > 1]
-        self.assertTrue(used, "压测 deck 里本该有跨页复用的图 —— 用例前提变了")
-        self.assertGreaterEqual(len(used[0]["pages"]), 2)
-        self.assertIn("第 11 页", self.md)
+        self.assertEqual(len(names), len(set(names)))
+        self.assertTrue(any(len(s["pages"]) > 1 for s in self.brief["slots"]))
 
-    def test_target_size_is_the_measured_slot_at_2x(self) -> None:
-        """每张图按所有复用图位的最大实测宽高给尺寸，不再统一假定640px。"""
+    def test_target_size_covers_all_measured_reuse_slots(self) -> None:
         import math
-        for s in self.brief["slots"]:
-            self.assertEqual(s["target_px"], [
-                math.ceil(max(r[dimension] for r in s["requirements"]) * image_source.BRIEF_SCALE)
-                for dimension in ("width", "height")])
+        for slot in self.brief["slots"]:
+            self.assertEqual(slot["target_px"], [
+                math.ceil(max(r[d] for r in slot["requirements"]) * image_source.BRIEF_SCALE)
+                for d in ("width", "height")])
 
-    def test_contract_states_every_thing_the_user_listed(self) -> None:
-        """用户点名的每一项都要在契约里：名称 / 大小 / 透明度 / 风格 / 内容 / 元素。"""
-        for key in ("文件名", "尺寸", "透明通道", "色彩要落在色板内", "内容"):
-            with self.subTest(field=key):
-                self.assertIn(key, self.md, f"契约里没写「{key}」")
+    def test_missing_subject_stays_unresolved_without_inventing_evidence(self) -> None:
+        for slot in self.brief["slots"]:
+            self.assertTrue(image_source.PLACEHOLDER_RE.search(
+                image_source.render_prompt(slot, self.brief)))
+        self.assertIn("参考材料", self.md)
+        self.assertIn("真实截图", self.md)
 
-    def test_prompt_carries_both_languages(self) -> None:
-        self.assertIn("中文提示词", self.md)
+    def test_geometry_and_transparency_parameters_are_honest(self) -> None:
+        self.assertIn("尺寸", self.md)
+        self.assertIn("来自实测尺寸", self.md)
+        self.assertIn("透明通道未指定", self.md)
+        self.assertNotIn("整张不透明照片", self.md)
+        self.assertNotIn("盖住整页是不允许的", self.md)
         self.assertIn("English prompt", self.md)
 
-    def test_fields_appear_in_the_mandated_order(self) -> None:
-        """出现的字段**必须按序**：主体 → 场景 → 构图 → (镜头) → 光线 → 色彩 → 风格 → 细节 → 文字 → 限制。
 
-        顺序本身就是"先明白画什么、再明白怎么画"。堆成一段的写法会让
-        「不要细密纹理」这种约束把「主体是什么」淹掉 —— 而主体最优先。
-        """
+class TestAuthoredImageBrief(unittest.TestCase):
+    def setUp(self) -> None:
+        self.brief = {"temperature": "安静", "colors": {"primary": "#0033CC", "secondary": "#111111", "background": "#FFFFFF"}}
+        self.slot = {"imageBrief": {}, "requirements": [{"fit": "cover"}]}
+
+    def test_illustration_direction_and_explicit_text_are_not_overruled(self) -> None:
+        self.slot["imageBrief"] = {
+            "purpose": "封面，表达两种观点的对话", "subject": "两只纸雕鸟，各持写有 YES 和 NO 的卡片",
+            "style": "彩色纸雕插画，柔和渐变和细线纹理", "composition": "双主体放在画面右侧",
+            "negativeSpace": "左侧 40% 留给正文，保持低细节", "focal": [78, 43],
+            "transparent": True, "avoid": ["不裁断鸟喙", "不要复制卡片"]}
         for lang in ("zh", "en"):
-            with self.subTest(lang=lang):
-                block = self._prompt_block(lang)
-                positions = []
-                for field in image_source.PROMPT_ORDER:
-                    if field in image_source.OPTIONAL_FIELDS:
-                        continue
-                    self.assertIn(f"【{field}】", block, f"{lang} 缺字段「{field}」")
-                    positions.append(block.index(f"【{field}】"))
-                self.assertEqual(positions, sorted(positions),
-                                 f"{lang} 的字段顺序乱了：{positions}")
+            prompt = image_source.render_prompt(self.slot, self.brief, lang)
+            for field in ("purpose", "subject", "style", "composition", "negativeSpace"):
+                self.assertIn(self.slot["imageBrief"][field], prompt)
+            self.assertIn("78%", prompt)
+            self.assertIn("43%", prompt)
+            self.assertNotIn("不要出现任何文字", prompt)
+            self.assertNotIn("documentary photography", prompt)
+            self.assertFalse(image_source.PLACEHOLDER_RE.search(prompt))
+        self.assertIn("真实透明通道", image_source.render_prompt(self.slot, self.brief))
 
-    def test_lens_line_is_absent_by_default(self) -> None:
-        """**只在需要时加** —— 所以默认整行不出现。
+    def test_contain_does_not_warn_that_all_edges_will_be_cropped(self) -> None:
+        self.slot["requirements"] = [{"fit": "contain"}]
+        self.slot["imageBrief"] = {"subject": "完整保留的产品组件示意图"}
+        prompt = image_source.render_prompt(self.slot, self.brief)
+        self.assertIn("保留完整画面", prompt)
+        self.assertNotIn("cover 裁切", prompt)
+        self.assertNotIn("中心 80%", prompt)
 
-        给一个"安全默认值"看起来无害，但它意味着**每次都加**，正好违反
-        "只有当镜头信息能明显改善画面时才加入"。工具判断不了这张图需不需要镜头感，
-        就把判断权交回给看图的人。
-        """
-        for lang in ("zh", "en"):
-            with self.subTest(lang=lang):
-                self.assertNotIn("【镜头】", self._prompt_block(lang))
-        # 但要告诉人怎么加、加在哪
-        self.assertIn("镜头", self.md)
-        self.assertIn("在【构图】和【光线】之间", self.md)
-        self.assertIn("LENS", self.md) if "LENS" in self.md else None
+    def test_legacy_hero_warning_requires_actual_route_metadata(self) -> None:
+        self.slot["layout"] = "hero"
+        self.assertNotIn("底部标题带", image_source.render_prompt(self.slot, self.brief))
+        self.slot["hero_overlay_pages"] = [2]
+        prompt = image_source.render_prompt(self.slot, self.brief)
+        self.assertIn("底部标题带", prompt)
+        self.assertNotIn("上 2/3", prompt)
+        self.assertNotIn("不需要在图内为文字留白", prompt)
 
-    def test_api_params_are_not_written_into_the_prompt(self) -> None:
-        """**回归**：尺寸 / 比例 / 数量不能出现在提示词正文里。
+    def test_transparent_false_is_explicit_not_the_default(self) -> None:
+        self.assertNotIn("【背景】", image_source.render_prompt(self.slot, self.brief))
+        self.slot["imageBrief"]["transparent"] = False
+        self.assertIn("不透明背景", image_source.render_prompt(self.slot, self.brief))
 
-        生图 API 有独立参数，prompt 里再写一遍只会在冲突时给出随机结果
-        （`3:2` 与 `1280x853px` 属于参数栏，不进正文）。
-        """
-        for lang in ("zh", "en"):
-            with self.subTest(lang=lang):
-                block = self._prompt_block(lang)
-                w, h = self.brief["target_px"]
-                for banned in (f"{w}", f"{h}", f"{w}×{h}", f"{w}x{h}", "3:2", "aspect ratio"):
-                    self.assertNotIn(banned, block,
-                                     f"{lang} 提示词里出现了 API 参数「{banned}」")
-        self.assertIn("参数", self.md)
-        self.assertIn("不要写进 prompt", self.md)
+    def test_spec_direction_reaches_measured_request_and_both_prompt_views(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            spec = deckio.read_json(STRESS)
+            spec["deck"]["slides"] = [{
+                "type": "content-image", "title": "不是图中文字", "image": "cutout.png", "layout": "hero",
+                "visual": {"kind": "evidence_image", "ratio": "4:3", "imageBrief": {
+                    "subject": "纸雕鸟", "purpose": "品牌概念示意", "focal": [72, 30],
+                    "negativeSpace": "左侧留白", "style": "多彩纸雕", "transparent": True}}}]
+            path = os.path.join(tmp, "deck.spec.json")
+            deckio.write_json(path, spec)
+            brief = image_source.build_brief(path, tmp)
+            slot = brief["slots"][0]
+            request = deckio.read_json(os.path.join(tmp, "assets", "requests", "cutout.png.json"))
+            self.assertEqual(request["focal"], [72, 30])
+            self.assertEqual(request["negative_space"], "左侧留白")
+            self.assertIs(request["transparent"], True)
+            self.assertEqual(request["prompt"], image_source.render_prompt(slot, brief))
+            self.assertIn("底部标题带", request["prompt"])
+            self.assertIn("纸雕鸟", request["prompt"])
+            self.assertFalse(image_source.PLACEHOLDER_RE.search(request["prompt"]))
+            self.assertGreater(request["target_px"][0], 0)
 
-    def test_out_of_frame_metadata_stays_out_of_the_prompt(self) -> None:
-        """**回归**：提示词只装"模型要照做的事"，不能混进写给读者的旁白。
-
-        上一版漏进去三句：「（可执行的视觉语言）」「限制只列与这条管线相关的，
-        不堆通用负面词」「优先于任何装饰性的色彩偏好」—— 后者是人看的规则说明，
-        模型会把它当成画面要求。两个读者不能混在一段里。
-        """
-        banned = ["可执行的视觉语言", "限制只列", "不堆通用负面词",
-                  "优先于任何装饰性的色彩偏好", "优先于",
-                  "pipeline-relevant", "boilerplate"]
-        for lang in ("zh", "en"):
-            for text in banned:
-                with self.subTest(lang=lang, text=text):
-                    self.assertNotIn(text, self._prompt_block(lang))
-
-    def test_style_is_not_duplicated_and_is_executable(self) -> None:
-        """风格栏要写"可执行的视觉语言"，且不许重复说同一件事。
-
-        上一版是「纪实摄影（可执行的视觉语言）；克制平静的**纪实摄影**…」。
-        """
-        block = self._prompt_block("zh")
-        style = block.split("【风格】")[1].split("\n")[0]
-        self.assertEqual(style.count("纪实摄影"), 1, style)
-        self.assertIn("大块明暗", style)
-
-    def _prompt_block(self, lang: str) -> str:
-        """取出某个语言的提示词正文（不含契约里的叙述部分）。"""
-        head = "**中文提示词**" if lang == "zh" else "**English prompt**"
-        chunk = self.md.split(head, 1)[1]
-        return chunk.split("```text", 1)[1].split("```", 1)[0]
-
-    def test_prompt_does_not_tell_the_model_to_leave_room_for_overlay(self) -> None:
-        """**不能**说"给文字留压字空间"：我们的版式里文字是独立一栏，不压在图上。
-
-        这么写模型会交一张主体偏到一边、空掉半张的图 —— 留白该为版式服务，
-        不是为"压字"服务。
-        """
-        self.assertNotIn("压文字", self.md)
-        self.assertIn("SEPARATE column", self.md)
-        self.assertIn("不要在图内为文字留白", self.md)
-
-    def test_limits_are_pipeline_specific_not_boilerplate(self) -> None:
-        """限制项要与任务相关。通用的"不要水印/不要额外人物"是噪音。"""
-        block = self._prompt_block("zh")
-        limits = block.split("【限制】")[1]
-        self.assertIn("细线", limits)
-        # 限制项是"进版式会糊"这条管线事实（不是"不要加网点"那种制版话术）
-        self.assertIn("糊成一团", limits)
-        for generic in ("水印", "额外人物", "畸形手指"):
-            self.assertNotIn(generic, limits)
-
-    def test_tool_does_not_invent_the_subject(self) -> None:
-        """主体 / 场景 / 细节留空给人填 —— 工具**不许**自己编。
-
-        规则是"用户未提供且会影响事实准确性的内容，不得擅自补充"。标题与条目讲的是
-        这份 deck 的叙事（"原始照片降噪后重新制版"），不是画面里该有什么 ——
-        拼进提示词只会让模型去画一串字。
-        """
-        for lang in ("zh", "en"):
-            for field in ("主体", "场景", "细节"):
-                with self.subTest(lang=lang, field=field):
-                    block = self._prompt_block(lang)
-                    line = block.split(f"【{field}】")[1].split("\n")[0]
-                    self.assertIn("〈" if lang == "zh" else "<", line,
-                                  f"{lang} 的「{field}」没留空，工具自己填了：{line}")
-        # 但参考材料要给到，否则人无从下手
-        self.assertIn("参考材料", self.md)
-        self.assertIn("现场", self.md)
-
-    def test_text_field_points_at_the_layout_not_the_model(self) -> None:
-        """「文字」那一栏要落到**版面**上：画面里不要字，字由版面排。
-
-        这比笼统的"不要水印"有用 —— 而且它把准确性放在后期排版，不押在模型身上。
-        """
-        block = self._prompt_block("zh")
-        self.assertIn("不要出现任何文字", block)
-        self.assertIn("版面", block)
-
-    def test_style_bibliography_stays_out_of_the_prompt(self) -> None:
-        """风格的"参考文献"只给人看，**不进提示词**（对模型是噪音）。"""
-        ref = self.brief["reference"]
-        self.assertTrue(ref, "这套风格本该有 reference")
-        body = self.md.split("**中文说明**")[1] if "**中文说明**" in self.md else ""
-        self.assertNotIn(ref, body, "把风格文献塞进提示词了")
-
-
-class TestCompositionByVariant(unittest.TestCase):
-    """构图文案按版式变体分支（审计发现 2：hero 满幅不能说'只占一栏'）。"""
-
-    def test_hero_says_full_bleed_not_one_column(self) -> None:
-        hero = image_source._composition_text("hero", zh=True)
-        self.assertIn("满幅主角", hero)
-        self.assertIn("上 2/3", hero, "没说标题条压图的安全区")
-        self.assertNotIn("只占一栏", hero, "hero 页却说只占一栏 —— 反指示")
-
-    def test_default_still_says_one_column(self) -> None:
-        plain = image_source._composition_text("", zh=True)
-        self.assertIn("只占一栏", plain)
-
-    def test_negative_space_branches(self) -> None:
-        self.assertIn("标题条压图", image_source._negative_space_text("hero"))
-        self.assertIn("另一栏", image_source._negative_space_text(""))
+    def test_conflicting_reused_image_directions_do_not_silently_pick_first(self) -> None:
+        from unittest.mock import patch
+        slides = {i: {"file": "same.png", "box": {"w": 100, "h": 100}, "title": "t", "bullets": [],
+                      "imageBrief": {"focal": focal}} for i, focal in ((1, [20, 50]), (2, [80, 50]))}
+        with tempfile.TemporaryDirectory() as tmp, patch.object(
+                image_source, "_slot_geometry", return_value=({"slides": slides, "colors": self.brief["colors"]}, "swiss-grid")):
+            with self.assertRaisesRegex(SystemExit, "imageBrief.focal 不一致"):
+                image_source.build_brief(STRESS, tmp)
 
 
 class TestAssetRequests(unittest.TestCase):
@@ -360,6 +259,24 @@ class TestCheck(unittest.TestCase):
 
     def _write(self, w: int, h: int) -> None:
         Image.new("RGB", (w, h), (180, 90, 60)).save(os.path.join(self.dir, self.name))
+
+    def test_transparency_contract_checks_pixels_instead_of_only_channel_name(self) -> None:
+        spec = deckio.read_json(self.spec)
+        for slide in spec["deck"]["slides"]:
+            if slide.get("image") == self.name:
+                slide.setdefault("visual", {})["imageBrief"] = {"transparent": True}
+        deckio.write_json(self.spec, spec)
+        self._write(1536, 1024)
+        _, problems, _ = image_source.check_images(self.spec, self.dir)
+        self.assertTrue(any("不满足声明的真实透明通道" in p for p in problems))
+        pixels = Image.new("RGBA", (1536, 1024), (20, 30, 40, 0))
+        pixels.save(os.path.join(self.dir, self.name))
+        _, problems, _ = image_source.check_images(self.spec, self.dir)
+        self.assertTrue(any("没有可见内容" in p for p in problems))
+        pixels.putpixel((700, 500), (20, 30, 40, 255))
+        pixels.save(os.path.join(self.dir, self.name))
+        _, problems, _ = image_source.check_images(self.spec, self.dir)
+        self.assertFalse(any("透明" in p for p in problems), problems)
 
     def test_missing_image_is_reported(self) -> None:
         code, problems, _notes = image_source.check_images(self.spec, self.dir)
@@ -609,41 +526,6 @@ class TestNoFullPageImage(unittest.TestCase):
             self._el(1600, 900), self._deck())[0]
         self.assertIn("真文字", msg)
         self.assertIn("配图或点缀", msg)
-
-
-class TestRoleStaysOutOfTheImage(unittest.TestCase):
-    """提示词要说清图的**角色**：配图 / 点缀，不是整页背景；信息不画进图里。"""
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        cls._tmp = tempfile.TemporaryDirectory()
-        cls.addClassCleanup(cls._tmp.cleanup)
-        brief = image_source.build_brief(STRESS, cls._tmp.name)
-        cls.path = os.path.join(cls._tmp.name, "image-brief.md")
-        image_source.write_brief_md(brief, cls.path)
-        cls.md = deckio.read_text(cls.path)
-
-    def _block(self, lang: str) -> str:
-        head = "**中文提示词**" if lang == "zh" else "**English prompt**"
-        return self.md.split(head, 1)[1].split("```text", 1)[1].split("```", 1)[0]
-
-    def test_image_is_declared_a_column_not_a_background(self) -> None:
-        for lang, needle in (("zh", "只占一栏"), ("en", "ONE COLUMN")):
-            with self.subTest(lang=lang):
-                self.assertIn(needle, self._block(lang))
-        self.assertIn("不是整页背景", self._block("zh"))
-
-    def test_page_information_must_not_be_drawn_into_the_image(self) -> None:
-        """这条是用户明确禁掉的那件事的正面表述：信息由版面排，图只负责观感。"""
-        self.assertIn("不要把这一页的信息画进去", self._block("zh"))
-        self.assertIn("界面截图", self._block("zh"))     # 点名了不许装的几类东西
-        self.assertIn("real text", self._block("en"))
-
-    def test_contract_header_states_the_two_roles(self) -> None:
-        self.assertIn("两种角色", self.md)
-        self.assertIn("配图", self.md)
-        self.assertIn("点缀", self.md)
-        self.assertIn("盖住整页是不允许的", self.md)
 
 
 class TestContractLocation(unittest.TestCase):

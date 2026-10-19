@@ -132,6 +132,62 @@ class TestQualityContracts(unittest.TestCase):
 
 @unittest.skipUnless(os.path.isfile(measure.CHROME), "Chrome is required")
 class TestBrowserQuality(unittest.TestCase):
+    def render_minimal_skin(self, skin=""):
+        render = check.render_mod
+        style = render.load_style(str(FIXTURES / "styles/minimal-baseline"))
+        style["skin"] = skin
+        style["tokens"]["fonts"].update(display="Arial, sans-serif", body="Arial, sans-serif")
+        style["tokens"]["type"].update(
+            cover=78, compact=44, small=36, end=72, subtitle=27,
+            bullet=25, bulletSmall=21, bulletLarge=31, colTitle=29,
+            nodeLabel=23, nodeNote=19, foot=15, caption=17)
+        image = ('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 '
+                 'width=%22200%22 height=%22100%22/%3E')
+        slides = [
+            {"type": "title", "title": "Cover", "subtitle": "Subtitle"},
+            {"type": "content-text", "title": "Body", "bullets": ["Point"]},
+            {"type": "two-column", "title": "Columns", "columns": [
+                {"title": "Column", "bullets": ["Detail"]}]},
+            {"type": "timeline", "title": "Timeline", "nodes": [
+                {"label": "Start", "note": "Description"}]},
+            {"type": "content-image", "title": "Image", "image": image,
+             "bullets": ["Evidence"], "caption": "Caption", "bulletTier": "bulletLarge"},
+            {"type": "end", "title": "End"},
+        ]
+        spec = {"deck": {"style": "minimal-baseline", "colorSet": "blue",
+                         "title": "Typography", "slides": slides}}
+        page = render.render(spec, style)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "minimal.html"
+            path.write_text(page, encoding="utf-8")
+            return measure.measure(str(path))
+
+    def test_skin_without_size_rules_uses_selected_typography_tokens(self):
+        data = self.render_minimal_skin()
+        sizes = {el["id"]: el["fontSize"] for el in data["elements"]}
+        expected = {"s1.title": 78, "s1.subtitle": 27, "s1.foot": 15,
+                    "s2.title": 44, "s2.bullet.0": 25,
+                    "s3.title": 36, "s3.col0.title": 29, "s3.col0.bullet.0": 21,
+                    "s4.node1.label": 23, "s4.node1.note": 19,
+                    "s5.title": 36, "s5.bullet.0": 31, "s5.caption": 17,
+                    "s6.title": 72}
+        for key, size in expected.items():
+            with self.subTest(element=key):
+                self.assertEqual(sizes[key], size)
+
+    def test_page_type_hooks_apply_and_skin_can_override_base_size(self):
+        kinds = ["title", "content-text", "two-column", "timeline", "content-image", "end"]
+        skin = "\n".join(
+            f'.slide[data-page="{kind}"] .title {{font-size:{50 + i}px;}}'
+            for i, kind in enumerate(kinds))
+        skin += '\n.bullets {font-size:30px;}'
+        data = self.render_minimal_skin(skin)
+        sizes = {el["id"]: el["fontSize"] for el in data["elements"]}
+        for i, kind in enumerate(kinds):
+            with self.subTest(kind=kind):
+                self.assertEqual(sizes[f"s{i + 1}.title"], 50 + i)
+        self.assertEqual(sizes["s2.bullet.0"], 30)
+
     def probe(self, markup, css="", script="", ids=("s1.title",)):
         manifest = [{"id": eid, "slide": 1, "role": "title", "text": "Text"} for eid in ids]
         html = ('<!doctype html><html><head><style>'

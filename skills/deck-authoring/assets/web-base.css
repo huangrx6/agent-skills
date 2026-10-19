@@ -1,0 +1,32 @@
+/* Canvas and player mechanics only. The source owns every visual design choice. */
+html.deck-web, .deck-web body { margin: 0; padding: 0; }
+.deck-web .deck-web-frame { position: relative; flex: none; width: calc(1600px * var(--deck-web-scale, 1)); height: calc(900px * var(--deck-web-scale, 1)); }
+.deck-web .deck-web-canvas { position: absolute; width: 1600px; height: 900px; transform: scale(var(--deck-web-scale, 1)); transform-origin: top left; }
+.deck-web section.slide { position: relative; box-sizing: border-box; width: 1600px; height: 900px; margin: 0; overflow: hidden; }
+.deck-web[data-deck-mode="present"] body,
+.deck-web[data-deck-mode="record"] body { width: 100vw; height: 100vh; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.deck-web[data-deck-mode="present"] .deck-web-frame:not([data-active]),
+.deck-web[data-deck-mode="record"] .deck-web-frame:not([data-active]) { display: none; }
+.deck-web[data-deck-mode="scroll"] body { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+.deck-web[data-deck-mode="record"] { --deck-web-scale: 1 !important; }
+.deck-web [data-reveal] { transition: none !important; animation: none !important; }
+.deck-web[data-deck-mode="record"] *,
+.deck-web[data-deck-mode="record"] *::before,
+.deck-web[data-deck-mode="record"] *::after { transition: none !important; animation: none !important; }
+.__deck_web_status { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.__deck_web_error { position: fixed; z-index: 2147483647; top: 12px; left: 12px; padding: 8px 12px; background: #fff; color: #8a1720; border: 1px solid currentColor; font: 16px/1.5 system-ui, sans-serif; }
+.deck-web[data-deck-mode="record"] .__deck_web_status,
+.deck-web[data-deck-mode="record"] .__deck_web_error { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .deck-web *, .deck-web *::before, .deck-web *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+@page { size: 1600px 900px; margin: 0; }
+@media print {
+  html.deck-web, .deck-web body { display: block !important; width: 1600px !important; height: auto !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
+  .deck-web .deck-web-frame { display: block !important; width: 1600px !important; height: 900px !important; margin: 0 !important; break-after: page; break-inside: avoid; overflow: hidden; }
+  .deck-web .deck-web-frame:last-of-type { break-after: auto; }
+  .deck-web .deck-web-canvas { transform: none !important; }
+  .deck-web section.slide { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .deck-web *, .deck-web *::before, .deck-web *::after { animation: none !important; transition: none !important; }
+  .__deck_web_status, .__deck_web_error { display: none !important; }
+}

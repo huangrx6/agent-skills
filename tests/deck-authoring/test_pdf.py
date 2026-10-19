@@ -54,6 +54,42 @@ def _load(name: str, path: str):
     return module
 
 
+class TestSlideCount(unittest.TestCase):
+    """Page counting uses HTML structure and does not need Chrome or Poppler."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.pdf = _load("deck_pdf_count", os.path.join(SCRIPTS, "pdf.py"))
+
+    def count(self, source):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "deck.html")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(source)
+            return self.pdf.slide_count(path)
+
+    def test_class_tokens_attribute_order_and_quote_forms(self):
+        source = ("<section id='one' class='hero slide featured'></section>"
+                  '<SECTION data-slide="2" CLASS="slide\tlight"></SECTION>'
+                  '<section class=slide data-slide="3"></section>')
+        self.assertEqual(self.count(source), 3)
+
+    def test_comments_scripts_styles_and_escaped_examples_do_not_add_pages(self):
+        source = ('<!-- Example: <section class="slide"> -->'
+                  '<script>const example = \'<section class="slide">\';</script>'
+                  '<style>.example::before {content: \'<section class="slide">\';}</style>'
+                  '<pre>&lt;section class="slide"&gt;</pre>'
+                  '<section class="slide">Real page</section>')
+        self.assertEqual(self.count(source), 1)
+
+    def test_other_tags_and_similar_class_names_are_not_slides(self):
+        source = ('<div class="slide"></div><section class="slideshow"></section>'
+                  '<section class="slide-wide"></section><section class="Slide"></section>'
+                  '<section></section><section class></section>'
+                  '<section class="hero\u00a0slide"></section>')
+        self.assertEqual(self.count(source), 0)
+
+
 @unittest.skipUnless(
     os.environ.get("DECK_PDFINFO") or shutil.which("pdfinfo"),
     "PDF integration requires pdfinfo (Poppler); install it or set DECK_PDFINFO",

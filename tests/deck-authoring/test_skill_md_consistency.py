@@ -1,18 +1,9 @@
 #!/usr/bin/env python3
-"""SKILL.md 的版式表必须与 render.py 的实际行为一致。
+"""Validate renderer capabilities against the contract reachable from SKILL.md.
 
-## 为什么这条要写成测试
-
-表格是**给模型看的规格** —— 它写错，模型拿到的就是错的版式语义。七行里错一行，
-肉眼扫过去发现不了；而"装饰落在哪几种版式上"这件事本来是**风格**的属性
-（token 的 `decor.types`），写进文档很容易变成一个过期的前提。
-
-所以这里把表**钉在实测行为上**：逐版式渲染一页，看产物里到底有没有 `data-zone=`，
-再把布局列与渲染器的能力清单逐字比对。文档与代码任何一边漂了，这条就红。
-
-跑法：
-    python3 -m unittest discover -s tests -v
-    python3 tests/deck-authoring/test_skill_md_consistency.py
+The entry links to the spec reference, which links to layout and chart details.
+Keep that progressive disclosure while checking exact supported vocabularies.
+Rendering probes separately verify decoration behavior, not a fixed aesthetic.
 """
 
 from __future__ import annotations
@@ -42,17 +33,12 @@ TOKENS = os.path.join(FIXTURES_DIR, "styles", "swiss-grid", "style.json")
 STYLES = os.path.join(FIXTURES_DIR, "styles")
 SKILL_MD = os.path.join(SKILL, "SKILL.md")
 
-# 「| `type` | 用途 | 风险点 |」——只取版式名与用途两列；装饰那一列删了，
-# 因为“放不放装饰”现在是**风格**决定的（token 的 decor.types），不是版式决定的，
-# 拿一张写死的表去对只会对出一个错的前提。守契约的用例改成了
-# test_decoration_contract_is_honored（有装饰的风格只在它声明的那几种版式上放）。
-TABLE_ROW = re.compile(r"^\|\s*`([a-z][a-z-]*)`\s*\|([^|]*)\|[^|]*\|\s*$", re.M)
+# Spec field table: type and supported fields. Decoration is tested separately.
+TABLE_ROW = re.compile(r"^\|\s*`([a-z][a-z-]*)`\s*\|([^|]*)\|\s*$", re.M)
 
-# 「| `type` | 用途 | 布局… |」——拿第三列里的反引号词。**这一列必须列全**：
-# 模型是从这张表知道“有哪些结构可选”的，少一个名字 = 它不知道那个结构存在。
-# （`visual-wide` 与 `lean-hard-left/right` 就这么漏过 —— 而候选搜索天天在用它们。）
+# Layout table: accumulate all documented layouts across rows of each type.
 LAYOUT_ROW = re.compile(
-    r"^\|\s*`(content-image|two-column)`\s*\|\s*[^|]*\|\s*([^|]*)\|\s*$", re.M)
+    r"^\|\s*(content-image|two-column)\s*\|\s*([^|]*)\|[^|]*\|\s*$", re.M)
 BACKTICKED = re.compile(r"`([a-z][a-z0-9-]*)`")
 
 # 每个版式一页的最小 spec —— 只为把那一页渲出来看有没有墨块
@@ -99,6 +85,19 @@ class TestSkillMdMatchesRender(unittest.TestCase):
     def setUpClass(cls) -> None:
         with open(SKILL_MD, encoding="utf-8") as fh:
             cls.skill_md = fh.read()
+        # Progressive disclosure: validate the linked contract, not a duplicate
+        # capability table forced into the design workflow's entry document.
+        def linked(parent, text, target):
+            paths = re.findall(r"\]\(([^)#]+)(?:#[^)]*)?\)", text)
+            if target not in paths:
+                raise AssertionError(f"{parent} does not link to {target}")
+            path = os.path.join(os.path.dirname(parent), target)
+            with open(path, encoding="utf-8") as document:
+                return path, document.read()
+
+        spec_path, cls.spec_md = linked(SKILL_MD, cls.skill_md, "references/style-architecture.md")
+        _, cls.layouts_md = linked(spec_path, cls.spec_md, "layout-system.md")
+        _, cls.charts_md = linked(spec_path, cls.spec_md, "charts.md")
         cls.style = render.load_style(FIXTURE_STYLE)
         cls.tokens = cls.style["tokens"]
         # 色板名从风格里取（不写死）：写死过 "vivid"，默认风格一换就变成
@@ -106,8 +105,9 @@ class TestSkillMdMatchesRender(unittest.TestCase):
         cls.color_set = next(iter(cls.tokens["colorSets"]))
 
     def _documented_types(self) -> set[str]:
-        found = {m.group(1) for m in TABLE_ROW.finditer(self.skill_md)}
-        self.assertTrue(found, "SKILL.md 里没解析到版式表 —— 表头或格式变了")
+        table = self.spec_md.split("| type | 该页额外字段 |", 1)[1].split("\n\n", 1)[0]
+        found = {m.group(1) for m in TABLE_ROW.finditer(table)}
+        self.assertTrue(found, "规格文档里没解析到 type 字段表")
         return found
 
     def _render_each(self, kinds: list[str], style: dict | None = None) -> dict[str, str]:
@@ -155,7 +155,7 @@ class TestSkillMdMatchesRender(unittest.TestCase):
             f"只在实现 {set(PROBE_SLIDES) - documented}")
 
     def test_documented_layouts_match_the_renderer(self) -> None:
-        """SKILL.md 的「布局」列 = 渲染器的结构清单（两边逐字相等）。
+        """Linked layout documentation equals the renderer's structure vocabulary.
 
         为什么必须钉：这份表是给模型看的**规格**，而布局名就是它要写进 spec 的值。
         实测漏过 —— 表里写了 4 个 content-image 结构、3 个 two-column 结构，
@@ -163,9 +163,10 @@ class TestSkillMdMatchesRender(unittest.TestCase):
         `visual-wide`、`lean-hard-left/right` 在候选搜索里天在用，却从没进过文档。
         少一个名字不等于“少个选项”：模型不知道它存在。
         """
-        rows = {m.group(1): BACKTICKED.findall(m.group(2))
-                for m in LAYOUT_ROW.finditer(self.skill_md)}
-        self.assertTrue(rows, "SKILL.md 里没解析到布局列 —— 表头或格式变了")
+        rows = {}
+        for match in LAYOUT_ROW.finditer(self.layouts_md):
+            rows.setdefault(match.group(1), []).extend(BACKTICKED.findall(match.group(2)))
+        self.assertTrue(rows, "布局文档里没解析到布局列")
         for page_type, allowed in (("content-image", render.IMAGE_LAYOUTS),
                                    ("two-column", render.TWO_COL_LAYOUTS)):
             with self.subTest(page_type=page_type):
@@ -177,13 +178,14 @@ class TestSkillMdMatchesRender(unittest.TestCase):
                     f"只在实现 {sorted(set(allowed) - documented)}")
 
     def test_documented_chart_types_cover_the_renderer(self) -> None:
-        """SKILL.md 必须点到每一个图形类型（少写一个 = 模型不知道它存在）。
+        """Linked chart contract must enumerate actual supported chart types.
 
         这一列是散文（不拆表），所以钉"全都出现过"——它拦的是"加了类型却
         忘了写文档"，而那正是会让模型永远不用它的错。
         """
-        missing = [t for t in render.CHART_TYPES if t not in self.skill_md]
-        self.assertEqual(missing, [], f"SKILL.md 没提到这些图形类型：{missing}")
+        table = self.charts_md.split("| chart | 数据 | HTML | 原生 PPTX |", 1)[1].split("\n\n", 1)[0]
+        documented = set(re.findall(r"^\| ([a-z][a-z-]*) \|", table, re.M))
+        self.assertEqual(documented, set(render.CHART_TYPES))
 
     def test_unknown_slide_type_is_rejected(self) -> None:
         """版式集是封闭的 —— 未知 type 必须被拒，而不是静默渲成空白页。

@@ -44,7 +44,7 @@ ROLES: dict[str, dict] = {
     "capabilities": {"label":  "能力并列", "visual": ('none',), "types": ("two-column", "content-text"),
                      "when": "几项对等的能力/模块"},
     "architecture": {"label":  "分层架构", "visual": ('evidence_image',), "types": ("content-image",),
-                     "when": "层与层的关系；结构图（excalidraw / draw.io）"},
+                     "when": "层与层的关系；核实节点关系，按项目需求选择解释图"},
     "flow": {"label":  "流程 / 拓扑图", "visual": ('evidence_image',), "types": ("content-image",),
              "when": "节点与连线；结构图"},
     "topology": {"label":  "拓扑 / 关系", "visual": ('evidence_image',), "types": ("content-image",),

@@ -11,8 +11,8 @@
 > 模型顺手写个 `fontSize: 120` 或 `x: 40` → 没报错 → 它以为生效了 → 出的图却没变
 > → 它开始怀疑整条链路，去改别的没用的地方。
 
-本 skill 的整个立论就是"坐标 / 字号 / 色值由脚本算，模型只写内容"。所以这里把字段集
-写死、未知项直接判失败 —— 让"顺手加一个"**当场撞墙**，而不是静默失效。
+这里仅校验结构化兼容路线：内容字段与项目样式分开，未知字段报错以免静默失效。
+自由 HTML 路线不使用本 schema，由 web_check.py 检查实际页面。
 
 和 `check.py` 的分工：那边查"产物长成什么样"，这边查"你让我画什么"。
 
@@ -56,7 +56,9 @@ ROLES = ("cover", "transition", "statement", "breakdown", "evidence", "metric", 
          "comparison", "process", "capabilities", "architecture", "flow", "topology", "hero_visual", "context_image",
          "risks", "actions", "result", "observation", "team", "closing")
 VISUAL_KINDS = ("none", "evidence_image", "data")
-VISUAL_KEYS = {"kind", "intent", "note", "ratio"}
+VISUAL_KEYS = {"kind", "intent", "note", "ratio", "imageBrief"}
+IMAGE_BRIEF_KEYS = {"purpose", "subject", "style", "composition", "negativeSpace",
+                    "focal", "transparent", "avoid"}
 # 比例的合理区间（宽/高）。超出就是写错了（把像素当比例、或写了 1:0 这种）。
 RATIO_RANGE = (0.4, 2.6)
 VISUAL_IMAGE_KINDS = ("evidence_image",)
@@ -357,6 +359,28 @@ def validate(spec: dict, color_sets: set[str] | None = None) -> Issues:
                              f"四种载体见 references/images.md")
             else:
                 _check_fields(visual, VISUAL_KEYS, vwhere, issues)
+                if "imageBrief" in visual:
+                    image_brief = visual["imageBrief"]
+                    bwhere = f"{vwhere}.imageBrief"
+                    if not isinstance(image_brief, dict):
+                        issues.error("BAD_IMAGE_BRIEF", bwhere, "imageBrief 必须是对象")
+                    else:
+                        _check_fields(image_brief, IMAGE_BRIEF_KEYS, bwhere, issues)
+                        if kind != "content-image":
+                            issues.error("BAD_IMAGE_BRIEF", bwhere, "imageBrief 需要 content-image 图位")
+                        for field in ("purpose", "subject", "style", "composition", "negativeSpace"):
+                            if field in image_brief:
+                                _text(image_brief[field], f"{bwhere}.{field}", issues, nonempty=True)
+                        if "transparent" in image_brief and not isinstance(image_brief["transparent"], bool):
+                            issues.error("BAD_IMAGE_BRIEF", f"{bwhere}.transparent", "transparent 必须是布尔值")
+                        if "focal" in image_brief:
+                            focal = image_brief["focal"]
+                            if (not isinstance(focal, list) or len(focal) != 2
+                                    or any(not _finite(n) or not 0 <= n <= 100 for n in focal)):
+                                issues.error("BAD_IMAGE_BRIEF", f"{bwhere}.focal",
+                                             "focal 必须是 0–100 的 [水平百分比, 垂直百分比]")
+                        if "avoid" in image_brief:
+                            _bullets(image_brief["avoid"], f"{bwhere}.avoid", issues)
                 vkind = visual.get("kind")
                 if vkind is None:
                     issues.error("BAD_VISUAL", vwhere, "visual 必须写 kind")

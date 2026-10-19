@@ -62,7 +62,6 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 
 def _load_sibling(name: str):
@@ -464,15 +463,16 @@ def slide_content_span(measured: dict, slide_no: int) -> tuple[float, float] | N
     return (top, bottom)
 
 
-def measure(html_path: str, budget_ms: int = 2500, chrome: str = CHROME) -> dict:
+def measure(html_path: str, budget_ms: int = 2500, chrome: str | None = None) -> dict:
     """跑一次真浏览器，返回合并了语义清单的实测结果。
 
     同一份 HTML（按内容 sha256）在**同一进程内只量一次** —— 否则每个校验调用点
     都会再开一次 Chrome（测试里同一份基线被查好几次，实测 36 条测试从 25 秒降到几秒）。
     """
-    if not os.path.isfile(chrome):
-        raise SystemExit(f"✗ 找不到 Chrome：{chrome}\n"
-                         f"  这一层靠真浏览器度量，估算是替代不了的。")
+    try:
+        chrome = _load_sibling("browser").find_chrome(chrome)
+    except RuntimeError as exc:
+        raise SystemExit(f"✗ {exc}") from exc
     html = deckio.read_text(html_path)
     # 缓存键必须**带上产物所在目录**：同一份 HTML 放在不同目录，量出来的结果可能不同
     # （相对路径的图片在不在旁边）。只拿 HTML 内容做键会把 A 目录的结果错给 B 目录 ——

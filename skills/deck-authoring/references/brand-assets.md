@@ -11,8 +11,8 @@ project/
   deck.spec.json
   brands/acme/
     brand.json
-    logo.svg
-    logo-inverse.svg
+    logo.png
+    logo-inverse.png
   assets/manifest.json
 ```
 
@@ -51,8 +51,9 @@ version 必须为 1，字段集封闭，仅允许以下键：
 合并规则不会自动协调品牌色与所有皮肤效果。最终文字对比度、深底 logo、
 图表分类色和复杂背景都要在真实渲染中检查。没有反白版时不擅自重绘官方 logo。
 
-HTML 内嵌 logo；原生 PPTX 不直接支持 SVG，导出器会尝试栅格化，
-仍须查看转换与导出诊断。品牌字体只声明名字不等于已安装或获嵌入授权，见 [字体](fonts.md)。
+logo 格式按项目要求选择，示例使用 PNG；允许 SVG 的项目也可使用官方矢量标志。
+HTML 内嵌 logo；原生 PPTX 不直接支持 SVG，导出器会尝试栅格化，仍须查看转换与导出诊断。
+用户明确禁止 SVG 时继续遵从，不因品牌层而例外。品牌字体只声明名字不等于已安装或获嵌入授权，见 [字体](fonts.md)。
 
 ## 图片资产
 

@@ -1,0 +1,96 @@
+/* Layout primitives, not a visual theme. Override the --deck-* properties per project.
+ * The named header/body/footer regions are informed by Slidev's layout mechanism:
+ * https://github.com/slidevjs/slidev/blob/main/packages/client/layouts/two-cols-header.vue
+ * This is original native CSS; it neither imports nor requires Slidev.
+ * Normal flow is a starting point. Recompose, adjust readable typography, or
+ * split content as needed; never hide required content to clear overflow.
+ */
+.deck-page {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--deck-region-gap, 48px);
+  width: 1600px;
+  height: 900px;
+  padding: var(--deck-pad-top, 88px) var(--deck-pad-inline, 112px) var(--deck-pad-bottom, 56px);
+  font-family: var(--deck-body-font, system-ui, sans-serif);
+  font-size: var(--deck-body-size, 24px);
+  line-height: var(--deck-body-leading, 1.6);
+  color: var(--deck-text, #181818);
+  background: var(--deck-background, #fff);
+}
+.deck-page *, .deck-page *::before, .deck-page *::after { box-sizing: border-box; }
+.deck-page :is(.deck-header, .deck-body, .deck-footer, .deck-copy, .deck-block, .deck-media) { min-width: 0; }
+.deck-page .deck-header { display: grid; gap: 12px; align-content: start; }
+.deck-page .deck-header h1, .deck-page .deck-header h2 {
+  margin: 0;
+  font-family: var(--deck-display-font, inherit);
+  font-size: var(--deck-title-size, 40px);
+  font-weight: var(--deck-title-weight, 500);
+  line-height: 1.2;
+  text-wrap: balance;
+  overflow-wrap: break-word;
+}
+.deck-page .deck-body {
+  display: grid;
+  align-content: start;
+  gap: var(--deck-content-gap, 28px);
+  min-height: 0;
+  padding-bottom: var(--deck-body-breathing, 48px);
+}
+.deck-page .deck-copy {
+  display: grid; align-content: start; gap: var(--deck-content-gap, 28px);
+  max-width: var(--deck-reading-width, 760px);
+}
+.deck-page .deck-block { margin: 0; overflow-wrap: break-word; }
+.deck-page .deck-copy > *, .deck-page .deck-caption { margin: 0; }
+.deck-page .deck-copy h2, .deck-page .deck-copy h3 {
+  font-size: var(--deck-subtitle-size, 28px);
+  font-weight: var(--deck-title-weight, 500);
+  line-height: 1.2;
+}
+.deck-page .deck-copy ul, .deck-page .deck-copy ol { padding-inline-start: 1.25em; }
+.deck-page .deck-copy li + li { margin-top: 0.4em; }
+.deck-page .deck-caption, .deck-page .deck-footer {
+  font-size: var(--deck-caption-size, 18px);
+  line-height: 1.5;
+  color: var(--deck-muted, #5b5b5b);
+}
+.deck-page .deck-footer {
+  font-size: var(--deck-footer-size, 16px);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--deck-content-gap, 24px);
+}
+.deck-page .deck-footer > * { margin: 0; min-width: 0; }
+.deck-page[data-layout="image-right"] > .deck-body,
+.deck-page[data-layout="image-left"] > .deck-body {
+  grid-template-columns: minmax(0, var(--deck-copy-track, 0.9fr)) minmax(0, var(--deck-image-track, 1.1fr));
+  grid-template-rows: minmax(0, 1fr);
+  align-content: stretch;
+  column-gap: var(--deck-region-gap, 48px);
+}
+.deck-page[data-layout="image-left"] > .deck-body {
+  grid-template-columns: minmax(0, var(--deck-image-track, 1.1fr)) minmax(0, var(--deck-copy-track, 0.9fr));
+}
+.deck-page[data-layout="image-left"] > .deck-body > .deck-media { grid-column: 1; grid-row: 1; }
+.deck-page[data-layout="image-left"] > .deck-body > .deck-copy { grid-column: 2; grid-row: 1; }
+.deck-page .deck-media {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 16px;
+  min-height: 0;
+  margin: 0;
+}
+.deck-page .deck-media > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  object-fit: contain;
+  object-position: var(--deck-image-position, center);
+}
+.deck-page[data-layout="statement"] > .deck-body,
+.deck-page[data-layout="chapter"] > .deck-body { align-content: center; }

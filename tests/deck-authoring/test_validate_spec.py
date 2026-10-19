@@ -90,6 +90,26 @@ class TestValidateSpec(unittest.TestCase):
     def _messages(self, spec: dict) -> str:
         return " ".join(i["message"] for i in vs.validate(spec, self.color_sets).items)
 
+    def test_optional_image_brief_is_validated_without_requiring_all_fields(self) -> None:
+        spec = _spec()
+        spec["deck"]["slides"][2]["visual"] = {
+            "kind": "evidence_image", "ratio": "4:3", "imageBrief": {
+                "subject": "纸雕鸟", "focal": [85, 25], "transparent": True,
+                "composition": "右侧主体，左侧标题", "avoid": ["不要重复主体"]}}
+        self.assertEqual(vs.validate(spec, self.color_sets).errors, [])
+        spec["deck"]["slides"][2]["visual"]["imageBrief"] = {"subject": "只声明主体"}
+        self.assertEqual(vs.validate(spec, self.color_sets).errors, [])
+
+    def test_image_brief_rejects_wrong_types_unknown_fields_and_bad_focal(self) -> None:
+        for direction in ("photo", {"transparent": "true"}, {"subject": []}, {"focal": [101, 30]},
+                          {"focal": [True, 30]}, {"focal": [float("nan"), 30]},
+                          {"focal": [20]}, {"avoid": "blur"}, {"typography": "fixed"}):
+            with self.subTest(direction=direction):
+                spec = _spec()
+                spec["deck"]["slides"][2]["visual"] = {
+                    "kind": "evidence_image", "ratio": "4:3", "imageBrief": direction}
+                self.assertTrue(vs.validate(spec, self.color_sets).errors)
+
     # ── 正向：合法的必须过 ────────────────────────────────────────────────
 
     def test_demo_spec_passes(self) -> None:
