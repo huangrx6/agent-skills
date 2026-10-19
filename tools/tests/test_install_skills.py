@@ -156,17 +156,40 @@ class TestCopyMode(InstallCase):
 
 
 class TestMissingInstallDir(InstallCase):
-    """安装位不存在 = 未安装，**不是失败**（换机器、CI 上很常见）。"""
+    """Read-only check may skip; an explicit installation must really install."""
 
     def test_absent_dir_is_not_a_failure(self):
         shutil.rmtree(self.install)
         self.assertEqual(0, self.run_tool("--check"))
         self.assertEqual(0, self.run_tool())
 
-    def test_does_not_create_the_dir_behind_your_back(self):
+    def test_check_does_not_create_the_dir(self):
         shutil.rmtree(self.install)
-        self.run_tool()
+        self.run_tool("--check")
         self.assertFalse(os.path.exists(self.install), "不该顺手把安装位建出来")
+
+    def test_first_link_install_creates_directory_and_actual_skill(self):
+        shutil.rmtree(self.install)
+        self.assertEqual(0, self.run_tool("--link"))
+        self.assertTrue(os.path.islink(self.installed))
+        self.assertTrue(os.path.isfile(os.path.join(self.installed, "SKILL.md")))
+        self.assertEqual(0, self.run_tool("--check"))
+
+    def test_first_copy_install_creates_directory_and_actual_skill(self):
+        shutil.rmtree(self.install)
+        self.assertEqual(0, self.run_tool("--copy"))
+        self.assertFalse(os.path.islink(self.installed))
+        self.assertTrue(os.path.isfile(os.path.join(self.installed, "SKILL.md")))
+        self.assertEqual(0, self.run_tool("--check"))
+
+    def test_install_path_is_a_file_is_an_error_without_overwriting(self):
+        shutil.rmtree(self.install)
+        with open(self.install, "w") as output:
+            output.write("keep")
+        self.assertEqual(2, self.run_tool("--copy"))
+        self.assertEqual(2, self.run_tool("--check"))
+        with open(self.install) as saved:
+            self.assertEqual("keep", saved.read())
 
 
 class TestInstalledKind(InstallCase):

@@ -28,7 +28,8 @@ pi 认不认软链**不能靠猜**，两处证据：
 - 只动 `<install>/<skill>/` 这几个条目，别处一律不碰；
 - `__pycache__` / `.DS_Store` 这类本地产物不参与比对、也不参与复制；
 - **安装位不存在**时 `--check` 报「未安装」并退出码 0 —— 这是唯一一个不算失败的
-  情况（换台机器、CI 里没装都很正常）。除它之外任何不一致都是失败。
+  情况（换台机器、CI 里没装都很正常）。显式 `--link` / `--copy` 会创建缺失的安装目录；
+  `--check` 只读，不创建。除上述情况外任何不一致都是失败。
 """
 
 from __future__ import annotations
@@ -177,8 +178,14 @@ def main(argv: list[str] | None = None, skills_dir: str | None = None) -> int:
 
     as_link = not args.copy
     if not os.path.isdir(args.install_dir):
-        print(f"  安装位不存在：{args.install_dir} —— 未安装，跳过（不算失败）")
-        return 0
+        if args.check and not os.path.lexists(args.install_dir):
+            print(f"  安装位不存在：{args.install_dir} —— 未安装，跳过（不算失败）")
+            return 0
+        try:
+            os.makedirs(args.install_dir, exist_ok=True)
+        except OSError as exc:
+            print(f"  无法创建安装目录 {args.install_dir}：{exc}", file=sys.stderr)
+            return 2
 
     source = skills_dir or SKILLS
     problems: list[str] = []

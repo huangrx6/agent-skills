@@ -1,13 +1,14 @@
 # ![agent-skills](assets/icons/agent-skills-light.svg#gh-light-mode-only) ![agent-skills](assets/icons/agent-skills-dark.svg#gh-dark-mode-only) Agent Skills
 
-个人维护的 Agent 工作流：演示文稿、技术图、Obsidian 知识管理、Git、PingCode 和 skill 设计。
+个人维护的 Agent 工作流：演示文稿、技术图、COSMIC 功能点拆分、Obsidian 知识管理、Git、PingCode 和 skill 设计。
 每个目录都以 `SKILL.md` 描述触发条件与操作流程，`README.md` 提供依赖、用法和限制。
 
 ## Skills
 
 | Skill | 用途 |
 | --- | --- |
-| [deck-authoring](skills/deck-authoring/README.md) | 从结构规格制作演示文稿，建立项目视觉风格，预览并导出 HTML、PDF、PNG、PPTX 或视频 |
+| [cosmic-function-point-splitter](skills/cosmic-function-point-splitter/README.md) | 按需求或接口识别 COSMIC 数据移动，生成带来源的拆分表，核对接口/页面覆盖并审计、改写已有表 |
+| [deck-authoring](skills/deck-authoring/README.md) | 从主题推导构图、留白与视觉节奏，用真实内容试排和截图修订，制作 HTML 演示并导出 PDF、PNG、PPTX 或视频 |
 | [diagram-authoring](skills/diagram-authoring/README.md) | 从结构描述生成技术图，支持 Excalidraw、draw.io 与 Mermaid，并检查布局、语义和观看尺寸 |
 | [obsidian-wiki](skills/obsidian-wiki/README.md) | 学习 Wiki：吸收资料、关联证据、更新主题知识、检索问答与复习，独立运行 |
 | [obsidian-work](skills/obsidian-work/README.md) | 独立工作台：需求、缺陷、任务分工、日常记录与 Bases 首页，支持外部来源快照 |
@@ -19,6 +20,9 @@ Obsidian 两项能力各自独立，通过笔记数据关联；理念和工具�
 
 例如：“使用 `$deck-authoring` 把材料做成演示文稿”，或“使用 `$pingcode` 查我的待办”。
 是否自动发现和如何显式调用，取决于使用的 Agent。
+
+本仓库原创代码与文档采用 [MIT License](LICENSE)。第三方依赖、字体、引用图片与品牌素材按各自许可使用，
+不能因为本仓库使用 MIT 就重新授权这些资源。
 
 ## 安装
 
