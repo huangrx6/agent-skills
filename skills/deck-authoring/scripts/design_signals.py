@@ -83,6 +83,28 @@ window.__designSignalsCollect = function(slide) {
     const first = String(value || '').split(',')[0].trim().replace(/^["']|["']$/g, '');
     return first || 'unknown';
   };
+  const painted = value => value && !/^rgba?\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)$/.test(value);
+  // 背景可能是同级层（.bg / .backdrop）而不是祖先，先按面积找覆盖整页的那一层
+  const pageBackdrop = () => {
+    const area = bounds.width * bounds.height;
+    let best = null, bestArea = 0;
+    for (const el of slide.querySelectorAll('*')) {
+      const r = el.getBoundingClientRect();
+      if ((r.width * r.height) < area * 0.6) continue;
+      const bg = getComputedStyle(el).backgroundColor;
+      if (!painted(bg)) continue;
+      if (r.width * r.height > bestArea) { best = bg; bestArea = r.width * r.height; }
+    }
+    return best;
+  };
+  const bgOf = el => {
+    for (let cur = el; cur; cur = cur.parentElement) {
+      const bg = getComputedStyle(cur).backgroundColor;
+      if (painted(bg)) return bg;
+      if (cur === slide) break;
+    }
+    return pageBackdrop() || 'rgb(255, 255, 255)';
+  };
   const blockSelector = 'h1,h2,h3,h4,h5,h6,p,li,figure,blockquote,img,svg,.deck-block,.deck-card,[class*="card"],[class*="column"],[class*="col"]';
   const blockOf = el => el.closest('li') || el.closest(blockSelector) || el;
   const blocks = new Map();
@@ -149,6 +171,9 @@ window.__designSignalsCollect = function(slide) {
       fontSize: round(parseFloat(cs.fontSize) || 0), family: firstFamily(cs.fontFamily),
       weight: cs.fontWeight, color: cs.color, align: cs.textAlign,
       letterSpacing: cs.letterSpacing, lineHeight: cs.lineHeight,
+      letterSpacingPx: Number.isFinite(parseFloat(cs.letterSpacing)) ? parseFloat(cs.letterSpacing) : 0,
+      cjk: /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(value),
+      bg: bgOf(el), familyStack: cs.fontFamily,
       heading: inHeading, body: inBody, caption: inCaption, footer: inFooter,
       blockX: blockItem ? blockItem.x : bbox.x, blockW: blockItem ? blockItem.w : bbox.w
     };
@@ -220,9 +245,19 @@ window.__designSignalsCollect = function(slide) {
     if (horizontal.length && Math.max(...horizontal) - Math.min(...horizontal) > 4) continue;
     const total = widths.reduce((a, b) => a + b, 0) + horizontal.reduce((a, b) => a + b, 0);
     if (total < bounds.width / scale * 0.35) continue;
+    const surfaced = kids.some(el => {
+      const cs = getComputedStyle(el);
+      const bg = cs.backgroundColor;
+      const painted = bg && !/^rgba?\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)$/.test(bg);
+      const framed = ['Top', 'Right', 'Bottom', 'Left']
+        .filter(side => parseFloat(cs['border' + side + 'Width']) > 0).length >= 2;
+      return painted || cs.boxShadow !== 'none'
+        || framed || parseFloat(cs.borderTopLeftRadius) >= 4;
+    });
     cardGroups.push({
       count: kids.length, width: round(widths[0]), height: round(heights[0]),
-      gap: round(horizontal[0] || 0), top: round((top - bounds.top) / scale)
+      gap: round(horizontal[0] || 0), top: round((top - bounds.top) / scale),
+      surfaced
     });
   }
 
@@ -238,7 +273,10 @@ window.__designSignalsCollect = function(slide) {
     sum + ((r.text.match(/\p{Extended_Pictographic}/gu) || []).length), 0);
   const blocksOut = Array.from(blocks.values()).map(item => ({...item}));
   const textBlocks = blocksOut.filter(b => b.headingBlock || b.bodyBlock);
-  const contentBlocks = textBlocks.concat(images.map(i => ({...i, textBlock: false})));
+  // 满版背景图不算内容块：否则 margins 恒为 0，bottom-empty / 顶部过挤永远测不出来
+  const foregroundImages = images.filter(i => (i.w || 0) < bounds.width / scale * 0.92
+    || (i.h || 0) < bounds.height / scale * 0.92);
+  const contentBlocks = textBlocks.concat(foregroundImages.map(i => ({...i, textBlock: false})));
   const margins = contentBlocks.length ? {
     left: round(Math.min(...contentBlocks.map(b => b.x))),
     top: round(Math.min(...contentBlocks.map(b => b.y))),
@@ -257,6 +295,7 @@ window.__designSignalsCollect = function(slide) {
     viewing: pageRoot ? (pageRoot.getAttribute('data-viewing') || 'screen') : null,
     layout: pageRoot ? (pageRoot.getAttribute('data-layout') || '') : '',
     regions: {header: region(header), body: region(body), footer: region(footer)},
+    declaredFamilies: Array.from(new Set(Array.from(document.fonts || []).map(f => f.family))),
     runs: runs.slice(0, 500),
     headings: headings.slice(0, 80),
     blocks: blocksOut.slice(0, 250),
@@ -304,6 +343,27 @@ def _rgb(value: str) -> tuple[float, float, float, float] | None:
         return (int(raw[0:2], 16), int(raw[2:4], 16), int(raw[4:6], 16),
                 int(raw[6:8], 16) / 255 if len(raw) == 8 else 1.0)
     return None
+
+
+def _contrast_ratio(foreground: str, background: str) -> float | None:
+    """WCAG 2.1 contrast for a text run against its effective background."""
+    front, back = _rgb(foreground), _rgb(background)
+    if not front or not back:
+        return None
+    if front[3] < 0.95:
+        return None
+
+    def channel(value: float) -> float:
+        value = value / 255
+        return value / 12.92 if value <= 0.03928 else ((value + 0.055) / 1.055) ** 2.4
+
+    def luminance(rgb):
+        red, green, blue = (channel(part) for part in rgb[:3])
+        return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+
+    first, second = luminance(front), luminance(back)
+    high, low = max(first, second), min(first, second)
+    return round((high + 0.05) / (low + 0.05), 2)
 
 
 def _hsl(value: str) -> tuple[float, float, float] | None:
@@ -495,13 +555,15 @@ def analyze_page(page: dict) -> dict:
             "至少让一组内容采用边对齐或非对称构图；居中只留给真正需要对称的页。",
             centered=centered, headings=heading_count))
 
-    if card_groups:
-        first = card_groups[0]
+    surfaced_cards = [group for group in card_groups if group.get("surfaced")]
+    if surfaced_cards:
+        first = surfaced_cards[0]
         signals.append(_signal(
             "equal-card-grid", "review",
-            f"检测到 {first.get('count')} 个等宽等高、等距的卡片，像通用组件阵列。",
-            "先问这些卡片是否等权；需要比较时保留同尺度，其余改成不同列宽、不同高度或连续排印。",
-            groups=card_groups[:3]))
+            f"检测到 {first.get('count')} 个等宽等高、带底/框的卡片，像通用组件阵列。",
+            "先问这些卡片是否等权；需要比较时保留同尺度，其余改成不同列宽、不同高度或连续排印。"
+            "纯文字分栏不算卡片，不需要为了消掉提示去加底色。",
+            groups=surfaced_cards[:3]))
 
     if len(gaps) >= 6 and gap_cv is not None and gap_cv < 0.08 and gap_modes <= 2 and char_count < 900:
         signals.append(_signal(
@@ -587,6 +649,96 @@ def analyze_page(page: dict) -> dict:
             "emoji 不能替代图标系统或证据；需要图标时用项目自己的形状语言，并检查它在投影尺寸下的辨识度。",
             emojiCount=page.get("emojiCount")))
 
+    # 中文字距：中文从 0 开始；大 tracking 只给全大写拉丁与短标签
+    tracked_cjk = [
+        run for run in runs
+        if run.get("cjk") and _num(run.get("letterSpacingPx")) > max(0.6, 0.03 * _num(run.get("fontSize"), 16))
+    ]
+    if tracked_cjk:
+        sample = tracked_cjk[0]
+        signals.append(_signal(
+            "cjk-tracking", "review",
+            f"{len(tracked_cjk)} 段中文被加了字距（示例 {sample.get('letterSpacing')} @ {sample.get('fontSize')}px）。",
+            "中文从 letter-spacing: 0 开始；0.1em 以上的字距只给全大写拉丁和短标签，句子保持 0。",
+            count=len(tracked_cjk), sample=str(sample.get("text", ""))[:40],
+            letterSpacing=sample.get("letterSpacing")))
+
+    # 文字对比度：正文 4.5:1、大字 3:1
+    low_contrast = []
+    for run in runs:
+        size = _num(run.get("fontSize"), 0)
+        if size <= 0:
+            continue
+        weight = _num(str(run.get("weight") or "400").replace("bold", "700"), 400)
+        large = size >= 24 or (size >= 18.66 and weight >= 700)
+        ratio = _contrast_ratio(str(run.get("color") or ""), str(run.get("bg") or ""))
+        if ratio is None:
+            continue
+        floor = 3.0 if large else 4.5
+        if ratio < floor:
+            low_contrast.append({"ratio": ratio, "floor": floor, "size": size,
+                                 "color": run.get("color"), "bg": run.get("bg"),
+                                 "text": str(run.get("text", ""))[:40]})
+    if low_contrast:
+        worst = min(low_contrast, key=lambda item: item["ratio"])
+        signals.append(_signal(
+            "low-contrast", "review",
+            f"{len(low_contrast)} 段文字的对比度低于 WCAG 门槛（最低 {worst['ratio']}:1，要求 {worst['floor']}:1，{worst['size']}px）。",
+            "提高该灰阶的明度差或加大字号/字重；浅灰小字在投影和打印上最先消失。",
+            count=len(low_contrast), worst=worst))
+
+    # 字体栈：栈里没有任何声明字族的文字，会落到系统字
+    declared = {str(name).strip().strip('"').strip("'").lower()
+                for name in (page.get("declaredFamilies") or []) if str(name).strip()}
+    if declared:
+        system_runs = []
+        for run in runs:
+            stack = {part.strip().strip('"').strip("'").lower()
+                     for part in str(run.get("familyStack") or "").split(",") if part.strip()}
+            if stack and not (stack & declared):
+                system_runs.append(run)
+        if system_runs:
+            sample = system_runs[0]
+            signals.append(_signal(
+                "system-font-fallback", "review",
+                f"{len(system_runs)} 段文字的字体栈不含任何已加载字族，实际会用系统字（示例：{sample.get('familyStack')}）。",
+                "把项目字体栈设在整张 slide（而不只是内容容器）上；容器外的边注、页码、单位最容易漏，导出 PDF 时还会嵌入系统字体。",
+                count=len(system_runs), sample=str(sample.get("text", ""))[:40],
+                stack=str(sample.get("familyStack"))[:120]))
+
+    # 声明了字体却整页没用到：字体没生效、或标题走了别的字族
+    if declared:
+        used = set()
+        for run in runs:
+            for part in str(run.get("familyStack") or "").split(","):
+                name = part.strip().strip('"').strip("'").lower()
+                if name:
+                    used.add(name)
+        unused = sorted(declared - used)
+        if unused and (headings or runs):
+            signals.append(_signal(
+                "declared-font-unused", "review",
+                f"本页声明了 {len(unused)} 个字体但一个字都没用上（{', '.join(unused[:3])}）。",
+                "确认字体文件真的加载、font-family 写在承载文字的容器上；标题与正文分别检查，别只看 body。",
+                unused=unused[:6], declared=sorted(declared)[:6]))
+
+    # 正文字族过多：一个字族承担全部文本，等宽只给机器标识
+    prose_families = set()
+    for run in runs:
+        stack = [part.strip().strip('"').strip("'") for part in str(run.get("familyStack") or "").split(",")]
+        first = next((name for name in stack if name and name.lower() not in ("monospace", "sans-serif", "serif")), "")
+        if not first:
+            continue
+        if "mono" in first.lower():
+            continue
+        prose_families.add(first.lower())
+    if len(prose_families) > 2:
+        signals.append(_signal(
+            "too-many-prose-families", "review",
+            f"本页正文用了 {len(prose_families)} 个字族：{', '.join(sorted(prose_families)[:4])}。",
+            "选定一个字族承担标题与正文；确需双族时只允许标题使用，并在 design.md 写明例外。",
+            families=sorted(prose_families)[:6]))
+
     metrics = {
         "typeSizes": distinct_sizes,
         "headingSize": heading_size,
@@ -612,6 +764,10 @@ def analyze_page(page: dict) -> dict:
         "centeredHeadingRatio": round(centered / heading_count, 2) if heading_count else None,
         "viewing": page.get("viewing"),
         "layout": page.get("layout"),
+        "cjkTrackedRuns": len(tracked_cjk),
+        "lowContrastRuns": len(low_contrast),
+        "minContrast": min((item["ratio"] for item in low_contrast), default=None),
+        "systemFontRuns": len(system_runs) if declared else None,
     }
     return {"slide": page.get("slide"), "title": page.get("title"), "metrics": metrics, "signals": signals}
 

@@ -18,6 +18,58 @@
 已有结构化 spec 继续用自己的请求合同及 `image_source.py --brief`，同样交付 `image-brief.md`，不重复维护两份计划。
 尚未有 HTML 时可先交 Markdown，但明确图位尚未接入。
 
+## 封面与尾页的图，单列出来
+
+封面和尾页如果需要图，必须在 `image-plan.json` 里**单独成条**：`role` 写 `cover` 或 `finale`，
+`purpose` 写清它承担的是氛围、材质还是主体。
+
+- 不要把它混进正文图列表里——正文图讲证据，封面图定语气，两回事。
+- 没有就明说"封面无图，由版式承担"，不要留一个空图位到最后。
+- 这两处的图和正文图**同一轮出**：风格、光线、色彩角色一致，否则头和尾会像两套 deck。
+
+## 提示词随视觉方向适配
+
+配图不是独立风格：它和本版选定的参考同源。写提示词前，先从 `design.md` 抄出四个变量，再逐个翻译成**可执行的约束**。
+
+| 从视觉命题里取 | 翻译成提示词里的东西 |
+| --- | --- |
+| 媒介 / 材质 | 摄影、扫描、手绘、版画、3D；颗粒、网点、纸纹、墨边、反光 |
+| 明暗关系 | 高调还是低调、对比度强弱、光源方向、是否单色 |
+| 色彩角色 | 只留几个色、强调色出现在哪、哪块必须留给文字 |
+| 构图与出血 | 主体位置、裁切方式、留白区、是否需要透明底 |
+
+写法要求：
+
+- **用可判断的约束，不用形容词**。"黑白高对比、硬光自左上、纸边锐利"能执行；"高级感、科技感、克制"不能。
+- **负向提示也来自方向**：手绘方向排除照片质感与渐变；排印方向排除插画与 3D；深色工程方向排除白底截图。
+- 同一套图要并排看出同族：媒介、光源、色彩角色一致，**主体与构图随页面变化**。
+- **换版本就重写**。上一版的提示词属于上一版的方向，不能拿来就用（见[素材也按版本走](refined-workflow.md#素材也按版本走)）。
+- `purpose` 写本页要解释的问题，不写风格词；风格由提示词承担。
+
+自检：把这句提示词换到另一个方向的项目里——如果仍然成立，说明它太泛，没有承担方向；如果换页就不成立，说明它只够做一张图，也不合格。
+
+## 什么时候把段落变成图
+
+先判断这段文字在做什么，再决定要不要画：
+
+| 文字在做的事 | 处理 |
+| --- | --- |
+| 陈述判断、理由、风险、边界条件 | 留在文字 |
+| 描述**对象之间的关系**：顺序、包含、依赖、对照、阈值 | 变成图，文字只留判断与条件 |
+| 枚举 3 个以上并列项且要比较 | 变成矩阵或条带，不要写成三段并列文字 |
+| 讲"在哪一层、在哪一段、谁写给谁、什么时候切" | 变成剖面或流向 |
+| 精确参数、契约条款、需要逐字检索的内容 | 留在文字或表格 |
+
+做法：把段落改写成一句「**谁 → 对谁 → 什么关系**」。三个成分都能指认，就画；只能得到一句判断，就别画。
+
+验收两个方向：
+
+1. **遮住文字**，图能不能回答本页的问题？
+2. **遮住图**，文字是否只剩判断与条件，而不是在复述图？
+
+常见该画没画：三个真源的"应该 / 实际 / 物化"、完成声明的证明链、拒答的三种原因、fail-closed 的四条边界。
+常见不该画却画了：只有一句判断的封面、把一个表格拆成一排等宽卡片。
+
 ## 让配图承担解释，让背景参与构图
 
 在现有 `design.md` 的页序中简记“视觉要解释什么 / 图片与 HTML 各负责什么 / 正文保留什么 / 背景怎么配合”。
@@ -68,48 +120,72 @@
 
 ## 自由 HTML 的图片计划
 
-`image_handoff.py` 不生图、不改 HTML。它生成完整交接说明，检查文件和声明页面的静态接入。
-计划使用 schemaVersion: 1，顶层包含 project 名称与非空 images 数组。每项填写：
+`image_handoff.py` 不生图、不改 HTML。它把本版配图整理成一份**可执行清单**：占位图位、目标路径、尺寸比例、用途与提示词。
+全部配图默认先占位，用户生成后按文件名放进 `assets/images/` 即生效。
+
+### 图位先写成占位，缺图不影响编译
+
+图位从一开始就指向最终文件路径。缺图时由占位样式兜底，图放进去刷新就是真图——**不改 HTML、不跑接入步骤、没有 pending 状态**。
+
+```html
+<figure class="img-slot" data-image-id="scan-vs-digital">
+  <img src="assets/images/scan-vs-digital.png" alt="左右并置：左侧数字版，右侧扫描件" data-placeholder
+       onerror="this.setAttribute('data-missing','');">
+  <figcaption>待配图 · scan-vs-digital.png · 1200 × 720</figcaption>
+</figure>
+```
+
+```css
+.img-slot { position: relative; background: #eceae5; border: 1px dashed #c9c5bc; overflow: hidden; }
+.img-slot > img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; }
+.img-slot > img[data-missing] { display: none; }
+.img-slot:not([data-missing]) > figcaption { display: none; }
+```
+
+- `data-placeholder` 是**声明**，不依赖 `onerror` 时序：导出遇到它缺失时跳过该图，不判失败。
+- 图在位时 `figcaption` 自动隐藏；缺失时显示占位说明，方便目检时确认还差哪张。
+- 图位按最终版式给足尺寸，缺图阶段也一样检查容量、裁切与文字避让。
+- 命名约定：`assets/images/<id>.<png|jpg|webp>`，与计划里的 `id` 一致。
+- 背景图同样用绝对定位的 `<img data-placeholder>` 配合叠层 CSS，保留明确资源路径。
+
+### 计划文件
+
+计划使用 `schemaVersion: 1`，顶层包含 `project` 与非空 `images` 数组。
+建议写一句 `styleDirection`（本版的媒介/明暗/色彩/构图关系），让后续改图的人按本版方向重写提示词，而不是沿用上一版。
 
 | 字段 | 含义 |
 | --- | --- |
-| id / pages / file | 稳定标识、实际使用页数组、项目内相对文件路径 |
+| id / pages / file | 稳定标识（与文件名同）、实际使用页数组、项目内相对路径 |
 | role / purpose | 图像职责与本页要解释的问题 |
 | target_px / fit / focal | 目标像素 `[宽, 高]`、cover 或 contain、焦点 `[横向%, 纵向%]` |
 | alt | 图像内容的替代描述 |
 | prompt | 能独立复制的完整生成提示，按本项目对象、关系、媒介与构图编写 |
 | source / source_note | 默认 generated；已有素材用 provided 并记录来源 |
-| negative / negativeSpace / transparent | 按需填写排除项数组、文字安全区描述与透明背景布尔值 |
+| negative / negativeSpace / transparent | 排除项数组、文字安全区描述、透明背景布尔值 |
 
 不提供固定色板、材质或主体的默认提示词；这些决定来自本轮视觉方案。
 
-`file` 相对计划文件所在目录，`pages` 为真实使用页。比例从 `target_px` 推导，也可显式写一致的 `aspect`。
-`source` 默认为 `generated`，需要完整 `prompt`；复用已提供的图片时写 `source: "provided"` 和 `source_note` 来源说明，
-省略 `prompt`，其他图位字段保留。复用项必须已有合格文件才能通过交接，不能借“复用”登记不存在的图片。
-`negative`、`negativeSpace`、`transparent` 按需要填写；不通过提示词字数判断质量。
-透明图必须 PNG / WebP，检查器验证确有透明像素；这不证明抠图边缘合格。
+`pages` 写真实使用页；比例从 `target_px` 推导，也可显式写一致的 `aspect`。
+`source: "provided"` 的复用项省略 `prompt`，其余图位字段保留。
+透明图必须 PNG / WebP；这不证明抠图边缘合格。
 复用素材按最大图位检查，并在所有使用页目检；不同比例的图位必要时采用不同素材。
 
 ```bash
+# 生成清单：逐图提示词 + 目标路径 + 尺寸，附占位片段
 python3 scripts/image_handoff.py --brief /project/image-plan.json --html /project/source.html
-python3 scripts/image_handoff.py --handoff /project/image-plan.json --html /project/source.html
-python3 scripts/image_handoff.py --check /project/image-plan.json --html /project/deck.html
+# 编译：缺图只提醒，不阻塞
+python3 scripts/web_deck.py /project/source.html -o /project/deck.html --image-plan /project/image-plan.json
+# 图放齐后确认文件是否就位（可选，不进编译链）
+python3 scripts/image_handoff.py --check /project/image-plan.json
 ```
 
-`--brief` 创建 `image-brief.md`，包含使用页、图片目的、完整提示词、像素与比例、安全区、透明要求、目标路径与接入片段；不覆盖人工修改，新版本用 `--out briefs/v2.md`，交付时链接当前有效版本。
-`--handoff` 检查 Markdown 确已生成、对应当前计划、包含逐图路径与完整提示词，且 HTML 图位接通；缺图允许待回填。
-默认检查 `image-brief.md`，新版本用 `--document briefs/v2.md`。只改了 Markdown 中的提示词时同步计划，再生成有效版本；不覆盖用户修改。
-该检查不判断功能图覆盖是否充分、背景是否设计或 CSS 下是否可见，这些必须逐页审阅。
-`--check` 返回 0 为文件及所请求的静态接入通过，1 为缺失或不合格，2 为计划无效。
-未提供 `--html` 只验文件；提供后还核对 `img src` 和页码，可用 `data-image-id` 对应计划。
-静态检查不认证 CSS 背景、`picture/srcset` 或脚本换图，这些需浏览器另核对；也不证明图片可见。
-背景图可用绝对定位的 `<img>` 配合叠层 CSS，从而保留明确资源路径。
+`--brief` 创建 `image-brief.md`：逐图给出文件名、目标路径、尺寸比例、用途、完整提示词与负面约束，
+外加可直接粘贴的占位片段。不覆盖人工修改；新版本用 `--out briefs/v2.md`，交付时链接当前有效版本。
+`--check` 只验文件是否就位；图还没生成时不必跑它。
 
-缺图阶段，图位保持设计尺寸并显示可辨认的待素材状态；不能挪走图位、写入假成品图或以错误后备图永久替换目标路径。
-核对 Markdown、计划及 HTML 指向同一文件。`--brief --html` 会在文档记录未接好的位置，但生成文档本身不等于接入通过。
-用 `--check --html` 区分 `files_ready` 与 `bindings.ready`：待图时允许前者为 false，承诺“放入目录刷新即可显示”前后者必须为 true。
-缺图稿标明待素材，不能把占位图算作成片；当前播放器/导出会等待图片，缺图造成的资源失败不能报成通过。
-回填后刷新页面、重新截图并导出，已有 PDF/PPTX 不会自动更新。
+缺图阶段按占位外观检查版式：不挪走图位、不写假成品图、不用错误的后备图永久替换目标路径。
+图放齐后刷新预览、重新截图并导出，已有 PDF/PPTX 不会自动更新。
+静态检查不认证 CSS 背景、`picture/srcset` 或脚本换图，这些需浏览器另核对。
 
 ## 结构化 spec 的兼容接口
 
@@ -143,3 +219,24 @@ python3 scripts/image_source.py --generate deck.spec.json --provider-cmd '你的
 
 spec 的图片 fit 与焦点在项目皮肤定义，默认仍是 cover。`--check` 临时渲染并量取每个实际槽位，
 按 cover / contain 检查有效像素。原生 PPTX 会读取实测 fit / position，但复杂背景和效果仍须回读验证。
+
+## 回填后的叠加层校准（必做）
+
+只要页面上有按百分比定位的 HTML 标注（区域框、取景框、引线、编号），回填后**必须按图像实际内容重测一次**。
+生成图不会遵守你设想的版式：示例里"公式在底部"，实际可能画在图表右侧。
+
+做法：先量出图像里各区域的像素边界，再换算成百分比写回 CSS/内联样式。
+
+```python
+from PIL import Image
+im = Image.open("assets/images/example.png").convert("L")
+w, h = im.size
+px = im.load()
+# 行方向：找有内容/无内容的区间，得到每个区域的 top/bottom
+rows = [min(px[x, y] for x in range(0, w, 4)) for y in range(h)]
+# 肉眼再核对截图，别只信阈值
+```
+
+- 标注框以**图像内容**为准，不以容器为准；框住的是"这段文字/这张表/这个图表"，不是"这块画布"。
+- 图注要说明哪些区域被框、哪些没有，避免观众以为漏标。
+- 宽高比与计划不一致时，先改 `target_px` 或裁切，再校坐标；`object-fit` 会改变实际可见区域。

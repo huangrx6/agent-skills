@@ -44,11 +44,17 @@ if [ -f "$LEAK" ]; then
   fi
 fi
 
-# ── 3. 脚本回归测试 ──
-# 按目录分进程执行，避免一个模块中断其余 skill 的测试。
+# ── 3. 脚本回归测试（默认跳过；发布前用 AGENT_SKILLS_GATE=1 跑）──
+# 全套回归会调 LibreOffice / Playwright / PDF / 字体，八个目录跑下来 5–10 分钟。
+# 提交不该被它拖住（用户明确要求「以后不能再影响我」）：它是发布闸门，不是每次提交的门票。
 TEST_FAILURES=0
 TEST_SUITES=0
 TEST_SKIPPED=0
+if [ "${AGENT_SKILLS_GATE:-0}" != "1" ]; then
+  echo "· 回归测试已跳过（默认）；发布前跑：AGENT_SKILLS_GATE=1 git commit …"
+  TEST_SKIPPED=-1
+fi
+if [ "${AGENT_SKILLS_GATE:-0}" = "1" ]; then
 for d in "$ROOT"/tests/* "$ROOT"/tools/tests; do
   [ -d "$d" ] || continue
   TEST_SUITES=$((TEST_SUITES + 1))
@@ -80,6 +86,7 @@ for d in "$ROOT"/tests/* "$ROOT"/tools/tests; do
     fi
   fi
 done
+fi
 
 # ── 4. 指针目标存在性 ──
 # 指针指向一个不存在的文件是客观错误。而“内容有没有真的搬过去”是语义判断 ——
@@ -96,7 +103,9 @@ if [ -f "$POINTERS" ]; then
 fi
 
 echo "✓ pre-commit: 已执行的结构、泄露、指针与文档数字检查通过"
-if [ "$TEST_FAILURES" -gt 0 ]; then
+if [ "${AGENT_SKILLS_GATE:-0}" != "1" ]; then
+  : # 跳过时的提示已在上方打印
+elif [ "$TEST_FAILURES" -gt 0 ]; then
   echo "⚠ 回归测试：$TEST_FAILURES 个目录失败（不阻塞提交）；跳过 $TEST_SKIPPED 条"
 else
   echo "✓ 回归测试：$TEST_SUITES 个目录通过；跳过 $TEST_SKIPPED 条"

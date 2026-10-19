@@ -146,6 +146,12 @@ window.__webCheckCollect = function(slide, options) {
   let layoutBudget=null;
   let typeRegions=null;
   const pageRoots=Array.from(slide.querySelectorAll('.deck-page'));
+  if(!pageRoots.length){
+    // 自定义页面根：容量/越界契约无法生效。给出明确提示，避免"检查通过"被误读。
+    add('no-capacity-contract','warning',
+      'This slide has no .deck-page, so capacity, footer-intrusion and region checks did not run',
+      slide,{hint:'wrap the page in <div class="deck-page"> or verify page capacity by screenshot'});
+  }
   if(pageRoots.length){
     const page=pageRoots[0];
     const viewing=page.getAttribute('data-viewing')??'screen';

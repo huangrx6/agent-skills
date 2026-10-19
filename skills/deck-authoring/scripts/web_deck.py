@@ -289,9 +289,13 @@ def main(argv=None):
             except handoff.PlanError as exc:
                 raise SourceError(str(exc)) from exc
             if not result["ready"]:
-                raise SourceError("Image handoff incomplete: " + "; ".join(result["errors"]))
-            print("Image handoff: passed; " + ("files present (visual review still required)" if result["files_ready"]
-                                             else "awaiting images: " + ", ".join(result["pending_images"])))
+                pending = "、".join(result["pending_images"]) or "（无待生成图）"
+                print("Image handoff: 占位待回填：" + pending
+                      + "；编译继续，图放进 assets/images/ 后重新编译即可")
+                for problem in result["errors"]:
+                    print("  · " + problem)
+            else:
+                print("Image handoff: passed; files present (visual review still required)")
         report_path = args.out.with_suffix(".check.json")
         if args.check:
             protected = (args.source, args.out)

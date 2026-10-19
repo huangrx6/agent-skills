@@ -144,8 +144,12 @@
     document.fonts ? document.fonts.ready : Promise.resolve(),
     Promise.all(Array.from(document.images).map(async function (image) {
       image.loading = 'eager';
-      if (image.decode) await image.decode();
-      if (!image.complete || !image.naturalWidth) throw new Error('image-not-ready: ' + image.src);
+      try { if (image.decode) await image.decode(); } catch (error) { /* 缺图由下面的分支判定 */ }
+      if (!image.complete || !image.naturalWidth) {
+        // 占位图位允许缺图：图放进 assets/images/ 后自动生效，导出不因它失败
+        if (image.hasAttribute('data-placeholder')) return;
+        throw new Error('image-not-ready: ' + image.src);
+      }
     }))
   ]).then(function () {
     ready = true;

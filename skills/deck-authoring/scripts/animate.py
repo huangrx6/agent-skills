@@ -203,8 +203,11 @@ async def _capture_async(html: str, out_dir: str, times: list[float], scale: flo
             ready_js = """(async function(){
               if(document.fonts) await document.fonts.ready;
               await Promise.all(Array.from(document.images).map(async function(im){
-                if(im.decode) await im.decode();
-                if(!im.complete || !im.naturalWidth) throw Error('image-not-ready: '+im.src);
+                try{ if(im.decode) await im.decode(); }catch(e){}
+                if(!im.complete || !im.naturalWidth){
+                  if(im.hasAttribute('data-placeholder')) return;
+                  throw Error('image-not-ready: '+im.src);
+                }
               }));
               if(window.__deck_charts_ready) await window.__deck_charts_ready;
               var bad=Array.from(document.querySelectorAll('.g2[data-g2]')).find(function(n){

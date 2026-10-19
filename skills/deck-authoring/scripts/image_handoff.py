@@ -155,6 +155,7 @@ def load_plan(path: Path | str) -> dict:
         if "negativeSpace" in raw:
             optional["negativeSpace"] = _text(raw["negativeSpace"], f"{identifier}.negativeSpace")
         normalized.append({
+            "styleDirection": _text(raw.get("styleDirection"), "") if raw.get("styleDirection") else "",
             "id": identifier, "pages": pages, "file": file,
             "role": _text(raw.get("role"), f"{identifier}.role"),
             "purpose": _text(raw.get("purpose"), f"{identifier}.purpose"),
@@ -163,7 +164,11 @@ def load_plan(path: Path | str) -> dict:
             "source": source, "source_note": source_note,
             "alt": _text(raw.get("alt"), f"{identifier}.alt"), **optional,
         })
+    direction = _text(data.get("styleDirection"), "") if data.get("styleDirection") else ""
+    if not direction:
+        direction = next((item["styleDirection"] for item in normalized if item.get("styleDirection")), "")
     return {"schemaVersion": 1, "project": _text(data.get("project", path.stem), "project"),
+            "styleDirection": direction,
             "images": normalized, "root": root, "path": path}
 
 
@@ -246,6 +251,20 @@ def image_markup(asset: dict) -> str:
             f'style="display:block;width:100%;height:auto;aspect-ratio:{w}/{h};'
             f'object-fit:{asset["fit"]};object-position:{x}% {y}%">')
 
+
+def placeholder_markup(asset: dict) -> str:
+    """A placeholder figure that swaps itself for the real image once the file lands."""
+    w, h = asset["target_px"]
+    src_url = html.escape(quote(asset["file"], safe="/"), quote=True)
+    alt = html.escape(asset["alt"], quote=True)
+    x, y = asset["focal"]
+    return (f'<figure class="img-slot" data-image-id="{asset["id"]}">\n'
+            f'  <img src="{src_url}" alt="{alt}" data-placeholder\n'
+            f'       onerror="this.dataset.missing=1"\n'
+            f'       style="display:block;width:100%;height:auto;aspect-ratio:{w}/{h};'
+            f'object-fit:{asset["fit"]};object-position:{x}% {y}%">\n'
+            f'  <figcaption>待配图 · {Path(asset["file"]).name} · {w} × {h}</figcaption>\n'
+            f'</figure>')
 
 def check_bindings(plan: dict, path: Path) -> dict:
     """Verify static img references on declared slides; no browser/visual claims.
@@ -374,61 +393,56 @@ def check_handoff(plan: dict, html_path: Path, document: str = "image-brief.md")
             "scope": "仅核对交接文件和静态路径；功能图覆盖、背景设计、可见性与最终画面仍须审阅"}
 
 
-def write_brief(plan: dict, out: str = "image-brief.md", html_path: Path | None = None) -> Path:
+def write_brief(plan: dict, out: str = "image-brief.md", html_path: Path | None = None, *, overwrite: bool = False) -> Path:
     destination = safe_path(plan["root"], out, "--out")
     if html_path and destination == html_path.resolve():
         raise PlanError("提示词文档不能覆盖待检查的 HTML")
     if destination == plan["path"] or any(destination == safe_path(plan["root"], item["file"]) for item in plan["images"]):
         raise PlanError("提示词文档不能覆盖 plan 或图片目标")
-    checked = {item["id"]: item for item in check_images(plan)["assets"]}
-    bindings = check_bindings(plan, html_path) if html_path else None
-    chunks = [f"# {plan['project']} — 图片生成交接\n",
+    chunks = [f"# {plan['project']} — 配图清单\n",
               f"<!-- deck-image-plan-sha256:{plan_digest(plan)} -->\n",
-              "这是交接文档，不代表素材齐备。标为生成的项目按完整提示词出图，标为复用的项目直接使用已登记文件。\n",
-              f"项目目录：`{plan['root']}`。下方文件路径均相对此目录。\n",
-              "1. 生成项按要求生成单张静态图片，复用项使用已登记文件；页面正文默认保留为可编辑文字。\n"
-              "2. 按指定格式导出，创建目标子目录并使用完全相同的文件名。不要只修改扩展名。\n"
-              "3. 回填后运行 `image_handoff.py --check` 并传入本 plan；重新预览每个使用页面。\n"
-              "4. 状态是文档生成时的快照；文件检查通过仍需目检，不能据此宣称配图或页面已完成。\n",
-              "机械校验不评估提示词创意质量；提交生图前确认提示词包含本图必要的主体、处理方式和构图约束。\n"]
-    if bindings:
-        chunks.append("页面接入：" + ("静态路径与页码已核对；回填后仍需刷新预览。" if bindings["ready"]
-                       else "尚未接好，不能承诺放入目录即可显示。\n" + "\n".join(bindings["errors"])) + "\n")
-    else:
-        chunks.append("页面接入：未核对。作者须将下方 img 接入声明页面，运行 --check PLAN --html HTML 后再承诺自动回填。\n")
+              "按下面的**文件名**逐张生成，放进 `assets/images/`，刷新页面即生效——不改 HTML，不做接入步骤。\n"
+              "占位图位已经在页面里接好：图缺失时显示占位框，图到位后自动换成真图。\n"]
+    if plan.get("styleDirection"):
+        chunks.append(
+            "## 本版视觉方向（提示词按它写）\n\n"
+            f"{plan['styleDirection']}\n\n"
+            "下面的提示词把这四个变量翻成了可执行约束：媒介 / 明暗 / 色彩角色 / 构图。"
+            "**换方向或换版本必须重写提示词**，不要把上一版的措辞改几个词继续用。\n")
+    chunks.append(f"项目目录：`{plan['root']}`。下方文件路径均相对此目录。\n")
     for asset in plan["images"]:
-        check = checked[asset["id"]]
         w, h = asset["target_px"]
-        instructions = (["### 复用来源（无需生成）\n", asset["source_note"] + "\n"]
-                        if asset["source"] == "provided" else [
-                            "### 可直接复制的完整提示词\n", _fence("\n".join(filter(None, [
-                                asset["prompt"],
-                                "文字安全区：" + asset["negativeSpace"] if asset.get("negativeSpace") else "",
-                                "输出真实透明背景，保留 alpha 通道。" if asset.get("transparent") else "",
-                            ]))) + "\n",
-                            "### 负面约束\n", (_fence("\n".join(asset["negative"])) if asset["negative"] else "未另设约束。") + "\n"])
-        chunks += [f"## {asset['id']} · 第 {', '.join(map(str, asset['pages']))} 页\n",
-                   f"- 文件：`{asset['file']}`\n- 当前状态：**{check['status']}**\n"
-                   f"- 角色：{asset['role']}\n- 页面目的：{asset['purpose']}\n"
-                   f"- 目标图位：{w} × {h} px；比例 {asset['aspect']}；格式 {FORMATS[Path(asset['file']).suffix.lower()]}\n"
+        if asset["source"] == "provided":
+            instructions = ["### 复用来源（无需生成）\n", asset["source_note"] + "\n"]
+        else:
+            instructions = ["### 提示词\n", _fence("\n".join(filter(None, [
+                asset["prompt"],
+                "文字安全区：" + asset["negativeSpace"] if asset.get("negativeSpace") else "",
+                "输出真实透明背景，保留 alpha 通道。" if asset.get("transparent") else "",
+            ]))) + "\n"]
+            if asset["negative"]:
+                instructions += ["### 负面约束\n", _fence("\n".join(asset["negative"])) + "\n"]
+        chunks += [f"## {asset['id']}\n",
+                   f"- 文件：`{asset['file']}`（生成后放这里）\n"
+                   f"- 使用页：第 {', '.join(map(str, asset['pages']))} 页\n"
+                   f"- 尺寸：{w} × {h} px；比例 {asset['aspect']}；格式 {FORMATS[Path(asset['file']).suffix.lower()]}\n"
                    f"- 放置方式：`object-fit: {asset['fit']}`；`object-position: {asset['focal'][0]}% {asset['focal'][1]}%`\n"
+                   f"- 要解释什么：{asset['purpose']}\n"
                    f"- 替代文本：{asset['alt']}\n",
                    *instructions,
-                   "### 作者接入片段\n",
-                   "源 HTML 与 plan 同目录时可使用；放入本页的自定图位，按布局调整实际宽高，保留比例或明确裁切。\n",
-                   "```html\n" + image_markup(asset) + "\n```\n",
-                   "### 回填验收\n",
-                   "- 检查文件名、格式、分辨率与比例。\n"
-                   "- 检查主体是否准确，是否有水印、乱码、多余标志或生成瑕疵。\n"
-                   "- 在所有使用页面复查裁切、焦点、正文避让；图文重叠不能靠裁掉关键信息解决。\n"]
-        for warning in check["errors"] + check["warnings"]:
-            chunks.append(f"- 当前检查：{warning}\n")
+                   "### 占位片段（页面里已接好，此处仅作对照）\n",
+                   "```html\n" + placeholder_markup(asset) + "\n```\n"]
     destination.parent.mkdir(parents=True, exist_ok=True)
+    if overwrite:
+        destination.write_text("\n".join(chunks), encoding="utf-8")
+        return destination
     try:
         with destination.open("x", encoding="utf-8") as output:
             output.write("\n".join(chunks))
     except FileExistsError as exc:
-        raise PlanError(f"文档已存在，保留原文不覆盖：{destination}；使用 --out 指定新文件名") from exc
+        raise PlanError(
+            f"文档已存在，保留原文不覆盖：{destination}；计划改过后用 --overwrite 重写，或用 --out 另存新版本"
+        ) from exc
     return destination
 
 
@@ -438,7 +452,9 @@ def main(argv=None) -> int:
     action.add_argument("--brief", type=Path, metavar="PLAN", help="校验计划并创建人工生图交接文档")
     action.add_argument("--check", type=Path, metavar="PLAN", help="验收真实回填文件，缺失或无效返回非零")
     action.add_argument("--handoff", type=Path, metavar="PLAN", help="验收配图 Markdown 与 HTML 图位；允许生成图片待回填")
-    parser.add_argument("--out", default=None, help="相对 plan 目录的文档路径；默认 image-brief.md；不覆盖")
+    parser.add_argument("--out", default=None, help="相对 plan 目录的文档路径；默认 image-brief.md")
+    parser.add_argument("--overwrite", action="store_true",
+                        help="计划改过后覆盖默认位置的 image-brief.md（默认不覆盖，避免冲掉人工修改）")
     parser.add_argument("--document", default=None, help="--handoff 使用的 Markdown，相对 plan 目录；默认 image-brief.md")
     parser.add_argument("--html", type=Path, help="同时核对 HTML 中的静态图片引用与声明页码")
     args = parser.parse_args(argv)
@@ -451,7 +467,7 @@ def main(argv=None) -> int:
     try:
         plan = load_plan(args.brief or args.check or args.handoff)
         if args.brief:
-            destination = write_brief(plan, args.out or "image-brief.md", args.html)
+            destination = write_brief(plan, args.out or "image-brief.md", args.html, overwrite=args.overwrite)
             print(f"交接文档已创建：{destination}\n尚未生成或改写任何图片。")
             return 0
         if args.handoff:
