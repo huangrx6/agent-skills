@@ -1,7 +1,8 @@
 # 六类标准样例
 
 这些是本项目新写的虚构案例，用于学习图型语义、复查生成器和比较后端，不来自客户系统。
-每例有一个明确的阅读问题，保留源规格、两种可编辑文件、官方导出图片及检查回执。
+每例有一个明确的阅读问题，保留源规格、至少两种可编辑文件、官方导出图片及检查回执
+（架构例另有 Mermaid 后端产物，用于同一规格的三后端对照）。
 起手时参考同类样例的表达方式，不把样例布局当作当前材料的事实。
 
 新增 [同规格文档／投影对照](presentation/README.md)，展示生成字号、间距和真实导出检查。
@@ -10,7 +11,7 @@
 
 | 图型 | 读者问题 / 必须读到的关系 | 建议观看场景 | 规格与可编辑文件 |
 | --- | --- | --- | --- |
-| 架构 | 请求在哪里处理和保存？客户端 → API → 订单服务 → 库；客户端在系统边界外 | doc-wide | [规格](architecture/source.diagram.json) · [Excalidraw](architecture/diagram.excalidraw) · [draw.io](architecture/diagram.drawio) |
+| 架构 | 请求在哪里处理和保存？客户端 → API → 订单服务 → 库；客户端在系统边界外 | doc-wide | [规格](architecture/source.diagram.json) · [Excalidraw](architecture/diagram.excalidraw) · [draw.io](architecture/diagram.drawio) · [Mermaid](architecture/mermaid.mmd) |
 | 流程 | 库存不足怎么办？校验后分别走接单和等待，两条边都有条件 | doc-inline | [规格](flow/source.diagram.json) · [Excalidraw](flow/diagram.excalidraw) · [draw.io](flow/diagram.drawio) |
 | 依赖 | 业务依赖什么？业务依赖契约及适配器，适配器依赖驱动 | doc-inline | [规格](dependency/source.diagram.json) · [Excalidraw](dependency/diagram.excalidraw) · [draw.io](dependency/diagram.drawio) |
 | 状态 | 如何审核和退回？提交指向审核，退回指向草稿，通过后发布，再归档 | doc-wide | [规格](state/source.diagram.json) · [Excalidraw](state/diagram.excalidraw) · [draw.io](state/diagram.drawio) |
@@ -27,7 +28,8 @@
 
 ![架构图官方导出](architecture/excalidraw.png)
 
-[draw.io 图片](architecture/drawio.png)。强调订单服务；分组只表达系统边界，不代表部署主机。
+[draw.io 图片](architecture/drawio.png)；Mermaid 后端另有 [.mmd](architecture/mermaid.mmd) 与 [PNG](architecture/mermaid.png)。
+强调订单服务；分组只表达系统边界，不代表部署主机。
 没有编造副本数、负载、缓存或容灾。中文标签与 Web / API / HTTPS 混排。
 
 ### 流程：分支结果
@@ -67,8 +69,9 @@
 
 ## 证据与维护
 
-2026-10-16 由作者代理逐张审查 12 张官方 PNG：节点和关系数量、方向、标签、
-边界、重点及明显裁切/遮挡。本轮属于作者自检，未进行独立盲评，也没有量化字体渲染测试。
+2026-10-16 由作者代理逐张审查当时 12 张官方 PNG：节点和关系数量、方向、标签、
+边界、重点及明显裁切/遮挡。2026-10-20 增加架构例的 Mermaid 导出（同一虚构规格），
+只用于后端对照，未纳入上述逐张审查。本轮属于作者自检，未进行独立盲评，也没有量化字体渲染测试。
 Excalidraw 使用 editorial，draw.io 使用 classic；两后端呈现不同，不要求像素一致。
 渲染环境为 macOS、draw.io 31.4.5、Chrome 154.0.8037.98、固定的
 `@excalidraw/utils@0.1.5`。中文使用本机字体回退，尚未记录实际解析字体，跨机器可能不同。

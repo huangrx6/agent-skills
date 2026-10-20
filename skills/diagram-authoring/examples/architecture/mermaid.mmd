@@ -1,0 +1,23 @@
+---
+title: "订单请求通过服务写入数据库"
+config: {"theme": "base", "securityLevel": "strict", "themeVariables": {"background": "#FFFFFF", "primaryTextColor": "#1F2328", "edgeLabelBackground": "#FFFFFF", "lineColor": "#9A9C9E", "fontSize": "18px"}, "markdownAutoWrap": false, "themeCSS": ".diagram_note .label { text-align:left !important; } .diagram_note text { text-anchor:start !important; transform:translateX(-50%); transform-box:fill-box; }", "flowchart": {"nodeSpacing": 56, "rankSpacing": 100, "curve": "linear", "wrappingWidth": 800, "diagramPadding": 16, "subGraphTitleMargin": {"top": 16, "bottom": 24}}, "state": {"padding": 24, "nodeSpacing": 56, "rankSpacing": 100}}
+---
+flowchart LR
+  n948fe603f61dc036b5c5(["Web 客户端"])
+  subgraph g0d45f5fd462b8c70bffb["订单系统"]
+    n4ea5ee68fea055861068("API 入口")
+    n1c168adb00d208e42f93("订单服务")
+    n7bdc25d1694ef984782a[("订单库")]
+  end
+  n948fe603f61dc036b5c5 -->|"HTTPS"| n4ea5ee68fea055861068
+  n4ea5ee68fea055861068 -->|"提交订单"| n1c168adb00d208e42f93
+  n1c168adb00d208e42f93 -->|"持久化"| n7bdc25d1694ef984782a
+  classDef cn948fe603f61dc036b5c5 fill:#FFFFFF,stroke:#1F2328,color:#1F2328,stroke-width:1px
+  class n948fe603f61dc036b5c5 cn948fe603f61dc036b5c5
+  classDef cn4ea5ee68fea055861068 fill:#FFFFFF,stroke:#1F2328,color:#1F2328,stroke-width:1px
+  class n4ea5ee68fea055861068 cn4ea5ee68fea055861068
+  classDef cn1c168adb00d208e42f93 fill:#DDEAFA,stroke:#0969DA,color:#1F2328,stroke-width:2px
+  class n1c168adb00d208e42f93 cn1c168adb00d208e42f93
+  classDef cn7bdc25d1694ef984782a fill:#FFFFFF,stroke:#1F2328,color:#1F2328,stroke-width:1px
+  class n7bdc25d1694ef984782a cn7bdc25d1694ef984782a
+  style g0d45f5fd462b8c70bffb fill:#E6F0FB,stroke:#C7C8C9,color:#1F2328

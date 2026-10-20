@@ -3,6 +3,25 @@
 从结构规格生成可编辑的技术图：架构、依赖、流程、状态、思维导图和网络拓扑。
 模型理解节点与关系；Python 负责布局、路由、检查和序列化。
 
+## 成品示例
+
+同一份虚构的订单系统规格（[source.diagram.json](examples/architecture/source.diagram.json)），
+三个后端各自计算布局。节点、连接、分组都来自规格，不是手工摆放的坐标。
+
+![Excalidraw 后端渲染的订单架构图](examples/architecture/excalidraw.png)
+
+**Excalidraw（默认）**：editorial 视觉，轻边框与手写感字体；产物是可继续编辑的 `.excalidraw`。
+
+![draw.io 后端渲染的订单架构图](examples/architecture/drawio.png)
+
+**draw.io**：同一份规格换成 classic 表现；需要 draw.io 协作或图标库时使用，产物是 `.drawio`。
+
+![Mermaid 官方渲染器输出的订单架构图](examples/architecture/mermaid.png)
+
+**Mermaid**：规格先生成 `.mmd`，再交给官方解析器/渲染器；适合嵌进 Markdown 与文档流水线。
+
+三张图来自 `examples/` 的虚构案例，不含客户数据；后端不同，布局与字体不要求像素一致。
+
 ## 安装与依赖
 
 从仓库根目录安装：
@@ -76,9 +95,10 @@ python3 scripts/check_presentation.py /project/docs/diagrams/system/system.excal
 | `scripts/check_drawio.py` | draw.io XML 结构检查（含压缩页） |
 | `scripts/readable_routing.py` | Excalidraw 密集图的近距离平行线、实际交叉与标签间隔检查（原生几何） |
 | `scripts/layout.py --explain` | 开发时查看布局推导 |
+| `scripts/emit_mermaid.py` / `check_mermaid.py` | 结构规格 → `.mmd`，并用官方解析器校验语法 |
 | `scripts/direction_preview.py` / `scheme_preview.py` | 按需比较视觉方向或 draw.io 配色 |
 | `scripts/sigils.py` / `icons.py` / `icons_fetch.py` | 内置图标、本地素材和官方库查询 |
-| `dev-tools/export_excalidraw.py` / `export_drawio.py` | 调用真实渲染器导出 |
+| `dev-tools/export_excalidraw.py` / `export_drawio.py` / `export_mermaid.py` | 调用真实渲染器导出 |
 | `dev-tools/sync_exports.py` | 只刷新已有格式；显式 `--format` 才新增格式，保存导出参数 |
 | `dev-tools/check_render.py` | 在真实浏览器核对单页官方 SVG；能力与限制见观看场景 |
 
@@ -110,6 +130,14 @@ python3 -m unittest discover -s tests/diagram-authoring -v
 
 ## Mermaid 与 draw.io 的补齐
 
-支持 `emit_mermaid.py` 从结构规格生成 `.mmd`，`check_mermaid.py` 使用官方解析器校验；
-PNG/SVG 由 `dev-tools/export_mermaid.py` 按需导出，已有格式通过 `sync_exports.py` 刷新。详见 [Mermaid 后端](references/mermaid-backend.md)。
+`emit_mermaid.py` 从结构规格生成 `.mmd`，`check_mermaid.py` 用官方解析器校验；
+PNG/SVG 由 `dev-tools/export_mermaid.py` 按需导出，已有格式通过 `sync_exports.py` 刷新：
+
+```sh
+python3 scripts/emit_mermaid.py system.diagram.json -o system.mmd
+python3 scripts/check_mermaid.py system.mmd
+python3 dev-tools/export_mermaid.py system.mmd -o system.png --format png
+```
+
+详见 [Mermaid 后端](references/mermaid-backend.md)。
 draw.io 支持压缩文件回读、默认名义留白 80，多页图片需显式页码，PDF 默认全部页。
