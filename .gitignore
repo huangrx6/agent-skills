@@ -34,6 +34,8 @@ file-only/
 skills/*.zip
 
 # deck-authoring 跑管线产生的二进制/图片（本地生成，不入库；仓库只收文本）。
+# 唯一例外是 README 的成品示例图 `assets/showcase/`：它们是压缩后的展示截图，
+# 不是管线产物；新增前先确认已隐去项目名与内部信息。
 # 这条清单要**跟着产出物的种类长** —— 新加一种导出就得补一行，
 # 漏一行就是让一个几 MB 的二进制摸进公共仓库。
 skills/deck-authoring/sample-treated.png

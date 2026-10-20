@@ -4,6 +4,32 @@
 新项目使用自由 HTML / CSS，页面按内容构图；已有 spec 项目保留兼容制作和有限的原生可编辑导出。
 使用入口见 [SKILL.md](SKILL.md)。
 
+## 成品示例
+
+同一类技术材料，可以形成完全不同的视觉方向。下面三份演示由本 skill 制作，截图是整份 deck
+的联系表（contact sheet），点击可看大图；图中的项目名已隐去。字体、配色与构图属于各自项目，
+不构成本 skill 的默认风格，也不是可复制的模板。
+
+<table>
+<tr>
+<td width="33%" valign="top">
+<a href="assets/showcase/paper-grid.webp"><img src="assets/showcase/paper-grid.webp" alt="纸面编辑方向：暖白纸底、红色强调、等宽注释，密集表格与流程用细线和编号组织" width="100%"></a>
+<br><sub><b>纸面编辑</b>：暖白纸底、红色强调、等宽注释；表格与流程用细线和编号组织，不靠卡片。</sub>
+</td>
+<td width="33%" valign="top">
+<a href="assets/showcase/dark-technical.webp"><img src="assets/showcase/dark-technical.webp" alt="深色技术方向：近黑底、橙红强调、大字排印，长表格与判断链在同一套栅格中展开" width="100%"></a>
+<br><sub><b>深色技术</b>：近黑底、橙红强调、大字排印；长表格和判断链在同一套栅格里展开。</sub>
+</td>
+<td width="33%" valign="top">
+<a href="assets/showcase/color-objects.webp"><img src="assets/showcase/color-objects.webp" alt="色彩与实物方向：亮绿、黑与蓝，实物摄影和立体物件承担章节节奏，颜色标记状态" width="100%"></a>
+<br><sub><b>色彩与实物</b>：亮绿、黑与蓝；实物摄影和立体物件承担章节节奏，颜色标记状态与结论。</sub>
+</td>
+</tr>
+</table>
+
+三份都按内容重新设计版式，先用真实页面验证再扩展整套；页面结构、配色与图像随项目而变，
+不套模板。判断标准见 [审美闸门](references/design-review.md)。
+
 ## 制作方式
 
 通用 skill 负责理解材料、研究参考、设计与审稿；项目保留自己的视觉决定、HTML/CSS 和素材；

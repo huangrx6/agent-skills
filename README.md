@@ -8,7 +8,7 @@
 | Skill | 用途 |
 | --- | --- |
 | [cosmic-function-point-splitter](skills/cosmic-function-point-splitter/README.md) | 按需求或接口识别 COSMIC 数据移动，生成带来源的拆分表，核对接口/页面覆盖并审计、改写已有表 |
-| [deck-authoring](skills/deck-authoring/README.md) | 从主题推导构图、留白与视觉节奏，用真实内容试排和截图修订，制作 HTML 演示并导出 PDF、PNG、PPTX 或视频 |
+| [deck-authoring](skills/deck-authoring/README.md) | 从主题推导构图、留白与视觉节奏，用真实内容试排和截图修订，制作 HTML 演示并导出 PDF、PNG、PPTX 或视频 · [成品示例](skills/deck-authoring/README.md#成品示例) |
 | [diagram-authoring](skills/diagram-authoring/README.md) | 从结构描述生成技术图，支持 Excalidraw、draw.io 与 Mermaid，并检查布局、语义和观看尺寸 |
 | [obsidian-wiki](skills/obsidian-wiki/README.md) | 学习 Wiki：吸收资料、关联证据、更新主题知识、检索问答与复习，独立运行 |
 | [obsidian-work](skills/obsidian-work/README.md) | 独立工作台：需求、缺陷、任务分工、日常记录与 Bases 首页，支持外部来源快照 |
