@@ -23,25 +23,40 @@
 何时提问、等待及继续，以 [制作入口](../SKILL.md#开始制作前先判断是否需要交互) 为准。本节提供选参考的方法，
 不能把“作者发现了一个合适参考”解释为不再需要用户选择。不要把找参考全部推给用户。
 
+**给用户的证据必须是「页面」，不是作品名。** 同媒介的实现案例优先（用户能打开的 deck 或 HTML）；
+参考来自影片、海报、摄影、游戏时，先做 1–2 页可比拟样张再让用户选，并把「取哪几个关系」写清楚。
+三条证据的等级、选择前必答的五个问题与常见媒介误读见 [风格证据](style-evidence.md)。
+只给风格缩略图或影视截图，等于让用户用想象补全页面——「3D 动画电影风格」被做成深色排版加暖色强调，
+就是这么发生的。参考截图只放 `refs/`，不进 `assets/images/`。
+
 第一次询问应能直接回答，例如：
 
 > 这次重做还没有确定视觉方向。你可以在 [Oh My PPT](https://www.ohmyppt.cc/style-showcase) 看封面气质，
 > 或在 [Pitch](https://pitch.com/templates) 看整套内容页，发我喜欢的作品链接或截图。
 > 你想自己挑参考、让我先找具体作品供你选，还是把风格交给我直接完成？
+> 也可以直接说这次要图像主导（插画、摄影或图形装置）还是文字主导；不确定就让我按内容判断。
 
 措辞随项目调整，不要求用户学习设计术语。用户选择让作者找参考时，展示可见作品及适用特点，等其选择；
 不要返回一串“极简 / 科技 / 商务”名称。用户给出作品后，只确认尚不清楚且影响制作的偏好，随后用真实内容做样页。
 
-| 可浏览入口 | 重点看什么 |
-| --- | --- |
-| [Oh My PPT 风格展示](https://www.ohmyppt.cc/style-showcase) | 封面构图、字体气质、色彩与装饰的关系；风格缩略图不能证明整套内容页质量 |
-| [Pitch 模板](https://pitch.com/templates) | 一套演示中封面、图文、数据与结尾如何接续 |
-| [Canva 演示模板](https://www.canva.com/presentations/templates/) | 广泛的主题与封面表达，进入具体作品比较内容页 |
-| [Slidesgo](https://slidesgo.com/) | 教学与主题化演示；其 [信息图](https://slidesgo.com/infographics) 可研究流程和比较如何组织 |
-| [PresentationGO](https://www.presentationgo.com/) | 图解、过程与关系表达，帮助找到替代长段文字的方式 |
+| 来源分组 | 看什么 | 在哪 |
+| --- | --- | --- |
+| **成品模板** | 整页版式、页数、真实排版：Canva / Miricanvas / Slidesgo / PresentationGO / Envato / Pitch | [风格来源](style-sources.md) 的注册表 |
+| **成套主题** | 同一母题如何贯穿封面 / 议程 / 章节 / 内容页：PPT-Design / Oh My PPT | 同上 |
+| **视觉语言** | 画风、光色、材质：Dribbble 的 tag | 同上 |
+
+站点清单只有**一份**：`assets/style-sources.json`，文档与 `style_probe.py` 都从这里读，
+`python3 scripts/style_probe.py --list-sites` 直接打印。新增站点改那张表，不要在别处再列一遍。
 
 这些是浏览入口，不是必须使用的平台或付费依赖；不能访问时说明限制，不用反复抓取拖延首次提问。
 截图足以说明偏好时，不要求注册或下载模板。
+
+成套主题值得看母题如何贯穿，而不是看单页配色。典型例子：
+[女巫花园](https://ppt-design.com/zh/themes/witch-s-garden-autumn-garden-theme-531) 的蘑菇与藤蔓、
+[Pricing Strategy](https://ppt-design.com/zh/themes/pricing-strategy-good-better-best-pricing-theme-687) 的价签、
+[Project Kickoff](https://ppt-design.com/zh/themes/project-kickoff-kickoff-meeting-presentation-theme-680) 的倒计时轨道——
+同一母题在封面、章节、数据页以不同尺度和角色反复出现，图像因此承担结构，而不是装饰。
+取其图像系统与节奏，不复制具体版式、主题符号或页面顺序。
 
 模板站适合让用户快速表达偏好，但不是视觉研究的天花板。确定方向或需要提高上限时，
 另看编辑设计、年报、海报档案、博物馆图录、数据新闻和字体样张；按

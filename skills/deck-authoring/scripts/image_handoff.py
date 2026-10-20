@@ -218,15 +218,19 @@ def check_images(plan: dict) -> dict:
         tw, th = asset["target_px"]
         scale = (max if asset["fit"] == "cover" else min)(tw / width, th / height)
         if scale > 1.01:
-            result["errors"].append(f"清晰度不足：按 {asset['fit']} 放入 {tw}×{th} 图位需放大 {scale:.2f} 倍")
+            result["errors"].append(
+                f"清晰度不足：按 {asset['fit']} 放入 {tw}×{th} 图位需放大 {scale:.2f} 倍；"
+                f"按 {tw}×{th} 重新出图，不要放大插值")
         visible_fraction = min((width / height) / (tw / th), (tw / th) / (width / height))
         if visible_fraction < .97:
             percent = (1 - visible_fraction) * 100
             if asset["fit"] == "cover":
                 result["warnings"].append(
-                    f"cover 约裁掉 {percent:.1f}% 图像面积；需核对焦点 {asset['focal']}% 和主体安全区")
+                    f"cover 约裁掉 {percent:.1f}% 图像面积；功能图（图表、流程、截图、剖面）请按 "
+                    f"{tw}×{th} 重出，照片再核对焦点 {asset['focal']}% 和主体安全区")
             else:
-                result["warnings"].append(f"contain 约有 {percent:.1f}% 图位留边；需检查背景衔接")
+                result["warnings"].append(
+                    f"contain 约有 {percent:.1f}% 图位留边；确认图位底色与图内底色一致，避免出现一圈边框")
         if not result["errors"]:
             result["status"] = "ready"
         results.append(result)
@@ -263,8 +267,36 @@ def placeholder_markup(asset: dict) -> str:
             f'       onerror="this.dataset.missing=1"\n'
             f'       style="display:block;width:100%;height:auto;aspect-ratio:{w}/{h};'
             f'object-fit:{asset["fit"]};object-position:{x}% {y}%">\n'
-            f'  <figcaption>待配图 · {Path(asset["file"]).name} · {w} × {h}</figcaption>\n'
+            f'  <!-- 缺图时只显示空白框；文件与尺寸见 image-brief.md，不要在图位里放文字 -->\n'
             f'</figure>')
+
+PLACEHOLDER_TEXT = re.compile(r"待配图|待回填|待生成图|占位图|图片占位")
+
+
+def placeholder_text(path: Path) -> list[str]:
+    """Visible placeholder copy in the rendered HTML; image slots must stay blank."""
+    found = []
+    class Scan(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.hidden = 0
+        def handle_starttag(self, tag, attrs):
+            if tag in ("script", "style", "template"):
+                self.hidden += 1
+        def handle_endtag(self, tag):
+            if tag in ("script", "style", "template"):
+                self.hidden = max(0, self.hidden - 1)
+        def handle_data(self, data):
+            if self.hidden:
+                return
+            value = " ".join(data.split())
+            if value and PLACEHOLDER_TEXT.search(value):
+                found.append(value[:120])
+    parser = Scan()
+    parser.feed(path.read_text(encoding="utf-8"))
+    parser.close()
+    return found
+
 
 def check_bindings(plan: dict, path: Path) -> dict:
     """Verify static img references on declared slides; no browser/visual claims.
@@ -381,6 +413,9 @@ def check_handoff(plan: dict, html_path: Path, document: str = "image-brief.md")
         errors.append("配图 Markdown 为空")
     bindings = check_bindings(plan, html_path)
     errors.extend(bindings["errors"])
+    residue = placeholder_text(html_path)
+    if residue:
+        errors.append("图位仍有可见占位文字（占位只放空白框）：" + "；".join(residue[:3]))
     files = check_images(plan)
     provided = {item["id"] for item in plan["images"] if item["source"] == "provided"}
     for asset in files["assets"]:
@@ -388,7 +423,7 @@ def check_handoff(plan: dict, html_path: Path, document: str = "image-brief.md")
         if asset["id"] in provided and asset["status"] != "ready":
             errors.append(f"{asset['id']}：登记复用的图片尚未就绪")
     return {"ready": not errors, "stage": "handoff", "document": str(path), "errors": errors,
-            "bindings": bindings, "files_ready": files["ready"],
+            "bindings": bindings, "files_ready": files["ready"], "placeholder_text": residue,
             "pending_images": [item["id"] for item in files["assets"] if item["status"] != "ready"],
             "scope": "仅核对交接文件和静态路径；功能图覆盖、背景设计、可见性与最终画面仍须审阅"}
 
@@ -401,13 +436,21 @@ def write_brief(plan: dict, out: str = "image-brief.md", html_path: Path | None 
         raise PlanError("提示词文档不能覆盖 plan 或图片目标")
     chunks = [f"# {plan['project']} — 配图清单\n",
               f"<!-- deck-image-plan-sha256:{plan_digest(plan)} -->\n",
-              "按下面的**文件名**逐张生成，放进 `assets/images/`，刷新页面即生效——不改 HTML，不做接入步骤。\n"
-              "占位图位已经在页面里接好：图缺失时显示占位框，图到位后自动换成真图。\n"]
+              "请用你自己的模型，按下面的**文件名**逐张生成，放进 `assets/images/`，刷新页面即生效——不改 HTML，不做接入步骤。\n"
+              "占位图位已经在页面里接好：缺图时只显示空白占位框，不叠加任何文字；图到位后自动换成真图。\n"]
+    if html_path is not None:
+        bindings = check_bindings(plan, html_path)
+        if not bindings["ready"]:
+            chunks.append("## 图位尚未接好\n\n"
+                          "先按下面的占位片段替换源文件里的图位，再让用户出图；"
+                          "否则回填后图片不会自动出现。\n")
+            chunks += [f"- {error}\n" for error in bindings["errors"][:6]]
     if plan.get("styleDirection"):
         chunks.append(
             "## 本版视觉方向（提示词按它写）\n\n"
             f"{plan['styleDirection']}\n\n"
             "下面的提示词把这四个变量翻成了可执行约束：媒介 / 明暗 / 色彩角色 / 构图。"
+            "整套共用同一个视觉母题，主体与构图随页面变化，质感与光位保持一致。"
             "**换方向或换版本必须重写提示词**，不要把上一版的措辞改几个词继续用。\n")
     chunks.append(f"项目目录：`{plan['root']}`。下方文件路径均相对此目录。\n")
     for asset in plan["images"]:
@@ -415,11 +458,17 @@ def write_brief(plan: dict, out: str = "image-brief.md", html_path: Path | None 
         if asset["source"] == "provided":
             instructions = ["### 复用来源（无需生成）\n", asset["source_note"] + "\n"]
         else:
-            instructions = ["### 提示词\n", _fence("\n".join(filter(None, [
-                asset["prompt"],
-                "文字安全区：" + asset["negativeSpace"] if asset.get("negativeSpace") else "",
-                "输出真实透明背景，保留 alpha 通道。" if asset.get("transparent") else "",
-            ]))) + "\n"]
+            # The output size belongs in the copied prompt: a generator has no idea
+            # which slot it fills and otherwise falls back to its own default ratio.
+            spec = (f"输出规格：{w} × {h} px（{asset['aspect']}）。按此比例原生生成，"
+                    f"不裁切、不拉伸、不加白边。")
+            instructions = ["### 提示词（整段复制，第一行是输出规格，别删）\n",
+                            _fence("\n".join(filter(None, [
+                                spec,
+                                asset["prompt"],
+                                "文字安全区：" + asset["negativeSpace"] if asset.get("negativeSpace") else "",
+                                "输出真实透明背景，保留 alpha 通道。" if asset.get("transparent") else "",
+                            ]))) + "\n"]
             if asset["negative"]:
                 instructions += ["### 负面约束\n", _fence("\n".join(asset["negative"])) + "\n"]
         chunks += [f"## {asset['id']}\n",
@@ -477,8 +526,11 @@ def main(argv=None) -> int:
         report = check_images(plan)
         report["files_ready"] = report["ready"]
         report["bindings"] = check_bindings(plan, args.html) if args.html else None
+        residue = placeholder_text(args.html) if args.html else []
+        if residue:
+            report["placeholder_text"] = residue
         if args.html:
-            report["ready"] = report["files_ready"] and report["bindings"]["ready"]
+            report["ready"] = report["files_ready"] and report["bindings"]["ready"] and not residue
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0 if report["ready"] else 1
     except (PlanError, OSError) as exc:

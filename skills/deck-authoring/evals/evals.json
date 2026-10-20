@@ -112,7 +112,7 @@
     {
       "id": 11,
       "prompt": "图我自己出太慢了，我配了 MiniMax 的 key，你能直接生成吗？",
-      "expected_output": "用户已有明确生成授权时不重复确认；仍应使用当前环境实际可用且适用的生图能力，不能因为提到 key 就假装后端已可调用。沿用结构化素材合同的项目可 --brief、填写准确 prompt，再按可用后端 --generate、--check；自由 HTML 则按实际素材槽位生成并验收，不伪造 spec。缺少必要后端或仍有占位符时说明具体缺项，不编造图；最终核对实际图位清晰度、焦点及裁切。",
+      "expected_output": "明确拒绝代生图：即使提到 MiniMax key，也不调用该密钥、MCP 图像工具或任何生图 API，不为出图写脚本。走「量图位 → image-plan.json → image-brief.md → 用户生成」的分工：brief 里保留完整提示词、尺寸、安全区与目标路径，说明用户可以拿 MiniMax 自己出图；回填后 --check 与目检，再进入导出。不假装后端已可调用，不因等待把图位删掉或改成纯文字，也不把“用户有 key”当成自己执行的授权。",
       "files": [
         "references/images.md",
         "SKILL.md",
@@ -184,7 +184,7 @@
     {
       "id": 18,
       "prompt": "这份新品发布会用 HTML 演示，PPTX 只要外观一致。想要像高级网页一样有主视觉、排版和动效，别再给我三种颜色的同一张列表。",
-      "expected_output": "采用自由HTML，不为已明确的PPTX外观要求再次提问。实际查看与新品材料相关的作品，提取可迁移的图文关系、背景和阅读节奏，用本项目真实中文内容形成代表页；字体、色彩和素材可在同一页共同试排，不增加逐项批准流程。主视觉与产品特点有关，不能只套大标题、抽象光球或三种颜色的相同清单。保留密集证据与必要条件，在实际观看尺寸检查主次、语义断行和有作用的留白。素材遵守项目要求，不伪造截图或数据；缺生图能力交完整提示词与回填路径。实现有阅读作用的动效并保持稳定完成态，实际播放；最终贴图PPTX从已验收逐页PNG导出。",
+      "expected_output": "采用自由HTML，不为已明确的PPTX外观要求再次提问。实际查看与新品材料相关的作品，提取可迁移的图文关系、背景和阅读节奏，用本项目真实中文内容形成代表页；字体、色彩和素材可在同一页共同试排，不增加逐项批准流程。主视觉与产品特点有关，不能只套大标题、抽象光球或三种颜色的相同清单。保留密集证据与必要条件，在实际观看尺寸检查主次、语义断行和有作用的留白。素材遵守项目要求，不伪造截图或数据；缺位图交完整提示词与回填路径。实现有阅读作用的动效并保持稳定完成态，实际播放；最终贴图PPTX从已验收逐页PNG导出。",
       "files": [
         "SKILL.md",
         "references/web-composition.md",
@@ -465,7 +465,7 @@
     {
       "id": 46,
       "prompt": "前面已经说过：不要SVG，所有配图只用生图模型生成；HTML效果优先，PPTX保留外观即可。现在把项目讲解完全重新生成，不看历史内容。/deck-authoring",
-      "expected_output": "重新核实内容并重建审美方向，同时保留已明确的素材、无SVG和外观交付约束，不重复询问是否需要原生可编辑PPTX。外部网页用于视觉研究，不能把其SVG、截图或现成视觉资产充作本项目配图，也不用Canvas或程序转PNG规避限制。根据本轮实际可见参考和材料自主试排；只有先前明确约定先确认方向时才等待该范围，不能因重做代选旧风格或添加新的审批链。按主题和图位生成图片；无生成能力或由用户另行生成时交完整提示词、比例尺寸和固定回填路径，缺图标为待素材。启用项目要求的raster-only，验收完整画面、播放及外观一致的贴图PPTX；这些限制不扩为其他项目默认规则。",
+      "expected_output": "重新核实内容并重建审美方向，同时保留已明确的素材、无SVG和外观交付约束，不重复询问是否需要原生可编辑PPTX。外部网页用于视觉研究，不能把其SVG、截图或现成视觉资产充作本项目配图，也不用Canvas或程序转PNG规避限制。根据本轮实际可见参考和材料自主试排；只有先前明确约定先确认方向时才等待该范围，不能因重做代选旧风格或添加新的审批链。按主题和图位写完整提示词、比例尺寸和固定回填路径并交 image-brief.md；作者不调用生图工具，缺图明确为待素材。启用项目要求的raster-only，验收完整画面、播放及外观一致的贴图PPTX；这些限制不扩为其他项目默认规则。",
       "files": [
         "SKILL.md",
         "references/refined-workflow.md",
@@ -657,7 +657,7 @@
     {
       "id": 65,
       "prompt": "用这些技术材料制作 HTML 演示，版面要有设计感，配图由我根据你给的 Markdown 自己生成，再放进指定文件夹。现在还没有图片。请完成待配图稿。",
-      "expected_output": "在正文布局前判断适合用图的页面，按实际内容设计图位，不默认技术内容只需 CSS 方框，也不规定每页必须有图。实际保存 image-plan.json 并生成 image-brief.md，每张图提供可独立复制的完整提示词、使用页、目的、尺寸比例、安全区、透明要求和准确的相对保存路径。HTML 使用同一目标路径并保留有尺寸的图位；检查绑定，明确素材尚缺，不声称资源或最终视觉验收完成。不调用生图工具，不以工具可用或不可用决定是否交 Markdown，不用聊天建议或只有 JSON 代替文件。回填后刷新核对裁切和显示，再重新导出；只有用户明确委托才执行生成。",
+      "expected_output": "在正文布局前判断适合用图的页面，按实际内容设计图位，不默认技术内容只需 CSS 方框，也不规定每页必须有图。实际保存 image-plan.json 并生成 image-brief.md，每张图提供可独立复制的完整提示词、使用页、目的、尺寸比例、安全区、透明要求和准确的相对保存路径。HTML 使用同一目标路径并保留有尺寸的图位；检查绑定，明确素材尚缺，不声称资源或最终视觉验收完成。不调用生图工具，不以工具可用或不可用决定是否交 Markdown，不用聊天建议或只有 JSON 代替文件。回填后刷新核对裁切和显示，再重新导出；即使委托也不代生图，仍交 brief 由用户执行。",
       "files": [
         "SKILL.md",
         "references/images.md",
@@ -787,6 +787,167 @@
         "references/visual-craft.md",
         "references/visual-quality.md",
         "scripts/design_signals.py"
+      ]
+    },
+    {
+      "id": 78,
+      "prompt": "上一版客户觉得还行，你再做一版，换个方向。项目里能看到 v1 的 HTML 和 CSS。",
+      "expected_output": "识别为整体重做：新建 v2 目录，不从 v1 复制 source.html / deck.css 或类名，设计期间也不打开旧源文件找灵感或“看哪里还能留”。先按制作入口确认新的视觉参考，在 design.md 写「与上一版的差异」（参考/字体/配色/构图/图案/封面尾页），再从空文件做 hero pages。用户没有授权沿用任何维度，不得用 --allow；三张 hero 后运行 version_guard.py，有硬失败就回本版参考重做该维（换参考、重画组件、重选字），不靠改色号或换封面图压低重合度。旧版本原样保留。",
+      "files": [
+        "SKILL.md",
+        "references/version-reset.md",
+        "references/refined-workflow.md",
+        "references/visual-language.md",
+        "scripts/version_guard.py"
+      ]
+    },
+    {
+      "id": 79,
+      "prompt": "v2 就用上一版的封面构图和那套宋体吧，其他随便改改。",
+      "expected_output": "只放行用户点名的两维：字体记录为指定沿用，封面构图在 design.md 写明并保持；用 version_guard.py --allow fonts --reason 引用户原话，其余维度仍按重做检查。不能把“其他随便改改”理解成沿用上一版配色、组件、纹理或页序，也不因封面沿用就跳过整维重做。若检查仍报其它硬失败，按本版参考重做，不把授权范围扩大到未点名的维度。",
+      "files": [
+        "SKILL.md",
+        "references/version-reset.md",
+        "scripts/version_guard.py"
+      ]
+    },
+    {
+      "id": 80,
+      "prompt": "HTML 做好了，直接发我 PDF 吧。",
+      "expected_output": "不直接导出。先说明这是 HTML 完成、配图尚未回填（占位图位仍在，image-brief.md 已交），问用户这次还要不要配图；要图就交回填路径并等待，回填后用 image_handoff.py --check 验收。用户说不要图或已完成回填后，才按其已指定的 PDF 格式导出；用户本轮已指定格式就不重复问。若用户坚持先导，只能标为草稿并列出待补图，不能称作成品。",
+      "files": [
+        "SKILL.md",
+        "references/delivery-formats.md",
+        "references/images.md",
+        "scripts/image_handoff.py"
+      ]
+    },
+    {
+      "id": 81,
+      "prompt": "不用配图了，导出吧。",
+      "expected_output": "把“不用配图”记为用户明确确认，进入格式选择：问导出 PDF 还是 PPTX，或按用户本轮已指定的格式执行；不把“导出吧”当成格式决定，也不默认只导 PDF。导出时说明这是无配图版本，并在交付说明记录用户确认，不保留占位图位还宣称配图完成。",
+      "files": [
+        "SKILL.md",
+        "references/delivery-formats.md"
+      ]
+    },
+    {
+      "id": 82,
+      "prompt": "图我已经放到 assets/images 了，现在导出 PDF。",
+      "expected_output": "先运行 image_handoff.py --check 核对计划中的文件与 HTML 图位，不只看目录里有没有文件。退出 0 才导出 PDF；退出 1 就报出缺失或无效的具体文件并继续等，不先导出再说。补图后重新编译和截图，已有 PDF 不会自动更新，不能把旧文件说成已包含新图。",
+      "files": [
+        "SKILL.md",
+        "references/delivery-formats.md",
+        "references/images.md",
+        "scripts/image_handoff.py"
+      ]
+    },
+    {
+      "id": 83,
+      "prompt": "标题想用宋体，正文用黑体，会不会更有层次？",
+      "expected_output": "先说明默认规则：一版只用一个字族承担全部文本，标题、正文、数字、图注、表格、页脚都用它；中文里标题与正文分族最容易在字面高度、重心和字重上露馅，翻页像换了作者。若用户确认仍要双族，把它当作明确授权：限制在标题等指定角色，正文回到主族，在样页里并排验证字面比例，写进 design.md，并用 type_audit.py --allow \"字族名\" --reason \"用户原话\" 放行；不能作者自行加第二族。",
+      "files": [
+        "SKILL.md",
+        "references/fonts.md",
+        "scripts/type_audit.py"
+      ]
+    },
+    {
+      "id": 84,
+      "prompt": "字体你来配，标题有气质，正文清楚就行。",
+      "expected_output": "这不是双族授权。选一个能同时承担标题与正文的字族，用字重、字号、行高和位置建立层次；不默认配“展示体 + 正文体”。按真实长标题、段落、数字和图标签试排，确认中英混排与汉字覆盖，落版后和交付前跑 type_audit.py，有第二个文本字族就并回主族；等宽只留给代码与机器标识。",
+      "files": [
+        "SKILL.md",
+        "references/fonts.md",
+        "references/typography-and-space.md",
+        "scripts/type_audit.py"
+      ]
+    },
+    {
+      "id": 85,
+      "prompt": "就照着这种主题站做，画面要满、要有冲击力，但别太像模板。",
+      "expected_output": "看成套主题的母题如何贯穿，而不是复制版式：先提出本内容的视觉母题（可放大缩小、可重复的对象/形状/材质/照片处理），安排它在封面、章节/议程、内容页以不同尺度和角色出现 3–6 次；封面与章节页由主视觉承担，内容页让图或图形参与解释，不把图缩成右侧小方块。参考只用于图像系统与节奏，不照搬其主题符号、页序和版式。写 image-brief 时把母题、媒介、光线、色板写进系列约束，按分镜把图位接齐，不设数量上限；图由用户按 brief 生成，作者不调用生图工具。",
+      "files": [
+        "SKILL.md",
+        "references/images.md",
+        "references/visual-language.md",
+        "references/design-review.md"
+      ]
+    },
+    {
+      "id": 86,
+      "prompt": "我们之前做的还是太保守了，为什么没有这种冲击力？是不是光在排文字？",
+      "expected_output": "先看实际缩略图与源文件，承认问题要具体：图像只做装饰或右侧小图、没有贯穿母题、封面与章节页由文字承担、页面主角仍是标题和段落。不要只靠加大字号或换字体补救；按图像系统重做：定母题与 3–6 次出现方式，让封面/章节/议程由图像或图形承担主体，内容页至少一半让图参与解释，并重新规划 image-plan 与图位。对技术材料仍保留事实与精确标签，图承担关系，文字留判断与条件；不能用装饰图冒充分解图。",
+      "files": [
+        "SKILL.md",
+        "references/images.md",
+        "references/design-review.md",
+        "scripts/design_signals.py"
+      ]
+    },
+    {
+      "id": 87,
+      "prompt": "技术方案也要有冲击力，但别给我每页生成插画。",
+      "expected_output": "不改用插画堆砌。先为技术内容选一个图形装置母题（轨道、框架、编号牌、剖面容器、刻度尺），让它在封面、章节、内容与数据页以不同尺度和角色出现 3–6 次；图承担关系，精确标签与事实留在 HTML/SVG 层。视觉分镜逐页写明载体与图文关系，连续三页同构就换。不用生成图替代架构图或证据；装饰图不能冒充分解图，也不能为了冲击力删条件、缩字或把数据做成无基准的大数字。",
+      "files": [
+        "SKILL.md",
+        "references/images.md",
+        "references/visual-craft.md",
+        "references/design-review.md"
+      ]
+    },
+    {
+      "id": 88,
+      "prompt": "这套图越多越好，你别省，做满一点。",
+      "expected_output": "不按张数设上限，也不因为“图多”劝退。按内容判断每一页的图是否承担解释或气氛：活动/品牌/叙事可以整页图、连续多页图；技术/数据用图形装置、图解与图表，照片只做证据或气氛。每张图都写进 image-plan 与 image-brief，交给用户生成或提供；作者不检查生图能力、不调用生图工具、不下载素材站图片。图多不等于每页同一构图：母题、裁切、尺度和角色要变；不凑数、不重复文字、不用图遮住事实。",
+      "files": [
+        "SKILL.md",
+        "references/images.md",
+        "references/design-review.md"
+      ]
+    },
+    {
+      "id": 89,
+      "prompt": "你有生图能力吗？没有的话找点能用的素材，别又让我自己出图。",
+      "expected_output": "说明分工不因提问而改变：skill 不代生图，也不从素材站下载图片，不会为了“别让用户自己出图”而调用任何生成能力。仍会完成量图位、写 image-plan、交 image-brief.md 与固定回填路径，逐图给出完整提示词、尺寸、安全区、负面约束和使用页；用户可用任意模型生成，回填后 --check 并目检。不用来源不明的图或生成图冒充真实证据，也不把“用户会出图”当成省略 brief 的理由。",
+      "files": [
+        "SKILL.md",
+        "references/images.md",
+        "references/web-composition.md",
+        "scripts/image_source.py"
+      ]
+    },
+    {
+      "id": 90,
+      "prompt": "这张插画被卡片切掉一块，后面还有张卡片盖住了图，帮我看看。",
+      "expected_output": "先看实际截图与 DOM：查父容器 overflow/高度、图片尺寸与定位、z-index 与层叠上下文，区分“有意裁切”和尺寸/层级错误。默认按错误修：调整容器或图片尺寸、改 object-fit/object-position、把主体移进安全区、重排背景-图-遮罩-文字层级；SVG 核对 viewBox 与宽高比，不硬压。修后跑 web_check --check，确认 media-clipped / media-occluded 清零或只保留有理由的项；有意裁切/遮挡才写 data-web-check-allow 与非空 reason，并保证主体完整可读。",
+      "files": [
+        "SKILL.md",
+        "references/images.md",
+        "references/web-composition.md",
+        "scripts/web_check.py"
+      ]
+    },
+    {
+      "id": 91,
+      "prompt": "这些图到底用 SVG 还是 PNG？有几张还是 3D 的。",
+      "expected_output": "按内容、透明、交付格式和文件大小选，不按“哪个更高级”选：图解、图标、线描和需要清晰缩放的矢量用 SVG（文字标签留 HTML）；透明主体、截图、精确像素插画用 PNG；照片、带透明的插画和 Web 交付可用 WebP；不透明照片用 JPG；AVIF 兼容性差不用于 PPTX/PDF。3D 渲染本质是位图，用 PNG/WebP，保留高分辨率与透明通道。还要核对交付格式：原生 PPTX 对 SVG 支持有限，PDF 可能栅格化，导出前实际回读；生成模型多数不出真 SVG，伪矢量要检查。统一视觉处理（裁切、色调、边框），不因格式混用而割裂。",
+      "files": [
+        "references/images.md",
+        "references/delivery-formats.md",
+        "SKILL.md"
+      ]
+    },
+    {
+      "id": 92,
+      "prompt": "这页三张卡都挤在上半部，卡里的字又小又密，下半页空着，帮我调大气一点。",
+      "expected_output": "先看实际页面与源文件，把问题拆成内容带、卡片内部空间和字号三件事，不只说“留白不好”。改法：把内容带定在可用高度的 60–80%，用放大标题/图/数字或一个视觉锚点占住下半部，也可有意居中；卡片正文从 22–26px、行高 1.5–1.7、内边距 28–32px 起，三列放不下就减列、拆页或删字。不要只加空白、拉高容器、统一垂直居中或继续缩字。改后跑 design_signals 的 bottom-empty / cramped-body-type 与 web_check 的 body-type-too-small，缩略图看内容是否像被“放在画面里”而不是堆在顶部。",
+      "files": [
+        "SKILL.md",
+        "references/composition-principles.md",
+        "references/design-review.md",
+        "scripts/design_signals.py",
+        "scripts/web_check.py"
       ]
     }
   ]

@@ -32,9 +32,10 @@ except RuntimeError:
 def analyzed_page(*, heading=64, body=26, family="Source Han Serif", chars=240,
                   card_groups=None, gaps=None, centered=0, headings=1,
                   images=None, blocks=None, margins=None, effects=None,
-                  heading_text="A page with a real focal point"):
+                  line_height=None, heading_text="A page with a real focal point"):
     run = {"text": "这是一段用于检查行长和图注关系的正文。" * 8, "body": True,
            "chars": chars, "lineCount": max(1, chars // 40), "fontSize": body,
+           "lineHeight": line_height or f"{round(body * 1.5)}px",
            "family": family, "x": 112, "y": 260, "w": 760, "h": 80}
     heading_run = {"text": heading_text, "heading": True, "chars": len(heading_text),
                    "lineCount": 1, "fontSize": heading, "family": family,
@@ -74,13 +75,20 @@ class TestPageSignals(unittest.TestCase):
         self.assertNotIn("flat-type-scale", found)
         self.assertNotIn("default-display-type", found)
 
-    def test_equal_card_grid_and_shadow_stack(self):
+    def test_equal_surfaced_card_grid_and_shadow_stack(self):
         page = analyzed_page(card_groups=[{"count": 3, "width": 300, "height": 200,
-                                           "gap": 24, "top": 300}],
+                                           "gap": 24, "top": 300, "surfaced": True}],
                              effects={"shadows": 3, "rounded": 4, "gradients": 0})
         found = codes(page)
         self.assertIn("equal-card-grid", found)
         self.assertIn("shadow-card-stack", found)
+
+    def test_plain_equal_columns_are_not_called_cards(self):
+        """等宽等高但无底/框/圆角的分栏是排印，不是卡片；不该提示去消掉它。"""
+        page = analyzed_page(card_groups=[{"count": 3, "width": 300, "height": 200,
+                                           "gap": 24, "top": 300, "surfaced": False}],
+                             effects={"shadows": 0, "rounded": 0, "gradients": 0})
+        self.assertNotIn("equal-card-grid", codes(page))
 
     def test_uniform_gaps_are_flagged_only_on_low_text_pages(self):
         found = codes(analyzed_page(chars=400, gaps=[24] * 8))
@@ -101,6 +109,27 @@ class TestPageSignals(unittest.TestCase):
         found = codes(analyzed_page(chars=80, gaps=[], blocks=[
             {"x": 112, "right": 872, "y": 100, "w": 760, "h": 40}]))
         self.assertEqual(found, set())
+
+    def test_cramped_body_type_and_bottom_empty_are_review_signals(self):
+        page = analyzed_page(body=14, chars=300, margins={
+            "left": 112, "top": 90, "right": 112, "bottom": 320})
+        found = {signal["code"]: signal for signal in signals.analyze_page(page)["signals"]}
+        self.assertIn("cramped-body-type", found)
+        self.assertIn("bottom-empty", found)
+        self.assertEqual(found["cramped-body-type"]["severity"], "review")
+        self.assertEqual(found["bottom-empty"]["severity"], "review")
+
+    def test_tight_line_height_is_reported_even_when_type_is_large(self):
+        page = analyzed_page(body=24, line_height="30px", chars=300)
+        self.assertIn("cramped-body-type", codes(page))
+        roomy = analyzed_page(body=24, line_height="38px", chars=300)
+        self.assertNotIn("cramped-body-type", codes(roomy))
+
+    def test_a_large_bottom_anchor_clears_bottom_empty(self):
+        page = analyzed_page(chars=300, margins={
+            "left": 112, "top": 90, "right": 112, "bottom": 320},
+            images=[{"w": 900, "h": 480, "y": 400, "bottom": 880}])
+        self.assertNotIn("bottom-empty", codes(page))
 
     def test_deck_flags_a_repeated_silhouette_and_missing_hero(self):
         page = signals.analyze_page(analyzed_page(heading=40, body=24, family="Arial"))

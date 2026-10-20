@@ -108,6 +108,24 @@ class TestPointerBoundaries(unittest.TestCase):
         code, _out = self._run()
         self.assertEqual(0, code)
 
+    def test_bare_project_artifacts_are_not_repo_paths(self):
+        """`design.md` / `image-plan.json` / `image-brief.md` 是使用者项目里的产物名。
+
+        它们不随 skill 发布，文档里写「状态写进 `design.md`」不是指向仓库文件。
+        曾经的实测：引入这三类产物名后，`check_pointers` 一次报出 18 条假悬空引用。
+        """
+        self._write("SKILL.md", "状态写进 `design.md`，配图见 `image-plan.json` 与 `image-brief.md`。\n")
+        code, out = self._run()
+        self.assertEqual(0, code, "裸产物名不该按仓库路径判定")
+        self.assertNotIn("design.md", out)
+
+    def test_project_artifact_inside_a_references_path_still_blocks(self):
+        """只豁免裸文件名：写成 `references/design.md` 就是仓库路径，缺了要拦。"""
+        self._write("SKILL.md", "见 `references/design.md`。\n")
+        code, out = self._run()
+        self.assertEqual(1, code)
+        self.assertIn("references/design.md", out)
+
     def test_json_output_separates_the_two_classes(self):
         self._write("SKILL.md", "见 `references/gone.md`。\n")
         self._write("references/other.md", "以后可以放 `references/also-gone.md`。\n")

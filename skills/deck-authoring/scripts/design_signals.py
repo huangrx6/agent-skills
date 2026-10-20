@@ -385,6 +385,14 @@ def _chromatic(value: str) -> bool:
     return saturation >= 0.18 and 0.08 <= lightness <= 0.95
 
 
+def _px(value, default: float = 0.0) -> float:
+    """Computed line-height arrives as "30px"; parse the number, keep 0 as unknown."""
+    text = str(value).strip().lower()
+    if text.endswith("px"):
+        text = text[:-2].strip()
+    return _num(text, default)
+
+
 def _median(values: list[float]) -> float | None:
     return round(statistics.median(values), 2) if values else None
 
@@ -443,7 +451,7 @@ def analyze_page(page: dict) -> dict:
     body_sizes = [_num(value) for value in type_data.get("bodySizes", []) if _num(value) > 0]
     families = [str(value) for value in type_data.get("families", []) if value]
     weights = [str(value) for value in type_data.get("weights", []) if value]
-    body_text = [run for run in runs if run.get("body")]
+    body_text = [run for run in runs if run.get("body") and run.get("tag") not in ("code", "pre", "kbd", "samp")]
     char_count = _int(page.get("charCount"))
     body_chars = sum(_int(run.get("chars")) for run in body_text)
 
@@ -513,11 +521,12 @@ def analyze_page(page: dict) -> dict:
             "为标题选择一个有明确字形态度的展示字，或让排印由尺度、字重和位置承担；不要只换一个默认无衬线。",
             family=display_family, headingCount=heading_count))
 
-    if len(_unique(families)) > 3:
+    if len(_unique(families)) > 2:
         signals.append(_signal(
             "font-family-mix", "info",
             f"一页出现 {len(_unique(families))} 个字族，视觉声音容易散。",
-            "收敛到展示字 + 正文字两族；第三族只用于数据或代码，并检查它是否真的必要。",
+            "收敛到一个文本字族；等宽只给代码与机器标识。第二文本字族需要用户或品牌明确授权，"
+            "并用 type_audit.py 登记。",
             families=_unique(families)))
 
     if len(chromatic) > 6:
@@ -581,13 +590,21 @@ def analyze_page(page: dict) -> dict:
                 "把边距当作构图的一部分；先统一左/上轴，再决定是否让一张图或色块故意出血。",
                 margins=margins))
 
-    if (margins and char_count > 250 and _num(margins.get("bottom")) > 280
-            and _num(margins.get("top"), 999) < 180 and len(images) <= 1):
-        signals.append(_signal(
-            "bottom-empty", "info",
-            f"底部空出约 {margins.get('bottom')}px，内容集中在页面上半部。",
-            "把空间放到组间或焦点周围，或让一个元素（图、数字、色块）承担下半部；不要用拉高容器填满。",
-            margins=margins, charCount=char_count))
+    big_images = [img for img in images
+                  if _num(img.get("w")) * _num(img.get("h")) >= 1600 * 900 * 0.05]
+    bottom_anchor = any(_num(img.get("y")) > 360 and _num(img.get("bottom")) > 620
+                        for img in big_images)
+    if margins and char_count > 200:
+        top = _num(margins.get("top"), 999)
+        bottom = _num(margins.get("bottom"))
+        content_height = max(0, 900 - top - bottom)
+        if bottom > 240 and top < 180 and content_height < 585 and not bottom_anchor:
+            signals.append(_signal(
+                "bottom-empty", "review",
+                f"内容带只占约 {content_height}px（画面 900px），底部空出 {bottom}px。",
+                "先定内容带：放大字号、主体或图，或让数字/色块占住下半部；也可以有意居中，让上下留白对称。"
+                "不要只把内容顶在上半，或用拉高容器填满。",
+                contentHeight=round(content_height), margins=margins, charCount=char_count))
 
     if char_count > 1600:
         signals.append(_signal(
@@ -595,6 +612,28 @@ def analyze_page(page: dict) -> dict:
             f"本页约 {char_count} 字符，阅读负担接近文档页。",
             "先按问题拆页或把细节下沉到图注/附录；不要靠缩字或缩小行距解决。",
             charCount=char_count))
+
+    line_ratios = []
+    for run in body_text:
+        font_size = _num(run.get("fontSize"))
+        line_height = _px(run.get("lineHeight"))
+        if font_size and line_height:
+            line_ratios.append(line_height / font_size)
+    line_ratio = _median(line_ratios)
+    if body_chars >= 160:
+        small = body_size is not None and body_size < 20
+        tight = line_ratio is not None and line_ratio < 1.4
+        if small or tight:
+            parts = []
+            if small:
+                parts.append(f"正文中位字号 {body_size:g}px")
+            if tight:
+                parts.append(f"行高约 {line_ratio:.2f}×")
+            signals.append(_signal(
+                "cramped-body-type", "review",
+                "；".join(parts) + "，正文在卡片或分栏里容易被挤住。",
+                "正文从 22–26px、行高 1.5–1.7 起；放不下就减列、拆页或删字，不要缩字或压行距。",
+                bodySize=body_size, lineRatio=line_ratio, bodyChars=body_chars))
 
     if line_chars and body_chars >= 200:
         p90 = _percentile(line_chars, 0.9)
@@ -690,8 +729,8 @@ def analyze_page(page: dict) -> dict:
     # 字体栈：栈里没有任何声明字族的文字，会落到系统字
     declared = {str(name).strip().strip('"').strip("'").lower()
                 for name in (page.get("declaredFamilies") or []) if str(name).strip()}
+    system_runs: list[dict] = []
     if declared:
-        system_runs = []
         for run in runs:
             stack = {part.strip().strip('"').strip("'").lower()
                      for part in str(run.get("familyStack") or "").split(",") if part.strip()}
@@ -821,11 +860,12 @@ def analyze_deck(pages: list[dict], raw_pages: list[dict]) -> dict:
             "让标题按页面任务移动：封面、章节、图像主角页可以不同；只保留必要的共同阅读坐标。",
             titleY=round(statistics.fmean(title_ys), 1)))
     families = _unique([family for page in pages for family in page["metrics"].get("fontFamilies", [])])
-    if len(families) > 3:
+    if len(families) > 2:
         signals.append(_signal(
             "deck-font-mix", "info",
             f"整套出现 {len(families)} 个字族，跨页亲缘可能变弱。",
-            "把字族收敛到展示 + 正文两族；第三族只在数据/代码页出现并说明理由。",
+            "默认一个文本字族承担全部文本；等宽只给代码。第二族只在用户或品牌明确要求时使用，"
+            "并用 type_audit.py 登记授权。",
             families=families))
     chromatic = _unique([color for page in pages for color in page["metrics"].get("chromaticColors", [])])
     if len(chromatic) > 10:
@@ -836,6 +876,18 @@ def analyze_deck(pages: list[dict], raw_pages: list[dict]) -> dict:
             colors=chromatic[:16]))
     max_image = max([page["metrics"].get("imageAreaRatio") or 0 for page in pages] or [0])
     max_ratio = max([page["metrics"].get("scaleRatio") or 0 for page in pages] or [0])
+    image_pages = sum(1 for page in pages
+                      if (page["metrics"].get("imageAreaRatio") or 0) >= 0.12)
+    if len(pages) >= 5 and image_pages / len(pages) < 0.34:
+        text_only = [page.get("slide") for page in pages
+                     if (page["metrics"].get("imageAreaRatio") or 0) < 0.02]
+        signals.append(_signal(
+            "image-sparse-deck", "review",
+            f"只有 {image_pages}/{len(pages)} 页的 img/svg 面积达到 12%，缩略图主要是一排排文字块。",
+            "让图像参与结构：封面、章节与议程由主视觉承担，内容页让图或图形参与解释；"
+            "先定母题与它 3–6 次的出现方式，再补图。合同/附录/密集参考型材料可以文字为主，"
+            "但封面与章节仍要有视觉角色。",
+            imagePages=image_pages, pages=len(pages), textOnlyPages=text_only[:30]))
     max_type = max([page["metrics"].get("maxTypeSize") or 0 for page in pages] or [0])
     if len(pages) >= 3 and max_image < 0.12 and max_ratio < 2.8 and max_type < 72:
         signals.append(_signal(

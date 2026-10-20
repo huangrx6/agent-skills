@@ -48,6 +48,8 @@ import urllib.request
 HERE = Path(__file__).resolve().parent
 
 _browser_spec = importlib.util.spec_from_file_location("_deck_browser", HERE / "browser.py")
+if _browser_spec is None or _browser_spec.loader is None:
+    raise RuntimeError(f"加载不了 browser.py：{HERE / 'browser.py'}")
 browser = importlib.util.module_from_spec(_browser_spec)
 _browser_spec.loader.exec_module(browser)
 
@@ -97,8 +99,8 @@ window.__webCheckCollect = function(slide, options) {
   }
   function add(code,severity,message,el,details={},other=null){
     const issue={code,severity,message,element:label(el),...details};
-    if(['text-overlap','text-mask','svg-fill-overridden','text-occluded','body-block-budget'].includes(code)) issue.requiresReview=true;
-    const exemptible=['text-overlap','text-mask','svg-fill-overridden','text-occluded','small-text'].includes(code);
+    if(['text-overlap','text-mask','svg-fill-overridden','text-occluded','body-block-budget','media-clipped','media-occluded','body-type-too-small'].includes(code)) issue.requiresReview=true;
+    const exemptible=['text-overlap','text-mask','svg-fill-overridden','text-occluded','small-text','media-clipped','media-occluded','body-type-too-small'].includes(code);
     const allowed=severity==='warning'&&exemptible&&(exemption(el,code)||(other && exemption(other,code)));
     if(allowed) exemptions.push({...issue,...allowed}); else issues.push(issue);
   }
@@ -118,6 +120,8 @@ window.__webCheckCollect = function(slide, options) {
     const css=getComputedStyle(el), group=semantic(el), fullText=node.nodeValue.trim().replace(/\s+/g,' '), text=fullText.slice(0,100);
     const fontSize=parseFloat(css.fontSize), run={el,group,text,fontSize,characterCount:Array.from(fullText).length,rects}; runs.push(run);
     signatures.push({element:label(el),text,rects:rects.map(box)});
+    if(/待配图|待回填|待生成图|占位图|图片占位/.test(fullText))
+      add('placeholder-label','error','Visible placeholder copy inside an image slot; keep the slot blank and move the note outside the image',el,{text});
     const over=rects.map(r=>({left:Math.max(0,bounds.left-r.left),top:Math.max(0,bounds.top-r.top),right:Math.max(0,r.right-bounds.right),bottom:Math.max(0,r.bottom-bounds.bottom)}));
     const excess=Object.fromEntries(['left','top','right','bottom'].map(k=>[k,round(Math.max(...over.map(r=>r[k])))]));
     if(Object.values(excess).some(v=>v>options.tolerance)) add('text-outside-slide','error','Text extends outside the slide',el,{text,excess,rects:rects.map(box)});
@@ -304,6 +308,13 @@ window.__webCheckCollect = function(slide, options) {
   // Auxiliary labels have a different reading role from the explanation. Apply
   // this only inside a valid capacity contract; legacy HTML keeps its existing
   // threshold, and an explicit minFont always remains a global advisory floor.
+  const tinyBody=runs.filter(run=>{
+    if(run.fontSize>=16||run.characterCount<20)return false;
+    if(run.el.closest('h1,h2,h3,h4,h5,h6,code,pre,kbd,samp,.mono,.deck-footer,.deck-caption,.deck-kicker'))return false;
+    return run.el.tagName==='P'||run.el.tagName==='LI'||!!run.el.closest('.deck-body, .deck-copy');
+  });
+  if(tinyBody.length) add('body-type-too-small','warning','Body text is below 16px; enlarge it or split the page',tinyBody[0].el,
+    {count:tinyBody.length,samples:tinyBody.slice(0,8).map(run=>({text:run.text,fontSize:run.fontSize,element:label(run.el)}))});
   const smallGroups=new Map();
   for(const run of runs){
     let role='text';
@@ -405,6 +416,62 @@ window.__webCheckCollect = function(slide, options) {
       if(r.width<1||r.height<1) add('image-zero-size','error','Loaded image has no visible area',im,{src});
     }
   }
+  // Media clipping/occlusion: an illustration cut by its container or covered
+  // by a later opaque layer is usually a sizing/stacking bug. The author can
+  // exempt an intentional crop or overlap with data-web-check-allow.
+  const mediaClip=(el,r)=>{
+    let worst=0,by=null;
+    for(let cur=el.parentElement;cur&&cur!==slide;cur=cur.parentElement){
+      const cs=getComputedStyle(cur),clipX=/^(hidden|clip|auto|scroll)$/.test(cs.overflowX),clipY=/^(hidden|clip|auto|scroll)$/.test(cs.overflowY);
+      if(!clipX&&!clipY)continue;
+      const c=cur.getBoundingClientRect();
+      const left=Math.max(r.left,c.left),right=Math.min(r.right,c.right),top=Math.max(r.top,c.top),bottom=Math.min(r.bottom,c.bottom);
+      const fraction=1-Math.max(0,right-left)*Math.max(0,bottom-top)/Math.max(1,r.width*r.height);
+      if(fraction>worst){worst=fraction;by=label(cur);}
+    }
+    return worst>.05?{fraction:round(worst),clippedBy:by}:null;
+  };
+  const opaqueForeground=el=>{
+    if(el instanceof SVGElement){
+      if(!/^(rect|circle|ellipse|path|polygon|image)$/.test(el.tagName))return false;
+      const cs=getComputedStyle(el);
+      return el.tagName==='image'||(cs.fill!=='none'&&Number(cs.fillOpacity)>=.95);
+    }
+    if(/^(IMG|CANVAS|VIDEO)$/.test(el.tagName))return true;
+    const cs=getComputedStyle(el),match=cs.backgroundColor.match(/^rgba?\((.*)\)$/);
+    const alpha=match?(match[1].split(',').length===4?Number(match[1].split(',')[3]):1):0;
+    return alpha>=.9;
+  };
+  const mediaCover=(el,r)=>{
+    let covered=0,total=0,by=null;
+    for(const fy of [.2,.5,.8])for(const fx of [.2,.5,.8]){
+      const x=r.left+r.width*fx,y=r.top+r.height*fy;
+      if(x<bounds.left||x>bounds.right||y<bounds.top||y>bounds.bottom)continue;
+      total++;
+      const stack=document.elementsFromPoint(x,y);
+      for(const node of stack){
+        if(node===el||el.contains(node)||node.contains(el)||!slide.contains(node))continue;
+        if(!opaqueForeground(node))continue;
+        covered++;if(!by)by=label(node);break;
+      }
+    }
+    return total&&covered/total>.3?{fraction:round(covered/total),coveredBy:by}:null;
+  };
+  for(const media of slide.querySelectorAll('img, svg')){
+    if(!visible(media))continue;
+    const r=media.getBoundingClientRect();
+    if(r.width<80||r.height<80)continue;
+    const kind=media.tagName.toLowerCase();
+    // Full-bleed backgrounds behind content cards are a normal composition; only
+    // small/illustrative media get the clipping/occlusion review by default.
+    const classes=(media.getAttribute('class')||'')+' '+((media.parentElement&&media.parentElement.getAttribute('class'))||'');
+    const backdrop=/(^|\s)(bg|background|backdrop|full-bleed|bleed)(\s|$)/i.test(classes)||(r.width*r.height)/Math.max(1,bounds.width*bounds.height)>=.5;
+    if(backdrop)continue;
+    const clipped=mediaClip(media,r);
+    if(clipped)add('media-clipped','warning','Media is clipped by an overflow container; keep the subject inside the visible area or exempt an intentional crop',media,{kind,fraction:clipped.fraction,clippedBy:clipped.clippedBy,bounds:box(r)});
+    const covered=mediaCover(media,r);
+    if(covered)add('media-occluded','warning','Media is substantially covered by an opaque element; reorder layers or move the subject',media,{kind,fraction:covered.fraction,coveredBy:covered.coveredBy,bounds:box(r)});
+  }
   // A declared raster-only policy is checked against the final DOM/computed
   // resources too: author scripts and external styles can add SVG after compile.
   // This identifies recognizable SVG; it does not prove an image's provenance.
@@ -447,7 +514,7 @@ window.__webCheckCollect = function(slide, options) {
   }
   for(const el of slide.querySelectorAll('[data-web-check-allow]')){
     if(!(el.getAttribute('data-web-check-reason')||'').trim()) issues.push({code:'invalid-exemption',severity:'error',message:'An exemption requires a nonempty data-web-check-reason',element:label(el)});
-    const supported=['text-overlap','text-mask','svg-fill-overridden','text-occluded','small-text'];
+    const supported=['text-overlap','text-mask','svg-fill-overridden','text-occluded','small-text','media-clipped','media-occluded','body-type-too-small'];
     const invalid=(el.getAttribute('data-web-check-allow')||'').split(/\s+/).filter(code=>code&&!supported.includes(code));
     if(invalid.length) issues.push({code:'invalid-exemption',severity:'error',message:'Only review/advisory checks can be exempted; hard errors always block',element:label(el),invalid});
   }

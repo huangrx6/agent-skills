@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "note": "风格来源注册表：一份清单，skill 文档与 style_probe.py 都从这里读。新增站点只改这里。",
+  "groups": [
+    {"id": "template", "name": "成品模板", "what": "能直接看到整页版式、页数与真实排版"},
+    {"id": "theme", "name": "成套主题", "what": "看同一母题如何贯穿封面 / 章节 / 内容页"},
+    {"id": "visual", "name": "视觉语言", "what": "看画风、光色与材质，不给页结构"}
+  ],
+  "sites": [
+    {
+      "id": "canva",
+      "name": "Canva 演示模板",
+      "group": "template",
+      "entry": "https://www.canva.com/presentations/templates/",
+      "category": "https://www.canva.com/presentations/templates/{slug}/",
+      "access": "render",
+      "parse": "canva",
+      "axes": "用途分类 + 标题里的「颜色 + 风格 + 行业」",
+      "categories": ["simple", "creative", "cool", "animated", "business", "keynote", "pitch-deck",
+                     "startup", "sales", "finance", "visual-charts", "brand-guidelines",
+                     "marketing", "company", "conference", "education", "scrapbook", "kids"],
+      "note": "标题就是风格标签：Green and Yellow Typographic Aesthetic Nature Presentation"
+    },
+    {
+      "id": "miri",
+      "name": "Miricanvas",
+      "group": "template",
+      "entry": "https://www.miricanvas.com/en/template/all-types?category=presentation",
+      "access": "api",
+      "parse": "miri",
+      "api": "https://api.miricanvas.com/template/api/d/templates/search?page=1&keyword={q}&templateTypeIdList=presentation&strictLanguage=true&pageSize={n}&status=ACTIVE&categoryList=TEMPLATE&includeTemplateV2=true&language=en&domain=www",
+      "axes": "类别 × Style（Cute / Sentimental / Professional / Traditional / Fun）× Color × 免费/付费",
+      "categories": ["presentation", "powerpoint", "business plan", "resume"],
+      "note": "情绪轴最清楚；标题同构「颜色 + 风格 + 行业」"
+    },
+    {
+      "id": "slidesgo",
+      "name": "Slidesgo",
+      "group": "template",
+      "entry": "https://slidesgo.com/",
+      "access": "static",
+      "parse": "slidesgo",
+      "link": "https://slidesgo.com/theme/{slug}",
+      "axes": "主题 / 学科分类，条目为单个模板主题",
+      "categories": ["education", "infographics", "business", "marketing", "medical"],
+      "note": "教学与主题化演示最多；信息图页可研究流程与比较怎么组织"
+    },
+    {
+      "id": "presentationgo",
+      "name": "PresentationGO",
+      "group": "template",
+      "entry": "https://www.presentationgo.com/",
+      "access": "static",
+      "parse": "presentationgo",
+      "link": "https://www.presentationgo.com/presentation/{slug}/",
+      "axes": "图表 / 流程 / 关系图分类（Business、Infographics、Education…）",
+      "categories": ["charts-diagrams", "templates", "business", "education", "infographics"],
+      "note": "找「替代长段文字」的图解：流程、关系、剖面"
+    },
+    {
+      "id": "envato",
+      "name": "Envato Elements",
+      "group": "template",
+      "entry": "https://elements.envato.com/presentation-templates/compatible-with-powerpoint",
+      "category": "https://elements.envato.com/presentation-templates/{slug}",
+      "access": "render",
+      "parse": "envato",
+      "axes": "用途 / 行业分类 + 软件兼容（PowerPoint / Keynote）",
+      "categories": ["business", "education", "marketing", "technology", "medical", "pitch+deck",
+                     "travel", "corporate", "company+profile", "infographic", "portfolio"],
+      "note": "商业模板里这类内容怎么排；条目常被 consent / 付费墙挡住，只给分类入口"
+    },
+    {
+      "id": "pitch",
+      "name": "Pitch 模板",
+      "group": "template",
+      "entry": "https://pitch.com/templates",
+      "access": "render",
+      "parse": "entry",
+      "axes": "整套演示的接续（封面 → 图文 → 数据 → 结尾）",
+      "categories": [],
+      "note": "SPA，条目名不落在 DOM 里；只给入口，让用户自己看接续节奏"
+    },
+    {
+      "id": "ppt-design",
+      "name": "PPT-Design 主题",
+      "group": "theme",
+      "entry": "https://ppt-design.com/zh/themes",
+      "access": "static",
+      "parse": "pptdesign",
+      "link": "https://ppt-design.com/zh/themes/{slug}",
+      "axes": "中文题材 / 风格 / 节日分类（商务、营销、创业路演、金融…）",
+      "categories": ["business", "marketing", "startup", "finance", "free"],
+      "note": "成套主题：母题在封面、议程、章节、内容页如何复用；取系统不抄版式"
+    },
+    {
+      "id": "ohmyppt",
+      "name": "Oh My PPT 风格画廊",
+      "group": "theme",
+      "entry": "https://www.ohmyppt.cc/style-showcase",
+      "access": "render",
+      "parse": "ohmyppt",
+      "axes": "中文风格名（国风治愈、经营图谱…），按气质成组",
+      "categories": [],
+      "note": "中文风格词的直接来源；风格缩略图不能证明整套内容页质量"
+    },
+    {
+      "id": "dribbble",
+      "name": "Dribbble",
+      "group": "visual",
+      "entry": "https://dribbble.com/tags/powerpoint",
+      "tag": "https://dribbble.com/tags/{slug}",
+      "access": "render",
+      "parse": "dribbble",
+      "axes": "视觉风格 tag：3d / gradient / dark-mode / glassmorphism / claymorphism / isometric",
+      "categories": ["powerpoint", "presentation", "slide-design", "3d", "gradient",
+                     "dark-mode", "isometric", "glassmorphism", "typography", "claymorphism"],
+      "note": "定画风用，不当结构模板；作品没有可套用的页结构"
+    }
+  ]
+}

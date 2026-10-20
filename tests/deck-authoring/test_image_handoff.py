@@ -54,9 +54,10 @@ class TestImageHandoff(unittest.TestCase):
         plan = self.plan()
         document = handoff.write_brief(plan)
         text = document.read_text(encoding="utf-8")
-        for expected in ("assets/images/opening.png", "第 1, 4 页", "600 × 400", "3:2", "pending",
+        for expected in ("assets/images/opening.png", "第 1, 4 页", "600 × 400", "3:2",
+                         "不改 HTML，不做接入步骤", "缺图时只显示空白占位框",
                          self.data["images"][0]["prompt"], self.data["images"][0]["negative"][0],
-                         "object-position: 70% 50%", "替代文本", "当前检查：文件缺失"):
+                         "object-position: 70% 50%", "替代文本", "输出规格：600 × 400 px（3:2）"):
             self.assertIn(expected, text)
         self.assertFalse((self.root / "assets").exists())
         self.assertEqual(self.data, json.loads(self.planfile.read_text()))
@@ -116,6 +117,9 @@ class TestImageHandoff(unittest.TestCase):
         opaque_plan["images"][0]["transparent"] = False
         self.assertFalse(handoff.check_images(opaque_plan)["ready"])
         brief = handoff.write_brief(plan).read_text()
+        # The generation spec carries the measured slot size into the copied prompt.
+        self.assertIn("输出规格：600 × 400 px（3:2）", brief)
+        self.assertIn("不裁切、不拉伸、不加白边", brief)
         self.assertIn("左侧 40% 保持低细节", brief)
         self.assertIn("alpha 通道", brief)
         Image.new("RGBA", (600, 400), (0, 0, 0, 0)).save(target)
@@ -424,7 +428,7 @@ class TestImageHandoff(unittest.TestCase):
         passed = subprocess.run(command, capture_output=True, text=True)
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertIn('name="deck-web-runtime"', output.read_text())
-        self.assertIn("awaiting images", passed.stdout)
+        self.assertIn("占位待回填", passed.stdout)
         before = output.read_bytes()
         source.write_text(source.read_text().replace("assets/images/opening.png", "assets/images/wrong.png"))
         wrong_path = subprocess.run(command, capture_output=True, text=True)

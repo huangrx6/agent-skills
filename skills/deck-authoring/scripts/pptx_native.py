@@ -62,6 +62,14 @@ from pptx.util import Emu, Inches, Pt
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
+def _float(value: str, default: float = 0.0) -> float:
+    """CSS 值解析：调用处虽然都用正则先匹配过，坏输入也不该让导出崩掉。"""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def _load_sibling(name: str):
     """动态加载同目录脚本（`scripts/` 不是包，同级 import 在静态层面无法解析）。
 
@@ -236,10 +244,10 @@ def add_text(slide, el: dict, box: tuple[float, float, float, float],
     p = tf.paragraphs[0]
     p.alignment = {"center": PP_ALIGN.CENTER, "right": PP_ALIGN.RIGHT,
                    "end": PP_ALIGN.RIGHT, "justify": PP_ALIGN.JUSTIFY}.get(
-                       el.get("textAlign"), PP_ALIGN.LEFT)
+                       str(el.get("textAlign") or ""), PP_ALIGN.LEFT)
     line_height = str(el.get("lineHeight", ""))
     if re.fullmatch(r"[\d.]+px", line_height):
-        p.line_spacing = Pt(float(line_height[:-2]) * PX_TO_PT)
+        p.line_spacing = Pt(_float(line_height[:-2]) * PX_TO_PT)
     run = p.add_run()
     run.text = el.get("text", "")
 
@@ -257,7 +265,7 @@ def add_text(slide, el: dict, box: tuple[float, float, float, float],
     run.font.size = Pt(round((el.get("fontSize") or 24) * PX_TO_PT, 1))
     spacing = str(el.get("letterSpacing", ""))
     if re.fullmatch(r"-?[\d.]+px", spacing):
-        run._r.get_or_add_rPr().set("spc", str(round(float(spacing[:-2]) * PX_TO_PT * 100)))
+        run._r.get_or_add_rPr().set("spc", str(round(_float(spacing[:-2]) * PX_TO_PT * 100)))
     # 字重**跟着实测走**，不按角色写死：有的风格标题是 400 字重，
     # 统一 bold 就等于把这两套风格的标题设计抹掉了（XML 里读出来是 b="1" ✗）。
     weight = el.get("fontWeight")
@@ -476,9 +484,9 @@ def _image_position(position: str, free: float, axis: int) -> float:
     if value in keywords:
         return free * keywords[value]
     if re.fullmatch(r"-?[\d.]+%", value):
-        return free * float(value[:-1]) / 100
+        return free * _float(value[:-1]) / 100
     if re.fullmatch(r"-?[\d.]+(?:px)?", value):
-        return float(value.removesuffix("px"))
+        return _float(value.removesuffix("px"))
     raise SystemExit(f"✗ 原生 PPTX 暂不支持 object-position={position!r}；请使用百分比或像素位置")
 
 

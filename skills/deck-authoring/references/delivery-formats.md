@@ -15,6 +15,31 @@ HTML 是演示与导出的基准，按用户用途选择交付格式；用户明
 | 原生 PPTX | 修改文字和支持的图表数据 | CSS 效果、文本引擎和字体可能不同，须回读验证 |
 | MP4 / GIF | 自动播放的逐页演示 | 不包含配乐或复杂多镜头制作 |
 
+## 导出前的两个问题
+
+生成 HTML 后**先不导出**。先问配图，再问格式；这是交付流程的一部分，不是额外审批。
+这一轮已经回答过的就跳过：配图已齐或用户已确认不要图 → 跳过第 1 问；格式已指定 → 跳过第 2 问。
+
+1. **配图还要吗？**
+   - 要：按 [配图流程](images.md) 交 `image-brief.md` 与回填路径，等用户生成或提供；不调用生图工具。回填后运行
+     `image_handoff.py --check <plan> --html deck.html`：退出 0 才进入导出，退出 1 就报出待补文件或残留的占位文字。
+   - 不要 / 纯文字：进入第 2 问，并在交付说明写"无配图，用户确认"。
+2. **导出 PDF 还是 PPTX？** 用户本轮已指定格式就不重复问；同时要多种就都列出来，按依赖顺序导出。
+
+只有用户明确说"不用管配图，直接导"才允许跳过第 1 问；此时导出物标为草稿，
+在交付说明里列出仍缺的图，不能当成品。缺图时 `pdf.py` 仍可能成功，所以工具成功
+不等于可以交付——判断依据是图位是否补齐，不是命令退出码。
+
+| 情况 | 做法 |
+| --- | --- |
+| 有占位图位、用户还没回填 | 不导出；交提示词与回填路径，等图 |
+| 用户说"图不要了" | 问格式，导出；记录"用户确认无配图" |
+| 用户说"先导一版看看" | 明确是草稿；导出后列待补图，不能称完成 |
+| 图已回填但 `--check` 退出 1 | 报哪些文件缺或无效，不导出 |
+| 用户先要 PDF、后补齐图 | 第一版标草稿；补图后重导，不改口说第一版是成品 |
+
+"占位图位缺图不阻塞编译"说的是 HTML 能打开，不是这份导出可以交付；不能拿它当跳过提问的理由。
+
 ## HTML 与讲稿
 
 下面是结构化路线的播放器。自由 HTML 普通打开即演示、`?scroll` 为静态阅读，
@@ -61,6 +86,7 @@ python3 scripts/pptx_native.py --resolved resolved.deck.json -o editable.pptx
 - `combo` 尚无原生导出实现，会明确拒绝；需要这种图时，可交 HTML/PDF/贴图版，
   或另行实现原生图表支持。不要把柱线组合图静默改成柱图。
 - 不支持任意 CSS、滤镜、颗粒、双墨错位与所有装饰效果。
+- SVG 支持有限：导出器可能栅格化，或只保留部分形状；需要矢量时改原生形状，或在导出前转成 PNG 并回读。
 - CSS `::before` 项目标记不会自动变成 PowerPoint 项目符号。
 - 浏览器与 PowerPoint 的换行机制不同；位置相同不代表排版逐像素相同。
 
@@ -79,15 +105,17 @@ python3 scripts/pdf.py deck.html -o deck.pdf
 `pdf.py` 通过 Poppler 的 `pdfinfo` 逐页检查页数和页面尺寸，需在 PATH 中可用，或设
 `DECK_PDFINFO=/完整路径/pdfinfo`。工具缺失会给出明确提示，不能跳过尺寸验证。
 字体与位图统计用于辅助检查，不能代替打开文件检查缺字、分页和图表完整性。
+缺图时它可能仍然成功，输出只能叫草稿；先走[导出前的两个问题](#导出前的两个问题)。
 
 ## 交付演练
 
-按依赖顺序运行；`N` 换成实际页数，只执行需要的格式：
+先完成[导出前的两个问题](#导出前的两个问题)，再按依赖顺序运行；`N` 换成实际页数，只执行用户选定且素材就绪的格式：
 
 ```bash
 python3 scripts/validate_spec.py deck.spec.json
 python3 scripts/render.py deck.spec.json -o deck.html --resolved resolved.deck.json
 python3 scripts/check.py deck.spec.json deck.html --resolved resolved.deck.json
+python3 scripts/image_handoff.py --check image-plan.json --html deck.html   # 退出 1 就停，回去问图
 python3 scripts/shots.py deck.html --out-dir pages --count N
 python3 scripts/pdf.py deck.html -o deck.pdf
 python3 scripts/pptx_native.py --png-dir pages -o deck.pptx

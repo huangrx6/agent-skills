@@ -27,7 +27,7 @@
 | 源码依据 | 本 skill 的采用方式与边界 |
 | --- | --- |
 | [布局 skill](https://github.com/arcsin1/oh-my-ppt/blob/56bc56d41e6065bbb7fa21f2b3ea407575cb3aae/resources/skills/oh-my-ppt-layout/SKILL.md)：设计约定与逐页 HTML | 在项目保留简短设计记录，让内容、视觉、素材和交付共用同一组决定；保持自由 HTML，不要求移植桌面应用的状态或固定风格包 |
-| [图片提示组织](https://github.com/arcsin1/oh-my-ppt/blob/56bc56d41e6065bbb7fa21f2b3ea407575cb3aae/src/main/image-generation/prompt-director.ts)：将图片意图转成生成要求 | 先说明图片任务、位置、文字安全区和图像语言，再取得素材并回填；不绑定其 provider，也不把通用图片提示当所有项目的审美默认值 |
+| [图片提示组织](https://github.com/arcsin1/oh-my-ppt/blob/56bc56d41e6065bbb7fa21f2b3ea407575cb3aae/src/main/image-generation/prompt-director.ts)：将图片意图转成生成要求 | 先说明图片任务、位置、文字安全区和图像语言，再写 image-brief.md 交用户出图并回填；不绑定其 provider，也不把通用图片提示当所有项目的审美默认值 |
 | [PPTX 渲染器](https://github.com/arcsin1/oh-my-ppt/blob/56bc56d41e6065bbb7fa21f2b3ea407575cb3aae/src/main/io/html-pptx/renderer.ts)：转换与渲染边界 | 保留本工具现有导出，实际回读用户所需格式；没有据此宣称任意 HTML/CSS 都能保真且可编辑 |
 
 方法是否改善本 skill，以相同真实材料的代表页和连续页面验证；源码功能列表、模板数量与检查通过均不能证明视觉质量。
@@ -116,6 +116,8 @@
 ## 待配图也要测量
 
 先固定图位比例和尺寸，用真实文字、标签、图注与条件说明编译，然后运行 `web_check.py`。
+把图位在 1600×900 下的渲染尺寸乘捕获倍率（PNG/贴图 PPTX 按 2×）记进 `image-plan.json` 的
+`target_px`，它就是之后交给用户出图的输出参数；量一次比回填后改裁切便宜。
 图片未到会产生资源失败，但检查器仍继续逐页读取几何；核对页数与 `layoutBudget` 是否实际产生，
 分别处理 `body-capacity-exceeded`、`body-text-outside`、裁切、页脚侵入等问题。待图稿可以保留已登记的缺图项，
 不能因此忽略其他错误或宣称整项检查通过。字体或脚本失败会影响测量有效性，应先修复。
@@ -154,6 +156,69 @@ Grid 的 `1fr` 行轨和父级 `align-items:stretch`。可用区域需要填满�
 用一行与多行单元格并存的实际内容验证：文字离上下分隔线是否舒服、同一行是否容易横向比较。
 字体本身的上下留空会影响视觉中心，不能只看 CSS 属性已写 middle 就算完成。
 
+### 容量超标的错误收敛与内容带
+
+容量检查超标后最常见的错误收敛是压缩 `gap`/`padding`/字号：每压一点报错都会消失，
+但累积结果是**内容全部挤在页面上半部、底部空出 15%–35% 页高**——检查通过，画面却
+头重脚轻。这与"内容真的过量"是两件事，不能用同一个动作解决。
+
+正确的顺序与 [构图原则](composition-principles.md#页面利用率内容带要有意) 一致：
+
+1. **先定内容带**（标题、主体、收束在画面中的上下位置），目标是可用高度的 60–80%。
+   内容带低于 55% 时先查主体：字号/图/数字是否太小、材料是否还没展开、要不要一个
+   视觉锚点占住下半部；确认不是内容带问题，才回头拆页或减内容。
+2. **再调间距层级**：内边距 < 组间距 < 页边距通常成立；组间距（900 基准）常取 24–40px，
+   大字停顿页 48–64px，卡片内距从 28–32px 起。三者比例失当时，页面会显得"框很大、字很挤"。
+3. **对齐位置放在最后**：内容带撑起后，整组在可用高里居中/均匀分布只用于"单纯需要对齐"的
+   场合；不要用它把标题与内容拉开、给空洞收场（见 [内容理解](content-intelligence.md#全篇复核)），
+   更不要把 `align-content:center` 当成修复"底部大空"的处方。
+
+量化方法：量内容总高占 body 可用比例与内容首尾到 body 边界的间距——占比落在 60–80%、
+顶部（标题下）与底部（页脚上）间距大致相称即成立；只有单侧空出页高 15% 以上且另一侧
+明显更小时，才是需要回头调内容带或间距的信号。在完成态页面控制台执行一次即可：
+
+```js
+document.querySelectorAll('.slide').forEach((s, i) => {
+  const b = s.querySelector('.deck-body'); if (!b) return;
+  const br = b.getBoundingClientRect(); const kids = [...b.children].filter(k => k.getBoundingClientRect().height > 2);
+  const t0 = Math.min(...kids.map(k => k.getBoundingClientRect().top));
+  const b0 = Math.max(...kids.map(k => k.getBoundingClientRect().bottom));
+  console.log(i + 1, 'fill', Math.round((b0 - t0) / br.height * 100) + '%',
+    'top', Math.round(t0 - br.top), 'bottom', Math.round(br.bottom - b0));
+});
+```
+
+两个附带判断：两栏页高度差超过 25% 时，把矮栏内容拆细（一个 pill 一行说明、每条路径
+单独成行、补一句关键条件）向高栏靠拢，而不是只居中留空；图像位高度按正文可用高的
+85–90% 取，固定小高度（如半屏）会把整页重心拉偏。压间距只允许发生在"间距明显超过
+本项目其他页"的个别页上；内容真实超出（`body-capacity-exceeded` 复测仍在）时减内容、拆页
+或调整图文比例。
+
+## SVG 形状的渲染边界
+
+内联 SVG 的 `viewBox` 是硬裁剪窗：任何坐标越界的形状都被**静默裁掉**，不报错、不警告，
+页面上看就是"半截""缺了一块"。四类高发场景：
+
+1. **角色或图标组放进矮 viewBox**——在 128px 高的横条里画 110px 高的站立角色，
+   头顶天线和头部整体超出顶部，只剩下半身。
+2. **装饰探出父容器再遇到上层裁剪**——印章、徽章用负 `top` 挂在卡片边缘，
+   卡片或页面层有 `overflow:hidden` 时被切。
+3. **贴边元素的描边被裁**——`cy = r` 的球体上缘恰好压在 viewBox 边界，
+   stroke 外半圈消失，视觉上"不圆"。
+4. **文字宽于所属形状**——色块内一行说明、圆内标签、卡片内编号超出形状边界，
+   文字压边框或探出弧线；形状按坐标写死宽度，没给文字留够空间。
+
+设计时给 viewBox 留余量：按**最高元素**（含天线、球杆、stroke 的一半）取上界，
+不要按"主体大概高度"估。收尾前做一次程序化扫描（在完成态页面执行）：
+对每个 SVG 的叶子形状（`circle/rect/path/ellipse/line/text`）比较其
+`getBoundingClientRect()` 与 SVG 根的渲染盒，任一方向越界大于 3px 即为实际被裁；
+`g` 组的包围盒会被 `transform` 天然放大，只以叶子形状为准。修改 viewBox 后同步检查
+`width`/`height` 与容器的关系，`preserveAspectRatio` 的 letterbox 不算裁剪。
+
+同一检查要覆盖 `text`：文字宽度超出**所属形状**（色块、圆、卡片）与越出 viewBox 一样算溢出。
+实测出现过色块内一行说明文字右端压边框、圆内小字两端探出弧线的情况——把每个 text 的测量盒与
+所属形状比较，或按「字号 × 每字宽 × 字符数 + 内边距」给形状留足宽度，不要依赖目测。
+
 ## 按项目选择素材策略
 
 仅当项目明确禁止 SVG 时启用 `--raster-only`。完整新稿先按 [配图流程](images.md) 交接；素材回填后检查资源与布局：
@@ -164,6 +229,6 @@ python3 scripts/image_handoff.py --check image-plan.json
 ```
 
 `--raster-only` 静态拒绝作者 SVG 标签、可识别 SVG 媒体 URL 和内联 CSS 资源，并把策略写入产物；
-浏览器检查继续查看实际 DOM 与计算样式中的 SVG。它不证明某张 PNG 来自生图模型，生成来源仍须
-保留提示词与原始文件。用户要求只用生图时，缺图或生成瑕疵不能临时用程序绘图替代；
-其他项目按用途选择真实证据、授权素材、图表或生成图，分别核对质量与事实。
+浏览器检查继续查看实际 DOM 与计算样式中的 SVG。它不证明某张 PNG 来自用户所用模型，素材来源仍须
+保留提示词与原始文件。用户要求只用生图时，缺图或素材瑕疵不能临时用程序绘图替代；
+其他项目按用途选择真实证据、授权素材、图表或用户生成图，分别核对质量与事实。

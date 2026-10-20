@@ -182,7 +182,8 @@ class TestWebCheckBrowser(unittest.TestCase):
                         thread.join(timeout=5)
                 self.assertTrue(mutated.is_set(), "Chrome must trigger the actual file mutation")
                 self.assertEqual(len(report["pages"]), 1)
-                self.assertEqual(report["pages"][0]["issues"], [])
+                self.assertEqual([i for i in report["pages"][0]["issues"]
+                                  if i["code"] != "no-capacity-contract"], [])
                 self.assertEqual(report["htmlSha256"], hashlib.sha256(content).hexdigest())
                 issues = [i for i in report["issues"] if i["code"] == "input-changed"]
                 self.assertEqual(len(issues), 1)
@@ -567,6 +568,36 @@ class TestWebCheckBrowser(unittest.TestCase):
             violations = [issue for issue in report["pages"][index]["issues"] if issue["code"] == "region-text-outside"]
             self.assertTrue(any(issue["region"] == region for issue in violations))
         self.assertEqual(checker.exit_code(report), 1)
+
+    def test_tiny_body_text_is_a_review_finding_and_can_be_exempted(self):
+        content = ('<p style="font-size:14px">This explanation is long enough to be body text, '
+                   'not a short label.</p>')
+        report = self.inspect([capacity_page(content)], CAPACITY_STYLE)
+        self.assertIn("body-type-too-small", self.codes(report))
+        self.assertEqual(checker.exit_code(report), 2)
+
+        exempt = content.replace(
+            '<p style="font-size:14px">',
+            '<p style="font-size:14px" data-web-check-allow="body-type-too-small" '
+            'data-web-check-reason="dense reference table">')
+        report = self.inspect([capacity_page(exempt)], CAPACITY_STYLE)
+        self.assertNotIn("body-type-too-small", self.codes(report))
+
+    def test_media_clipping_and_occlusion_are_reported_and_can_be_exempted(self):
+        pixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='
+        clipped = ('<div style="position:relative;width:300px;height:200px;overflow:hidden">'
+                   '<svg width="500" height="300"><rect width="500" height="300" fill="#3355aa"/></svg></div>')
+        covered = (f'<img src="{pixel}" alt="Fixture" style="position:absolute;left:20px;top:20px;width:400px;height:300px">'
+                   '<div style="position:absolute;left:220px;top:20px;width:300px;height:300px;background:#ffffff"></div>')
+        report = self.inspect([capacity_page(clipped), capacity_page(covered)], CAPACITY_STYLE)
+        self.assertIn("media-clipped", self.codes(report, 0))
+        self.assertIn("media-occluded", self.codes(report, 1))
+
+        exempt = clipped.replace(
+            'overflow:hidden"',
+            'overflow:hidden" data-web-check-allow="media-clipped" data-web-check-reason="intentional bleed"')
+        report = self.inspect([capacity_page(exempt)], CAPACITY_STYLE)
+        self.assertNotIn("media-clipped", self.codes(report, 0))
 
     def test_capacity_text_and_images_need_regions_and_images_cannot_exceed_boundaries(self):
         pixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='

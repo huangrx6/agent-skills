@@ -288,12 +288,18 @@ def main(argv=None):
                 result = handoff.check_handoff(plan, args.source, args.image_brief or "image-brief.md")
             except handoff.PlanError as exc:
                 raise SourceError(str(exc)) from exc
+            if result.get("placeholder_text"):
+                raise SourceError("图位仍有可见占位文字，删除后再编译："
+                                  + "；".join(result["placeholder_text"][:3]))
+            # 缺文档、文档过期或图位没接：编译会产出"看起来完成"的页面，必须拦住。
+            # 只有"图片文件待回填"是正常中间态，继续编译。
             if not result["ready"]:
+                details = "；".join(result["errors"][:3]) or "配图文档与图位未就绪"
+                raise SourceError("Image handoff incomplete: " + details)
+            if not result["files_ready"]:
                 pending = "、".join(result["pending_images"]) or "（无待生成图）"
                 print("Image handoff: 占位待回填：" + pending
                       + "；编译继续，图放进 assets/images/ 后重新编译即可")
-                for problem in result["errors"]:
-                    print("  · " + problem)
             else:
                 print("Image handoff: passed; files present (visual review still required)")
         report_path = args.out.with_suffix(".check.json")

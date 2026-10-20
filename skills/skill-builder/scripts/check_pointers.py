@@ -48,6 +48,11 @@ PATH_IN_TICK = re.compile(r"`([^`*?\s]*\.(?:md|py|json|yaml|yml))`")
 
 SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv"}
 
+# 使用者项目里生成的文件，不随 skill 发布。文档里用反引号写它们是**在说产物名**，
+# 不是指向仓库里的某个文件；按路径判定会得出 18 条假悬空引用。
+# 只对**不带目录的裸文件名**生效：`references/design.md` 这种仍然按仓库路径检查。
+PROJECT_ARTIFACTS = {"design.md", "image-plan.json", "image-brief.md"}
+
 
 def iter_docs(targets: list[str]):
     for t in targets:
@@ -88,8 +93,10 @@ def find_pointers(path: str) -> list[dict]:
             continue
         if in_fence:
             continue
-        # 以点开头的不是路径而是扩展名（`.excalidraw.md`），排除掉避免误报
-        targets = [t for t in PATH_IN_TICK.findall(line) if not t.startswith(".")]
+        # 以点开头的不是路径而是扩展名（`.excalidraw.md`），排除掉避免误报；
+        # 裸文件名命中 PROJECT_ARTIFACTS 的是使用者项目产物，不是仓库路径。
+        targets = [t for t in PATH_IN_TICK.findall(line)
+                   if not t.startswith(".") and not (os.sep not in t and t in PROJECT_ARTIFACTS)]
         if not targets:
             continue
         # `pointer` 区分“这句话在指路”与“只是提到了一个文件名”。
