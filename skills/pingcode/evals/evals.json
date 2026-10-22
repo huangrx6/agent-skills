@@ -192,6 +192,12 @@
       "prompt": "查这个项目里高优先级、带“后端”标签、父项是 SCR-1 的工作项；只看 9 月创建的。",
       "expected_output": "用 `workitem list --project X --priority 高 --tag 后端 --parent SCR-1 --created-between 2026-09-01,2026-09-30`。优先级/标签按项目解析成 id，父项解析成真实 id，时间范围转成官方 created_between 的 start,end 时间戳；不要把这些条件静默丢掉。",
       "files": []
+    },
+    {
+      "id": 33,
+      "prompt": "在 kanban 项目里建一个看板，加一个栏和一个泳道，改完名字再删掉。",
+      "expected_output": "用 `board create` → `board entry-create` / `board swimlane-create` → `entry-update` / `swimlane-update` → `entry-delete` / `swimlane-delete` → `board delete --yes`。看板只适用于 kanban/hybrid；新建看板自带默认泳道和系统栏，创建自定义泳道前先看列表避免重名。",
+      "files": []
     }
   ]
 }

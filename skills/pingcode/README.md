@@ -23,6 +23,7 @@ python3 skills/pingcode/scripts/pingcode.py workitem relations SCR-12
 python3 skills/pingcode/scripts/pingcode.py workitem participants SCR-12
 python3 skills/pingcode/scripts/pingcode.py project members --project X
 python3 skills/pingcode/scripts/pingcode.py list boards --project X
+python3 skills/pingcode/scripts/pingcode.py board create --project X --name 测试看板 --dry-run
 python3 skills/pingcode/scripts/pingcode.py workitem tags SCR-12
 python3 skills/pingcode/scripts/pingcode.py tag create --project X --name 后端 --dry-run
 python3 skills/pingcode/scripts/pingcode.py worklog list SCR-12

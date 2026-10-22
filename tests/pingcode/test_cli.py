@@ -248,6 +248,44 @@ class CliCase(unittest.TestCase):
         for text in ("John", "Open Team", "管理员", "成员"):
             self.assertIn(text, out)
 
+    def test_看板与栏和泳道可创建(self):
+        code, out, err, router = self.run_cli(
+            ["board", "create", "--project", "演示项目", "--name", "测试看板"],
+            {("POST", "/v2/pjm/boards"): {"id": "b" * 24, "name": "测试看板"}})
+        self.assertEqual(0, code, err)
+        self.assertIn("看板已创建", out)
+        self.assertEqual({"project_id": "pj1", "name": "测试看板"},
+                         router.find("POST", "/v2/pjm/boards")[0][2])
+
+        code, out, err, router = self.run_cli(
+            ["board", "entry-create", "--project", "演示项目", "--board", "b" * 24,
+             "--name", "待办", "--wip-limit", "3"],
+            {("POST", f"/v2/pjm/boards/{'b' * 24}/entries"): {"id": "e1"}})
+        self.assertEqual(0, code, err)
+        self.assertIn("看板栏已创建", out)
+        body = router.find("POST", f"/v2/pjm/boards/{'b' * 24}/entries")[0][2]
+        self.assertEqual({"name": "待办", "wip_limit": 3}, body)
+
+        code, out, err, router = self.run_cli(
+            ["board", "swimlane-create", "--project", "演示项目", "--board", "b" * 24,
+             "--name", "默认泳道"],
+            {("POST", f"/v2/pjm/boards/{'b' * 24}/swimlanes"): {"id": "s1"}})
+        self.assertEqual(0, code, err)
+        self.assertIn("泳道已创建", out)
+
+    def test_看板栏和泳道删除要_yes(self):
+        code, _out, err, _router = self.run_cli(
+            ["board", "entry-delete", "e1", "--project", "演示项目", "--board", "b" * 24],
+            {})
+        self.assertEqual(1, code)
+        self.assertIn("--yes", err)
+
+        code, out, err, router = self.run_cli(
+            ["board", "entry-delete", "e1", "--project", "演示项目", "--board", "b" * 24, "--yes"],
+            {("DELETE", f"/v2/pjm/boards/{'b' * 24}/entries/e1"): {}})
+        self.assertEqual(0, code, err)
+        self.assertIn("看板栏已删除", out)
+
     def test_看板栏目和泳道只读(self):
         code, out, err, router = self.run_cli(
             ["list", "boards", "--project", "演示项目", "--no-cache"],

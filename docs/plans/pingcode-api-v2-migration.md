@@ -160,7 +160,7 @@ V2 表生成后，`api --show/--list` 只认 V2 路径。V1 路径会被拦下�
 - [x] 真实租户只读冒烟 + 可丢弃写操作；记录实际响应。
 - [x] 文档：`fields.md`、`commands.md`、`api.md`、`auth.md`、README、evals。
 
-当前结果：459 个 V2 接口；252 个单元测试通过；`gen_endpoints.py --check` 无漂移；
+当前结果：459 个 V2 接口；254 个单元测试通过；`gen_endpoints.py --check` 无漂移；
 `validate_skill.py` / `check_pointers.py` / `preflight.py` 通过。
 真实租户核心链路已跑通；剩余边缘项见上一节。
 
@@ -173,3 +173,8 @@ V2 表生成后，`api --show/--list` 只认 V2 路径。V1 路径会被拦下�
 - 真实租户验证通过后再合并；若租户暂不支持 V2，保留 `main`，另开版本策略讨论，
   不要在没有验证的情况下把默认路径切到 V2。
 - 合并后更新 `skills-lock.json` 哈希、根 README 的能力描述和 evals。
+
+## 看板真实写验证（2026-10-22）
+
+为验证 kanban 看板写链路，创建了临时项目 `ZZKB657428`，创建看板/栏/泳道并完成更新、删除。
+项目接口没有删除能力，项目已置为“结束”状态并保留；看板已删除。

@@ -45,8 +45,17 @@ pingcode.py list user_groups                # 团队（--group 关注/取消关�
 pingcode.py project members --project X     # 项目成员与角色
 pingcode.py list roles                      # 角色字典
 pingcode.py list boards --project X         # 看板（仅 kanban/hybrid）
-pingcode.py board entries --project X --board 默认看板
-pingcode.py board swimlanes --project X --board 默认看板
+pingcode.py board create --project X --name 测试看板
+pingcode.py board entry-create --project X --board 看板 --name 待办 --wip-limit 3
+pingcode.py board swimlane-create --project X --board 看板 --name 泳道
+pingcode.py board entries --project X --board 看板
+pingcode.py board swimlanes --project X --board 看板
+pingcode.py board entry-update <栏 id> --project X --board 看板 --name 进行中
+pingcode.py board swimlane-update <泳道 id> --project X --board 看板 --name 新泳道
+pingcode.py board entry-delete <栏 id> --project X --board 看板 --yes
+pingcode.py board swimlane-delete <泳道 id> --project X --board 看板 --yes
+pingcode.py board update --project X --board 看板 --name 新名字
+pingcode.py board delete --project X --board 看板 --yes
 pingcode.py workitem tags SCR-12            # 当前工作项已打的标签
 pingcode.py tag create --project X --name 后端   # 创建项目标签
 pingcode.py tag update <tag_id> --name 服务端   # 重命名
@@ -207,7 +216,8 @@ pingcode.py api --method POST --path /v2/comments --data '{"principal_type":"wor
 | "给这条打/去标签" | `workitem tags SCR-12` / `workitem tag SCR-12 后端` / `workitem untag SCR-12 后端 --yes` |
 | "管理项目标签" | `tag create/update/delete …` |
 | "项目成员/角色" | `project members --project X` / `list roles` |
-| "看看看板栏/泳道" | `list boards --project X` / `board entries / swimlanes …` |
+| "看看板栏/泳道" | `list boards --project X` / `board entries / swimlanes …` |
+| "建/改/删看板栏或泳道" | `board entry-create/update/delete …` / `board swimlane-create/update/delete …` |
 | "登记/查看/修改工时" | `worklog add SCR-12 --duration 2` / `worklog list SCR-12` / `worklog update <id> --duration 3` |
 | "建/改迭代" | `sprint create …` / `sprint update …`（没有删除迭代接口） |
 | "删评论" | `workitem comment-delete SCR-12 <id> --yes`（官方没有评论编辑接口） |
@@ -251,3 +261,6 @@ judge 退出 0 视为通过；不给 judge 时只记录 transcript。运行记�
 
 工时端点需要 `pcp:read/write:global:workload`，并依赖工时所属工作项的作用域；
 当前租户未开这个 scope 时，`worklog list/add` 会返回 403，错误会点名所需 scope。
+
+看板只适用于 kanban/hybrid 项目。新建看板会自动生成一个“默认泳道”和系统栏；
+再建泳道时先 `board swimlanes` 看名字，避免重名 400。

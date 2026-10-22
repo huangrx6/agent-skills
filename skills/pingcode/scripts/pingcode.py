@@ -454,6 +454,157 @@ def cmd_project_members(args: argparse.Namespace) -> int:
     return 0
 
 
+def _board_id(args: argparse.Namespace, client: Any) -> str:
+    raw = str(args.board or "").strip()
+    if _looks_like_id(raw):
+        return raw
+    pid, _pname = need_project(args, client)
+    return str(_resolve.find("boards", client, raw, project_id=pid,
+                             force=args.no_cache)["id"])
+
+
+def cmd_board_create(args: argparse.Namespace) -> int:
+    """创建看板：POST /v2/pjm/boards。"""
+    client = build_client(args)
+    pid, pname = need_project(args, client)
+    body: dict[str, Any] = {"project_id": pid, "name": args.name}
+    if args.type_ids:
+        body["workitem_type_ids"] = args.type_ids
+    result = perform(args, client, "POST", _compat.BOARDS_BASE, body=body,
+                     summary=f"在「{pname}」创建看板「{args.name}」")
+    if result is not None:
+        _resolve.invalidate("boards")
+        data = result.data if isinstance(result.data, dict) else {}
+        print(f"✓ 看板已创建（id={data.get('id', '?')}）")
+    return 0
+
+
+def cmd_board_update(args: argparse.Namespace) -> int:
+    """更新看板：PATCH /v2/pjm/boards/{id}。"""
+    client = build_client(args)
+    board_id = _board_id(args, client)
+    body: dict[str, Any] = {}
+    if args.name:
+        body["name"] = args.name
+    if args.type_ids:
+        body["workitem_type_ids"] = args.type_ids
+    if not body:
+        raise CliError("没有要改的字段（--name / --type-id）")
+    perform(args, client, "PATCH", _api.build(_compat.BOARD_ONE, board_id=board_id),
+            body=body, summary=f"更新看板 {board_id}")
+    if not args.dry_run:
+        _resolve.invalidate("boards")
+        print("✓ 看板已更新")
+    return 0
+
+
+def cmd_board_delete(args: argparse.Namespace) -> int:
+    """删除看板：DELETE /v2/pjm/boards/{id}。"""
+    client = build_client(args)
+    board_id = _board_id(args, client)
+    if not args.yes and not args.dry_run:
+        raise CliError(f"删除看板会丢失栏/泳道配置。确认要删 {board_id} 就加 --yes")
+    perform(args, client, "DELETE", _api.build(_compat.BOARD_ONE, board_id=board_id),
+            summary=f"删除看板 {board_id}")
+    if not args.dry_run:
+        _resolve.invalidate("boards")
+        print("✓ 看板已删除")
+    return 0
+
+
+def cmd_board_entry_create(args: argparse.Namespace) -> int:
+    """创建看板栏：POST /v2/pjm/boards/{id}/entries。"""
+    client = build_client(args)
+    board_id = _board_id(args, client)
+    body: dict[str, Any] = {"name": args.name}
+    if args.is_split is not None:
+        body["is_split"] = args.is_split
+    if args.wip_limit is not None:
+        body["wip_limit"] = args.wip_limit
+    if args.dod is not None:
+        body["dod"] = args.dod
+    result = perform(args, client, "POST",
+                     _api.build(_compat.BOARD_ENTRIES, board_id=board_id),
+                     body=body, summary=f"创建看板栏「{args.name}」")
+    if result is not None and isinstance(result.data, dict):
+        print(f"✓ 看板栏已创建（id={result.data.get('id', '?')}）")
+    return 0
+
+
+def cmd_board_entry_update(args: argparse.Namespace) -> int:
+    """更新看板栏：PATCH .../entries/{id}。"""
+    client = build_client(args)
+    board_id = _board_id(args, client)
+    body: dict[str, Any] = {}
+    if args.name:
+        body["name"] = args.name
+    if args.is_split is not None:
+        body["is_split"] = args.is_split
+    if args.wip_limit is not None:
+        body["wip_limit"] = args.wip_limit
+    if args.dod is not None:
+        body["dod"] = args.dod
+    if not body:
+        raise CliError("没有要改的字段（--name / --is-split / --wip-limit / --dod）")
+    path = _api.build(_compat.BOARD_ENTRY_ONE, board_id=board_id, entry_id=args.entry_id)
+    perform(args, client, "PATCH", path, body=body, summary=f"更新看板栏 {args.entry_id}")
+    if not args.dry_run:
+        print("✓ 看板栏已更新")
+    return 0
+
+
+def cmd_board_entry_delete(args: argparse.Namespace) -> int:
+    """删除看板栏：DELETE .../entries/{id}。"""
+    client = build_client(args)
+    board_id = _board_id(args, client)
+    if not args.yes and not args.dry_run:
+        raise CliError(f"删除看板栏会改变看板配置。确认要删 {args.entry_id} 就加 --yes")
+    path = _api.build(_compat.BOARD_ENTRY_ONE, board_id=board_id, entry_id=args.entry_id)
+    perform(args, client, "DELETE", path, summary=f"删除看板栏 {args.entry_id}")
+    if not args.dry_run:
+        print("✓ 看板栏已删除")
+    return 0
+
+
+def cmd_board_swimlane_create(args: argparse.Namespace) -> int:
+    """创建泳道：POST .../swimlanes。"""
+    client = build_client(args)
+    board_id = _board_id(args, client)
+    result = perform(args, client, "POST",
+                     _api.build(_compat.BOARD_SWIMLANES, board_id=board_id),
+                     body={"name": args.name}, summary=f"创建泳道「{args.name}」")
+    if result is not None and isinstance(result.data, dict):
+        print(f"✓ 泳道已创建（id={result.data.get('id', '?')}）")
+    return 0
+
+
+def cmd_board_swimlane_update(args: argparse.Namespace) -> int:
+    """更新泳道：PATCH .../swimlanes/{id}。"""
+    client = build_client(args)
+    board_id = _board_id(args, client)
+    path = _api.build(_compat.BOARD_SWIMLANE_ONE, board_id=board_id,
+                      swimlane_id=args.swimlane_id)
+    perform(args, client, "PATCH", path, body={"name": args.name},
+            summary=f"更新泳道 {args.swimlane_id}")
+    if not args.dry_run:
+        print("✓ 泳道已更新")
+    return 0
+
+
+def cmd_board_swimlane_delete(args: argparse.Namespace) -> int:
+    """删除泳道：DELETE .../swimlanes/{id}。"""
+    client = build_client(args)
+    board_id = _board_id(args, client)
+    if not args.yes and not args.dry_run:
+        raise CliError(f"删除泳道会改变看板配置。确认要删 {args.swimlane_id} 就加 --yes")
+    path = _api.build(_compat.BOARD_SWIMLANE_ONE, board_id=board_id,
+                      swimlane_id=args.swimlane_id)
+    perform(args, client, "DELETE", path, summary=f"删除泳道 {args.swimlane_id}")
+    if not args.dry_run:
+        print("✓ 泳道已删除")
+    return 0
+
+
 def cmd_board_entries(args: argparse.Namespace) -> int:
     """列看板栏：GET /v2/pjm/boards/{board_id}/entries。"""
     client = build_client(args)
@@ -2115,18 +2266,75 @@ def build_parser() -> argparse.ArgumentParser:
     td.add_argument("--yes", action="store_true", help="确认删除")
     td.set_defaults(func=cmd_tag_delete)
 
-    board = make(sub, "board", help="看板只读（栏目 / 泳道）")
+    board = make(sub, "board", help="看板（看板 / 栏 / 泳道）")
     bsub = board.add_subparsers(dest="action", required=True)
+    bc = make(bsub, "create", help="创建看板")
+    bc.add_argument("--project")
+    bc.add_argument("--name", required=True)
+    bc.add_argument("--type-id", action="append", dest="type_ids",
+                    help="支持的工作项类型 id，可重复")
+    bc.set_defaults(func=cmd_board_create)
+    bu = make(bsub, "update", help="更新看板")
+    bu.add_argument("--project")
+    bu.add_argument("--board", required=True)
+    bu.add_argument("--name")
+    bu.add_argument("--type-id", action="append", dest="type_ids")
+    bu.set_defaults(func=cmd_board_update)
+    bd = make(bsub, "delete", help="删除看板（要 --yes）")
+    bd.add_argument("--project")
+    bd.add_argument("--board", required=True)
+    bd.add_argument("--yes", action="store_true")
+    bd.set_defaults(func=cmd_board_delete)
     be = make(bsub, "entries", help="列看板栏")
     be.add_argument("--project")
     be.add_argument("--board", required=True, help="看板名或 id（先用 list boards）")
     be.add_argument("--limit", type=int, default=100)
     be.set_defaults(func=cmd_board_entries)
+    bec = make(bsub, "entry-create", help="创建看板栏")
+    bec.add_argument("--project")
+    bec.add_argument("--board", required=True)
+    bec.add_argument("--name", required=True)
+    bec.add_argument("--is-split", action="store_true", default=None)
+    bec.add_argument("--wip-limit", type=int)
+    bec.add_argument("--dod")
+    bec.set_defaults(func=cmd_board_entry_create)
+    beu = make(bsub, "entry-update", help="更新看板栏")
+    beu.add_argument("entry_id")
+    beu.add_argument("--project")
+    beu.add_argument("--board", required=True)
+    beu.add_argument("--name")
+    beu.add_argument("--is-split", action="store_true", default=None)
+    beu.add_argument("--wip-limit", type=int)
+    beu.add_argument("--dod")
+    beu.set_defaults(func=cmd_board_entry_update)
+    bed = make(bsub, "entry-delete", help="删除看板栏（要 --yes）")
+    bed.add_argument("entry_id")
+    bed.add_argument("--project")
+    bed.add_argument("--board", required=True)
+    bed.add_argument("--yes", action="store_true")
+    bed.set_defaults(func=cmd_board_entry_delete)
     bs = make(bsub, "swimlanes", help="列泳道")
     bs.add_argument("--project")
     bs.add_argument("--board", required=True, help="看板名或 id")
     bs.add_argument("--limit", type=int, default=100)
     bs.set_defaults(func=cmd_board_swimlanes)
+    bsc = make(bsub, "swimlane-create", help="创建泳道")
+    bsc.add_argument("--project")
+    bsc.add_argument("--board", required=True)
+    bsc.add_argument("--name", required=True)
+    bsc.set_defaults(func=cmd_board_swimlane_create)
+    bsu = make(bsub, "swimlane-update", help="更新泳道")
+    bsu.add_argument("swimlane_id")
+    bsu.add_argument("--project")
+    bsu.add_argument("--board", required=True)
+    bsu.add_argument("--name", required=True)
+    bsu.set_defaults(func=cmd_board_swimlane_update)
+    bsd = make(bsub, "swimlane-delete", help="删除泳道（要 --yes）")
+    bsd.add_argument("swimlane_id")
+    bsd.add_argument("--project")
+    bsd.add_argument("--board", required=True)
+    bsd.add_argument("--yes", action="store_true")
+    bsd.set_defaults(func=cmd_board_swimlane_delete)
 
     worklog = make(sub, "worklog", help="工时（/v2/workloads）")
     wlsub = worklog.add_subparsers(dest="action", required=True)
