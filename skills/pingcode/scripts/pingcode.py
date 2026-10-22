@@ -1297,7 +1297,8 @@ def cmd_workitem_bulk_update(args: argparse.Namespace) -> int:
     pids = {str(_fmt.dig(item, "project.id") or "") for item in items}
     type_scoped = (bool(args.state) or args.story_points is not None
                    or getattr(args, "estimated_workload", None) is not None
-                   or getattr(args, "remaining_workload", None) is not None)
+                   or getattr(args, "remaining_workload", None) is not None
+                   or bool(getattr(args, "property", None)))
     project_scoped = (type_scoped or bool(args.priority) or bool(args.sprint))
     if project_scoped and (len(pids) > 1 or "" in pids):
         raise CliError(
@@ -1312,7 +1313,22 @@ def cmd_workitem_bulk_update(args: argparse.Namespace) -> int:
             "而状态 / 工作量属性是按类型配的 —— 分成几批改，或换成别的属性"
         )
     pid = str(_fmt.dig(items[0], "project.id") or "")
-    body = _workitem_body(args, client, pid, sorted(types)[0] if len(types) == 1 else "")
+    # 批量自定义属性要写成 `properties.<key>`，交给 bulk/set 的 property_name；
+    # 不能走 _workitem_body 的通用 properties 合并，否则会变成“一个 properties 对象”属性。
+    ns = argparse.Namespace(**vars(args))
+    ns.property = None
+    body = _workitem_body(ns, client, pid, sorted(types)[0] if len(types) == 1 else "")
+    if getattr(args, "property", None):
+        if len(args.property) != 1:
+            raise CliError("批量接口一次只能改一个自定义属性（--property 只给一次）")
+        key, sep, raw = args.property[0].partition("=")
+        key = key.strip()
+        if not sep or not key:
+            raise CliError(f"--property 要写成 KEY=VALUE，收到 {args.property[0]!r}")
+        keys = _resolve.property_keys(client, pid, sorted(types)[0])
+        if keys and key not in keys:
+            raise CliError(f"属性方案里没有 {key}；可用属性：{'、'.join(keys)}")
+        body[f"properties.{key}"] = _parse_property_value(raw)
     visible_body = {key: value for key, value in body.items() if not key.startswith("_")}
     if len(visible_body) != 1:
         raise CliError(
@@ -2468,6 +2484,8 @@ def build_parser() -> argparse.ArgumentParser:
     wbu.add_argument("--start")
     wbu.add_argument("--end")
     wbu.add_argument("--story-points", type=float)
+    wbu.add_argument("--property", action="append", metavar="KEY=VALUE",
+                     help="批量改一个自定义属性；一次只能给一个")
     wbu.add_argument("--all", action="store_true", help="按编号找时含已删除的")
     wbu.set_defaults(func=cmd_workitem_bulk_update)
     wcm = make(wsub, "comment", help="加评论")

@@ -198,6 +198,12 @@
       "prompt": "在 kanban 项目里建一个看板，加一个栏和一个泳道，改完名字再删掉。",
       "expected_output": "用 `board create` → `board entry-create` / `board swimlane-create` → `entry-update` / `swimlane-update` → `entry-delete` / `swimlane-delete` → `board delete --yes`。看板只适用于 kanban/hybrid；新建看板自带默认泳道和系统栏，创建自定义泳道前先看列表避免重名。",
       "files": []
+    },
+    {
+      "id": 34,
+      "prompt": "把 SCR-1、SCR-2 的风险属性都改成 high。",
+      "expected_output": "用 `workitem bulk-update --ids SCR-1,SCR-2 --property risk=high`，批量接口 property_name 必须是 `properties.risk`，不是把整个 properties 对象当成一个属性；一次仍只能改一个属性。",
+      "files": []
     }
   ]
 }

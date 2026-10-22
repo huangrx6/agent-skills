@@ -741,6 +741,19 @@ class CliCase(unittest.TestCase):
         body = router.find("POST", "/v2/pjm/workitems/bulk/set")[0][2]
         self.assertEqual("title", body["property_name"])
 
+    def test_批量改自定义属性走_properties_key(self):
+        other = dict(WORKITEM, id="w2", identifier="DOC-2")
+        code, _out, err, router = self.run_cli(
+            ["workitem", "bulk-update", "--ids", "w1,w2", "--property", "risk=high"],
+            {("GET", "/v2/pjm/workitems/w1"): WORKITEM,
+             ("GET", "/v2/pjm/workitems/w2"): other,
+             ("POST", "/v2/pjm/workitems/bulk/set"):
+                 [{"state": "success", "id": "w1"}, {"state": "success", "id": "w2"}]})
+        self.assertEqual(0, code, err)
+        body = router.find("POST", "/v2/pjm/workitems/bulk/set")[0][2]
+        self.assertEqual("properties.risk", body["property_name"])
+        self.assertEqual("high", body["property_value"])
+
     def test_批量改正常路径(self):
         code, out, _err, router = self.run_cli(
             ["workitem", "bulk-update", "--ids", "DOC-1", "--title", "统一标题"],

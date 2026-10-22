@@ -30,6 +30,7 @@ import sys
 import tempfile
 import time
 import unittest
+import urllib.parse
 from email.message import Message
 from urllib.error import HTTPError, URLError
 from unittest import mock
@@ -310,7 +311,6 @@ class MultipartTest(TransportCase):
 
 class ClientTest(TransportCase):
     def test_网络错误中的url编码凭据也脱敏(self):
-        import urllib.parse
         secret = "synthetic" + " secret+with spaces"
         cli, _calls = self.make_client(URLError("offline"))
         with self.assertRaises(client.ApiError) as caught:

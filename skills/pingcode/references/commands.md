@@ -134,6 +134,7 @@ pingcode.py workitem attach-remove SCR-12 <附件 id> --yes
 # 改状态/优先级/迭代/工作量时，所有 id 必须在同一项目、同一类型；否则先分批。
 pingcode.py workitem bulk-update --ids SCR-1,SCR-2,SCR-3 --state 已完成
 pingcode.py workitem bulk-update --ids SCR-1,SCR-2 --assignee @me --dry-run
+pingcode.py workitem bulk-update --ids SCR-1,SCR-2 --property risk=high
 
 # 一次建一棵树（史诗 → 特性 → 用户故事 → 任务）：适合把一段需求/一份计划落成工作项
 pingcode.py workitem create-plan --file plan.json             # 默认只打印整棵树，不建
