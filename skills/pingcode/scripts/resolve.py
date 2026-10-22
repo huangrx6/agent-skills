@@ -102,6 +102,12 @@ SOURCES: dict[str, dict[str, Any]] = {
         "needs": (),
         "scopes": ("pcp:read:pjm:workitem",),
     },
+    "workload_types": {
+        "label": _compat.DICT_LABELS["workload_types"],
+        "url": _compat.DICT_PATHS["workload_types"],
+        "needs": (),
+        "scopes": ("pcp:read:global:workload",),
+    },
     "users": {
         "label": _compat.DICT_LABELS["users"],
         "url": _compat.DICT_PATHS["users"],

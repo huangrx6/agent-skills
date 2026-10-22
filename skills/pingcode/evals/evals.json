@@ -114,6 +114,12 @@
       "prompt": "帮我关注 SCR-5，之后再取消关注。",
       "expected_output": "用 `workitem watch SCR-5 @me` POST `/v2/participants`，body 含 principal_type=workitem、principal_id、type=user、participant_id；用 `workitem participants SCR-5` 确认；取消用 `workitem unwatch SCR-5 @me --yes` DELETE 对应 participant。不要误删工作项。",
       "files": []
+    },
+    {
+      "id": 20,
+      "prompt": "给 SCR-5 登记 2 小时研发工时，日期 2026-09-20；然后查一下再删掉。",
+      "expected_output": "用 `worklog add SCR-5 --duration 2 --type 研发 --date 2026-09-20`，POST `/v2/workloads`，body 含 principal_type=workitem、principal_id、duration、report_at 日期对象；用 `worklog list SCR-5` 查，删除用 `worklog delete <id> --yes`。缺 workload scope 时说明需要 `pcp:write:global:workload` 与工作项主体作用域，不要伪造成功。",
+      "files": []
     }
   ]
 }

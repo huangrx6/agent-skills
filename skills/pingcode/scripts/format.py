@@ -94,6 +94,15 @@ PARTICIPANT = (
     ("id", "ID"),
 )
 
+WORKLOG = (
+    ("report_date", "日期"),
+    ("type.name", "类型"),
+    ("duration", "工时"),
+    ("report_by.display_name", "登记人"),
+    ("description", "说明"),
+    ("id", "ID"),
+)
+
 # 这些字段按显示宽度截断（值是该列的最大显示宽度）。
 CLIP_FIELDS = {"content": 64, "title": 48, "download_url": 56}
 
@@ -141,6 +150,7 @@ SCHEMAS: dict[str, tuple[tuple[str, str], ...]] = {
     "history": HISTORY,
     "relation": RELATION,
     "participant": PARTICIPANT,
+    "worklog": WORKLOG,
     "simple": SIMPLE,
 }
 

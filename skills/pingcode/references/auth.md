@@ -12,6 +12,8 @@
 | 识别「我」（`whoami` / `--assignee @me`） | `pcp:read:account:personal` |
 | 人名 → ID（`--assignee 张三`） | `pcp:read:global:team` |
 | 查工作项 / 类型 / 状态 / 标签 | `pcp:read:pjm:workitem` |
+| 查工时 / 工时类型 | `pcp:read:global:workload` + 工作项主体的 `pcp:read:pjm:workitem` |
+| 登记 / 改 / 删工时 | `pcp:write:global:workload` + 工作项主体的 `pcp:write:pjm:workitem` |
 | 建 / 改 / 删工作项 | `pcp:write:pjm:workitem` |
 | 查项目 / 项目状态 / 进度 | `pcp:read:pjm:project` |
 | 建 / 改项目 | `pcp:write:pjm:project` |

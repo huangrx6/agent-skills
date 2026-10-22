@@ -183,6 +183,7 @@ class CliCase(unittest.TestCase):
                         {"id": "estimated_workload"}, {"id": "remaining_workload"}])
         resolve.store("relation_types", {}, [{"id": "rt1", "name": "关联", "category": "relate"}])
         resolve.store("tags", {"project_id": "pj1"}, [{"id": "tag1", "name": "后端"}])
+        resolve.store("workload_types", {}, [{"id": "wt1", "name": "研发"}])
 
     # ── 运行与断言 ──
     def run_cli(self, argv: list[str], routes: dict | None = None) -> tuple[int, str, str, Router]:
@@ -899,6 +900,56 @@ class CliCase(unittest.TestCase):
              ("GET", "/v2/participants"): {"values": [], "total": 0}})
         self.assertEqual(0, code)
         self.assertIn("还没有关注人", out)
+
+    def test_工时列表和添加删除(self):
+        workload = {"id": "wl1", "duration": 2,
+                    "report_at": {"date": 1700000000},
+                    "type": {"id": "wt1", "name": "研发"},
+                    "report_by": {"display_name": "John"},
+                    "description": "修复登录"}
+        code, out, err, router = self.run_cli(
+            ["worklog", "list", "w1"],
+            {("GET", "/v2/pjm/workitems/w1"): WORKITEM,
+             ("GET", "/v2/workloads"): {"values": [workload], "total": 1}})
+        self.assertEqual(0, code, err)
+        for text in ("研发", "John", "修复登录"):
+            self.assertIn(text, out)
+        url = router.find("GET", "/v2/workloads")[0][1]
+        self.assertIn("principal_type=workitem", url)
+        self.assertIn("principal_id=w1", url)
+
+        code, out, err, router = self.run_cli(
+            ["worklog", "add", "w1", "--duration", "2", "--date", "2026-09-20",
+             "--type", "研发", "--description", "修复登录"],
+            {("GET", "/v2/pjm/workitems/w1"): WORKITEM,
+             ("POST", "/v2/workloads"): {"id": "wl1"}})
+        self.assertEqual(0, code, err)
+        self.assertIn("工时已登记", out)
+        body = router.find("POST", "/v2/workloads")[0][2]
+        self.assertEqual(2, body["duration"])
+        self.assertEqual("wt1", body["type_id"])
+        self.assertEqual("w1", body["principal_id"])
+        self.assertEqual(0, body["report_at"]["with_time"])
+
+        code, _out, err, _router = self.run_cli(
+            ["worklog", "delete", "wl1"],
+            {})
+        self.assertEqual(1, code)
+        self.assertIn("--yes", err)
+
+        code, out, err, router = self.run_cli(
+            ["worklog", "delete", "wl1", "--yes"],
+            {("DELETE", "/v2/workloads/wl1"): {}})
+        self.assertEqual(0, code, err)
+        self.assertIn("工时已删除", out)
+        self.assertEqual(1, len(router.find("DELETE", "/v2/workloads/wl1")))
+
+    def test_工时列表_start_end_要成对(self):
+        code, _out, err, _router = self.run_cli(
+            ["worklog", "list", "w1", "--start", "2026-09-01"],
+            {("GET", "/v2/pjm/workitems/w1"): WORKITEM})
+        self.assertEqual(1, code)
+        self.assertIn("--end", err)
 
     def test_mine_缺_scope_时要给不改后台的办法(self):
         """实测：数据范围里没有 pcp:read:account:personal 时 /v2/myself 会 403。

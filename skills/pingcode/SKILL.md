@@ -41,9 +41,10 @@ description: >-
 | 评论 / 附件 | `workitem comment/comments/attachments/attach/download/attach-code/attach-remove …` |
 | 流转历史 / 内部关联 / 关注人 | `workitem history SCR-12` / `workitem relations SCR-12` / `workitem participants SCR-12` |
 | 标签 / 关注人写入 | `workitem tags/tag/untag …` / `workitem watch/unwatch …` |
+| 工时 | `worklog list/add/delete …`（需要 workload scope） |
 | 删除工作项 | `workitem delete SCR-12 --yes` |
 | 项目列表 / 详情 / 进度 / 创建 / 更新 | `project list/show/progress/create/update …` |
-| 字典 / 默认项目 | `list projects\|sprints\|types\|states\|priorities\|tags\|users\|project_states\|processes\|workitem_properties` / `config context --project X` |
+| 字典 / 默认项目 | `list projects\|sprints\|types\|states\|priorities\|tags\|users\|project_states\|processes\|workitem_properties\|relation_types\|workload_types` / `config context --project X` |
 | 授权与诊断 | `auth login/status/logout` / `whoami` / `config show` |
 
 “未完成”按 `state.type` 排除 `completed` 和 `closed`，不能按中文状态名猜。

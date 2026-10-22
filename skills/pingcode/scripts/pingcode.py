@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime
 import difflib
 import importlib.util
 import json
@@ -1286,6 +1287,73 @@ def cmd_workitem_unwatch(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_worklog_list(args: argparse.Namespace) -> int:
+    """列工作项工时：GET /v2/workloads?principal_type=workitem&principal_id=…。"""
+    client = build_client(args)
+    if bool(args.start) != bool(args.end):
+        raise CliError("--start 和 --end 要一起给")
+    current = fetch_workitem(client, args.ref)
+    params: dict[str, Any] = {"principal_type": "workitem", "principal_id": current["id"]}
+    if args.start:
+        params["start_at"] = _fmt.parse_time(args.start)
+        params["end_at"] = _fmt.parse_time(args.end)
+    values = client.paginate(_compat.WORKLOADS, max_items=args.limit, **params)
+    if args.full:
+        print(json.dumps(values, ensure_ascii=False, indent=2))
+        return 0
+    if not values:
+        print(f"{current.get('identifier', args.ref)} 还没有工时")
+        return 0
+    enriched: list[dict[str, Any]] = []
+    for value in values:
+        item = dict(value)
+        item["report_date"] = _fmt.show_time(_fmt.dig(value, "report_at.date"))
+        enriched.append(item)
+    emit(_fmt.rows("worklog", enriched), args, "worklog", values)
+    return 0
+
+
+def cmd_worklog_add(args: argparse.Namespace) -> int:
+    """登记工时：POST /v2/workloads。"""
+    client = build_client(args)
+    current = fetch_workitem(client, args.ref)
+    if not 0 < args.duration <= 24:
+        raise CliError("工时时长要在 0–24 小时之间")
+    date_text = args.date or datetime.date.today().isoformat()
+    body: dict[str, Any] = {
+        "principal_type": "workitem",
+        "principal_id": current["id"],
+        "duration": args.duration,
+        "report_at": _compat.date_object(_fmt.parse_time(date_text), _has_clock(date_text)),
+    }
+    if args.type:
+        body["type_id"] = _resolve.find("workload_types", client, args.type,
+                                       force=args.no_cache)["id"]
+    if args.report_by:
+        body["report_by_id"] = _resolve.user_id(client, args.report_by, force=args.no_cache)
+    if args.description:
+        body["description"] = args.description
+    summary = (f"给 {current.get('identifier', args.ref)} 登记 {args.duration:g} 小时工时"
+               f"（{date_text}）")
+    result = perform(args, client, "POST", _compat.WORKLOADS, body=body, summary=summary)
+    if result is not None and isinstance(result.data, dict):
+        print(f"✓ 工时已登记（id={result.data.get('id', '?')}）")
+    return 0
+
+
+def cmd_worklog_delete(args: argparse.Namespace) -> int:
+    """删除工时：DELETE /v2/workloads/{id}。"""
+    client = build_client(args)
+    if not args.yes and not args.dry_run:
+        raise CliError(f"删除工时不可逆。确认要删 {args.workload_id} 就加 --yes")
+    path = _api.build(_compat.WORKLOAD_ONE, workload_id=args.workload_id)
+    summary = f"删除工时 {args.workload_id}"
+    perform(args, client, "DELETE", path, summary=summary)
+    if not args.dry_run:
+        print("✓ 工时已删除")
+    return 0
+
+
 def _download_to(url: str, path: str) -> None:
     """下载到本地文件；只允许 http/https，避免 file:// 等意外协议。"""
     scheme = urllib.parse.urlparse(url).scheme.lower()
@@ -1676,7 +1744,7 @@ def build_parser() -> argparse.ArgumentParser:
     ctx.add_argument("--clear", action="store_true", help="清空")
     ctx.set_defaults(func=cmd_config_context)
     refresh = make(cfg_sub, "refresh", help="刷新字典缓存")
-    refresh.add_argument("--what", help="projects,sprints,types,states,priorities,tags,users,project_states,processes,workitem_properties；不给就全清")
+    refresh.add_argument("--what", help="projects,sprints,types,states,priorities,tags,users,project_states,processes,workitem_properties,relation_types,workload_types；不给就全清")
     refresh.add_argument("--project")
     refresh.add_argument("--type", help="刷新 states / workitem_properties 时要给工作项类型")
     refresh.set_defaults(func=cmd_config_refresh)
@@ -1715,6 +1783,27 @@ def build_parser() -> argparse.ArgumentParser:
     pu.add_argument("--assignee")
     pu.add_argument("--state", help="项目状态名（官方没有删除项目的接口，关闭靠状态）")
     pu.set_defaults(func=cmd_project_update)
+
+    worklog = make(sub, "worklog", help="工时（/v2/workloads）")
+    wlsub = worklog.add_subparsers(dest="action", required=True)
+    wll = make(wlsub, "list", help="列工作项工时")
+    wll.add_argument("ref")
+    wll.add_argument("--start", help="登记日期起（含），要和 --end 一起给")
+    wll.add_argument("--end", help="登记日期止（含）")
+    wll.add_argument("--limit", type=int, default=100)
+    wll.set_defaults(func=cmd_worklog_list)
+    wla = make(wlsub, "add", help="给工作项登记工时")
+    wla.add_argument("ref")
+    wla.add_argument("--duration", type=float, required=True, help="小时数，0–24")
+    wla.add_argument("--date", help="登记日期，默认今天")
+    wla.add_argument("--type", help="工时类型（研发 / 测试 … 或 id）")
+    wla.add_argument("--description")
+    wla.add_argument("--report-by", help="登记人（企业令牌通常必填）")
+    wla.set_defaults(func=cmd_worklog_add)
+    wld = make(wlsub, "delete", help="删除一个工时（要 --yes）")
+    wld.add_argument("workload_id")
+    wld.add_argument("--yes", action="store_true", help="确认删除")
+    wld.set_defaults(func=cmd_worklog_delete)
 
     wi = make(sub, "workitem", help="工作项（史诗 / 故事 / 任务 / 缺陷 …）")
     wsub = wi.add_subparsers(dest="action", required=True)

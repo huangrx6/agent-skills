@@ -36,6 +36,8 @@ PARTICIPANT_ONE = ("/v2/participants/{participant_id}"
                    "?principal_type={principal_type}&principal_id={principal_id}")
 WORKITEM_TAGS = "/v2/pjm/workitems/{workitem_id}/workitem_tags"
 WORKITEM_TAG_ONE = "/v2/pjm/workitems/{workitem_id}/workitem_tags/{workitem_tag_id}"
+WORKLOADS = "/v2/workloads"
+WORKLOAD_ONE = "/v2/workloads/{workload_id}"
 ATTACHMENTS = "/v2/attachments"
 ATTACHMENT = ("/v2/attachments/{attachment_id}"
               "?principal_type={principal_type}&principal_id={principal_id}")
@@ -55,6 +57,7 @@ DICT_PATHS: dict[str, str] = {
     "workitem_properties": ("/v2/pjm/workitem/workitem_properties"
                            "?project_id={project_id}&workitem_type_id={workitem_type_id}"),
     "relation_types": "/v2/pjm/workitem_relation_types",
+    "workload_types": "/v2/workload_types",
     "users": "/v2/directory/users",
     # V2 把项目流程改成了项目模板；保留 `list processes` 这个命令名，
     # 避免用户为了“看有哪些流程”再记一个新命令。
@@ -71,6 +74,7 @@ DICT_LABELS: dict[str, str] = {
     "tags": "工作项标签",
     "workitem_properties": "工作项属性方案",
     "relation_types": "工作项关联类型",
+    "workload_types": "工时类型",
     "users": "企业成员",
     "processes": "项目模板",
 }

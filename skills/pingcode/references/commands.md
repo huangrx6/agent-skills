@@ -38,11 +38,12 @@ pingcode.py workitem relations SCR-12       # 内部关联：类型 / 另一端�
 pingcode.py workitem relations SCR-12 --type blocked_by  # 只看某类关联
 pingcode.py workitem participants SCR-12    # 关注人 / 用户组
 pingcode.py workitem tags SCR-12            # 当前工作项已打的标签
+pingcode.py worklog list SCR-12 [--start 2026-09-01 --end 2026-09-30]  # 工时
 pingcode.py workitem download SCR-12 <附件 id> --out ./日志.txt  # 下载附件
 pingcode.py project list [--keywords X] [--type scrum] [--all] [--limit 50]
 pingcode.py project show X
 pingcode.py project progress [--project X]
-pingcode.py list projects|sprints|types|states|priorities|tags|users|project_states|processes|relation_types \
+pingcode.py list projects|sprints|types|states|priorities|tags|users|project_states|processes|relation_types|workload_types \
     [--project X] [--type bug]
 pingcode.py list workitem_properties --project X --type 用户故事   # 看该类型能写哪些属性
 ```
@@ -189,6 +190,7 @@ pingcode.py api --method POST --path /v2/comments --data '{"principal_type":"wor
 | "这条和哪些工作项有关联" | `workitem relations SCR-12 [--type blocked_by]` |
 | "谁在关注这条" | `workitem participants SCR-12` |
 | "给这条打/去标签" | `workitem tags SCR-12` / `workitem tag SCR-12 后端` / `workitem untag SCR-12 后端 --yes` |
+| "登记/查看工时" | `worklog add SCR-12 --duration 2` / `worklog list SCR-12` |
 | "把附件下载下来" | `workitem download SCR-12 <附件 id> --out ./文件` |
 | "把两条工作项关联起来" | `workitem relate SCR-12 --to SCR-5 [--type relate]` |
 | "我名下某项目的任务" | `workitem mine --project X --open-only`（服务端按项目/类型过滤） |
@@ -225,3 +227,6 @@ judge 退出 0 视为通过；不给 judge 时只记录 transcript。运行记�
 
 项目创建/更新的真实写链路没有在随附验证中执行：端点表没有项目删除接口，
 创建后无法保证“用完即删”；命令已有 mock/dry-run 覆盖，真实写需在专用测试租户进行。
+
+工时端点需要 `pcp:read/write:global:workload`，并依赖工时所属工作项的作用域；
+当前租户未开这个 scope 时，`worklog list/add` 会返回 403，错误会点名所需 scope。
