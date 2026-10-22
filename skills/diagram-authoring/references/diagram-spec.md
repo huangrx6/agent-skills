@@ -39,14 +39,16 @@
 | `edges` | 边数组；省略表示无边 |
 | `groups` | 区域声明，节点用 `group` 引用 |
 | `cards` | 图下结论卡，每卡包含 `title` 和非空字符串数组 `items` |
-| `direction` | 分层图的 `LR` / `TB`；径向与力导向不靠此字段排列 |
+| `direction` | 分层图的 `LR` / `TB`；省略时按图型默认，默认只是起手值，可按内容覆盖；径向与力导向不靠此字段排列 |
 | `detail` | `executive` / `standard`（默认）/ `diagnostic` |
 | `visual` | Excalidraw 视觉方向，见下表；省略或 `auto` 按图型、mood 选择 |
 | `mood` | 用户的视觉意图短句，辅助自动选方向/方案 |
 | `style` | 样式轴对象，见下表 |
 
 `architecture` / `state` 默认 LR；`dependency` / `flow` 默认 TB。
-`mindmap` 用径向布局，`network` 用力导向布局。不能把算法名写成 type。
+这些默认值不是锁定值：用户说“横着/竖着”时直接写 `direction`；横向流水线、分支并排或
+16:9 幻灯片优先 LR，纵向步骤或窄栏文档优先 TB。`mindmap` 用径向布局，`network` 用力导向布局。
+不能把算法名写成 type。
 
 ## 表达意图（可选）
 

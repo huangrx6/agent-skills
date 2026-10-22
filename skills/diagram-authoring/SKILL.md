@@ -17,7 +17,7 @@ description: >-
 
 ## 用户决定内容与视觉
 
-默认按 **内容 → 配色 → 图标（Excalidraw）→ 生成** 顺序执行。
+默认按 **内容（含分层方向） → 配色 → 图标（Excalidraw）→ 生成** 顺序执行。
 每到一个节点，先给出基于用户条件的具体提案，再提出一个确认问题，**停止并等待用户回复**；
 未确认不进入下一节点、不生成最终图、不覆盖现有图或同步图片。所有图型/后端均适用内容与配色确认。
 用户已明确确认的选择不重复询问；“你看着来”用于准备推荐，不默认取消等待。
@@ -29,8 +29,10 @@ description: >-
 1. 从用户材料、代码、配置或运行结果确认图的主题、边界和关系。不要凭目录名猜架构；
    未证实的关系先核对，或清楚标为待确认。
 2. 明确一句读者问题、受众和观看场景；需要行为解释时读 [表达模式](references/semantic-patterns.md)。
-   按下表选图类型并读 [图型规则](references/type-guides.md) 的对应段。拿不准可用 `python3 scripts/guide.py "一句话描述"` 辅助判断。
-3. 提交内容提案：列清主题、图型/后端、分组节点、关系、信息取舍与单图/多图安排，等待用户确认。
+   按下表选图类型并读 [图型规则](references/type-guides.md) 的对应段；同时按内容形态给出分层方向建议（LR/TB）。
+   默认方向只是起手值，不能每次都直接沿用。拿不准可用 `python3 scripts/guide.py "一句话描述"` 辅助判断。
+3. 提交内容提案：列清主题、图型/后端、分层方向（LR/TB 及依据）、分组节点、关系、信息取舍与单图/多图安排，等待用户确认。
+   用户明确说“横着/竖着”时直接采用，不再把方向当成待猜的偏好。
    确认后读 [规格契约](references/diagram-spec.md)，写 `*.diagram.json`。规格只含结构、语义档位
    和方向约束；没有坐标、宽高、像素字号或色值。输出放在用户指定目录或当前项目中。
    新图默认一图一目录，规格与配色放该图的 `.source/`，成品放外层；具体路径优先遵守用户要求和已有引用，见 [文件组织](references/delivery-files.md)。
@@ -72,7 +74,7 @@ python3 dev-tools/sync_exports.py /path/to/diagrams/system/system.drawio
 
 ## 图型与后端
 
-| `type` | 布局 | 默认方向 |
+| `type` | 布局 | 默认方向（起手值） |
 | --- | --- | --- |
 | `architecture` | 分层 | `LR` |
 | `dependency` | 分层 | `TB` |
@@ -80,6 +82,11 @@ python3 dev-tools/sync_exports.py /path/to/diagrams/system/system.drawio
 | `state` | 分层，处理环回边；暂不支持自环 | `LR` |
 | `mindmap` | 径向 | 不适用 |
 | `network` | 力导向 | 不适用 |
+
+默认方向只用于起手，不是锁定值；分层图用规格里的 `direction` 覆盖。
+横向流水线、阶段推进、分支并排或 16:9 幻灯片优先 `LR`；纵向步骤、窄栏文档或移动端优先 `TB`。
+用户说“横着/竖着”时按其选择执行；拿不准可用 `python3 scripts/direction_preview.py` 对比，
+不要每次都落回 `flow`/`dependency` 的默认 `TB`。
 
 | 后端 | 适用 | 当前边界 |
 | --- | --- | --- |

@@ -98,6 +98,29 @@ SCENARIOS: dict[str, dict] = {
 }
 
 
+# 用户已经把方向说出口时，不要让类型默认值盖过它。只认明确的排版词，
+# 不把“上下文”“上下班”之类的日常词误判成 TB。
+DIRECTION_CUES = {
+    "LR": ("横向", "横着", "横屏", "水平", "从左到右", "左到右", "left to right", "horizontal"),
+    "TB": ("纵向", "竖着", "竖排", "竖屏", "垂直", "从上到下", "上到下", "top to bottom", "vertical"),
+}
+
+
+def _negated(text: str, index: int) -> bool:
+    prefix = text[max(0, index - 6):index]
+    return any(prefix.endswith(word) for word in
+               ("不", "不要", "不用", "别", "不是", "而非", "不想"))
+
+
+def direction_cue(text: str) -> str | None:
+    """从描述里读显式方向；跳过“不要竖着”这类否定，同时出现时取最先的肯定项。"""
+    lowered = text.lower()
+    hits = [(lowered.find(cue), direction)
+            for direction, cues in DIRECTION_CUES.items() for cue in cues
+            if cue in lowered and not _negated(lowered, lowered.find(cue))]
+    return min(hits)[1] if hits else None
+
+
 def score(scenario: str) -> list[tuple[str, int]]:
     """按信号词打分，返回按分数降序的 (类型, 分数)。"""
     text = scenario.lower()
@@ -163,6 +186,10 @@ def recommend(scenario: str, *, pattern: str | None = None,
     if unsupported:
         rec.update(recommended=None, candidates=[],
                    why="请求含当前生成器尚不支持的专用图型；不能把普通节点图冒充该图型。")
+    cue = direction_cue(text)
+    if cue and rec.get("recommended") in L.DIRECTION_FOR_TYPE:
+        rec["direction"] = cue
+    rec["direction_explicit"] = bool(cue and rec.get("recommended") in L.DIRECTION_FOR_TYPE)
     rec.update(pattern=selected, pattern_candidates=matches,
                unsupported_types=unsupported, audience=audience,
                audience_guidance=A.AUDIENCES[audience], preset=preset,
@@ -176,8 +203,13 @@ def starter_prompt(rec: dict, scenario: str) -> str:
     """给作者的起手骨架：推荐类型 + include 清单 + 原话。"""
     name = rec.get("recommended") or "<从候选里挑一个>"
     include = "\n".join(f"  - {item}" for item in rec.get("include", []))
+    direction = rec.get("direction")
+    direction_note = "来自你的方向描述" if rec.get("direction_explicit") else "只是默认值"
+    direction_line = (f"方向起手：{direction}（{direction_note}；按内容和媒介可用 direction 改成 LR/TB）。\n"
+                      if direction else "")
     return (f"用 {name} 画：{scenario}\n"
             f"要包含：\n{include}\n"
+            f"{direction_line}"
             f"先明确读者要理解的问题；intent 可记录 question/audience/pattern。\n"
             f"受众：{rec.get('audience', 'mixed')}；观看场景：{rec.get('preset', 'doc-inline')}。\n"
             "规格不写坐标、颜色、字号；生成后运行语义检查和场景可读性检查。")

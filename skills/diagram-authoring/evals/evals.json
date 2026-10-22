@@ -212,6 +212,16 @@
       "id": 39,
       "prompt": "用 draw.io，内容和配色都已确认。",
       "expected_output": "当前生成器无图标支持，图标节点记录不适用并简短说明，然后生成；不提供无法实现的图标选择，不未经请求改成 Excalidraw。"
+    },
+    {
+      "id": 40,
+      "prompt": "内容已确认。画一个从左到右的订单处理流程图，用 Excalidraw。",
+      "expected_output": "在规格中显式写 direction: LR，不沿用 flow 默认 TB；按横向流程生成并检查。不把“从左到右”误解成只改箭头语义，也不再次追问方向。"
+    },
+    {
+      "id": 41,
+      "prompt": "为什么你给我画的图总是竖着的？能不能灵活点？",
+      "expected_output": "说明 flow/dependency 默认 TB、architecture/state 默认 LR，分层图可用 direction 覆盖；提出按内容形态或用户偏好选 LR/TB 的方案，不把默认值说成生成器只能竖向。"
     }
   ],
   "evaluation_context": "设计/重画场景默认执行内容→配色→Excalidraw图标的逐步确认；未收到当前节点确认时，不应在同一回复继续后续节点或生成成品。原有用例涉及生成/导出的预期描述为确认完成后的实现行为；纯检查、机械修复与纯导出不额外重开设计确认。"

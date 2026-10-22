@@ -33,6 +33,35 @@ class TestGuide(unittest.TestCase):
         self.assertEqual("flow", rec["recommended"])
         self.assertEqual("TB", rec["direction"])
 
+    def test_starter_prompt_exposes_direction_override(self):
+        rec = G.recommend("审批通过后部署，失败则回滚重试")
+        prompt = G.starter_prompt(rec, "审批通过后部署，失败则回滚重试")
+        self.assertIn("方向起手：TB", prompt)
+        self.assertIn("可用 direction 改成 LR/TB", prompt)
+
+    def test_explicit_horizontal_cue_overrides_flow_default(self):
+        rec = G.recommend("从左到右的订单处理流程")
+        self.assertEqual("flow", rec["recommended"])
+        self.assertEqual("LR", rec["direction"])
+        self.assertTrue(rec["direction_explicit"])
+        self.assertIn("来自你的方向描述", G.starter_prompt(rec, "从左到右的订单处理流程"))
+
+    def test_explicit_vertical_cue_keeps_flow_tb(self):
+        rec = G.recommend("从上到下的审批流程")
+        self.assertEqual("flow", rec["recommended"])
+        self.assertEqual("TB", rec["direction"])
+        self.assertTrue(rec["direction_explicit"])
+
+    def test_negative_vertical_cue_falls_through_to_horizontal(self):
+        rec = G.recommend("不要竖着，要横着的订单流程")
+        self.assertEqual("flow", rec["recommended"])
+        self.assertEqual("LR", rec["direction"])
+
+    def test_negative_horizontal_cue_falls_through_to_vertical(self):
+        rec = G.recommend("不是横向，是纵向的审批流程")
+        self.assertEqual("flow", rec["recommended"])
+        self.assertEqual("TB", rec["direction"])
+
     def test_dependency_wins_for_import_text(self):
         self.assertEqual("dependency", G.recommend("模块之间的 import 依赖关系")["recommended"])
 
