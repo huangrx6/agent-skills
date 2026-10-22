@@ -1,10 +1,14 @@
 # 端点与请求契约
 
+当前生成表来自官方 **REST API V2**（`api_data.json` 2026-10-14 快照，459 个接口）。
+V1 路径不再在表内；`api --show /v1/...` 会被拦下。
+
 ```text
 官方 https://open.pingcode.com/api_data.json
   → dev-tools/gen_endpoints.py
   → scripts/endpoints.py（生成数据、来源时间、SHA256）
   → scripts/api_index.py（require/build/find/scopes）
+  → scripts/compat.py（V2 路径与字段适配）
   → scripts/pingcode.py（类型化命令）
 ```
 
@@ -16,7 +20,7 @@
 python3 scripts/api_index.py --groups
 python3 scripts/api_index.py --scopes
 python3 scripts/pingcode.py api --list 工作项
-python3 scripts/pingcode.py api --show GET /v1/pjm/workitems
+python3 scripts/pingcode.py api --show GET /v2/pjm/workitems
 python3 dev-tools/gen_endpoints.py --check
 python3 dev-tools/gen_endpoints.py --input /path/to/api_data.json
 ```
@@ -31,8 +35,8 @@ python3 dev-tools/gen_endpoints.py --input /path/to/api_data.json
 ## 通用 API
 
 ```sh
-python3 scripts/pingcode.py api --method GET --path /v1/pjm/workitem/priorities --param project_id=xxx
-python3 scripts/pingcode.py api --method GET --path '/v1/pjm/workitems/{workitem_id}' --param workitem_id=xxx
+python3 scripts/pingcode.py api --method GET --path /v2/pjm/workitem/workitem_priorities --param project_id=xxx
+python3 scripts/pingcode.py api --method GET --path '/v2/pjm/workitems/{workitem_id}' --param workitem_id=xxx
 ```
 
 `--param` 填路径占位符，也可能作为查询参数发送；`--data` 提供 JSON body。
@@ -44,9 +48,9 @@ python3 scripts/pingcode.py api --method GET --path '/v1/pjm/workitems/{workitem
 
 | 类型 | 端点与内容 |
 | --- | --- |
-| 文件 | `POST /v1/attachments?principal_type=workitem&principal_id=…`；multipart `title` + `file` |
-| 代码段 | `POST /v1/attachments`；JSON `principal_type`、`principal_id`、`title`、`format`、`content`、`comment_id` |
-| 删除 | `DELETE /v1/attachments/{attachment_id}`；带主体查询参数，有评论归属时带 `comment_id` |
+| 文件 | `POST /v2/attachments?principal_type=workitem&principal_id=…`；multipart `title` + `file` |
+| 代码段 | `POST /v2/attachments`；JSON `principal_type`、`principal_id`、`title`、`format`、`content`、`comment_id` |
+| 删除 | `DELETE /v2/attachments/{attachment_id}`；带主体查询参数，有评论归属时带 `comment_id` |
 
 文件上传到已有评论时也带 `comment_id`。代码段在历史租户验证中缺少该字段会返回
 400/code=100039，因此当前 CLI 要求它。不要为了上传代码段擅自发布新评论；应先使用已授权的评论。

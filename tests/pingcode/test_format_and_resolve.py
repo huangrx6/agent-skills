@@ -45,6 +45,7 @@ def _load(name: str):
 
 fmt = _load("format")
 resolve = _load("resolve")
+compat = _load("compat")
 cfg = _load("config")
 
 
@@ -71,9 +72,8 @@ class TimeTest(unittest.TestCase):
 
     def test_看不懂要报错并给例子(self):
         for bad in ("", "  ", "下周三", "13 月"):
-            with self.subTest(text=bad):
-                with self.assertRaises(fmt.TimeParseError):
-                    fmt.parse_time(bad)
+            with self.subTest(text=bad), self.assertRaises(fmt.TimeParseError):
+                fmt.parse_time(bad)
 
     def test_空时间显示为空串不是_None(self):
         self.assertEqual("", fmt.show_time(None))
@@ -83,6 +83,32 @@ class TimeTest(unittest.TestCase):
         self.assertEqual("缺陷", fmt.type_label("bug"))
         self.assertEqual("史诗", fmt.type_label("epic"))
         self.assertEqual("自定义类型id", fmt.type_label("自定义类型id"))
+
+    def test_v2_工作项规范化(self):
+        item = {
+            "identifier": 5,
+            "whole_identifier": "SCR-5",
+            "title": "用户故事 5",
+            "type": {"id": "t1", "name": "用户故事", "group": "requirement"},
+            "state": {"id": "s1", "name": "处理中", "type": "in_progress"},
+            "priority": {"id": "p1", "name": "高"},
+            "assignee": {"id": "u1", "display_name": "John"},
+            "project": {"id": "pj1", "identifier": "SCR", "name": "演示项目"},
+            "start": {"date": 1577808000, "with_time": 1},
+            "due": {"date": 1577894400, "with_time": 0},
+            "properties": {"story_points": 3, "estimated_workload": 8},
+        }
+        norm = compat.normalize_workitem(item)
+        self.assertEqual("SCR-5", norm["identifier"])
+        self.assertEqual("t1", norm["type"])
+        self.assertEqual("用户故事", norm["type_name"])
+        self.assertEqual(1577808000, norm["start_at"])
+        self.assertEqual(1577894400, norm["end_at"])
+        self.assertEqual(3, norm["story_points"])
+        out = fmt.compact("workitem", item)
+        self.assertEqual("SCR-5", out["编号"])
+        self.assertEqual("用户故事", out["类型"])
+        self.assertEqual(fmt.show_time(1577894400), out["截止"])
 
 
 class CompactTest(unittest.TestCase):
@@ -303,13 +329,13 @@ class ResolveTest(unittest.TestCase):
     # ── 缓存 ──
     def test_缓存命中就不打网络(self):
         self.seed("projects", self.PROJECTS)
-        client = self.FakeClient({"/v1/pjm/projects": self.PROJECTS})
+        client = self.FakeClient({"/v2/pjm/projects": self.PROJECTS})
         resolve.find("projects", client, "演示")
         self.assertEqual([], client.hits, "已有缓存就不该再请求")
 
     def test_force_跳过缓存(self):
         self.seed("projects", self.PROJECTS)
-        client = self.FakeClient({"/v1/pjm/projects": self.PROJECTS})
+        client = self.FakeClient({"/v2/pjm/projects": self.PROJECTS})
         resolve.find("projects", client, "演示", force=True)
         self.assertEqual(1, len(client.hits))
 
@@ -326,7 +352,7 @@ class ResolveTest(unittest.TestCase):
         for entry in data["entries"].values():
             entry["at"] = time.time() - resolve.CACHE_TTL - 10
         cfg.save_cache(data)
-        client = self.FakeClient({"/v1/pjm/projects": self.PROJECTS})
+        client = self.FakeClient({"/v2/pjm/projects": self.PROJECTS})
         resolve.find("projects", client, "演示")
         self.assertEqual(1, len(client.hits), "过期了要重新拉")
 
@@ -351,13 +377,13 @@ class ResolveTest(unittest.TestCase):
 
     def test_dry_run_不该把空字典写进缓存(self):
         """实测撞到过：dry-run 下字典被解析成空列表并落盘，之后正常命令也拿不到可选项。"""
-        client = _resolve_client(self.FakeClient({"/v1/pjm/projects": []}), dry_run=True)
+        client = _resolve_client(self.FakeClient({"/v2/pjm/projects": []}), dry_run=True)
         self.assertIsNone(resolve.cached("projects", {}))
         resolve.items("projects", client)
         self.assertIsNone(resolve.cached("projects", {}), "dry-run 的结果不能进缓存")
 
     def test_正常客户端照样写缓存(self):
-        client = _resolve_client(self.FakeClient({"/v1/pjm/projects": self.PROJECTS}))
+        client = _resolve_client(self.FakeClient({"/v2/pjm/projects": self.PROJECTS}))
         resolve.items("projects", client)
         self.assertEqual(len(self.PROJECTS), len(resolve.cached("projects", {})))
 
@@ -376,7 +402,7 @@ class ResolveTest(unittest.TestCase):
         self.assertNotIn("workitems", resolve.SOURCES)
         for kind, spec in resolve.SOURCES.items():
             with self.subTest(kind=kind):
-                self.assertNotIn("/v1/pjm/workitems", spec["url"])
+                self.assertNotIn("/v2/pjm/workitems", spec["url"])
 
 
 if __name__ == "__main__":

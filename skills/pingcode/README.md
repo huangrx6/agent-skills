@@ -1,7 +1,8 @@
 # pingcode
 
-PingCode 项目与工作项 CLI。Agent 操作规则见 [SKILL.md](SKILL.md)，
-完整参数见 [命令参考](references/commands.md)。依赖 Python 3.10+，仅用标准库。
+PingCode 项目与工作项 CLI，端点表来自官方 **REST API V2**（2026-10-14 快照）。
+Agent 操作规则见 [SKILL.md](SKILL.md)，完整参数见 [命令参考](references/commands.md)。
+依赖 Python 3.10+，仅用标准库。
 
 ## 配置
 
@@ -35,6 +36,16 @@ python3 skills/pingcode/dev-tools/gen_endpoints.py --check --input /path/to/api_
 单元测试使用临时配置与模拟传输，不访问真实租户。生成器的无 `--input` 模式访问官方公开文档，
 `--check` 只比对、不改文件。端点表记录来源与快照指纹，不证明当前服务端接受每个参数；
 新增接口应对照官方请求参数表，并在获授权后做实际验证。
+
+## 验证状态
+
+- 2026-09-13 在真实租户（企业令牌）跑过 V1 只读 + 写全链路：项目/字典/进度、建树、建缺陷、
+  改描述与截止、改状态、评论、附件、删除。
+- 2026-10-22 按官方 **V2** 文档重新生成端点表并迁移字段；单元测试覆盖 V2 编号、日期、
+  `properties`、批量接口与项目 `template_type`。
+- **V2 尚未在真实租户复核**：`identifier` 查询是数字还是完整编号、`with_time` 是否必填、
+  `properties.story_points` 是否可写、附件代码段是否仍强制 `comment_id`，都需要在获授权后
+  用只读命令和一条可丢弃的测试数据验证。详细清单见 `docs/plans/pingcode-api-v2-migration.md`。
 
 已封装项目、工作项、结构化搜索、树形创建、单字段批量更新、评论与附件。
 当前端点表无项目删除接口；成员/权限/部门/CI 管理不在 skill 的操作范围。

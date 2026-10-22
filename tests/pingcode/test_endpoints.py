@@ -60,41 +60,37 @@ gen = _load(os.path.join(DEV_TOOLS, "gen_endpoints.py"), "_test_gen_endpoints")
 # 本 skill 的类型化子命令会调的端点。这里的每一条都必须能在官方表里解析到 ——
 # 少一条就会在真实调用时 404，而那是本文件最想提前拦住的失败。
 USED = [
-    ("GET", "/v1/auth/token", {"grant_type": "client_credentials"}),
-    ("GET", "/v1/auth/token", {"grant_type": "authorization_code"}),
-    ("GET", "/v1/auth/token", {"grant_type": "refresh_token"}),
-    ("GET", "/v1/myself", None),
-    ("GET", "/v1/directory/users", None),
-    ("GET", "/v1/pjm/processes", None),
-    ("GET", "/v1/pjm/projects", None),
-    ("POST", "/v1/pjm/projects", None),
-    ("GET", "/v1/pjm/projects/{project_id}", None),
-    ("PATCH", "/v1/pjm/projects/{project_id}", None),
-    ("GET", "/v1/pjm/projects/{project_id}/progress", None),
-    ("GET", "/v1/pjm/projects/{project_id}/members", None),
-    ("GET", "/v1/pjm/projects/{project_id}/sprints", None),
-    ("POST", "/v1/pjm/projects/{project_id}/sprints", None),
-    ("PATCH", "/v1/pjm/projects/{project_id}/sprints/{sprint_id}", None),
-    ("GET", "/v1/pjm/projects/{project_id}/boards", None),
-    ("GET", "/v1/pjm/project/states", None),
-    ("GET", "/v1/pjm/workitems", None),
-    ("POST", "/v1/pjm/workitems", None),
-    ("PATCH", "/v1/pjm/workitems", None),
-    ("POST", "/v1/pjm/workitems/search", None),
+    ("GET", "/v2/auth/token", {"grant_type": "client_credentials"}),
+    ("GET", "/v2/auth/token", {"grant_type": "authorization_code"}),
+    ("GET", "/v2/auth/token", {"grant_type": "refresh_token"}),
+    ("GET", "/v2/myself", None),
+    ("GET", "/v2/directory/users", None),
+    ("GET", "/v2/pjm/project_templates", None),
+    ("GET", "/v2/pjm/projects", None),
+    ("POST", "/v2/pjm/projects", None),
+    ("GET", "/v2/pjm/projects/{project_id}", None),
+    ("PATCH", "/v2/pjm/projects/{project_id}", None),
+    ("GET", "/v2/pjm/projects/{project_id}/progress", None),
+    ("GET", "/v2/pjm/sprints", None),
+    ("GET", "/v2/pjm/project/project_states", None),
+    ("GET", "/v2/pjm/workitems", None),
+    ("POST", "/v2/pjm/workitems", None),
+    ("POST", "/v2/pjm/workitems/bulk/set", None),
+    ("POST", "/v2/pjm/workitems/search", None),
     # 附件三件套（此前一条都没进 USED —— 契约测试其实没守住它们）
-    ("GET", "/v1/attachments", {"principal_type": "workitem", "principal_id": "x"}),
-    ("POST", "/v1/attachments", {"principal_type": "workitem", "principal_id": "x"}),
-    ("DELETE", "/v1/attachments/{attachment_id}",
+    ("GET", "/v2/attachments", {"principal_type": "workitem", "principal_id": "x"}),
+    ("POST", "/v2/attachments", {"principal_type": "workitem", "principal_id": "x"}),
+    ("DELETE", "/v2/attachments/{attachment_id}",
      {"principal_type": "workitem", "principal_id": "x"}),
-    ("GET", "/v1/pjm/workitems/{workitem_id}", None),
-    ("PATCH", "/v1/pjm/workitems/{workitem_id}", None),
-    ("DELETE", "/v1/pjm/workitems/{workitem_id}", None),
-    ("GET", "/v1/pjm/workitem/types", None),
-    ("GET", "/v1/pjm/workitem/states", None),
-    ("GET", "/v1/pjm/workitem/priorities", None),
-    ("GET", "/v1/pjm/workitem/tags", None),
-    ("GET", "/v1/comments", None),
-    ("POST", "/v1/comments", None),
+    ("GET", "/v2/pjm/workitems/{workitem_id}", None),
+    ("PATCH", "/v2/pjm/workitems/{workitem_id}", None),
+    ("DELETE", "/v2/pjm/workitems/{workitem_id}", None),
+    ("GET", "/v2/pjm/workitem/workitem_types", None),
+    ("GET", "/v2/pjm/workitem/workitem_states", None),
+    ("GET", "/v2/pjm/workitem/workitem_priorities", None),
+    ("GET", "/v2/pjm/workitem/workitem_tags", None),
+    ("GET", "/v2/comments", None),
+    ("POST", "/v2/comments", None),
 ]
 
 # 参考实现里写过、官方当前文档里**不存在**的路径。钉成"必须不存在"，
@@ -124,9 +120,9 @@ class TableShapeTest(unittest.TestCase):
         self.assertEqual(endpoints.ENDPOINT_COUNT, len(endpoints.ENTRIES))
         self.assertGreater(len(endpoints.ENTRIES), 100, "官方表不可能只有这么点接口")
 
-    def test_每条都是_v1_路径且方法合法(self):
+    def test_每条都是_v2_路径且方法合法(self):
         for e in api.ENTRIES:
-            self.assertTrue(e.url.startswith("/v1/"), e.url)
+            self.assertTrue(e.url.startswith("/v2/"), e.url)
             self.assertIn(e.method, gen.METHODS, e.url)
 
     def test_method_url_不重复(self):
@@ -159,20 +155,21 @@ class UsedEndpointsContractTest(unittest.TestCase):
                 self.assertEqual(path, entry.path)
 
     def test_代码段那个附件变体在表里且没有查询参数(self):
-        """`POST /v1/attachments` 有两个变体：**无查询参数**的是「代码段」，带
+        """`POST /v2/attachments` 有两个变体：**无查询参数**的是「代码段」，带
         principal_type/principal_id 的是「文件」。前一个没法用 `require(query)` 选
         （空 query 不做窄化），所以这里直接盯住「两个变体都在、且哪个是空的」。
         """
-        variants = api.find(method="POST", path="/v1/attachments")
+        variants = api.find(method="POST", path="/v2/attachments")
         templates = sorted(tuple(sorted(k for k, _ in v.query_template)) for v in variants)
         self.assertEqual([(), ("principal_id", "principal_type")], templates)
 
     def test_写操作要的是写_scope(self):
-        for method, path in (("POST", "/v1/pjm/workitems"),
-                             ("PATCH", "/v1/pjm/workitems/{workitem_id}"),
-                             ("DELETE", "/v1/pjm/workitems/{workitem_id}"),
-                             ("POST", "/v1/pjm/projects"),
-                             ("PATCH", "/v1/pjm/projects/{project_id}")):
+        for method, path in (("POST", "/v2/pjm/workitems"),
+                             ("PATCH", "/v2/pjm/workitems/{workitem_id}"),
+                             ("DELETE", "/v2/pjm/workitems/{workitem_id}"),
+                             ("POST", "/v2/pjm/workitems/bulk/set"),
+                             ("POST", "/v2/pjm/projects"),
+                             ("PATCH", "/v2/pjm/projects/{project_id}")):
             with self.subTest(endpoint=f"{method} {path}"):
                 entry = api.require(method, path)
                 joined = " ".join(entry.scopes)
@@ -190,7 +187,7 @@ class UsedEndpointsContractTest(unittest.TestCase):
                     api.require(method, path)
 
     def test_myself_只认用户令牌(self):
-        entry = api.require("GET", "/v1/myself")
+        entry = api.require("GET", "/v2/myself")
         self.assertEqual(("用户令牌",), entry.perms)
         self.assertTrue(entry.needs_user_token)
         self.assertFalse(entry.needs_enterprise_token)
@@ -199,63 +196,63 @@ class UsedEndpointsContractTest(unittest.TestCase):
 class RequireTest(unittest.TestCase):
     def test_取不到时报错并给最接近的候选(self):
         with self.assertRaises(api.UnknownEndpoint) as ctx:
-            api.require("GET", "/v1/pjm/work_item")
+            api.require("GET", "/v2/pjm/work_item")
         msg = str(ctx.exception)
-        self.assertIn("/v1/pjm/work_item", msg)
-        self.assertIn("/v1/pjm/workitems", msg, "报错要给出候选，否则调用方只能猜")
+        self.assertIn("/v2/pjm/work_item", msg)
+        self.assertIn("/v2/pjm/workitems", msg, "报错要给出候选，否则调用方只能猜")
 
     def test_同路径多变体要报歧义并列出变体(self):
         with self.assertRaises(api.AmbiguousEndpoint) as ctx:
-            api.require("GET", "/v1/auth/token")
+            api.require("GET", "/v2/auth/token")
         msg = str(ctx.exception)
         for grant in ("client_credentials", "authorization_code", "refresh_token"):
             self.assertIn(grant, msg)
 
     def test_补上_query_就能唯一定位(self):
-        entry = api.require("GET", "/v1/auth/token", {"grant_type": "refresh_token"})
+        entry = api.require("GET", "/v2/auth/token", {"grant_type": "refresh_token"})
         self.assertIn("grant_type=refresh_token", entry.url)
         self.assertEqual(("grant_type",), tuple(k for k, _v in entry.query_template))
 
     def test_方法大小写不敏感(self):
-        self.assertEqual(api.require("get", "/v1/myself").method, "GET")
+        self.assertEqual(api.require("get", "/v2/myself").method, "GET")
 
     def test_find_支持前缀与分组(self):
-        self.assertTrue(api.find(path_prefix="/v1/pjm/"))
+        self.assertTrue(api.find(path_prefix="/v2/pjm/"))
         self.assertTrue(api.find(group="工作项"))
-        self.assertEqual([], api.find(path="/v1/不存在的路径"))
+        self.assertEqual([], api.find(path="/v2/不存在的路径"))
 
 
 class BuildTest(unittest.TestCase):
     def test_填路径占位符(self):
-        url = api.build("/v1/pjm/workitems/{workitem_id}", workitem_id="abc123")
-        self.assertEqual("/v1/pjm/workitems/abc123", url)
+        url = api.build("/v2/pjm/workitems/{workitem_id}", workitem_id="abc123")
+        self.assertEqual("/v2/pjm/workitems/abc123", url)
 
     def test_填查询占位符(self):
         url = api.build(
-            "/v1/pjm/workitem/states?project_id={project_id}&workitem_type_id={workitem_type_id}",
+            "/v2/pjm/workitem/workitem_states?project_id={project_id}&workitem_type_id={workitem_type_id}",
             project_id="p1", workitem_type_id="bug")
-        self.assertEqual("/v1/pjm/workitem/states?project_id=p1&workitem_type_id=bug", url)
+        self.assertEqual("/v2/pjm/workitem/workitem_states?project_id=p1&workitem_type_id=bug", url)
 
     def test_缺占位符要报错(self):
         with self.assertRaises(api.PathParamError) as ctx:
-            api.build("/v1/pjm/workitems/{workitem_id}")
+            api.build("/v2/pjm/workitems/{workitem_id}")
         self.assertIn("workitem_id", str(ctx.exception))
 
     def test_多给参数名要报错(self):
         """拼错参数名（比如把 assignee_id 写成 assignee_ids）必须当场报错。"""
         with self.assertRaises(api.PathParamError) as ctx:
-            api.build("/v1/pjm/workitems/{workitem_id}", workitem_id="a", assignee_ids="u1")
+            api.build("/v2/pjm/workitems/{workitem_id}", workitem_id="a", assignee_ids="u1")
         self.assertIn("assignee_ids", str(ctx.exception))
 
     def test_值要转义(self):
-        url = api.build("/v1/pjm/workitems/{workitem_id}", workitem_id="a b/c")
-        self.assertEqual("/v1/pjm/workitems/a%20b%2Fc", url)
+        url = api.build("/v2/pjm/workitems/{workitem_id}", workitem_id="a b/c")
+        self.assertEqual("/v2/pjm/workitems/a%20b%2Fc", url)
 
     def test_占位符识别(self):
-        self.assertEqual(("workitem_id",), api.path_placeholders("/v1/pjm/workitems/{workitem_id}"))
+        self.assertEqual(("workitem_id",), api.path_placeholders("/v2/pjm/workitems/{workitem_id}"))
         self.assertEqual(
             ("project_id", "workitem_type_id"),
-            api.placeholders("/v1/pjm/workitem/states?project_id={project_id}&workitem_type_id={workitem_type_id}"))
+            api.placeholders("/v2/pjm/workitem/workitem_states?project_id={project_id}&workitem_type_id={workitem_type_id}"))
 
 
 class GeneratorTest(unittest.TestCase):

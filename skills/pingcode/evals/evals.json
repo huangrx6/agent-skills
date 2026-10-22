@@ -10,13 +10,13 @@
     {
       "id": 2,
       "prompt": "把 SCR-12 这个缺陷标记成已完成。",
-      "expected_output": "先 `workitem show SCR-12` 确认它确实是那个缺陷（标题、状态一并对上），再 `workitem set-state SCR-12 已完成`。状态要走「先查该类型可用状态、再 PATCH state_id」这条路——因为官方要求 state_id 同时满足该类型的「状态方案」与「状态流转」。若状态名对不上，要把该类型**可用的状态列表**列出来让用户选，不能随手挑一个近似的。回显里要出现编号与改后的状态。",
+      "expected_output": "用 `workitem set-state SCR-12 已完成`。类型化命令本身会读取目标，只有在编号/项目有歧义或用户要求核对时才需要先 `workitem show`。状态要走「先查该类型可用状态、再 PATCH state_id」这条路——因为官方要求 state_id 同时满足该类型的「状态方案」与「状态流转」。若状态名对不上，要把该类型**可用的状态列表**列出来让用户选，不能随手挑一个近似的。回显里要出现编号与改后的状态。",
       "files": []
     },
     {
       "id": 3,
       "prompt": "在演示项目下面给我建一个缺陷：登录页偶发 500，负责人是我，截止这周五。",
-      "expected_output": "用 `workitem create`，`--type bug --title …`，项目名走解析（拿不到就报错或问，不要猜 ID）。因为涉及多个字段，合理的做法是先加 `--dry-run` 回显将要发送的 body（project_id / type_id / title 都是解析后的真 id），核对后在现有授权范围内执行，无需重复询问。相对时间（「这周五」）要换算成具体日期再填 `--end`。企业令牌下 `--assignee @me` 不可用，要说明原因并改用人名或用户 ID。不允许直接拼 `/v1/project/work_items` 这类路径。",
+      "expected_output": "用 `workitem create`，`--type bug --title …`，项目名走解析（拿不到就报错或问，不要猜 ID）。因为涉及多个字段，合理的做法是先加 `--dry-run` 回显将要发送的 body（project_id / type_id / title 都是解析后的真 id），核对后在现有授权范围内执行，无需重复询问。相对时间（「这周五」）要换算成具体日期再填 `--end`。企业令牌下 `--assignee @me` 不可用，要说明原因并改用人名或用户 ID。不允许直接拼 `/v1/project/work_items` 这类官方不存在的路径。",
       "files": []
     },
     {
@@ -35,6 +35,36 @@
       "id": 6,
       "prompt": "帮我删掉那个重复的项目。",
       "expected_output": "说明当前随附端点表**没有项目删除接口**（只有创建 / 部分更新 / 复制 / 改项目状态），所以「删项目」这件事本 skill 做不到，需要用户选择其他受支持方式；不能擅自改成修改项目状态。若用户其实要删的是**工作项**，那可以：`workitem delete <ref> --yes`（不可逆，缺 `--yes` 必须拒绝执行）。不允许把「不能删项目」含糊成「操作失败」，也不允许在没有 `--yes` 的情况下直接删。",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "把 DEMO-1 的截止日期改到 2026-09-30，故事点改成 5。",
+      "expected_output": "用 `workitem update DEMO-1 --end 2026-09-30 --story-points 5`。V2 请求体里截止日期是 `due: {date, with_time: 0}`，故事点在 `properties.story_points`，不能把 `end_at` / 顶层 `story_points` 发给 V2。编号查询要拆成 `identifier=1` + `project_id`，不能把 `DEMO-1` 整个当数字。回显要出现编号和改后的字段。",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "把 PingCode 里的 scrum 项目列出来。",
+      "expected_output": "用 `project list --type scrum`。V2 列表接口的过滤参数是 `template_type`，不是 `type`；发送前要确认 URL 里是 `template_type=scrum`。输出仍是紧凑表格（标识 / 名称 / 类型 / 状态 / 负责人 / 起止 / ID），不能把原始 JSON 直接倒给用户。",
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "把我名下所有缺陷列出来。",
+      "expected_output": "用 `workitem mine --type bug --open-only`。V2 的系统类型 id 是 24 位，`mine` 又没有项目上下文，不能把 `bug` 直接当 `type_id` 发；应取回「我名下」后按 `type.group=bug` / `type.name=缺陷` 本地过滤，并在输出里说明这是本地过滤。不能把任务、故事混进缺陷列表。",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "把 SCR-1、SCR-2、SCR-3 这三条任务都标成已完成。",
+      "expected_output": "用 `workitem bulk-update --ids SCR-1,SCR-2,SCR-3 --state 已完成`。V2 走 `POST /v2/pjm/workitems/bulk/set`，body 是 `ids` + `property_name=state_id` + `property_value`；仍然一次只能改一个属性、最多 100 个 id。若三条类型不同，状态 id 不能共用，应分批或提示用户。不能逐条 PATCH 却说成批量接口。",
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "看一下 SCR-5 的原始响应，我要确认接口返回的字段。",
+      "expected_output": "用 `workitem show SCR-5 --full`。`--full` 必须输出 V2 原始字段（`whole_identifier`、`type` 对象、`start` / `due` 对象、`properties`），而不是命令层规范化后的 `identifier` / `start_at` / 顶层 `story_points`。默认紧凑输出才做规范化；两者不能混。",
       "files": []
     }
   ]

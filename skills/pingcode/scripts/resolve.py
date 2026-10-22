@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
 import sys
 import time
 from typing import Any
@@ -40,63 +41,65 @@ def _load_sibling(name: str):
 
 _config = _load_sibling("config")
 _api = _load_sibling("api_index")
+_compat = _load_sibling("compat")
 
 # kind → 端点模板、名字、需要哪些上下文参数。
 # 这张表是**唯一一处**定义"字典类数据有哪些"，加一种只改这里。
 SOURCES: dict[str, dict[str, Any]] = {
     "projects": {
-        "label": "项目",
-        "url": "/v1/pjm/projects",
+        "label": _compat.DICT_LABELS["projects"],
+        "url": _compat.DICT_PATHS["projects"],
         "needs": (),
         "scopes": ("pcp:read:pjm:project",),
     },
     "sprints": {
-        "label": "迭代",
-        "url": "/v1/pjm/projects/{project_id}/sprints",
+        "label": _compat.DICT_LABELS["sprints"],
+        "url": _compat.DICT_PATHS["sprints"],
         "needs": ("project_id",),
         "scopes": ("pcp:read:pjm:sprint",),
     },
     "types": {
-        "label": "工作项类型",
-        "url": "/v1/pjm/workitem/types?project_id={project_id}",
+        "label": _compat.DICT_LABELS["types"],
+        "url": _compat.DICT_PATHS["types"],
         "needs": ("project_id",),
         "scopes": ("pcp:read:pjm:workitem",),
     },
     "states": {
-        "label": "工作项状态",
-        "url": "/v1/pjm/workitem/states?project_id={project_id}&workitem_type_id={workitem_type_id}",
+        "label": _compat.DICT_LABELS["states"],
+        "url": _compat.DICT_PATHS["states"],
         "needs": ("project_id", "workitem_type_id"),
         "scopes": ("pcp:read:pjm:workitem",),
     },
     "project_states": {
         # 项目状态和工作项状态是**两张不同的表**（端点也不同）。曾经用 states
         # 去改项目状态，报「工作项状态 需要这些上下文参数：workitem_type_id」。
-        "label": "项目状态",
-        "url": "/v1/pjm/project/states?project_id={project_id}",
+        "label": _compat.DICT_LABELS["project_states"],
+        "url": _compat.DICT_PATHS["project_states"],
         "needs": ("project_id",),
         "scopes": ("pcp:read:pjm:project",),
     },
     "priorities": {
-        "label": "优先级",
-        "url": "/v1/pjm/workitem/priorities?project_id={project_id}",
+        "label": _compat.DICT_LABELS["priorities"],
+        "url": _compat.DICT_PATHS["priorities"],
         "needs": ("project_id",),
         "scopes": ("pcp:read:pjm:configuration",),
     },
     "tags": {
-        "label": "工作项标签",
-        "url": "/v1/pjm/workitem/tags?project_id={project_id}",
+        "label": _compat.DICT_LABELS["tags"],
+        "url": _compat.DICT_PATHS["tags"],
         "needs": ("project_id",),
         "scopes": ("pcp:read:pjm:workitem",),
     },
     "users": {
-        "label": "企业成员",
-        "url": "/v1/directory/users",
+        "label": _compat.DICT_LABELS["users"],
+        "url": _compat.DICT_PATHS["users"],
         "needs": (),
         "scopes": ("pcp:read:global:team",),
     },
     "processes": {
-        "label": "项目流程",
-        "url": "/v1/pjm/processes",
+        # V2 把“项目流程”改成了“项目模板”；命令名保留，减少用户迁移成本。
+        "label": _compat.DICT_LABELS["processes"],
+        "url": _compat.DICT_PATHS["processes"],
         "needs": (),
         "scopes": ("pcp:read:pjm:configuration",),
     },
@@ -110,6 +113,9 @@ SYSTEM_TYPES = {
 }
 
 ME_ALIASES = ("@me", "@我", "me", "我", "自己", "myself")
+
+# 工作项编号的形状（`DEMO-80` / `SCR-12`）：带连字符 + 结尾是数字。
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*-\d+$")
 
 
 class NotFound(Exception):
@@ -292,15 +298,44 @@ def state_id_for(client: Any, project: str, workitem_type_id: str, state: str,
     return str(item.get("id", ""))
 
 
+def type_name(client: Any, project: str, workitem_type_id: str, force: bool = False) -> str:
+    """类型 id → 展示名。V2 的系统类型 id 是 24 位，不能再靠枚举映射中文。"""
+    try:
+        item = find("types", client, workitem_type_id, force=force, project_id=project)
+    except (NotFound, Ambiguous):
+        return ""
+    return str(item.get("name", "") or "")
+
+
+def identifier_params(client: Any, ref: str, force: bool = False) -> dict[str, Any]:
+    """把 `SCR-12` 转成 V2 列表接口的查询参数。
+
+    V2 的 `identifier` 查询参数在文档里标为 Number，响应里另有 `whole_identifier`。
+    用项目字典把前缀解析成 project_id；解析不到时保留完整编号，让服务端给出
+    更准确的错误（真实租户可能仍接受字符串）。
+    """
+    text = str(ref or "").strip()
+    if not _IDENTIFIER_RE.match(text):
+        return {"identifier": text}
+    prefix, _, number = text.rpartition("-")
+    if not prefix or not number.isdigit():
+        return {"identifier": text}
+    try:
+        project = find("projects", client, prefix, force=force)
+    except (NotFound, Ambiguous):
+        return {"identifier": text}
+    return {"identifier": int(number), "project_id": str(project.get("id", ""))}
+
+
 def user_id(client: Any, who: str, force: bool = False) -> str:
-    """解析成员 → user_id。`@me`/`我` 需要用户令牌（走 /v1/myself）。"""
+    """解析成员 → user_id。`@me`/`我` 需要用户令牌（走 /v2/myself）。"""
     text = str(who or "").strip()
     if text.lower() in ME_ALIASES:
         auth = _load_sibling("auth")
         me = auth.whoami(client)
         got = str(me.get("id", "") or "")
         if not got:
-            raise NotFound("/v1/myself 没返回 id，无法识别「我」")
+            raise NotFound("/v2/myself 没返回 id，无法识别「我」")
         return got
     item = find("users", client, text, force=force)
     return str(item.get("id", ""))

@@ -46,10 +46,10 @@ TUPLE_DOC = '''
 # (method, url 模板, scopes, 令牌要求, 分组, 名称)
 #
 # url 模板就是官方文档里的原始形态，带 `{占位符}` 与查询模板（如
-# `/v1/auth/token?grant_type=client_credentials`），它是条目的**唯一身份** ——
+# `/v2/auth/token?grant_type=client_credentials`），它是条目的**唯一身份** ——
 # 同一路径不同 grant_type 的接口靠它区分。路径与查询参数名由 api_index 现算。
 #
-# 令牌要求：企业令牌 / 用户令牌 / 企业令牌/用户令牌。注意 /v1/myself 只认**用户令牌**。
+# 令牌要求：企业令牌 / 用户令牌 / 企业令牌/用户令牌。注意 /v2/myself 只认**用户令牌**。
 '''
 
 
@@ -74,7 +74,7 @@ def load_source(input_path: str | None, url: str) -> tuple[bytes, str]:
 
 
 def split_url(url: str) -> tuple[str, tuple[str, ...]]:
-    """把 `/v1/x?page_size={page_size}&page_index={page_index}` 拆成路径与参数名。"""
+    """把 `/v2/x?page_size={page_size}&page_index={page_index}` 拆成路径与参数名。"""
     path, _, query = url.partition("?")
     keys = tuple(k for k, _v in urllib.parse.parse_qsl(query, keep_blank_values=True))
     return path, keys

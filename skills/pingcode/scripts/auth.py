@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """用户/企业令牌授权、缓存、刷新与本地回调。
 
-默认用户令牌支持 /v1/myself；企业令牌需显式指定用户。
+默认用户令牌支持 /v2/myself；企业令牌需显式指定用户。
 令牌请求按生成表使用 GET，authenticate=False；凭据不得进入展示输出。
 """
 
@@ -41,9 +41,10 @@ def _load_sibling(name: str):
 _config = _load_sibling("config")
 _client = _load_sibling("client")
 _api = _load_sibling("api_index")
+_compat = _load_sibling("compat")
 
-TOKEN_PATH = "/v1/auth/token"
-MYSELF_PATH = "/v1/myself"
+TOKEN_PATH = _compat.OAUTH_ENDPOINT
+MYSELF_PATH = _compat.MYSELF
 CALLBACK_TIMEOUT = 180
 
 
@@ -205,10 +206,10 @@ def wait_for_code(redirect_uri: str, timeout: int = CALLBACK_TIMEOUT,
 
 # ── 身份 ──────────────────────────────────────────────────────
 def whoami(client: Any) -> dict[str, Any]:
-    """`/v1/myself`。企业令牌拿不到 —— 这里提前说清，不让它变成一句 403。"""
+    """`/v2/myself`。企业令牌拿不到 —— 这里提前说清，不让它变成一句 403。"""
     if current_mode() == "enterprise":
         raise _config.TokenError(
-            "企业令牌拿不到个人信息（官方约定 /v1/myself 只认用户令牌）。\n"
+            "企业令牌拿不到个人信息（官方约定 /v2/myself 只认用户令牌）。\n"
             "  想看「我是谁」：pingcode.py auth login --mode user\n"
             "  企业令牌下指定负责人要显式给用户 ID 或名字。"
         )

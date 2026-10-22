@@ -11,10 +11,30 @@
 from __future__ import annotations
 
 import datetime
+import importlib.util
 import os
 import sys
 import unicodedata
 from typing import Any
+
+
+def _load_sibling(name: str):
+    """动态加载同目录脚本（`scripts/` 不是包，同级 import 在静态层面无法解析）。"""
+    key = f"_pingcode_{name}"
+    loaded = sys.modules.get(key)
+    if loaded is not None:
+        return loaded
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"{name}.py")
+    spec = importlib.util.spec_from_file_location(key, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"加载不了同目录模块：{path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[key] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_compat = _load_sibling("compat")
 
 # kind → ((字段路径, 表头), ...)。字段路径支持点号取嵌套，如 state.name。
 WORKITEM = (
@@ -212,6 +232,7 @@ def human_size(value: Any) -> str:
 
 def compact(kind: str, obj: dict[str, Any]) -> dict[str, Any]:
     """按白名单裁剪一条记录。"""
+    obj = _compat.normalize(kind, obj)
     schema = SCHEMAS.get(kind, SIMPLE)
     out: dict[str, Any] = {}
     for path, title in schema:
@@ -224,7 +245,9 @@ def compact(kind: str, obj: dict[str, Any]) -> dict[str, Any]:
         elif path in ("start_at", "end_at", "completed_at", "created_at"):
             value = show_time(value)
         elif path == "type":
-            value = type_label(value)
+            # V2 工作项的 type 是对象，normalize 后 type 是 id、type_name 是展示名。
+            # 系统类型 id 变成 24 位后，不能再靠枚举映射中文。
+            value = obj.get("type_name") or type_label(value)
         elif path == "size":
             value = human_size(value)
         if path in CLIP_FIELDS and value not in (None, ""):

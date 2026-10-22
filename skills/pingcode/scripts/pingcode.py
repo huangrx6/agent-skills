@@ -5,8 +5,7 @@
 ------------
 1. **路径不交给调用方。** 端点来自 `scripts/endpoints.py`（由官方 `api_data.json`
    生成），用 `api_index.require()` 取。参考实现把 `--path` 暴露给调用方，结果写死了
-   `/v1/project/work_items` 这种官方根本不存在的路径 —— 而它的测试 mock 了网络，
-   错路径照样全绿。
+   官方根本不存在的路径 —— 而它的测试 mock 了网络，错路径照样全绿。
 2. **默认紧凑输出。** 要原始 JSON 才加 `--full`。默认值写在代码里，不写在文档里。
 3. **不猜 ID。** 项目名 / 迭代名 / 状态名 / 人名都走 `resolve`；匹配到多个就**列候选**，
    不自动取第一个。
@@ -53,16 +52,16 @@ _api = _load_sibling("api_index")
 _auth = _load_sibling("auth")
 _client = _load_sibling("client")
 _config = _load_sibling("config")
+_compat = _load_sibling("compat")
 _fmt = _load_sibling("format")
 _resolve = _load_sibling("resolve")
 
-WORKITEM = "/v1/pjm/workitems"
-PROJECTS = "/v1/pjm/projects"
-COMMENTS = "/v1/comments"
-ATTACHMENTS = "/v1/attachments"
+WORKITEM = _compat.WORKITEMS
+PROJECTS = _compat.PROJECTS
+COMMENTS = _compat.COMMENTS
+ATTACHMENTS = _compat.ATTACHMENTS
 # 单个附件：路径占位符 + 两个查询占位符都在模板里，必须走 _api.build 填
-ATTACHMENT_ONE = ("/v1/attachments/{attachment_id}"
-                  "?principal_type={principal_type}&principal_id={principal_id}")
+ATTACHMENT_ONE = _compat.ATTACHMENT
 
 # 工作项编号的形状（`DEMO-80` / `SCR-12`）：带连字符 + 结尾是数字。
 # 用形状先分流，省掉一次注定 400 的直取（官方对编号返回 400 而不是 404）。
@@ -152,6 +151,11 @@ def resolve_type(args: argparse.Namespace, client: Any, project_id: str) -> str:
         raise
 
 
+def _type_display(client: Any, project_id: str, type_id: str, force: bool = False) -> str:
+    """类型 id → 展示名。V2 系统类型 id 是 24 位，直接 type_label 会显示十六进制。"""
+    return _resolve.type_name(client, project_id, type_id, force=force) or _fmt.type_label(type_id)
+
+
 def _looks_like_id(text: str) -> bool:
     return len(text) == 24 and all(ch in "0123456789abcdef" for ch in text.lower())
 
@@ -173,38 +177,44 @@ def system_type_or_raw(text: str) -> str:
     return raw
 
 
-def fetch_workitem(client: Any, ref: str, include_deleted: bool = False) -> dict[str, Any]:
+def fetch_workitem(client: Any, ref: str, include_deleted: bool = False,
+                   raw: bool = False) -> dict[str, Any]:
     """按 id / short_id / 编号（SCR-12）取一个工作项。
 
-    官方：`GET /v1/pjm/workitems/{id}` 收 id **或 short_id**，但**不收编号**，而且给编号时
-    返回的是 **400 + code=100317「工作项资源不存在」**（不是 404，实测得到）。所以：
-    形状像编号的（`DEMO-80`）直接走列表接口的 `identifier` 查询；其它先直取，
-    400/404 再兜底。
+    V2：`GET /v2/pjm/workitems/{id}` 收 id **或 short_id**，但**不收编号**；给编号时
+    仍按 V1 的实测经验走列表接口的 `identifier` 查询。V2 的 `identifier` 查询参数
+    在文档里是 Number，所以 `resolve.identifier_params()` 会把 `SCR-12` 拆成
+    `identifier=12&project_id=…`；拆不出来时保留完整编号，让服务端报准确错误。
 
-    归档的默认找得到（引用旧条目是常事）；**已删除的默认不找** —— 实测：DELETE 是软删除，
+    归档的默认找得到（引用旧条目是常事）；**已删除的默认不找** —— DELETE 是软删除，
     若把 `include_deleted` 也打开，刚删掉的工作项会像没删一样接着显示出来。
+
+    `raw=True` 返回 V2 原始响应（`--full` 用）；默认返回规范字段（命令逻辑用）。
     """
     ref = str(ref or "").strip()
     if not ref:
         raise CliError("没给工作项：可以是编号（SCR-12）、short_id 或 id")
 
     if not _IDENTIFIER_RE.match(ref):
-        path = _api.build("/v1/pjm/workitems/{workitem_id}", workitem_id=ref)
+        path = _api.build(_compat.WORKITEM, workitem_id=ref)
         try:
             data = client.get(path).data
             if isinstance(data, dict) and data.get("id"):
-                return dict(data)
+                return dict(data) if raw else _compat.normalize_workitem(dict(data))
         except _client.ApiError as exc:
             if exc.status not in (400, 404):
                 raise
 
-    result = client.get(WORKITEM, identifier=ref, include_archived=BOOLEAN_TRUE,
-                        include_deleted=BOOLEAN_TRUE if include_deleted else None)
+    params = _resolve.identifier_params(client, ref)
+    result = client.get(WORKITEM, include_archived=BOOLEAN_TRUE,
+                        include_deleted=BOOLEAN_TRUE if include_deleted else None,
+                        **params)
     values = result.values
     if not values:
         hint = "" if include_deleted else "（它可能已被删除，加 --all 看已删除的）"
         raise CliError(f"找不到工作项 {ref!r}（编号 / short_id / id 都试过了）{hint}")
-    return dict(values[0])
+    record = dict(values[0])
+    return record if raw else _compat.normalize_workitem(record)
 
 
 def perform(args: argparse.Namespace, client: Any, method: str, path: str,
@@ -352,7 +362,7 @@ def cmd_config_refresh(args: argparse.Namespace) -> int:
 # ── 只读 ──────────────────────────────────────────────────────
 def cmd_project_list(args: argparse.Namespace) -> int:
     client = build_client(args)
-    params: dict[str, Any] = {"keywords": args.keywords, "type": args.type}
+    params: dict[str, Any] = {"keywords": args.keywords, "template_type": args.type}
     if args.all:
         # 实测：项目被删/归档后从默认列表里消失，不看这两个开关会以为“项目没了”。
         # 当初查 DEMO 去哪了，就是靠逃生口手动加这两个参数才看出来的。
@@ -370,7 +380,7 @@ def cmd_project_list(args: argparse.Namespace) -> int:
 def cmd_project_show(args: argparse.Namespace) -> int:
     client = build_client(args)
     pid, _name = _resolve.project_id(client, args.project, force=args.no_cache)
-    data = client.get(_api.build("/v1/pjm/projects/{project_id}", project_id=pid)).data
+    data = client.get(_api.build(_compat.PROJECT, project_id=pid)).data
     if args.full:
         print(json.dumps(data, ensure_ascii=False, indent=2))
         return 0
@@ -386,7 +396,7 @@ PROGRESS_FIELDS = (("total", "总数"), ("pending_count", "待处理"),
 def cmd_project_progress(args: argparse.Namespace) -> int:
     client = build_client(args)
     pid, name = _resolve.project_id(client, args.project, force=args.no_cache)
-    data = client.get(_api.build("/v1/pjm/projects/{project_id}/progress", project_id=pid)).data
+    data = client.get(_api.build(_compat.PROJECT_PROGRESS, project_id=pid)).data
     if args.full:
         print(json.dumps(data, ensure_ascii=False, indent=2))
         return 0
@@ -412,9 +422,19 @@ def cmd_project_progress(args: argparse.Namespace) -> int:
 
 def cmd_workitem_list(args: argparse.Namespace) -> int:
     client = build_client(args)
-    params: dict[str, Any] = {"keywords": args.keywords, "identifier": args.identifier}
+    params: dict[str, Any] = {"keywords": args.keywords}
     if pick(args, "project", "project"):
         params["project_id"] = need_project(args, client)[0]
+    if args.identifier:
+        id_params = _resolve.identifier_params(client, args.identifier, force=args.no_cache)
+        if "project_id" in id_params:
+            if params.get("project_id") and params["project_id"] != id_params["project_id"]:
+                raise CliError(
+                    f"编号 {args.identifier} 属于另一个项目（id={id_params['project_id']}），"
+                    "与 --project 指定的项目不一致"
+                )
+            params["project_id"] = id_params["project_id"]
+        params["identifier"] = id_params["identifier"]
     if args.type:
         params["type_id"] = resolve_type(args, client, params.get("project_id", ""))
     if args.state:
@@ -444,9 +464,10 @@ def cmd_workitem_list(args: argparse.Namespace) -> int:
 
 def cmd_workitem_show(args: argparse.Namespace) -> int:
     client = build_client(args)
-    data = fetch_workitem(client, args.ref, include_deleted=bool(args.all))
+    raw = fetch_workitem(client, args.ref, include_deleted=bool(args.all), raw=True)
+    data = _compat.normalize_workitem(raw)
     if args.full:
-        print(json.dumps(data, ensure_ascii=False, indent=2))
+        print(json.dumps(raw, ensure_ascii=False, indent=2))
         return 0
     print(_fmt.render([_fmt.compact("workitem", data)]))
     if args.all and data.get("is_deleted"):
@@ -456,6 +477,14 @@ def cmd_workitem_show(args: argparse.Namespace) -> int:
     return 0
 
 
+def _type_matches(item: dict[str, Any], want: str, original: str) -> bool:
+    """V2 的 type 是对象；没有项目上下文时按 group / name / id 本地匹配。"""
+    return (str(item.get("type_group") or "") == want
+            or str(item.get("type_name") or "") == original
+            or str(item.get("type_name") or "") == want
+            or str(item.get("type") or "") == want)
+
+
 def cmd_workitem_mine(args: argparse.Namespace) -> int:
     client = build_client(args)
     try:
@@ -463,22 +492,37 @@ def cmd_workitem_mine(args: argparse.Namespace) -> int:
     except _client.ApiError as exc:
         if exc.status != 403:
             raise
-        # 实测：应用的数据范围里没有 pcp:read:account:personal 时，/v1/myself 会 403。
+        # 实测：应用的数据范围里没有 pcp:read:account:personal 时，/v2/myself 会 403。
         # 这条报错本身已经点名了 scope，这里再给一个**不用改后台**的替代做法，
         # 否则「我的任务」这条最常用的路径就成了死胡同。
         raise CliError(
-            f"{exc}\n  「我」要读 /v1/myself，需要应用数据范围里有 pcp:read:account:personal。\n"
+            f"{exc}\n  「我」要读 /v2/myself，需要应用数据范围里有 pcp:read:account:personal。\n"
             "  不想动后台：改用 `workitem list --assignee <你的真名>`（效果一样）。"
         ) from exc
     params: dict[str, Any] = {"assignee_id": me}
-    if args.type:
-        params["type_id"] = system_type_or_raw(args.type)
-    values = client.paginate(WORKITEM, max_items=args.limit, **params)
-    open_items = [v for v in values
-                  if str(_fmt.dig(v, "state.type") or "") not in DONE_STATE_TYPES]
+    raw_type = str(args.type or "").strip()
+    local_type = ""
+    if raw_type:
+        # V2 的系统类型 id 是 24 位，不能把 `bug` / `缺陷` 直接当 type_id 发。
+        # 有 id 就交给服务端过滤；没有项目上下文时按 type.group / type.name 本地过滤。
+        if _looks_like_id(raw_type):
+            params["type_id"] = raw_type
+        else:
+            local_type = system_type_or_raw(raw_type)
+    raw_values = client.paginate(WORKITEM, max_items=args.limit, **params)
+    pairs = [(value, _compat.normalize_workitem(value)) for value in raw_values]
+    if local_type:
+        pairs = [(raw, value) for raw, value in pairs
+                 if _type_matches(value, local_type, raw_type)]
+    values = [value for _raw, value in pairs]
+    raw_values = [raw for raw, _value in pairs]
+    open_pairs = [(raw, value) for raw, value in pairs
+                  if str(_fmt.dig(value, "state.type") or "") not in DONE_STATE_TYPES]
+    open_items = [value for _raw, value in open_pairs]
     if args.open_only:
         values = open_items
-    emit(_fmt.rows("workitem", values), args, "workitem", values)
+        raw_values = [raw for raw, _value in open_pairs]
+    emit(_fmt.rows("workitem", values), args, "workitem", raw_values)
     if not args.full:
         print(f"（我名下 {len(values)} 条，其中未完成 {len(open_items)} 条）")
     return 0
@@ -507,6 +551,11 @@ def cmd_dict_list(args: argparse.Namespace) -> int:
 
 
 # ── 写 ────────────────────────────────────────────────────────
+def _has_clock(text: str) -> bool:
+    """输入里有没有时分秒；决定 V2 日期对象的 `with_time`。"""
+    return ":" in str(text or "")
+
+
 def _workitem_body(args: argparse.Namespace, client: Any, project_id: str,
                    type_id: str) -> dict[str, Any]:
     body: dict[str, Any] = {}
@@ -516,8 +565,10 @@ def _workitem_body(args: argparse.Namespace, client: Any, project_id: str,
         body["description"] = _read_description(args)
     if getattr(args, "start", None):
         body["start_at"] = _fmt.parse_time(args.start)
+        body["_start_with_time"] = 1 if _has_clock(args.start) else 0
     if getattr(args, "end", None):
         body["end_at"] = _fmt.parse_time(args.end)
+        body["_end_with_time"] = 1 if _has_clock(args.end) else 0
     if getattr(args, "assignee", None):
         body["assignee_id"] = _resolve.user_id(client, args.assignee, force=args.no_cache)
     if getattr(args, "priority", None):
@@ -559,7 +610,8 @@ def cmd_workitem_create(args: argparse.Namespace) -> int:
         raise CliError("要一个标题：--title <标题>")
     body = {"project_id": pid, "type_id": tid, "title": args.title}
     body.update(_workitem_body(args, client, pid, tid))
-    summary = f"在「{pname}」创建 {_fmt.type_label(tid)}：{args.title}"
+    body = _compat.workitem_body(body)
+    summary = f"在「{pname}」创建 {_type_display(client, pid, tid)}：{args.title}"
     result = perform(args, client, "POST", WORKITEM, body=body, summary=summary)
     if result is not None:
         data = result.data if isinstance(result.data, dict) else {}
@@ -690,6 +742,7 @@ def _create_plan_node(args: argparse.Namespace, client: Any, project_id: str,
         if parent_id:
             body["parent_id"] = parent_id
         body.update(_workitem_body(_node_namespace(node, args.no_cache), client, project_id, type_id))
+        body = _compat.workitem_body(body)
         result = client.request("POST", WORKITEM, body=body)
     except (_client.ApiError, CliError) as exc:
         # 不能静默半途而废 —— 把已建成的编号报出来，用户才知道不用从头再来
@@ -704,7 +757,7 @@ def _create_plan_node(args: argparse.Namespace, client: Any, project_id: str,
     if not new_id:
         raise CliError(f"创建 {path}（{node['title']}）的响应缺少 id，停止创建子项。\n"
                        f"  已返回的编号：{_created_summary(created)}；请先查询确认，勿整棵重跑。")
-    print(f"  ✓ {created[path]:11} {_fmt.type_label(type_id):8} {node['title']}")
+    print(f"  ✓ {created[path]:11} {_type_display(client, project_id, type_id):8} {node['title']}")
     for index, child in enumerate(node.get("children") or [], start=1):
         _create_plan_node(args, client, project_id, child, new_id, created, f"{path}.{index}")
 
@@ -748,7 +801,8 @@ def cmd_workitem_update(args: argparse.Namespace) -> int:
     if not body:
         raise CliError("没有要改的字段（--title / --description / --assignee / --priority / "
                        "--sprint / --start / --end / --parent / --state / --story-points）")
-    path = _api.build("/v1/pjm/workitems/{workitem_id}", workitem_id=current["id"])
+    body = _compat.workitem_body(body)
+    path = _api.build(_compat.WORKITEM, workitem_id=current["id"])
     summary = f"更新 {current.get('identifier', args.ref)}：{'、'.join(sorted(body))}"
     result = perform(args, client, "PATCH", path, body=body, summary=summary)
     if result is not None:
@@ -780,10 +834,10 @@ def cmd_workitem_set_state(args: argparse.Namespace) -> int:
         # 只在**这里**报一次可用状态 —— 把 find 那句已经带列表的消息盖掉，
         # 否则同一串状态名会在输出里出现两遍（实测看着很吵）。
         raise CliError(
-            f"{_fmt.type_label(tid)}没有叫「{args.state}」的状态。"
+            f"{_type_display(client, pid, tid)}没有叫「{args.state}」的状态。"
             f"这个类型可用：{names}"
         ) from exc
-    path = _api.build("/v1/pjm/workitems/{workitem_id}", workitem_id=current["id"])
+    path = _api.build(_compat.WORKITEM, workitem_id=current["id"])
     summary = f"{current.get('identifier', args.ref)} 状态改为「{args.state}」"
     result = perform(args, client, "PATCH", path, body={"state_id": sid}, summary=summary)
     if result is not None:
@@ -793,7 +847,7 @@ def cmd_workitem_set_state(args: argparse.Namespace) -> int:
 
 
 def cmd_workitem_search(args: argparse.Namespace) -> int:
-    """POST /v1/pjm/workitems/search —— 结构化条件查询（GET 那套盖不住的场景）。
+    """POST /v2/pjm/workitems/search —— 结构化条件查询（GET 那套盖不住的场景）。
 
     操作符写法是**实测**出来的（官方文档只列了名字，没说格式）：
       · 不带 `$` 前缀：`{"in": [...]}` 可以，`{"$in": [...]}` 报 400「缺少有效的操作符」
@@ -810,7 +864,7 @@ def cmd_workitem_search(args: argparse.Namespace) -> int:
     if args.type:
         if not pid:
             raise CliError("按类型搜要指定项目：--project（类型是**按项目**配的）")
-        flt["type"] = {"in": [resolve_type(args, client, pid)]}
+        flt["type.id"] = {"in": [resolve_type(args, client, pid)]}
     if args.state:
         if _looks_like_id(args.state):
             flt["state.id"] = {"in": [args.state]}
@@ -848,7 +902,7 @@ def cmd_workitem_search(args: argparse.Namespace) -> int:
     if args.all:
         payload["include_deleted"] = True
         payload["include_archived"] = True
-    result = client.request("POST", "/v1/pjm/workitems/search",
+    result = client.request("POST", _compat.WORKITEM_SEARCH,
                             body={"mode": "query", "payload": payload})
     values = result.values
     if args.full:
@@ -861,7 +915,7 @@ def cmd_workitem_search(args: argparse.Namespace) -> int:
 
 
 def cmd_workitem_bulk_update(args: argparse.Namespace) -> int:
-    """PATCH /v1/pjm/workitems —— 官方限制：**一个属性 + 一个相同值 + ≤100 个 id**。
+    """POST /v2/pjm/workitems/bulk/set —— 官方限制：**一个属性 + 一个相同值 + ≤100 个 id**。
 
     所以参数面故意做成「与单条 update 同一套 flag」，但只允许给**一个**：
     给了两个就报错，而不是默默取一个（那样用户以为都改了）。
@@ -876,24 +930,36 @@ def cmd_workitem_bulk_update(args: argparse.Namespace) -> int:
     types = {str(item.get("type", "")) for item in items}
     pid = str(_fmt.dig(items[0], "project.id") or "")
     if args.state and len(types) > 1:
+        labels = sorted(str(item.get("type_name") or _fmt.type_label(str(item.get("type", ""))))
+                        for item in items)
         raise CliError(
-            f"这批工作项的类型不一样（{'、'.join(sorted(_fmt.type_label(t) for t in types))}），"
+            f"这批工作项的类型不一样（{'、'.join(labels)}），"
             "而状态 id 是按类型配的 —— 分成几批改，或换成别的属性"
         )
     body = _workitem_body(args, client, pid, sorted(types)[0] if len(types) == 1 else "")
-    if len(body) != 1:
+    visible_body = {key: value for key, value in body.items() if not key.startswith("_")}
+    if len(visible_body) != 1:
         raise CliError(
-            f"批量接口一次只能改**一个**属性，你给了 {len(body)} 个：{'、'.join(sorted(body)) or '（一个都没给）'}\n"
+            f"批量接口一次只能改**一个**属性，你给了 {len(visible_body)} 个："
+            f"{'、'.join(sorted(visible_body)) or '（一个都没给）'}\n"
             "  分开跑，或者用 create-plan / 逐条 update。"
         )
-    name, value = next(iter(body.items()))
+    method, path, name, value = _compat.bulk_request(body)
     summary = f"把 {len(items)} 条改成 {name}={args.state or args.assignee or args.priority or args.sprint or args.title or value}"
-    result = perform(args, client, "PATCH", WORKITEM,
+    result = perform(args, client, method, path,
                      body={"ids": [str(i.get("id", "")) for i in items],
                            "property_name": name, "property_value": value}, summary=summary)
     if result is not None:
-        data = result.data if isinstance(result.data, dict) else {}
-        print(f"✓ 已更新 {data.get('updated', len(items))} 条")
+        data = result.data
+        if isinstance(data, list):
+            ok = [row for row in data if isinstance(row, dict) and row.get("state") == "success"]
+            failed = [row for row in data if isinstance(row, dict) and row.get("state") != "success"]
+            print(f"✓ 已更新 {len(ok)} 条")
+            if failed:
+                print(f"  ✗ {len(failed)} 条失败：" + "、".join(
+                    str(row.get("id", "")) for row in failed))
+        else:
+            print(f"✓ 已更新 {len(items)} 条")
     return 0
 
 
@@ -910,7 +976,7 @@ def visible(records: list[dict[str, Any]], include_deleted: bool) -> list[dict[s
 
 
 def cmd_workitem_comments(args: argparse.Namespace) -> int:
-    """列评论：GET /v1/comments?principal_type=workitem&principal_id=<id>。"""
+    """列评论：GET /v2/comments?principal_type=workitem&principal_id=<id>。"""
     client = build_client(args)
     current = fetch_workitem(client, args.ref, include_deleted=bool(args.all))
     values = visible(client.paginate(COMMENTS, max_items=args.limit,
@@ -927,7 +993,7 @@ def cmd_workitem_comments(args: argparse.Namespace) -> int:
 
 
 def cmd_workitem_attachments(args: argparse.Namespace) -> int:
-    """列附件：GET /v1/attachments?principal_type=workitem&principal_id=<id>。
+    """列附件：GET /v2/attachments?principal_type=workitem&principal_id=<id>。
 
     只列不传 —— 上传是 multipart/form-data，字段名没法从文档确认，而且列附件才是
     日常真正要看的那一半（“这个缺陷有没有附日志”）。
@@ -959,7 +1025,7 @@ def cmd_workitem_comment(args: argparse.Namespace) -> int:
 
 
 def cmd_workitem_attach(args: argparse.Namespace) -> int:
-    """上传文件附件：`POST /v1/attachments`，**multipart/form-data**。
+    """上传文件附件：`POST /v2/attachments`，**multipart/form-data**。
 
     form-data 的字段名是官方文档定的（`references/api.md` 有抄出来的契约表）：
     `title` + `file`，两个都必填；`principal_type=workitem` 与主体 id 走查询参数。
@@ -989,7 +1055,7 @@ def cmd_workitem_attach(args: argparse.Namespace) -> int:
 
 
 def cmd_workitem_attach_code(args: argparse.Namespace) -> int:
-    """上传代码段：`POST /v1/attachments`（**这个变体没有任何查询参数，正文是 JSON**）。
+    """上传代码段：`POST /v2/attachments`（**这个变体没有任何查询参数，正文是 JSON**）。
 
     字段名同样来自官方文档：`principal_type` `principal_id` `title` `format` `content`
     （都必填）+ `comment_id`（**文档写可选，实测必填**）。和文件上传只差一个名字，但请求形状完全不同 ——
@@ -1026,7 +1092,7 @@ def cmd_workitem_attach_code(args: argparse.Namespace) -> int:
 
 
 def cmd_workitem_attach_remove(args: argparse.Namespace) -> int:
-    """删一个附件：`DELETE /v1/attachments/{attachment_id}?principal_type=&principal_id=`。
+    """删一个附件：`DELETE /v2/attachments/{attachment_id}?principal_type=&principal_id=`。
 
     不可逆，所以要 `--yes`（和 `workitem delete` 同一套）。上传现在是真能用的，
     没有配对的删除就是个陷阱 —— 传错了只能去网页端收拾。
@@ -1055,7 +1121,7 @@ def cmd_workitem_delete(args: argparse.Namespace) -> int:
             f"删除是不可逆的。确认要删 {current.get('identifier', args.ref)}"
             f"「{current.get('title', '')}」就加 --yes"
         )
-    path = _api.build("/v1/pjm/workitems/{workitem_id}", workitem_id=current["id"])
+    path = _api.build(_compat.WORKITEM, workitem_id=current["id"])
     summary = f"删除 {current.get('identifier', args.ref)}「{current.get('title', '')}」"
     perform(args, client, "DELETE", path, summary=summary)
     if not args.dry_run:
@@ -1070,10 +1136,13 @@ def cmd_project_create(args: argparse.Namespace) -> int:
         body["description"] = args.description
     if args.start:
         body["start_at"] = _fmt.parse_time(args.start)
+        body["_start_with_time"] = 1 if _has_clock(args.start) else 0
     if args.end:
         body["end_at"] = _fmt.parse_time(args.end)
+        body["_end_with_time"] = 1 if _has_clock(args.end) else 0
     if args.assignee:
         body["assignee_id"] = _resolve.user_id(client, args.assignee, force=args.no_cache)
+    body = _compat.project_body(body)
     summary = f"创建项目「{args.name}」（标识 {args.identifier}，类型 {args.type}）"
     result = perform(args, client, "POST", PROJECTS, body=body, summary=summary)
     if result is not None:
@@ -1097,18 +1166,21 @@ def cmd_project_update(args: argparse.Namespace) -> int:
         body["description"] = args.description
     if args.start:
         body["start_at"] = _fmt.parse_time(args.start)
+        body["_start_with_time"] = 1 if _has_clock(args.start) else 0
     if args.end:
         body["end_at"] = _fmt.parse_time(args.end)
+        body["_end_with_time"] = 1 if _has_clock(args.end) else 0
     if args.assignee:
         body["assignee_id"] = _resolve.user_id(client, args.assignee, force=args.no_cache)
     if args.state:
-        # 项目状态走 project_states（/v1/pjm/project/states），不是工作项状态表
+        # 项目状态走 project_states（/v2/pjm/project/project_states），不是工作项状态表
         body["state_id"] = str(_resolve.find("project_states", client, args.state,
                                             force=args.no_cache, project_id=pid)["id"])
     if not body:
         raise CliError("没有要改的字段（--name / --identifier / --description / --start / "
                        "--end / --assignee / --state）")
-    path = _api.build("/v1/pjm/projects/{project_id}", project_id=pid)
+    body = _compat.project_body(body)
+    path = _api.build(_compat.PROJECT, project_id=pid)
     summary = f"更新项目「{pname}」：{'、'.join(sorted(body))}"
     perform(args, client, "PATCH", path, body=body, summary=summary)
     if not args.dry_run:
@@ -1131,7 +1203,7 @@ def cmd_api(args: argparse.Namespace) -> int:
     if forwarded:
         return _api.main(forwarded)
     if not args.path:
-        raise CliError("要一个路径：--path /v1/pjm/workitems（先用 --list 关键词 找）")
+        raise CliError("要一个路径：--path /v2/pjm/workitems（先用 --list 关键词 找）")
     method = args.method.upper()
     path = args.path.split("?")[0]
 
@@ -1155,7 +1227,7 @@ def cmd_api(args: argparse.Namespace) -> int:
             print(f"· {method} {path} 有 {len(variants)} 个变体；没给查询参数 → "
                   f"按不需要查询参数的那个走（另一个：{others}）", file=sys.stderr)
     if chosen is None:
-        # 只有真的存在多个变体时才把 query 交给 require 消歧（如 /v1/attachments 的
+        # 只有真的存在多个变体时才把 query 交给 require 消歧（如 /v2/attachments 的
         # 「代码段」变体无查询参数、「文件」变体要 principal_type + principal_id）。
         # 单变体端点**不能**这么干：多给个 page_size 就会被判成「路径不存在」。
         try:

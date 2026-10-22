@@ -285,7 +285,7 @@ class MultipartTest(TransportCase):
 
     def test_post_multipart_带_boundary_和正确_content_type(self):
         cli, calls = self.make_client(FakeResponse({"id": "a1"}))
-        result = cli.post_multipart("/v1/attachments", {"title": "t"},
+        result = cli.post_multipart("/v2/attachments", {"title": "t"},
                                     [("file", "f.txt", b"data")],
                                     principal_type="workitem", principal_id="w1")
         self.assertEqual("a1", result.data["id"])
@@ -297,7 +297,7 @@ class MultipartTest(TransportCase):
 
     def test_post_multipart_的_dry_run_回显不含二进制(self):
         cli, calls = self.make_client(FakeResponse({}), dry_run=True)
-        result = cli.post_multipart("/v1/attachments", {"title": "t"},
+        result = cli.post_multipart("/v2/attachments", {"title": "t"},
                                     [("file", "f.txt", b"\x00\x01binary")],
                                     principal_type="workitem", principal_id="w1")
         self.assertEqual([], calls)
@@ -313,7 +313,7 @@ class ClientTest(TransportCase):
         secret = "synthetic secret+with spaces"
         cli, _calls = self.make_client(urllib.error.URLError("offline"))
         with self.assertRaises(client.ApiError) as caught:
-            cli.request("GET", "/v1/auth/token", params={"client_secret": secret}, authenticate=False)
+            cli.request("GET", "/v2/auth/token", params={"client_secret": secret}, authenticate=False)
         output = str(caught.exception)
         for variant in (secret, urllib.parse.quote(secret, safe=""), urllib.parse.quote_plus(secret, safe="")):
             self.assertNotIn(variant, output)
@@ -323,9 +323,9 @@ class ClientTest(TransportCase):
         secrets = {"client_secret": "test-secret-unique", "code": "test-code-unique",
                    "refresh_token": "test-refresh-unique"}
         cli, calls = self.make_client(http_error(400, {"message": "rejected test-secret-unique"}))
-        plan = cli.describe("GET", "/v1/auth/token", params=secrets, body=secrets, authenticate=False)
+        plan = cli.describe("GET", "/v2/auth/token", params=secrets, body=secrets, authenticate=False)
         with self.assertRaises(client.ApiError) as caught:
-            cli.request("GET", "/v1/auth/token", params=secrets, authenticate=False)
+            cli.request("GET", "/v2/auth/token", params=secrets, authenticate=False)
         for value in secrets.values():
             self.assertNotIn(value, json.dumps(plan))
             self.assertNotIn(value, str(caught.exception))
@@ -334,13 +334,13 @@ class ClientTest(TransportCase):
 
     def test_describe_不带真令牌(self):
         cli, _calls = self.make_client(FakeResponse({}))
-        plan = cli.describe("GET", "/v1/myself")
+        plan = cli.describe("GET", "/v2/myself")
         self.assertEqual("Bearer ***", plan["headers"]["Authorization"])
         self.assertNotIn("tok", json.dumps(plan))
 
     def test_dry_run_不发请求(self):
         cli, calls = self.make_client(FakeResponse({"id": "x"}), dry_run=True)
-        result = cli.post("/v1/pjm/workitems", {"title": "t"})
+        result = cli.post("/v2/pjm/workitems", {"title": "t"})
         self.assertEqual(0, result.status)
         self.assertEqual([], calls)
         self.assertEqual("t", result.data["body"]["title"])
@@ -351,30 +351,30 @@ class ClientTest(TransportCase):
         那本来就必须要能读。
         """
         cli, calls = self.make_client(FakeResponse({"values": [{"id": "x"}]}), dry_run=True)
-        result = cli.get("/v1/pjm/workitems")
+        result = cli.get("/v2/pjm/workitems")
         self.assertEqual(1, len(calls), "dry-run 下 GET 要真发")
         self.assertEqual("x", result.values[0]["id"])
         for method in ("POST", "PATCH", "PUT", "DELETE"):
             with self.subTest(method=method):
                 before = len(calls)
-                blocked = cli.request(method, "/v1/pjm/workitems", body={"a": 1})
+                blocked = cli.request(method, "/v2/pjm/workitems", body={"a": 1})
                 self.assertEqual(0, blocked.status)
                 self.assertEqual(before, len(calls), f"dry-run 下 {method} 不能发")
 
     def test_查询参数只带非空值(self):
         cli, calls = self.make_client(FakeResponse({"values": []}))
-        cli.get("/v1/pjm/workitems", project_id="p", keywords=None, state_id="")
+        cli.get("/v2/pjm/workitems", project_id="p", keywords=None, state_id="")
         self.assertIn("project_id=p", calls[0].full_url)
         self.assertNotIn("keywords", calls[0].full_url)
 
     def test_换令牌时不带认证头(self):
         cli, calls = self.make_client(FakeResponse({"access_token": "x"}), bearer=lambda: "should-not-appear")
-        cli.request("GET", "/v1/auth/token", params={"grant_type": "refresh_token"}, authenticate=False)
+        cli.request("GET", "/v2/auth/token", params={"grant_type": "refresh_token"}, authenticate=False)
         self.assertIsNone(calls[0].get_header("Authorization"))
 
     def test_有令牌时带上认证头(self):
         cli, calls = self.make_client(FakeResponse({}))
-        cli.get("/v1/myself")
+        cli.get("/v2/myself")
         self.assertEqual("Bearer tok", calls[0].get_header("Authorization"))
 
     def test_公有云的429读_X_RateLimit_Retry_After(self):
@@ -385,7 +385,7 @@ class ClientTest(TransportCase):
 
         cli, _calls = self.make_client(make_error, retries=0)
         with self.assertRaises(client.RateLimited) as ctx:
-            cli.get("/v1/pjm/workitems")
+            cli.get("/v2/pjm/workitems")
         self.assertEqual(50, ctx.exception.retry_after)
         self.assertEqual("pingcode-team", ctx.exception.reason)
         self.assertIn("X-RateLimit-Retry-After", str(ctx.exception))
@@ -404,7 +404,7 @@ class ClientTest(TransportCase):
         cli = client.Client(bearer=lambda: "t", host="h", opener=opener,
                             retries=2, sleep=lambda s: slept.append(s))
         with self.assertRaises(client.RateLimited):
-            cli.get("/v1/pjm/workitems")
+            cli.get("/v2/pjm/workitems")
         self.assertEqual([7, 7], slept, "每次重试都按官方建议等待")
 
     def test_429没有建议时用指数退避且封顶(self):
@@ -416,7 +416,7 @@ class ClientTest(TransportCase):
         cli = client.Client(bearer=lambda: "t", host="h", opener=opener,
                             retries=3, sleep=lambda s: slept.append(s))
         with self.assertRaises(client.RateLimited):
-            cli.get("/v1/pjm/workitems")
+            cli.get("/v2/pjm/workitems")
         self.assertEqual(3, len(slept))
         self.assertLessEqual(max(slept), client.MAX_RETRY_SLEEP)
 
@@ -431,12 +431,12 @@ class ClientTest(TransportCase):
 
         cli = client.Client(bearer=lambda: "t", host="h", opener=opener,
                             retries=2, sleep=lambda s: None)
-        self.assertEqual(["ok"], [v["id"] for v in cli.get("/v1/pjm/workitems").values])
+        self.assertEqual(["ok"], [v["id"] for v in cli.get("/v2/pjm/workitems").values])
 
     def test_配额从响应头读出来(self):
         cli, _calls = self.make_client(FakeResponse(
             {"values": []}, headers={"X-RateLimit-Team-Limit": "200", "X-RateLimit-Team-Remaining": "0"}))
-        result = cli.get("/v1/pjm/workitems")
+        result = cli.get("/v2/pjm/workitems")
         self.assertTrue(result.quota.have_any)
         self.assertIn("企业每分钟上限 200", result.quota.line())
 
@@ -445,32 +445,32 @@ class ClientTest(TransportCase):
             http_error(403, {"message": "无权限"}),
             scopes_for=lambda method, url: ("pcp:write:pjm:workitem",))
         with self.assertRaises(client.ApiError) as ctx:
-            cli.post("/v1/pjm/workitems", {})
+            cli.post("/v2/pjm/workitems", {})
         self.assertIn("pcp:write:pjm:workitem", str(ctx.exception))
 
     def test_401要说去重新授权(self):
         cli, _calls = self.make_client(http_error(401, {"message": "invalid token"}))
         with self.assertRaises(client.ApiError) as ctx:
-            cli.get("/v1/myself")
+            cli.get("/v2/myself")
         self.assertIn("auth login", str(ctx.exception))
 
     def test_400的父项提示只在带了父项时出现(self):
         """实测：每条 400 都挂一句无关的父项提示，会把真正的错因冲淡。"""
         cli, _calls = self.make_client(http_error(400, {"code": "100006", "message": "bad"}))
         with self.assertRaises(client.ApiError) as ctx:
-            cli.get("/v1/pjm/workitems", type_id="缺陷")
+            cli.get("/v2/pjm/workitems", type_id="缺陷")
         self.assertNotIn("父工作项", str(ctx.exception))
 
         cli, _calls = self.make_client(http_error(400, {"code": "100319",
                                                      "message": "父工作项的类型不正确"}))
         with self.assertRaises(client.ApiError) as ctx:
-            cli.post("/v1/pjm/workitems", {"title": "x", "parent_id": "w1"})
+            cli.post("/v2/pjm/workitems", {"title": "x", "parent_id": "w1"})
         self.assertIn("父工作项", str(ctx.exception))
 
     def test_错误体里的_code_与_message_要带出来(self):
         cli, _calls = self.make_client(http_error(400, {"code": "100014", "message": "参数不合法"}))
         with self.assertRaises(client.ApiError) as ctx:
-            cli.get("/v1/pjm/workitems")
+            cli.get("/v2/pjm/workitems")
         self.assertEqual("100014", ctx.exception.code)
         self.assertEqual("参数不合法", ctx.exception.message)
         self.assertEqual(400, ctx.exception.status)
@@ -480,13 +480,13 @@ class ClientTest(TransportCase):
                                        io.BytesIO(b"<html>502</html>"))
         cli, _calls = self.make_client(error)
         with self.assertRaises(client.ApiError) as ctx:
-            cli.get("/v1/pjm/projects")
+            cli.get("/v2/pjm/projects")
         self.assertIn("502", str(ctx.exception))
 
     def test_连不上要给网络提示(self):
         cli, _calls = self.make_client(urllib.error.URLError("dns 挂了"))
         with self.assertRaises(client.ApiError) as ctx:
-            cli.get("/v1/myself")
+            cli.get("/v2/myself")
         self.assertEqual(0, ctx.exception.status)
         self.assertIn("host", str(ctx.exception))
 
@@ -500,13 +500,13 @@ class ClientTest(TransportCase):
             return FakeResponse(pages[min(len(seen) - 1, len(pages) - 1)])
 
         cli = client.Client(bearer=lambda: "t", host="h", opener=opener)
-        values = cli.paginate("/v1/pjm/workitems", page_size=2)
+        values = cli.paginate("/v2/pjm/workitems", page_size=2)
         self.assertEqual(["1", "2", "3"], [v["id"] for v in values])
         self.assertEqual(2, len(seen), "拿到短页就停，不要多打一次")
 
     def test_分页不吃超过上限的_page_size(self):
         cli, calls = self.make_client(FakeResponse({"values": []}))
-        cli.paginate("/v1/pjm/workitems", page_size=999)
+        cli.paginate("/v2/pjm/workitems", page_size=999)
         self.assertIn("page_size=100", calls[0].full_url, "官方上限是 100")
 
 

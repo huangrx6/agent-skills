@@ -10,7 +10,8 @@ description: >-
 # PingCode 项目与工作项
 
 入口为本 skill 的 `scripts/pingcode.py`：`python3 <skill路径>/scripts/pingcode.py <子命令>`。
-使用类型化命令和生成端点表，不凭记忆拼 API 路径。首次配置或授权失败时读
+使用类型化命令和生成端点表，不凭记忆拼 API 路径。当前端点表为官方 **REST API V2**
+（2026-10-14 快照）；V1 路径不在表内。首次配置或授权失败时读
 [auth.md](references/auth.md)。
 
 ## 操作原则
@@ -39,7 +40,7 @@ description: >-
 | 评论 / 附件 | `workitem comment/comments/attachments/attach/attach-code/attach-remove …` |
 | 删除工作项 | `workitem delete SCR-12 --yes` |
 | 项目列表 / 详情 / 进度 / 创建 / 更新 | `project list/show/progress/create/update …` |
-| 字典 / 默认项目 | `list projects\|sprints\|types\|states\|priorities\|tags\|users` / `config context --project X` |
+| 字典 / 默认项目 | `list projects\|sprints\|types\|states\|priorities\|tags\|users\|project_states\|processes` / `config context --project X` |
 | 授权与诊断 | `auth login/status/logout` / `whoami` / `config show` |
 
 “未完成”按 `state.type` 排除 `completed` 和 `closed`，不能按中文状态名猜。

@@ -16,7 +16,8 @@
 
 ```sh
 # 我名下（--open-only 排除 state.type 为 completed / closed 的）
-# --type 可以用中文（缺陷 / 任务 …），本地会翻成枚举；自定义类型要带 --project
+# --type 可以用中文（缺陷 / 任务 …）；V2 的系统类型 id 是 24 位，
+# 没有项目上下文时按 type.group / type.name 本地过滤
 pingcode.py workitem mine [--type bug|缺陷] [--open-only] [--limit 100]
 
 # 按条件查（--project 不给就用上下文里的当前项目）
@@ -31,41 +32,44 @@ pingcode.py workitem search --filter '{"priority.id":{"in":["…"]}}'
 
 pingcode.py workitem show SCR-12            # 编号 / short_id / id 都收；带描述与链接
 pingcode.py workitem show SCR-12 --all      # 连已删除的一起看（DELETE 是软删除）
-pingcode.py project list [--keywords X] [--type scrum]
+pingcode.py project list [--keywords X] [--type scrum] [--all]
 pingcode.py project show X
 pingcode.py project progress [--project X]
-pingcode.py list projects|sprints|types|states|priorities|tags|users [--project X] [--type bug]
+pingcode.py list projects|sprints|types|states|priorities|tags|users|project_states|processes \
+    [--project X] [--type bug]
 ```
 
 `--assignee @me`（或 `我` / `me`）需要**用户令牌**；企业令牌下请给人名或用户 ID。
 
 ## 搜索的过滤语法（实测出来的，与文档描述不完全一致）
 
-`workitem search` 走的是 `POST /v1/pjm/workitems/search`（类 MongoDB 语法）。官方文档
-列出了操作符**名字**，但没说格式 —— 下面几条是拿真实接口试出来的：
+`workitem search` 走的是 `POST /v2/pjm/workitems/search`（类 MongoDB 语法）。官方文档
+列出了操作符**名字**，但没说格式 —— 下面几条是拿真实接口试出来的（V1 租户；V2 待复核）：
 
 | 实测结论 | 证据 |
 | --- | --- |
 | 操作符**不带 `$` 前缀** | `{"in":[…]}` → 200；`{"$in":[…]}` → 400「缺少有效的操作符」 |
 | 值**必须是对象**，不能直接给标量 | `{"type":"epic"}` → 400「值必须是对象」 |
-| 引用类型用 `属性名.id` | `project.id` / `state.id` / `assignee.id` / `sprint.id` |
+| 引用类型用 `属性名.id` | `project.id` / `type.id` / `state.id` / `assignee.id` / `sprint.id` |
 | `identifier` 这类内置属性**不能**过滤 | 400「不支持使用过滤条件 filter.identifier」 |
 | 每个属性只能带一个操作符、不支持逻辑运算符 | 官方文档明说 |
 
 各类型的可用操作符（官方文档）：文本 `exists`/`contains`；枚举与选项 `exists`/`in`/`nin`；
 数字 `exists`/`eq`/`ne`/`gt`/`lt`/`gte`/`lte`；时间 `exists`/`gt`/`lt`/`gte`/`lte`/`between`。
 
-CLI 把常用条件做成了参数（`--type` / `--state` / `--assignee` / `--sprint` / `--title-contains` /
-`--created-after`），其余用 `--filter` 直接给原始条件（不另发明语法）。
+CLI 把常用条件做成了参数（`--type` / `--state` / `--assignee` / `--sprint` / `--keywords` /
+`--title-contains` / `--created-after` / `--created-before`），其余用 `--filter` 直接给原始条件
+（不另发明语法）。`--state` 按名字过滤时要同时给 `--project` 与 `--type`（状态 id 是按
+「项目 + 类型」配的），直接给状态 id 除外。
 
 ## 写
 
 ```sh
-# 项目：type / name / identifier 是官方必填
+# 项目：V2 官方必填 template_type / name / identifier（CLI 的 --type 会映射成 template_type）
 pingcode.py project create --type scrum --name "演示项目" --identifier DEMO \
                           [--description …] [--start 2026-09-01] [--end 2026-12-31] [--assignee @me]
-pingcode.py project update [--project X] [--name …] [--description …] [--start …] [--end …] \
-                          [--assignee …] [--state 进行中]
+pingcode.py project update [--project X] [--name …] [--identifier …] [--description …] \
+                          [--start …] [--end …] [--assignee …] [--state 进行中]
 
 # 工作项：epic(史诗) / feature(特性) / story(用户故事) / task(任务) / bug(缺陷) / issue(事务)…
 pingcode.py workitem create --project X --type bug --title "登录页 500" \
@@ -81,7 +85,7 @@ pingcode.py workitem delete SCR-12 --yes            # 需明确授权
 
 # 附件：列表默认不列软删除的（--all 才列）；上传两端点形状不同
 pingcode.py workitem attachments SCR-12
-pingcode.py workitem attach SCR-12 --file ./trace.log --title "网关日志"
+pingcode.py workitem attach SCR-12 --file ./trace.log --title "网关日志" [--comment <评论 id>]
 # 代码段**实测必须带 --comment**（官方文档把 comment_id 标成可选，不带回 400 code=100039）：
 pingcode.py workitem comment SCR-12 "这段是根因"     # 先拿评论 id
 pingcode.py workitem comments SCR-12 --full
@@ -134,7 +138,8 @@ pingcode.py workitem create-plan --file plan.json --yes       # 确认才建
 **写操作会先回显**：`→ 在「演示项目」创建 缺陷：登录页 500`，然后才发。
 不确定就先加 `--dry-run` 看 body。
 
-**时间格式**：`2026-09-20`（当天 00:00）、`2026-09-20 18:30`、或 10 位时间戳。
+**时间格式**：`2026-09-20`（当天 00:00，V2 `with_time=0`）、
+`2026-09-20 18:30`（`with_time=1`）、或 10 位时间戳。
 
 ## 上下文
 
@@ -142,7 +147,7 @@ pingcode.py workitem create-plan --file plan.json --yes       # 确认才建
 pingcode.py config context --project 演示项目 --sprint "Sprint 12"
 pingcode.py config context                # 看当前
 pingcode.py config context --clear
-pingcode.py config refresh [--what projects,sprints,types,states,priorities,tags,users]
+pingcode.py config refresh [--what projects,sprints,types,states,priorities,tags,users,project_states,processes]
 pingcode.py config show                   # 凭据/令牌/上下文的完整状态
 ```
 
@@ -152,9 +157,9 @@ pingcode.py config show                   # 凭据/令牌/上下文的完整状�
 
 ```sh
 pingcode.py api --list 工作项                  # 在生成的端点表里按关键词找
-pingcode.py api --show GET /v1/pjm/workitems   # 看某个端点的分组 / scope / 令牌要求
-pingcode.py api --method GET --path /v1/pjm/workitem/priorities --param project_id=xxx
-pingcode.py api --method POST --path /v1/comments --data '{"principal_type":"workitem","principal_id":"…","content":"…"}'
+pingcode.py api --show GET /v2/pjm/workitems   # 看某个端点的分组 / scope / 令牌要求
+pingcode.py api --method GET --path /v2/pjm/workitem/workitem_priorities --param project_id=xxx
+pingcode.py api --method POST --path /v2/comments --data '{"principal_type":"workitem","principal_id":"…","content":"…"}'
 ```
 
 路径不在随附官方文档快照里会被拦下（并给出最接近的候选）；先核实官方契约且属于已授权范围，才使用 `--force`。

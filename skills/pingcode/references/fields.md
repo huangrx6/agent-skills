@@ -1,21 +1,24 @@
 # 字段、状态与分页
 
-字段名都来自官方响应示例（`open.pingcode.com/api_data.json` 的 `success.examples`），不是猜的。
+字段名来自官方 **REST API V2** 响应示例（`open.pingcode.com/api_data.json` 的
+`success.examples`，2026-10-14 快照），不是猜的。
 紧凑输出只保留下面这些列，`--full` 才出原始 JSON。
+命令层使用一套规范字段（编号字符串、`start_at` / `end_at` 时间戳、顶层工作量），
+由 `scripts/compat.py` 在 V2 边界上转换。
 
 ## 工作项
 
 | 紧凑列 | 字段路径 | 说明 |
 | --- | --- | --- |
-| 编号 | `identifier` | 形如 `SCR-12`。**实测：它不是 id** —— `GET /{ref}` 与 `DELETE` 都不收编号（给编号返回 400），所以 CLI 会先解析成 id（见下面「编号不是 id」） |
+| 编号 | `whole_identifier`（回退 `identifier`） | V2 响应里 `identifier` 是数字（如 `5`），完整编号在 `whole_identifier`（如 `SCR-5`）。**它不是 id** —— `GET /{ref}` 与 `DELETE` 都不收完整编号，所以 CLI 会先解析成 id（见下面「编号不是 id」） |
 | 标题 | `title` | |
-| 类型 | `type` | 系统类型枚举：`epic` 史诗 / `feature` 特性 / `story` 用户故事 / `stage` 阶段 / `milestone` 里程碑 / `requirement` 需求 / `task` 任务 / `bug` 缺陷 / `issue` 事务；自定义类型是 24 位 id |
+| 类型 | `type` | V2 是对象 `{id, name, group}`；CLI 用 id 做逻辑、用 name 做展示。系统类型 id 是 24 位（不再是 `bug` 这种枚举），`--type bug` 由类型字典解析 |
 | 状态 | `state.name` / `state.type` | `state.type` 是语义值（见下），**判断完没完用它，不要用中文名** |
 | 优先级 | `priority.name` | |
 | 负责人 | `assignee.display_name` | |
 | 迭代 | `sprint.name` | 只有 scrum / hybrid 项目有 |
 | 项目 | `project.name` | |
-| 截止 | `end_at` | 10 位秒级时间戳，显示时转成本地时间 |
+| 截止 | `due.date` | V2 是 `{date, with_time}` 对象；CLI 规范成 10 位秒级时间戳，显示时转本地时间 |
 | 链接 | `html_url` | 网页端地址，可以直接给人 |
 
 创建/更新时用到的字段（`workitem create` / `update` 的 flag → 官方字段名）：
@@ -26,14 +29,14 @@
 | `--type` | `type_id` | 必填；系统枚举或自定义类型 id |
 | `--title` | `title` | 必填 |
 | `--description` / `--description-file` | `description` | |
-| `--start` / `--end` | `start_at` / `end_at` | 里程碑类型的 `start_at` 无效 |
+| `--start` / `--end` | `start` / `due` | V2 是 `{date, with_time}` 对象；日期输入 `with_time=0`，带时分秒 `with_time=1`。里程碑类型的 `start` 无效 |
 | `--assignee` | `assignee_id` | 支持名字、id、`@me` |
 | `--priority` | `priority_id` | |
 | `--sprint` | `sprint_id` | 仅 scrum / hybrid |
 | `--parent` | `parent_id` | 父工作项的类型要支持这种子类型 |
 | `--state` | `state_id` | 必须同时满足该类型的「状态方案」与「状态流转」 |
-| `--story-points` | `story_points` | ≥0 的整数或最多一位小数 |
-| `--estimated-workload` / `--remaining-workload` | `estimated_workload` / `remaining_workload` | |
+| `--story-points` | `properties.story_points` | ≥0 的整数或最多一位小数 |
+| `--estimated-workload` / `--remaining-workload` | `properties.estimated_workload` / `properties.remaining_workload` | V2 放在 `properties` 里，命令层仍按顶层字段接收 |
 | （未封装） | `board_id` / `entry_id` / `swimlane_id` | 仅 kanban / hybrid；走逃生口 |
 | （未封装） | `properties.{key}` | 自定义属性，需在该类型的属性方案里；走逃生口 |
 
@@ -56,8 +59,11 @@
 `workitem mine --open-only` 的判据是 `state.type ∉ {completed, closed}`（**黑名单**）：
 以后官方再加语义值时，新值会被算进「未完成」—— 宁可多列，也不要把活藏起来。
 
-状态名每个项目、每种类型都不一样（`GET /v1/pjm/workitem/states?project_id=&workitem_type_id=`），
+状态名每个项目、每种类型都不一样（`GET /v2/pjm/workitem/workitem_states?project_id=&workitem_type_id=`），
 所以 `set-state` 一定先查表；名字对不上时会把该类型的可用状态列出来。
+
+`mine --type` 没有项目上下文，V2 的系统类型 id 又是 24 位，不能把 `bug` / `缺陷` 直接当
+`type_id` 发；CLI 先取回「我名下」的条目，再按 `type.group` / `type.name` 本地过滤。
 
 ## 项目
 
@@ -65,32 +71,34 @@
 | --- | --- | --- |
 | 标识 | `identifier` | ≤15 位大写字母/数字/`_`/`-`，**全企业唯一** |
 | 名称 | `name` | ≤255 |
-| 类型 | `type` | `scrum` / `kanban` / `waterfall` / `hybrid` |
+| 类型 | `template_type` | `scrum` / `kanban` / `waterfall` / `hybrid`；CLI 的 `--type` 对外仍是这个参数 |
 | 状态 | `state.name` | 项目自己的状态（和 `workitem_states` 不是一套） |
 | 负责人 | `assignee.display_name` | |
-| 开始 / 结束 | `start_at` / `end_at` | |
+| 开始 / 结束 | `start` / `due` | V2 是 `{date, with_time}` 对象 |
 | ID | `id` | |
 
-创建项目必填：`type`、`name`、`identifier`。`process_id`（项目流程）可选，
-来自 `GET /v1/pjm/processes`（要 `pcp:read:pjm:configuration` scope）。
+创建项目必填：`template_type`、`name`、`identifier`。可选 `template_id`（项目模板，来自
+`GET /v2/pjm/project_templates`，要 `pcp:read:pjm:configuration` scope）；V1 的 `process_id`
+在 V2 文档里已不存在。
 
-**当前随附端点表没有项目删除接口。** 只有 `POST /v1/pjm/projects`、`PATCH /v1/pjm/projects/{id}`、
-`POST /v1/pjm/projects/{id}/clone`、`PATCH /v1/pjm/project_states/{id}`。用户明确要求关闭项目时，可修改其项目状态。
+**当前随附端点表没有项目删除接口。** 只有 `POST /v2/pjm/projects`、`PATCH /v2/pjm/projects/{id}`、
+`POST /v2/pjm/projects/{id}/clone`、`PATCH /v2/pjm/project_states/{id}`。用户明确要求关闭项目时，可修改其项目状态。
 
 ## 迭代 / 类型 / 优先级 / 标签 / 成员
 
-都在 `/v1/pjm/...` 下，且**大部分要带 `project_id`**（不同项目的配置是独立的）：
+都在 `/v2/pjm/...` 下，且**大部分要带 `project_id`**（不同项目的配置是独立的）：
 
 | 字典 | 端点 | 需要的上下文 |
 | --- | --- | --- |
-| 项目 | `GET /v1/pjm/projects` | — |
-| 迭代 | `GET /v1/pjm/projects/{project_id}/sprints` | 项目 |
-| 工作项类型 | `GET /v1/pjm/workitem/types?project_id=` | 项目 |
-| 工作项状态 | `GET /v1/pjm/workitem/states?project_id=&workitem_type_id=` | 项目 + 类型 |
-| 优先级 | `GET /v1/pjm/workitem/priorities?project_id=` | 项目 |
-| 标签 | `GET /v1/pjm/workitem/tags?project_id=` | 项目 |
-| 成员 | `GET /v1/directory/users` | — |
-| 项目状态 | `GET /v1/pjm/project/states?project_id=` | 项目 |
+| 项目 | `GET /v2/pjm/projects` | — |
+| 迭代 | `GET /v2/pjm/sprints?project_id=` | 项目 |
+| 工作项类型 | `GET /v2/pjm/workitem/workitem_types?project_id=` | 项目 |
+| 工作项状态 | `GET /v2/pjm/workitem/workitem_states?project_id=&workitem_type_id=` | 项目 + 类型 |
+| 优先级 | `GET /v2/pjm/workitem/workitem_priorities?project_id=` | 项目 |
+| 标签 | `GET /v2/pjm/workitem/workitem_tags?project_id=` | 项目 |
+| 成员 | `GET /v2/directory/users` | — |
+| 项目状态 | `GET /v2/pjm/project/project_states?project_id=` | 项目 |
+| 项目模板 | `GET /v2/pjm/project_templates` | — |
 
 这些进 6 小时的本地缓存；`--no-cache` 或 `config refresh` 可以强制重拉。
 
@@ -101,12 +109,13 @@
 
 实测三条关于编号的硬事实（都会影响怎么写调用）：
 
-1. `GET /v1/pjm/workitems/{ref}` **只收 id 或 short_id，不收编号**；给编号返回的是
-   **400 + code=100317「工作项资源不存在」**，不是 404。
-2. `DELETE /v1/pjm/workitems/{id}` 只收 id。
+1. `GET /v2/pjm/workitems/{ref}` **只收 id 或 short_id，不收完整编号**；给完整编号返回的是
+   **400 + code=100317「工作项资源不存在」**，不是 404（V1 实测；V2 待复核）。
+2. `DELETE /v2/pjm/workitems/{id}` 只收 id。
 3. **失败也会消耗编号**：一次父项类型不对的创建用掉了 `DEMO-82`，所以编号有空档。
 
-CLI 的做法：形状像编号的（`DEMO-80`）直接走列表接口的 `identifier` 查询；其它先直取，
+V2 列表接口的 `identifier` 查询参数在文档里是 **Number**；CLI 把 `DEMO-80` 拆成
+`identifier=80` + `project_id`（项目标识 `DEMO` 由项目字典解析）。其它先直取，
 400/404 再兜底；删除前先把编号解析成 id。
 
 ## 删除是软删除
@@ -126,8 +135,8 @@ CLI 的做法：形状像编号的（`DEMO-80`）直接走列表接口的 `ident
 
 - `page_size` 默认 30、**上限 100**；`page_index` **从 0 开始**。
 - 响应：`{page_size, page_index, total, values: [...]}`。
-- 不需要 `page_index` 的调用用 `GET /v1/pjm/workitems`；复杂组合、日期、自定义属性过滤要用
-  `POST /v1/pjm/workitems/search`（类 MongoDB 的 `payload.filter`），CLI 分别提供 `workitem list` 与 `workitem search`，常用搜索参数和 `--filter` 见 commands.md。
+- 不需要 `page_index` 的调用用 `GET /v2/pjm/workitems`；复杂组合、日期、自定义属性过滤要用
+  `POST /v2/pjm/workitems/search`（类 MongoDB 的 `payload.filter`），CLI 分别提供 `workitem list` 与 `workitem search`，常用搜索参数和 `--filter` 见 commands.md。
 
 ## 错误格式与限流
 
@@ -146,8 +155,9 @@ CLI 的做法：形状像编号的（`DEMO-80`）直接走列表接口的 `ident
 
 ## 时间
 
-官方全部用 **10 位秒级时间戳**。CLI 收 `2026-09-20`、`2026-09-20 18:30` 或时间戳本身，
-只写日期时按当天 00:00（本地时区）算。
+官方全部用 **10 位秒级时间戳**；V2 的请求/响应把日期包成 `{date, with_time}`，
+CLI 在边界上转换。CLI 收 `2026-09-20`、`2026-09-20 18:30` 或时间戳本身，
+只写日期时按当天 00:00（本地时区）算；带时分秒时 V2 `with_time=1`。
 
 `expires_in` 兼容相对秒数和绝对时间戳（大于等于 10^9 按绝对时间处理）。
 缺少有效值时，访问令牌按 30 天回退；refresh_token 的存在不会延长访问令牌寿命。

@@ -17,19 +17,19 @@
 | 建 / 改项目 | `pcp:write:pjm:project` |
 | 迭代 | `pcp:read:pjm:sprint`（要建迭代再加 `pcp:write:pjm:sprint`） |
 | 看板 | `pcp:read:pjm:board` |
-| 项目流程、工作项优先级 | `pcp:read:pjm:configuration` |
+| 项目模板、工作项优先级 | `pcp:read:pjm:configuration` |
 
-`pcp:read:pjm:configuration` 最容易漏：漏了会表现为「能查工作项，但列不出优先级和项目流程」，
-建项目时也就填不了 `process_id`。
+`pcp:read:pjm:configuration` 最容易漏：漏了会表现为「能查工作项，但列不出优先级和项目模板」，
+建项目时也就填不了 `template_id`。
 
 ## 两种授权模式（都实现了）
 
 | 模式 | 怎么来 | 有效期 | 能不能识别「我」 | 说明 |
 | --- | --- | --- | --- | --- |
-| `user`（默认） | 授权码 `authorization_code`：浏览器点一次授权 | access **30 天** / refresh **90 天** | ✅ `/v1/myself` | 只能访问该用户权限内的数据 |
+| `user`（默认） | 授权码 `authorization_code`：浏览器点一次授权 | access **30 天** / refresh **90 天** | ✅ `/v2/myself` | 只能访问该用户权限内的数据 |
 | `enterprise` | 客户端凭据 `client_credentials` | **30 天** | ❌ 要显式给用户 | 官方原话：企业令牌「拥有系统管理员权限」，**谨慎保管** |
 
-默认走 `user`，原因是官方 `/v1/myself` 只认**用户令牌** —— 企业令牌下「我的任务」只能靠
+默认走 `user`，原因是官方 `/v2/myself` 只认**用户令牌** —— 企业令牌下「我的任务」只能靠
 手工维护一个用户 ID，配错了不报错，只是查出来是别人的东西。
 
 ```sh
@@ -118,7 +118,7 @@ python3 scripts/pingcode.py auth logout                # 只删本地令牌，�
 | 404 | 对象不存在，或路径不对 | 对象确认一遍；路径以生成的端点表为准（`api --list 关键词`） |
 | 429 | 触发了限流 | 报错会带官方建议的等待秒数与剩余配额；CLI 已自动按建议重试 |
 | 连不上 / 域名解析失败 | host 写错（私有部署少了 `/open`）或网络 | `auth status` 会打出解析后的 REST 根与 OAuth2 根 |
-| `/v1/myself` 报「只认用户令牌」 | 当前是企业令牌 | `auth login --mode user` |
+| `/v2/myself` 报「只认用户令牌」 | 当前是企业令牌 | `auth login --mode user` |
 
 限流配额以服务端响应为准。429 时公有云返回 `X-RateLimit-Retry-After`，私有部署返回 `X-PC-Retry-After`。
 两种响应头都读，默认最多重试 3 次；网络中断和 5xx 不自动重试写操作。

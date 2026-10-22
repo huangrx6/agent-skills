@@ -62,7 +62,7 @@ class Entry(NamedTuple):
 
     @property
     def needs_user_token(self) -> bool:
-        """只有用户令牌能用（`/v1/myself` 这类）。企业令牌拿不到。"""
+        """只有用户令牌能用（`/v2/myself` 这类）。企业令牌拿不到。"""
         return self.perms == ("用户令牌",)
 
     @property
@@ -131,8 +131,8 @@ def require(method: str, path: str,
             query: dict[str, str] | None = None) -> Entry:
     """取唯一的端点条目；取不到或有歧义都抛错（发送前就拦住）。
 
-    query 用于同名不同变体的接口：`/v1/auth/token` 有三个 grant_type，
-    靠 `require("GET", "/v1/auth/token", {"grant_type": "refresh_token"})` 区分。
+    query 用于同名不同变体的接口：`/v2/auth/token` 有三个 grant_type，
+    靠 `require("GET", "/v2/auth/token", {"grant_type": "refresh_token"})` 区分。
     """
     want_method = method.upper()
     hits = [e for e in ENTRIES if e.method == want_method and e.path == path]
