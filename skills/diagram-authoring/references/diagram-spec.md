@@ -47,7 +47,8 @@
 
 `architecture` / `state` 默认 LR；`dependency` / `flow` 默认 TB。
 这些默认值不是锁定值：用户说“横着/竖着”时直接写 `direction`；横向流水线、分支并排或
-16:9 幻灯片优先 LR，纵向步骤或窄栏文档优先 TB。`mindmap` 用径向布局，`network` 用力导向布局。
+16:9 幻灯片优先 LR，纵向步骤或窄栏文档优先 TB。单张图仍只有一个主轴；
+同一画布内横竖混排见 [混合方向](mixed-direction.md)。`mindmap` 用径向布局，`network` 用力导向布局。
 不能把算法名写成 type。
 
 ## 表达意图（可选）

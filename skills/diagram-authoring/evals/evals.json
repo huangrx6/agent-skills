@@ -222,6 +222,16 @@
       "id": 41,
       "prompt": "为什么你给我画的图总是竖着的？能不能灵活点？",
       "expected_output": "说明 flow/dependency 默认 TB、architecture/state 默认 LR，分层图可用 direction 覆盖；提出按内容形态或用户偏好选 LR/TB 的方案，不把默认值说成生成器只能竖向。"
+    },
+    {
+      "id": 42,
+      "prompt": "一张图里主链路横向、异常分支竖向，能不能直接混排？",
+      "expected_output": "说明单张图只有一根主轴；提出面板式 compose_panels（每个面板独立 LR/TB）或拆视图，并说明跨面板不自动连线；不承诺单图内复合布局。"
+    },
+    {
+      "id": 43,
+      "prompt": "把 main.excalidraw 和 ops.excalidraw 并排到一张图里。",
+      "expected_output": "写 panels 计划并运行 compose_panels.py；检查面板 ID/引用已隔离、布局不重叠，保留各自背景；不把两个文件的元素直接拼接造成 ID 冲突，也不声称生成了跨面板连线。"
     }
   ],
   "evaluation_context": "设计/重画场景默认执行内容→配色→Excalidraw图标的逐步确认；未收到当前节点确认时，不应在同一回复继续后续节点或生成成品。原有用例涉及生成/导出的预期描述为确认完成后的实现行为；纯检查、机械修复与纯导出不额外重开设计确认。"

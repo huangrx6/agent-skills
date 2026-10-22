@@ -31,6 +31,7 @@ description: >-
 2. 明确一句读者问题、受众和观看场景；需要行为解释时读 [表达模式](references/semantic-patterns.md)。
    按下表选图类型并读 [图型规则](references/type-guides.md) 的对应段；同时按内容形态给出分层方向建议（LR/TB）。
    默认方向只是起手值，不能每次都直接沿用。拿不准可用 `python3 scripts/guide.py "一句话描述"` 辅助判断。
+   需要一张画布内横竖混排时，读 [混合方向](references/mixed-direction.md)，用面板式组合，不要用单图 `direction` 硬掰。
 3. 提交内容提案：列清主题、图型/后端、分层方向（LR/TB 及依据）、分组节点、关系、信息取舍与单图/多图安排，等待用户确认。
    用户明确说“横着/竖着”时直接采用，不再把方向当成待猜的偏好。
    确认后读 [规格契约](references/diagram-spec.md)，写 `*.diagram.json`。规格只含结构、语义档位
@@ -87,6 +88,7 @@ python3 dev-tools/sync_exports.py /path/to/diagrams/system/system.drawio
 横向流水线、阶段推进、分支并排或 16:9 幻灯片优先 `LR`；纵向步骤、窄栏文档或移动端优先 `TB`。
 用户说“横着/竖着”时按其选择执行；拿不准可用 `python3 scripts/direction_preview.py` 对比，
 不要每次都落回 `flow`/`dependency` 的默认 `TB`。
+同一画布需要横竖混排时，用 `scripts/compose_panels.py` 把独立面板拼起来；跨面板连线不自动生成。
 
 | 后端 | 适用 | 当前边界 |
 | --- | --- | --- |
@@ -131,6 +133,7 @@ python3 scripts/scheme_preview.py -o /tmp/schemes.drawio
 
 - [表达模式](references/semantic-patterns.md)：先确定要解释的行为与必要信息。
 - [图型规则](references/type-guides.md)：选型后读对应段；专属语义、反例与能力限制。
+- [混合方向](references/mixed-direction.md)：同画布 LR/TB 面板式组合的边界与命令。
 - [观看场景](references/output-presets.md)：文档、投影与打印检查的命令及边界。
 - [文件组织](references/delivery-files.md)：一图一目录、最少交付格式、源文件保留与旧引用迁移。
 - [标准样例](examples/README.md)：起手前选同图型参考；样例不代替当前产物验收。

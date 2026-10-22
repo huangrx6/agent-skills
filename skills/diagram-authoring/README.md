@@ -54,7 +54,8 @@ draw.io/Mermaid 确认内容与配色，图标按当前能力标记为不适用�
 Excalidraw/draw.io 生成器 `--preset` 支持文档、投影与打印字号/间距；默认 fit 保持旧输出。
 语义检查提示遗漏，观看检查估算字号，官方 SVG 检查测量真实渲染；三者均不改事实。
 一张图承载多个阅读问题时，先写视图计划再用 `split_views.py` 提取，保留全部原始节点与边并生成覆盖回执，
-见 [阅读视图](references/reading-views.md)。
+见 [阅读视图](references/reading-views.md)。需要同一画布内横竖混排时，用 `compose_panels.py` 做面板式组合，
+每个面板独立布局，跨面板连线不自动生成；见 [混合方向](references/mixed-direction.md)。
 [标准样例](examples/README.md) 提供六类输入、可编辑产物与实际导出。
 
 ## 自由配色
@@ -97,6 +98,7 @@ python3 scripts/check_presentation.py /project/docs/diagrams/system/system.excal
 | `scripts/layout.py --explain` | 开发时查看布局推导 |
 | `scripts/emit_mermaid.py` / `check_mermaid.py` | 结构规格 → `.mmd`，并用官方解析器校验语法 |
 | `scripts/direction_preview.py` / `scheme_preview.py` | 按需比较视觉方向或 draw.io 配色 |
+| `scripts/compose_panels.py` | 把多张已生成的 Excalidraw 按 row/column 拼到同一画布，隔离 ID 与引用 |
 | `scripts/sigils.py` / `icons.py` / `icons_fetch.py` | 内置图标、本地素材和官方库查询 |
 | `dev-tools/export_excalidraw.py` / `export_drawio.py` / `export_mermaid.py` | 调用真实渲染器导出 |
 | `dev-tools/sync_exports.py` | 只刷新已有格式；显式 `--format` 才新增格式，保存导出参数 |

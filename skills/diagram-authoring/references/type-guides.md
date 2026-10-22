@@ -14,6 +14,7 @@
 - 主轴预计超过两屏时先拆图或换方向，不靠缩小字号硬塞。
 
 `flow`/`dependency` 的默认 TB 最容易被误当成唯一选项；横向流水线或幻灯片场景应显式写 LR。
+同一画布内需要横竖混排时，见 [混合方向](mixed-direction.md)；不要用单图 `direction` 硬掰。
 
 ## architecture：组件与边界（默认 LR）
 
