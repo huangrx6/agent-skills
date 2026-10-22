@@ -632,8 +632,8 @@ def _workitem_body(args: argparse.Namespace, client: Any, project_id: str,
                         ("remaining_workload", "remaining_workload")):
         value = getattr(args, flag, None)
         if value is not None:
-            if field == "story_points" and type_id:
-                # V2 把故事点放进 properties，但任务类型没有这个属性；先查属性方案，
+            if type_id:
+                # V2 把工作量字段放进 properties，但不是每种类型都有；写前查属性方案，
                 # 否则更新会 400 code=100355，新建甚至可能被静默忽略。
                 try:
                     keys = _resolve.property_keys(client, project_id, type_id,
@@ -820,6 +820,32 @@ def _create_plan_node(args: argparse.Namespace, client: Any, project_id: str,
         _create_plan_node(args, client, project_id, child, new_id, created, f"{path}.{index}")
 
 
+def _preflight_plan_node(args: argparse.Namespace, client: Any, project_id: str,
+                        node: dict[str, Any], path: str) -> None:
+    try:
+        type_id = _plan_type_id(str(node["type"]), client, project_id, args)
+        body: dict[str, Any] = {"project_id": project_id, "type_id": type_id,
+                                "title": node["title"]}
+        body.update(_workitem_body(_node_namespace(node, args.no_cache), client,
+                                   project_id, type_id))
+        _compat.workitem_body(body)
+    except (_client.ApiError, CliError, _resolve.NotFound, _resolve.Ambiguous,
+            _fmt.TimeParseError, _config.ConfigError, _config.TokenError) as exc:
+        raise CliError(
+            f"计划预检失败：{path}（{node['title']}）：{exc}\n"
+            "  尚未创建任何节点；修正后重跑。"
+        ) from exc
+    for index, child in enumerate(node.get("children") or [], start=1):
+        _preflight_plan_node(args, client, project_id, child, f"{path}.{index}")
+
+
+def _preflight_plan(args: argparse.Namespace, client: Any, project_id: str,
+                    nodes: list[Any]) -> None:
+    """建之前把所有节点都解析一遍，避免建到一半才发现后面的节点有错。"""
+    for index, node in enumerate(nodes, start=1):
+        _preflight_plan_node(args, client, project_id, node, str(index))
+
+
 def cmd_workitem_create_plan(args: argparse.Namespace) -> int:
     client = build_client(args)
     plan = load_plan(args.file)
@@ -837,6 +863,8 @@ def cmd_workitem_create_plan(args: argparse.Namespace) -> int:
         print("以上只是计划 —— **没有建任何东西**。确认要建就加 --yes。")
         return 0
     created: dict[str, str] = {}
+    _preflight_plan(args, client, pid, nodes)
+    print("预检通过，开始创建…")
     try:
         for index, node in enumerate(nodes, start=1):
             _create_plan_node(args, client, pid, node, "", created, str(index))

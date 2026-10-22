@@ -178,7 +178,8 @@ class CliCase(unittest.TestCase):
         resolve.store("workitem_properties", {"project_id": "pj1", "workitem_type_id": "task"},
                        [{"id": "description"}, {"id": "start"}])
         resolve.store("workitem_properties", {"project_id": "pj1", "workitem_type_id": "bug"},
-                       [{"id": "description"}, {"id": "story_points"}])
+                       [{"id": "description"}, {"id": "story_points"},
+                        {"id": "estimated_workload"}, {"id": "remaining_workload"}])
 
     # ── 运行与断言 ──
     def run_cli(self, argv: list[str], routes: dict | None = None) -> tuple[int, str, str, Router]:
@@ -370,6 +371,15 @@ class CliCase(unittest.TestCase):
         self.assertIn("属性方案", err)
         self.assertIn("story_points", err)
         self.assertEqual([], router.find("POST", "/v2/pjm/workitems"), "不能发一个必 400 的请求")
+
+    def test_任务类型没有预估工作量也要当场拒绝(self):
+        code, _out, err, router = self.run_cli(
+            ["workitem", "create", "--project", "演示项目", "--type", "task",
+             "--title", "x", "--estimated-workload", "2"])
+        self.assertEqual(1, code)
+        self.assertIn("属性方案", err)
+        self.assertIn("estimated_workload", err)
+        self.assertEqual([], router.find("POST", "/v2/pjm/workitems"))
 
         project = {"id": "pj9", "identifier": "NEW", "name": "新项目",
                    "template_type": "scrum"}
@@ -782,18 +792,20 @@ class CliCase(unittest.TestCase):
         self.assertIn("缺少 id", err)
         self.assertEqual(1, len(router.find("POST", "/v2/pjm/workitems")))
 
-    def test_计划后续本地解析失败也报告已创建节点(self):
+    def test_计划后续本地解析失败时零创建(self):
         plan = {"project": "演示项目", "nodes": [
             {"type": "bug", "title": "第一项"},
             {"type": "bug", "title": "第二项", "priority": "不存在的优先级"}]}
-        code, out, err, router = self.run_cli(
+        code, _out, err, router = self.run_cli(
             ["workitem", "create-plan", "--file", self.write_plan(plan), "--yes"],
             {("POST", "/v2/pjm/workitems"): {"id": "new", "identifier": "DEMO-9"}})
         self.assertEqual(1, code)
-        self.assertIn("已建成的：DEMO-9", err)
-        self.assertEqual(1, len(router.find("POST", "/v2/pjm/workitems")))
+        self.assertIn("计划预检失败", err)
+        self.assertIn("2（第二项）", err)
+        self.assertIn("尚未创建任何节点", err)
+        self.assertEqual([], router.find("POST", "/v2/pjm/workitems"))
 
-    def test_计划后续描述文件缺失也报告已创建节点(self):
+    def test_计划后续描述文件缺失时零创建(self):
         plan = {"project": "演示项目", "nodes": [
             {"type": "bug", "title": "第一项"},
             {"type": "bug", "title": "第二项", "description_file": os.path.join(self._tmp.name, "missing.md")}]}
@@ -801,10 +813,23 @@ class CliCase(unittest.TestCase):
             ["workitem", "create-plan", "--file", self.write_plan(plan), "--yes"],
             {("POST", "/v2/pjm/workitems"): {"id": "new", "identifier": "DEMO-9"}})
         self.assertEqual(1, code)
-        self.assertIn("已建成的：DEMO-9", err)
-        self.assertIn("建到 2（第二项）失败", err)
-        self.assertIn("不要整棵重跑", err)
-        self.assertEqual(1, len(router.find("POST", "/v2/pjm/workitems")))
+        self.assertIn("计划预检失败", err)
+        self.assertIn("2（第二项）", err)
+        self.assertIn("尚未创建任何节点", err)
+        self.assertEqual([], router.find("POST", "/v2/pjm/workitems"))
+
+    def test_计划预检第二项工作量属性不支持时不创建第一项(self):
+        plan = {"project": "演示项目", "nodes": [
+            {"type": "bug", "title": "第一项"},
+            {"type": "task", "title": "第二项", "estimated_workload": 2}]}
+        code, _out, err, router = self.run_cli(
+            ["workitem", "create-plan", "--file", self.write_plan(plan), "--yes"],
+            {("POST", "/v2/pjm/workitems"): {"id": "new", "identifier": "DEMO-9"}})
+        self.assertEqual(1, code)
+        self.assertIn("计划预检失败", err)
+        self.assertIn("2（第二项）", err)
+        self.assertIn("estimated_workload", err)
+        self.assertEqual([], router.find("POST", "/v2/pjm/workitems"))
 
     def test_计划带_yes_才建且父先子后(self):
         path = self.write_plan(self.GOOD_PLAN)

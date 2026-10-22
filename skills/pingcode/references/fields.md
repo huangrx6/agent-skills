@@ -36,7 +36,7 @@
 | `--parent` | `parent_id` | 父工作项的类型要支持这种子类型 |
 | `--state` | `state_id` | 必须同时满足该类型的「状态方案」与「状态流转」 |
 | `--story-points` | `properties.story_points` | 仅当该类型的属性方案包含 `story_points` 时可写（用户故事等）。任务类型没有这个属性，CLI 会先查 `workitem_properties` 并当场拒绝；V2 直接发会 400 `code=100355` |
-| `--estimated-workload` / `--remaining-workload` | `properties.estimated_workload` / `properties.remaining_workload` | V2 放在 `properties` 里，命令层仍按顶层字段接收 |
+| `--estimated-workload` / `--remaining-workload` | `properties.estimated_workload` / `properties.remaining_workload` | V2 放在 `properties` 里，命令层仍按顶层字段接收；写前查属性方案，不支持会拒绝 |
 | （未封装） | `board_id` / `entry_id` / `swimlane_id` | 仅 kanban / hybrid；走逃生口 |
 | （未封装） | `properties.{key}` | 自定义属性，需在该类型的属性方案里；走逃生口 |
 

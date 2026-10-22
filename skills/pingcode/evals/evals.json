@@ -66,6 +66,12 @@
       "prompt": "看一下 SCR-5 的原始响应，我要确认接口返回的字段。",
       "expected_output": "用 `workitem show SCR-5 --full`。`--full` 必须输出 V2 原始字段（`whole_identifier`、`type` 对象、`start` / `due` 对象、`properties`），而不是命令层规范化后的 `identifier` / `start_at` / 顶层 `story_points`。默认紧凑输出才做规范化；两者不能混。",
       "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "按 plan.json 把这棵树建到演示项目，确认没问题就直接建。",
+      "expected_output": "先打印整棵树；加 `--yes` 后必须先对全树做只读预检：解析每个节点的类型、属性方案、负责人、优先级、迭代、状态、日期和描述文件。任何一个节点失败都要报出路径（如 2（第二项））并确保一条都没创建，不能边建边发现。预检通过后才父先子后创建；预检后的 API 失败仍要报出已建成的编号，不能整棵重跑。",
+      "files": []
     }
   ]
 }
