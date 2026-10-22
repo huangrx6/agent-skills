@@ -3,7 +3,7 @@ name: pingcode
 description: >-
   Use when querying or updating PingCode projects and work items, including tasks, bugs, sprints,
   statuses, assignees, comments, and attachments. 中文：PingCode 里查待办、查缺陷、建任务、
-  改状态、看迭代、看项目进度、批量改、按条件搜索或排查授权。Use for PingCode work tracking and authentication or API errors. Do NOT use for local Git work or administration of members,
+  改状态、看迭代、看项目进度、看流转历史、批量改、按条件搜索或排查授权。Use for PingCode work tracking and authentication or API errors. Do NOT use for local Git work or administration of members,
   permissions, or CI pipelines.
 ---
 
@@ -38,6 +38,7 @@ description: >-
 | 创建 / 更新 / 改状态 | `workitem create …` / `workitem update SCR-12 …` / `workitem set-state SCR-12 状态` |
 | 树形创建 / 单字段批量更新 | `workitem create-plan --file plan.json [--yes]` / `workitem bulk-update …` |
 | 评论 / 附件 | `workitem comment/comments/attachments/attach/attach-code/attach-remove …` |
+| 流转历史 | `workitem history SCR-12` |
 | 删除工作项 | `workitem delete SCR-12 --yes` |
 | 项目列表 / 详情 / 进度 / 创建 / 更新 | `project list/show/progress/create/update …` |
 | 字典 / 默认项目 | `list projects\|sprints\|types\|states\|priorities\|tags\|users\|project_states\|processes\|workitem_properties` / `config context --project X` |

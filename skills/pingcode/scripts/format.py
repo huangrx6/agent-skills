@@ -74,6 +74,13 @@ ATTACHMENT = (
     ("download_url", "下载"),
 )
 
+HISTORY = (
+    ("created_at", "时间"),
+    ("from_state.name", "原状态"),
+    ("to_state.name", "新状态"),
+    ("created_by.display_name", "操作人"),
+)
+
 # 这些字段按显示宽度截断（值是该列的最大显示宽度）。
 CLIP_FIELDS = {"content": 64, "title": 48, "download_url": 56}
 
@@ -118,6 +125,7 @@ SCHEMAS: dict[str, tuple[tuple[str, str], ...]] = {
     "state": STATE,
     "comment": COMMENT,
     "attachment": ATTACHMENT,
+    "history": HISTORY,
     "simple": SIMPLE,
 }
 

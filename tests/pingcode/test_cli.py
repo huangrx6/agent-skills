@@ -657,6 +657,42 @@ class CliCase(unittest.TestCase):
         self.assertEqual(0, code)
         self.assertIn("没有附件", out)
 
+    def test_流转历史列出状态变化(self):
+        history = [
+            {"id": "h1", "from_state": {"name": "新建"}, "to_state": {"name": "进行中"},
+             "created_at": 1700000000, "created_by": {"display_name": "John"}},
+            {"id": "h2", "from_state": {"name": "进行中"}, "to_state": {"name": "已完成"},
+             "created_at": 1700003600, "created_by": {"display_name": "John"}},
+        ]
+        code, out, err, _router = self.run_cli(
+            ["workitem", "history", "DOC-1"],
+            {("GET", "/v2/pjm/workitems"): {"values": [WORKITEM]},
+             ("GET", "/v2/pjm/workitems/w1/transition_histories"):
+                 {"values": history, "total": 2}})
+        self.assertEqual(0, code, err)
+        for text in ("新建", "进行中", "已完成", "John"):
+            self.assertIn(text, out)
+
+    def test_没有流转记录时说一句人话(self):
+        code, out, _err, _router = self.run_cli(
+            ["workitem", "history", "DOC-1"],
+            {("GET", "/v2/pjm/workitems"): {"values": [WORKITEM]},
+             ("GET", "/v2/pjm/workitems/w1/transition_histories"):
+                 {"values": [], "total": 0}})
+        self.assertEqual(0, code)
+        self.assertIn("还没有流转记录", out)
+
+    def test_已删除工作项的流转历史给出人话(self):
+        deleted = dict(WORKITEM, is_deleted=1)
+        code, _out, err, _router = self.run_cli(
+            ["workitem", "history", "DOC-1", "--all"],
+            {("GET", "/v2/pjm/workitems"): {"values": [deleted]},
+             ("GET", "/v2/pjm/workitems/w1/transition_histories"):
+                 http_error(400, {"code": "100317", "message": "工作项资源不存在"})})
+        self.assertEqual(1, code)
+        self.assertIn("已删除", err)
+        self.assertIn("流转历史", err)
+
     # ── mine 缺 scope 时的替代做法 ──
     def test_mine_缺_scope_时要给不改后台的办法(self):
         """实测：数据范围里没有 pcp:read:account:personal 时 /v2/myself 会 403。

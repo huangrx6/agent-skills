@@ -1088,6 +1088,30 @@ def cmd_workitem_comments(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_workitem_history(args: argparse.Namespace) -> int:
+    """列工作项流转记录：GET /v2/pjm/workitems/{id}/transition_histories。"""
+    client = build_client(args)
+    current = fetch_workitem(client, args.ref, include_deleted=bool(args.all))
+    path = _api.build(_compat.TRANSITION_HISTORIES, workitem_id=current["id"])
+    try:
+        values = client.paginate(path, max_items=args.limit)
+    except _client.ApiError as exc:
+        if current.get("is_deleted") and exc.status == 400:
+            raise CliError(
+                f"{current.get('identifier', args.ref)} 已删除；"
+                f"服务端不返回已删除工作项的流转历史。\n  原始错误：{exc}"
+            ) from exc
+        raise
+    if args.full:
+        print(json.dumps(values, ensure_ascii=False, indent=2))
+        return 0
+    if not values:
+        print(f"{current.get('identifier', args.ref)} 还没有流转记录")
+        return 0
+    emit(_fmt.rows("history", values), args, "history", values)
+    return 0
+
+
 def cmd_workitem_attachments(args: argparse.Namespace) -> int:
     """列附件：GET /v2/attachments?principal_type=workitem&principal_id=<id>。
 
@@ -1569,6 +1593,11 @@ def build_parser() -> argparse.ArgumentParser:
     wcl.add_argument("--limit", type=int, default=50)
     wcl.add_argument("--all", action="store_true", help="按编号找时含已删除的")
     wcl.set_defaults(func=cmd_workitem_comments)
+    wh = make(wsub, "history", help="工作项流转历史")
+    wh.add_argument("ref")
+    wh.add_argument("--limit", type=int, default=100)
+    wh.add_argument("--all", action="store_true", help="按编号找时含已删除的")
+    wh.set_defaults(func=cmd_workitem_history)
     wat = make(wsub, "attachments", help="列附件")
     wat.add_argument("ref")
     wat.add_argument("--limit", type=int, default=50)
