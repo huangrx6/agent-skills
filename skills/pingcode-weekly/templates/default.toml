@@ -1,0 +1,29 @@
+[layout]
+body = """
+# {week_start} ~ {week_end} 周报
+
+## 本周任务
+{this_week}
+
+## 本周新增/待开始
+{new_items}
+
+## 本周新增缺陷
+{new_bugs}
+
+## 缺陷清单
+{bugs}
+
+## 下周计划
+{next_week}
+
+{gaps}
+"""
+
+[format]
+project = "**{name}**："
+requirement = "- [需求] {summary}（{id}，{state}）"
+bug = "- [缺陷] {summary}（{id}，{state}）"
+new_bug = "- [{severity}] {summary}（{id}，{state}）"
+open_bug = "- [{severity}] {summary}（{id}，{state}，{assignee}，已存在 {age_days} 天）"
+next_item = "- {summary}（{id}）"

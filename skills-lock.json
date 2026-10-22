@@ -24,6 +24,12 @@
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
+    "learning-scout": {
+      "computedHash": "577375512a61b4f4059834a8c0f6adf0c2430d02046421bde6741e913db58ca7",
+      "skillPath": "skills/learning-scout/SKILL.md",
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github"
+    },
     "obsidian-wiki": {
       "computedHash": "3faffb15d947603bf193cb8dfbe08b2ba1646920000898b8c7cdd07b8b5a204b",
       "skillPath": "skills/obsidian-wiki/SKILL.md",
@@ -37,8 +43,14 @@
       "sourceType": "github"
     },
     "pingcode": {
-      "computedHash": "d34abb05e8ea6ecd92cacdac9c01ad17e5d764ee9dd3127cddfe02f7187f53ad",
+      "computedHash": "6d92cde767121ac65bcf95f41e99cf22a0e1fe2cc3f9f849fcc5e666780bde87",
       "skillPath": "skills/pingcode/SKILL.md",
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github"
+    },
+    "pingcode-weekly": {
+      "computedHash": "de9a16c60c30f5deb909ababa85caaedf4e3ae18cf64130714525916e6d7900c",
+      "skillPath": "skills/pingcode-weekly/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },

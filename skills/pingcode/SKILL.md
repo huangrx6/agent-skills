@@ -2,8 +2,8 @@
 name: pingcode
 description: >-
   Use when querying or updating PingCode projects and work items, including tasks, bugs, sprints,
-  statuses, assignees, comments, and attachments. 中文：PingCode 里查待办、查缺陷、建任务、
-  改状态、看迭代、看项目进度、看流转历史、看关联/关注人、下载附件、批量改、按条件搜索或排查授权。Use for PingCode work tracking and authentication or API errors. Do NOT use for local Git work or administration of members,
+  statuses, assignees, comments, and attachments. 中文：PingCode 里查待办、查缺陷、拆需求、
+  建史诗/故事/任务、改状态、看迭代、看项目进度、看流转历史、看关联/关注人、下载附件、批量改、按条件搜索或排查授权。Use for PingCode work tracking and authentication or API errors. Do NOT use for local Git work or administration of members,
   permissions, or CI pipelines.
 ---
 
@@ -20,9 +20,15 @@ description: >-
 - 更新或删除前核对目标及当前字段。类型化 update/set-state/delete 命令已读取目标，
   不必为了流程固定再查一遍；需要向用户消除歧义时才单独 `show`。
 - 用户已明确授权且参数齐全时直接执行。复杂多字段或批量操作可用 `--dry-run` 检查计划；
-  dry-run 仍允许为解析 ID 发起只读请求。删除和树形创建要求 `--yes`，这是 CLI 执行开关，
-  不要求重复获取已有授权。
+  dry-run 仍允许为解析 ID 发起只读请求。删除、树形创建和批量补日期要求 `--yes`，
+  这是 CLI 执行开关，不要求重复获取已有授权。
 - 评论会对外发送信息，仅在用户明确要求评论时执行；上传附件也须属于请求范围。
+- 拆分或录入需求时，史诗、特性、用户故事、任务都要有可执行描述；用户提供截图时，
+  创建后上传附件并在描述里回链，见 [workitem-authoring.md](references/workitem-authoring.md)。
+- 创建/计划默认从 `--sprint`、带日期的 `--parent` 或项目日期继承起止时间；都没有时会在
+  stderr 提示。缺失日期用 `workitem fill-dates` 预览后加 `--yes` 回填。
+- 负责人尽量明确：`--assignee 姓名` 或 `--assignee @me`；确认先不分配就用
+  `--unassigned`（`--assignee none` 同义）。不写会按未分配处理并提示，不要自己猜人。
 - 写操作失败或超时后先检查是否已生效，再决定重试，避免重复创建。批量/树形操作报告已完成部分，
   不宣称自动回滚或可直接整棵重跑。
 - 凭据与令牌不回显；状态只用 `auth status` / `config show`，不要读取或粘贴凭据文件内容。
@@ -42,6 +48,7 @@ description: >-
 | 流转历史 / 内部关联 / 关注人 | `workitem history SCR-12` / `workitem relations SCR-12` / `workitem participants SCR-12` |
 | 标签 / 关注人写入 | `workitem tags/tag/untag …` / `tag create/update/delete …` / `workitem watch/unwatch … [--group]` |
 | 工时 / 迭代 / 看板 | `worklog …` / `sprint create/update …` / `board create/entry/swimlane/delete …` |
+| 补齐起止时间 | `workitem fill-dates --project X [--start … --end …] [--yes]` |
 | 删除工作项 | `workitem delete SCR-12 --yes` |
 | 项目列表 / 详情 / 进度 / 成员 / 创建 / 更新 | `project list/show/progress/members/create/update …` |
 | 字典 / 默认项目 | `list projects\|sprints\|types\|states\|priorities\|tags\|users\|project_states\|processes\|workitem_properties\|relation_types\|workload_types` / `config context --project X` |
@@ -53,6 +60,7 @@ description: >-
 ## 按需查阅
 
 - [commands.md](references/commands.md)：参数、搜索语法、树形计划与批量操作。
+- [workitem-authoring.md](references/workitem-authoring.md)：需求拆分、描述模板和截图附件流程。
 - [fields.md](references/fields.md)：字段映射、状态、编号解析和分页。
 - [auth.md](references/auth.md)：配置路径、两种令牌与错误处理。
 - [api.md](references/api.md)：端点表、参数来源、维护和通用 API。

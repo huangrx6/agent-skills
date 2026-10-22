@@ -7,7 +7,7 @@
 
 | 开关 | 作用 |
 | --- | --- |
-| `--full` | 出原始 JSON（默认是紧凑表格：编号/标题/类型/状态/优先级/负责人/迭代/截止/链接） |
+| `--full` | 出原始 JSON（默认是紧凑表格：编号/标题/类型/状态/优先级/负责人/迭代/开始/截止/链接） |
 | `--dry-run` | 写操作只打印将发出的 `method / url / headers / body`，**不发送写请求；ID 解析仍可读取接口** |
 | `--no-cache` | 字典（项目/迭代/类型/状态/优先级/标签/成员）不吃缓存，重新拉 |
 | `--host` | 临时覆盖 host |
@@ -104,9 +104,11 @@ pingcode.py project update [--project X] [--name …] [--identifier …] [--desc
                           [--start …] [--end …] [--assignee …] [--state 进行中]
 
 # 工作项：epic(史诗) / feature(特性) / story(用户故事) / task(任务) / bug(缺陷) / issue(事务)…
+# 没给 --start/--end 时，会从 --sprint、带日期的 --parent 或项目日期自动继承；
+# 都没有时会提示，建议先补日期再建。
 pingcode.py workitem create --project X --type bug --title "登录页 500" \
     [--description "…"] [--description-file 描述.md] \
-    [--assignee @me] [--priority 高] [--sprint "Sprint 12"] [--parent SCR-1] \
+    [--assignee @me | --unassigned] [--priority 高] [--sprint "Sprint 12"] [--parent SCR-1] \
     [--state 新建] [--start 2026-09-20] [--end 2026-09-30] \
     [--story-points 3] [--estimated-workload 8] [--property risk=high]
 
@@ -114,6 +116,14 @@ pingcode.py workitem create --project X --type bug --title "登录页 500" \
 # 任务没有这个属性；CLI 会先查 workitem_properties 并拒绝，避免 400 code=100355。
 
 pingcode.py workitem update SCR-12 --description "…" --end 2026-09-30
+
+# 回填缺失起止时间：默认只预览，--yes 才写
+# 推导顺序：迭代 → 子项汇总 → 创建时间/完成时间 → 项目日期 → 兜底日期
+# 超过 --limit 时结果可能截断；项目很大时先调大 --limit
+pingcode.py workitem fill-dates --project X
+pingcode.py workitem fill-dates --project X --yes
+# 没有迭代/父项可继承的根节点，用兜底日期
+pingcode.py workitem fill-dates --project X --start 2026-10-19 --end 2026-10-25 --yes
 pingcode.py workitem set-state SCR-12 已完成
 pingcode.py workitem comment SCR-12 "已定位到网关超时"
 pingcode.py workitem delete SCR-12 --yes            # 需明确授权
@@ -139,6 +149,9 @@ pingcode.py workitem bulk-update --ids SCR-1,SCR-2 --property risk=high
 # 一次建一棵树（史诗 → 特性 → 用户故事 → 任务）：适合把一段需求/一份计划落成工作项
 pingcode.py workitem create-plan --file plan.json             # 默认只打印整棵树，不建
 pingcode.py workitem create-plan --file plan.json --yes       # 确认才建
+# 给未写负责人的节点统一指定；--unassigned 明确不分配
+pingcode.py workitem create-plan --file plan.json --assignee @me
+pingcode.py workitem create-plan --file plan.json --unassigned
 ```
 
 `plan.json`：字段集是**封闭的**（写错字段名当场报错并给候选），层次靠 `children` 嵌套：
@@ -174,6 +187,14 @@ pingcode.py workitem create-plan --file plan.json --yes       # 确认才建
 
 `type` 写中文也行（史诗 / 特性 / 用户故事 / 任务 / 缺陷），本地会翻成枚举；
 自定义类型要写 id。
+
+需求拆分、描述模板和截图附件流程见 [workitem-authoring.md](workitem-authoring.md)。
+树建好后逐条上传截图，再在描述里回链附件标题：
+
+```sh
+pingcode.py workitem attach SCR-3 --file ./截图.png --title "下单流程-异常状态"
+pingcode.py workitem attachments SCR-3
+```
 
 **写操作会先回显**：`→ 在「演示项目」创建 缺陷：登录页 500`，然后才发。
 不确定就先加 `--dry-run` 看 body。

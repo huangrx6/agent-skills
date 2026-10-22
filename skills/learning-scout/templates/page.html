@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="{{LANG}}" data-theme="{{THEME}}" data-motif="{{MOTIF}}" data-layout="{{LAYOUT}}" style="--accent: {{ACCENT}};">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="{{COLOR_SCHEME}}">
+  <meta name="description" content="{{PROMISE_ATTR}}">
+  <title>{{PAGE_TITLE}}</title>
+  <script>document.documentElement.classList.add("js");</script>
+  <style>{{CSS}}</style>
+  <noscript><style>.reveal { opacity: 1 !important; transform: none !important; }</style></noscript>
+</head>
+<body data-plan-id="{{PLAN_ID}}">
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="wordmark" href="#top" aria-label="回到页首">
+      <span class="wordmark-mark" aria-hidden="true">L</span>
+      <span class="wordmark-text">LEARNING<br><b>/ SCOUT</b></span>
+    </a>
+    <div class="topbar-meta" aria-label="学习路线信息">
+      <span>{{DURATION}}</span>
+      <span class="meta-dot" aria-hidden="true"></span>
+      <span>{{EFFORT}}</span>
+    </div>
+    <div class="progress-chip" aria-live="polite">
+      <span id="progress-count" class="progress-count">0 / {{TOTAL}}</span>
+      <span class="progress-track" aria-hidden="true"><i id="progress-bar"></i></span>
+    </div>
+  </header>
+
+  <main id="top">
+    {{HERO}}
+
+    {{STATS}}
+
+    <nav class="stage-nav" aria-label="学习路线导航">
+      <span class="stage-nav-label">ROUTE</span>
+      <div class="stage-nav-links">{{STAGE_NAV}}</div>
+      <a class="stage-nav-shelf" href="#shelf">资源架 <span aria-hidden="true">↘</span></a>
+    </nav>
+
+    <section class="manifesto reveal">
+      <div class="manifesto-lead">
+        <span class="section-label">WHY THIS ROUTE</span>
+        <blockquote>{{THESIS}}</blockquote>
+      </div>
+      <div class="manifesto-copy">
+        <div>
+          <span class="section-label">为什么是现在</span>
+          <p>{{WHY_NOW}}</p>
+        </div>
+        <div class="manifesto-note">
+          <span class="section-label">这条路线的气质</span>
+          <p>先建立判断，再动手；先跑通一条链路，再谈生产。每一站都留一个能验证自己的小出口。</p>
+        </div>
+      </div>
+    </section>
+
+    {{OUTCOMES}}
+
+    <div class="journey">
+      {{STAGES}}
+    </div>
+
+    {{SHELF}}
+    {{NOT_NOW}}
+    {{RABBIT_HOLES}}
+    {{START}}
+
+    <footer class="footer">
+      <div class="footer-mark" aria-hidden="true">L / S</div>
+      <div class="footer-copy">
+        <p>{{SOURCE_NOTE}}</p>
+        <p>资源核验：{{VERIFIED_AT}} · 视觉主题：{{THEME}} / {{MOTIF}} · {{THEME_REASON}}</p>
+      </div>
+      <a href="#top">回到顶端 ↑</a>
+    </footer>
+  </main>
+
+  <script>{{JS}}</script>
+</body>
+</html>

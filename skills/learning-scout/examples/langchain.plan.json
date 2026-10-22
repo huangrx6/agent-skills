@@ -1,0 +1,624 @@
+{
+  "version": 1,
+  "topic": "LangChain 深潜",
+  "title": "从调用 API 到读懂 Agent",
+  "title_lines": [
+    "从调用 API",
+    "到读懂 Agent"
+  ],
+  "subtitle": "覆盖 1.x 主链路和源码入口；不把 100+ integrations 当成学习目标。",
+  "language": "中文讲解 · 英文文档/源码",
+  "audience": "会 Python、用过 LLM API，能读英文文档；还没系统读过 LangChain 源码",
+  "duration": "7 天 · 30–38 小时",
+  "effort": "每天 4–6 小时；可拉成 10–14 天",
+  "promise": "7 天，不是背完 LangChain 的所有 API，而是读懂 create_agent 到 LangGraph 的主链路，并做出一个有工具、记忆、审批和评估的中等 Agent。",
+  "why_now": "LangChain 1.x 把主入口收敛到 create_agent + middleware + LangGraph runtime。旧教程里的 AgentExecutor、Chain 和大量旧式写法，已经不能代表现在的源码结构；先读对入口，比多学几个 API 更重要。",
+  "thesis": "先读懂一条执行链，再扩展能力：消息 → 工具 → 中间件 → 图状态 → checkpoint。",
+  "theme": {
+    "name": "blueprint",
+    "accent": "#62e6ff",
+    "motif": "grid",
+    "reason": "深蓝与青色像一张工程蓝图；网格适合读源码、画执行链和标注扩展点。"
+  },
+  "stats": [
+    {
+      "value": "07",
+      "label": "天 / 阶段"
+    },
+    {
+      "value": "30–38h",
+      "label": "总投入"
+    },
+    {
+      "value": "22",
+      "label": "份主资源"
+    },
+    {
+      "value": "01",
+      "label": "个中等 Agent"
+    }
+  ],
+  "outcomes": [
+    {
+      "title": "画出主链路",
+      "detail": "能画清 create_agent、middleware、LangGraph runtime 和 checkpoint 的关系。"
+    },
+    {
+      "title": "读懂源码入口",
+      "detail": "能在 factory.py、middleware/types.py、state.py 里找到关键类和调用链，而不是从头读到尾。"
+    },
+    {
+      "title": "做出中等 Agent",
+      "detail": "有 3 个工具、RAG、短期记忆、人工审批、流式输出和 10 条评估。"
+    },
+    {
+      "title": "用证据迭代",
+      "detail": "能通过 trace 和 eval 判断失败发生在工具选择、参数、检索还是生成。"
+    }
+  ],
+  "stages": [
+    {
+      "id": "d1",
+      "label": "DAY 01",
+      "kicker": "建立地图",
+      "title": "先拆开这台机器，再决定怎么用",
+      "time": "4 小时",
+      "orbit": "MAP",
+      "orbit_note": "FRAME",
+      "goal": "建立 LangChain 1.x 的四层地图，并跑通一个最小、可观察的 Agent。",
+      "hook": "不要先写复杂 Agent。先搞清楚 create_agent 到底替你做了什么。",
+      "metaphor": "像拆一台跑步机：控制面板是 API，电机是 runtime，传感器是 middleware 和 checkpoint；先看结构，再按按钮。",
+      "resources": [
+        {
+          "title": "LangChain overview",
+          "url": "https://docs.langchain.com/oss/python/langchain/overview",
+          "format": "docs",
+          "source": "LangChain Docs",
+          "tier": "primary",
+          "why": "先看 1.x 对 create_agent 的定位和边界；知道它不负责什么，比知道它有什么更重要。",
+          "time": "15 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "Quickstart",
+          "url": "https://docs.langchain.com/oss/python/langchain/quickstart",
+          "format": "docs",
+          "source": "LangChain Docs",
+          "tier": "primary",
+          "why": "最小可运行 Agent。先跑通、打印消息，再去源码里找对应实现。",
+          "time": "20 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "LangChain and LangGraph Agent Frameworks Reach v1.0",
+          "url": "https://www.langchain.com/blog/langchain-langgraph-1dot0",
+          "format": "blog",
+          "source": "LangChain Blog",
+          "tier": "primary",
+          "why": "解释为什么主入口变成 create_agent + middleware，以及旧教程为什么容易误导。",
+          "time": "15 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "LangChain System Architecture",
+          "url": "https://github.com/langchain-ai/langchain/blob/master/openwiki/architecture.md",
+          "format": "docs",
+          "source": "LangChain repo · openwiki",
+          "tier": "practitioner",
+          "why": "core / langchain / partners 三层和依赖关系。把它当地图，不替代源码；读完后自己画一遍。",
+          "time": "20 分钟",
+          "language": "英文",
+          "cost": "免费"
+        }
+      ],
+      "practice": {
+        "title": "最小 Agent + 消息轨迹",
+        "brief": "用 create_agent 做一个只带一个工具（例如 echo 或 calculator）的 Agent；打开 debug 或 callback，把 HumanMessage、AIMessage、ToolMessage 打印出来。",
+        "deliverable": "可运行脚本 + 一张 5 行的架构图 + 一次完整消息轨迹",
+        "time": "90 分钟"
+      },
+      "checkpoint": {
+        "question": "create_agent 返回的到底是什么？模型和工具在什么地方循环？",
+        "pass": "能说出它返回一个编译后的图/可运行对象，循环由 model → tools → model 的边驱动，而不是一个普通函数里的 while。"
+      },
+      "detour": {
+        "title": "先别上 LangGraph Platform",
+        "brief": "本地 create_agent 跑通、能看消息就够了；部署平台不是第一天的杠杆。"
+      },
+      "skills": [
+        "框架地图",
+        "最小 Agent",
+        "消息轨迹"
+      ],
+      "title_lines": [
+        "先拆开这台机器",
+        "再决定怎么用"
+      ]
+    },
+    {
+      "id": "d2",
+      "label": "DAY 02",
+      "kicker": "核心抽象",
+      "title": "消息、工具和结构化输出",
+      "time": "5 小时",
+      "orbit": "READ",
+      "orbit_note": "TRACE",
+      "goal": "理解 Agent 的数据流，并能从 create_agent 的入口读到模型/工具边。",
+      "hook": "Agent 不是魔法：它只是模型 → 工具 → 模型的状态机。",
+      "metaphor": "把 AIMessage 想成一张工单：模型写下要调用什么工具、参数是什么；ToolMessage 是工具回填的结果。",
+      "resources": [
+        {
+          "title": "Agents",
+          "url": "https://docs.langchain.com/oss/python/langchain/agents",
+          "format": "docs",
+          "source": "LangChain Docs",
+          "tier": "primary",
+          "why": "把 model、tools、prompt、middleware 四件套和 agent harness 讲清楚；先形成正确词汇表。",
+          "time": "25 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "agents/factory.py",
+          "url": "https://github.com/langchain-ai/langchain/blob/master/libs/langchain_v1/langchain/agents/factory.py",
+          "format": "repo",
+          "source": "langchain-ai/langchain",
+          "tier": "primary",
+          "why": "create_agent 的真正构造入口。重点看 create_agent、_make_model_to_tools_edge、_make_tools_to_model_edge、_add_middleware_edge；不要从头逐行读 2,000 行。",
+          "time": "90 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "agents/structured_output.py",
+          "url": "https://github.com/langchain-ai/langchain/blob/master/libs/langchain_v1/langchain/agents/structured_output.py",
+          "format": "repo",
+          "source": "langchain-ai/langchain",
+          "tier": "primary",
+          "why": "ToolStrategy、ProviderStrategy、AutoStrategy 如何把 Agent 输出变成 Pydantic/TypedDict。中等 Agent 需要可消费的输出。",
+          "time": "30 分钟",
+          "language": "英文",
+          "cost": "免费"
+        }
+      ],
+      "practice": {
+        "title": "3 个工具 + 一个结构化输出",
+        "brief": "实现 search_docs、calculator、save_note（save_note 先 mock）；给 Agent 加 ResearchBrief 结构化输出，并测试缺参数/错参数。",
+        "deliverable": "3 个带 schema 的工具 + ResearchBrief 输出 + 3 条错误参数测试",
+        "time": "120 分钟"
+      },
+      "checkpoint": {
+        "question": "一次工具调用在消息里长什么样？模型怎么知道该调哪个工具？",
+        "pass": "能指出 AIMessage.tool_calls 里的 name/args/id，以及 ToolMessage 如何用 tool_call_id 回填；能解释工具 schema 如何进入模型上下文。"
+      },
+      "detour": {
+        "title": "用假模型读源码",
+        "brief": "不必每次调真实 API。用固定返回的 fake chat model 或 echo 工具，先把图跑通，再换成真实模型。"
+      },
+      "skills": [
+        "消息协议",
+        "工具 schema",
+        "结构化输出"
+      ],
+      "title_lines": [
+        "消息、工具",
+        "和结构化输出"
+      ]
+    },
+    {
+      "id": "d3",
+      "label": "DAY 03",
+      "kicker": "中间件",
+      "title": "在循环上装钩子，而不是改框架",
+      "time": "5 小时",
+      "orbit": "HOOK",
+      "orbit_note": "GUARD",
+      "goal": "掌握 AgentMiddleware 的 hook 生命周期，并做出一个可审批的副作用工具。",
+      "hook": "真正让 Agent 可用的，不是多一个工具，而是知道什么时候拦截、重试、裁剪和等待人。",
+      "metaphor": "middleware 像机场安检：不改变航班路线，但在登机前后检查、拦截、补材料。",
+      "resources": [
+        {
+          "title": "Middleware overview",
+          "url": "https://docs.langchain.com/oss/python/langchain/middleware/overview",
+          "format": "docs",
+          "source": "LangChain Docs",
+          "tier": "primary",
+          "why": "先看官方对 hook、预置 middleware 和 context engineering 的分类；知道哪些不该自己写。",
+          "time": "25 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "agents/middleware/types.py",
+          "url": "https://github.com/langchain-ai/langchain/blob/master/libs/langchain_v1/langchain/agents/middleware/types.py",
+          "format": "repo",
+          "source": "langchain-ai/langchain",
+          "tier": "primary",
+          "why": "AgentMiddleware、AgentState 和 6 个核心 hook 的类型签名。先读类型，再看具体 middleware 实现。",
+          "time": "60 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "Human-in-the-loop",
+          "url": "https://docs.langchain.com/oss/python/langchain/human-in-the-loop",
+          "format": "docs",
+          "source": "LangChain Docs",
+          "tier": "primary",
+          "why": "在副作用工具前暂停、审批、恢复。中等 Agent 的边界感来自这里，不是靠 prompt 求模型小心。",
+          "time": "20 分钟",
+          "language": "英文",
+          "cost": "免费"
+        }
+      ],
+      "practice": {
+        "title": "自定义 middleware + 人工审批",
+        "brief": "写一个记录每次模型调用的 middleware；给 save_note 加 human-in-the-loop 审批；演示拒绝和批准两条路径。",
+        "deliverable": "middleware.py + 一次 interrupt/resume 记录 + 拒绝路径截图",
+        "time": "120 分钟"
+      },
+      "checkpoint": {
+        "question": "before_model 和 wrap_tool_call 分别适合改什么？审批为什么不能只靠 system prompt？",
+        "pass": "能说出 before_model 改请求/上下文，wrap_tool_call 包住工具执行；审批是运行时中断和状态恢复，不是模型自觉。"
+      },
+      "skills": [
+        "middleware 生命周期",
+        "HITL",
+        "运行时边界"
+      ],
+      "title_lines": [
+        "在循环上装钩子",
+        "而不是改框架"
+      ]
+    },
+    {
+      "id": "d4",
+      "label": "DAY 04",
+      "kicker": "运行时",
+      "title": "把 Agent 放回 LangGraph 里看",
+      "time": "5 小时",
+      "orbit": "GRAPH",
+      "orbit_note": "STATE",
+      "goal": "理解 StateGraph、state schema、checkpoint 和 thread 的关系，并能手写同构的 Agent 图。",
+      "hook": "create_agent 只是上层封装；真正让 Agent 可恢复、可暂停、可观测的是图运行时。",
+      "metaphor": "checkpoint 像游戏存档：state 是当前进度，thread_id 是存档槽，恢复时从最后一个 checkpoint 继续。",
+      "resources": [
+        {
+          "title": "LangGraph overview",
+          "url": "https://docs.langchain.com/oss/python/langgraph/overview",
+          "format": "docs",
+          "source": "LangChain Docs",
+          "tier": "primary",
+          "why": "先理解 LangGraph 的定位：低层编排、状态、持久化和可控性。",
+          "time": "20 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "langgraph/graph/state.py",
+          "url": "https://github.com/langchain-ai/langgraph/blob/main/libs/langgraph/langgraph/graph/state.py",
+          "format": "repo",
+          "source": "langchain-ai/langgraph",
+          "tier": "primary",
+          "why": "StateGraph 和 CompiledStateGraph 的实现。重点看 add_node、add_edge、compile、state schema 合并；不要逐行读工具函数。",
+          "time": "45 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "checkpoint/base/__init__.py",
+          "url": "https://github.com/langchain-ai/langgraph/blob/main/libs/checkpoint/langgraph/checkpoint/base/__init__.py",
+          "format": "repo",
+          "source": "langchain-ai/langgraph",
+          "tier": "primary",
+          "why": "Checkpoint、CheckpointTuple、BaseCheckpointSaver。看懂 thread_id 和 checkpoint_ns 怎样支撑多轮对话与恢复。",
+          "time": "45 分钟",
+          "language": "英文",
+          "cost": "免费"
+        }
+      ],
+      "practice": {
+        "title": "手写同构循环 + thread memory",
+        "brief": "用 StateGraph 手写 model → tools → model 的循环，接入 InMemorySaver；用两个 thread_id 验证会话隔离。",
+        "deliverable": "graph_agent.py + 同一 thread 续聊 / 不同 thread 隔离的两段记录",
+        "time": "120 分钟"
+      },
+      "checkpoint": {
+        "question": "state、checkpoint、thread_id 三者是什么关系？",
+        "pass": "能解释 state 是图当前数据，checkpoint 是某一 superstep 的持久化快照，thread_id 选择恢复哪条会话。"
+      },
+      "detour": {
+        "title": "先用 InMemorySaver",
+        "brief": "不要在第四天接 Postgres。先验证状态和恢复逻辑，再换持久化后端。"
+      },
+      "skills": [
+        "StateGraph",
+        "checkpoint",
+        "会话隔离"
+      ],
+      "title_lines": [
+        "把 Agent 放回",
+        "LangGraph 里看"
+      ]
+    },
+    {
+      "id": "d5",
+      "label": "DAY 05",
+      "kicker": "项目成型",
+      "title": "做出中等 Agent v0.1",
+      "time": "6 小时",
+      "orbit": "BUILD",
+      "orbit_note": "SHIP",
+      "goal": "把工具、RAG、记忆、流式和结构化输出接成一个可演示的研究助理。",
+      "hook": "今天不再拆零件，开始让它们一起工作；复杂度来自集成，不是来自更多概念。",
+      "metaphor": "RAG 是图书管理员，memory 是记事本，middleware 是门禁；你的 Agent 是一个会查资料、记事、等人批准的研究助理。",
+      "resources": [
+        {
+          "title": "Build a semantic search engine with LangChain",
+          "url": "https://docs.langchain.com/oss/python/langchain/knowledge-base",
+          "format": "docs",
+          "source": "LangChain Docs",
+          "tier": "primary",
+          "why": "官方语义检索/RAG 教程。把它收敛成 search_docs 工具，不要另起一套框架。",
+          "time": "30 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "Short-term memory",
+          "url": "https://docs.langchain.com/oss/python/langchain/short-term-memory",
+          "format": "docs",
+          "source": "LangChain Docs",
+          "tier": "primary",
+          "why": "对话历史、state 和 thread 的关系；决定什么时候保留、裁剪、摘要。",
+          "time": "20 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "Streaming",
+          "url": "https://docs.langchain.com/oss/python/langchain/streaming",
+          "format": "docs",
+          "source": "LangChain Docs",
+          "tier": "primary",
+          "why": "流式 token 和事件不只是 UX；它也是观察 Agent 正在做什么的调试接口。",
+          "time": "20 分钟",
+          "language": "英文",
+          "cost": "免费"
+        }
+      ],
+      "practice": {
+        "title": "研究助理 Agent v0.1",
+        "brief": "接 20 篇本地文档做 search_docs；保留 3 个工具；加 thread memory、结构化 ResearchBrief 和流式输出；save_note 仍需审批。",
+        "deliverable": "agent_v01.py + 一次完整对话 + 一份 ResearchBrief JSON",
+        "time": "180 分钟"
+      },
+      "checkpoint": {
+        "question": "检索结果、对话历史和工具结果，谁应该进入上下文？什么时候该裁剪？",
+        "pass": "能说清三类信息的优先级和预算；能指出上下文过长时应该摘要/裁剪，而不是无限追加。"
+      },
+      "detour": {
+        "title": "先 20 篇文档",
+        "brief": "不要第一天接 10 个数据源。固定 20 篇文档，才能判断问题出在检索、切块还是生成。"
+      },
+      "skills": [
+        "RAG 工具化",
+        "短期记忆",
+        "流式事件"
+      ],
+      "title_lines": [
+        "做出中等",
+        "Agent v0.1"
+      ]
+    },
+    {
+      "id": "d6",
+      "label": "DAY 06",
+      "kicker": "评估",
+      "title": "让 Agent 的失败留下证据",
+      "time": "5 小时",
+      "orbit": "EVAL",
+      "orbit_note": "TRACE",
+      "goal": "建立 10 条固定评估和一条可读的 trace，把“感觉还行”变成失败分类。",
+      "hook": "没有 trace 和 eval 的 Agent，只是在随机行为上叠 prompt。",
+      "metaphor": "trace 是黑匣子，eval 是飞行检查单；先知道哪一步偏了，再谈优化。",
+      "resources": [
+        {
+          "title": "Test",
+          "url": "https://docs.langchain.com/oss/python/langchain/test",
+          "format": "docs",
+          "source": "LangChain Docs",
+          "tier": "primary",
+          "why": "单元、集成和轨迹测试的边界。先测工具和状态，再测整体回答。",
+          "time": "25 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "Agent Evals",
+          "url": "https://docs.langchain.com/oss/python/langchain/test/evals",
+          "format": "docs",
+          "source": "LangChain Docs",
+          "tier": "primary",
+          "why": "轨迹匹配和 LLM-as-judge 的适用边界；不要用一个总体分数掩盖工具调用失败。",
+          "time": "25 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "Trace LangChain applications",
+          "url": "https://docs.langchain.com/langsmith/trace-with-langchain",
+          "format": "docs",
+          "source": "LangSmith Docs",
+          "tier": "primary",
+          "why": "把一次运行展开成模型、工具、中间件和状态事件；没有 trace，失败归因只能靠猜。",
+          "time": "25 分钟",
+          "language": "英文",
+          "cost": "免费/需账号"
+        }
+      ],
+      "practice": {
+        "title": "10 题评估 + 失败归因",
+        "brief": "从真实问题里选 10 条，记录工具选择、参数、检索命中、答案支持；按 retrieval / tool / argument / generation 分类。",
+        "deliverable": "10 条 eval + 一张 failure log + 一次修复前后对比",
+        "time": "150 分钟"
+      },
+      "checkpoint": {
+        "question": "你能从 trace 里指出一次失败发生在哪一层吗？",
+        "pass": "能定位到具体 span：工具没被调用、参数错、检索没命中、上下文丢失，还是生成不忠实；不笼统说“模型不行”。"
+      },
+      "skills": [
+        "轨迹评估",
+        "trace 阅读",
+        "失败归因"
+      ],
+      "title_lines": [
+        "让 Agent 的失败",
+        "留下证据"
+      ]
+    },
+    {
+      "id": "d7",
+      "label": "DAY 07",
+      "kicker": "源码与收束",
+      "title": "沿着 runtime 再往下读一层",
+      "time": "5 小时",
+      "orbit": "SHIP",
+      "orbit_note": "HARDEN",
+      "goal": "读懂 Pregel 运行时和 checkpoint 循环，完成硬化、演示和一页源码笔记。",
+      "hook": "最后一天不追新功能；把已经跑通的东西读透、测稳、讲清楚。",
+      "metaphor": "前面在驾驶舱按按钮；今天打开引擎盖，看 superstep、checkpoint 和恢复是怎样让 Agent 跑起来的。",
+      "resources": [
+        {
+          "title": "Source Map: Repository File Organization",
+          "url": "https://github.com/langchain-ai/langchain/blob/master/openwiki/source-map.md",
+          "format": "docs",
+          "source": "LangChain repo · openwiki",
+          "tier": "practitioner",
+          "why": "概念到路径的索引：factory、middleware、messages、tools、runnables、tests。用它查源码，不要背目录。",
+          "time": "30 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "langgraph/pregel/main.py",
+          "url": "https://github.com/langchain-ai/langgraph/blob/main/libs/langgraph/langgraph/pregel/main.py",
+          "format": "repo",
+          "source": "langchain-ai/langgraph",
+          "tier": "primary",
+          "why": "Pregel 运行时和 superstep/checkpoint 循环。读 Pregel 类、run loop 和 checkpoint 调用，不逐行读所有分支。",
+          "time": "60 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "12-Factor Agents",
+          "url": "https://github.com/humanlayer/12-factor-agents",
+          "format": "repo",
+          "source": "HumanLayer",
+          "tier": "practitioner",
+          "why": "把 Agent 当工程项目而不是 prompt 魔法：状态、控制流、工具、人工审批、可观测性。用来对照你的 v0.1。",
+          "time": "30 分钟",
+          "language": "英文",
+          "cost": "免费"
+        }
+      ],
+      "practice": {
+        "title": "源码笔记 + 5 分钟演示",
+        "brief": "写一页架构笔记：入口、状态、循环、扩展点、失败模式；给 Agent 加工具调用上限和错误重试；录一次 5 分钟演示。",
+        "deliverable": "architecture-note.md + 硬化后的 Agent + 5 分钟演示 + README",
+        "time": "180 分钟"
+      },
+      "checkpoint": {
+        "question": "不看文档，你能从 create_agent 一路讲到 Pregel/checkpoint 吗？",
+        "pass": "能画出一条完整链路，并指出哪些地方可以扩展、哪些地方不该改；能说清这套方案不适合什么场景。"
+      },
+      "detour": {
+        "title": "先别做多 Agent",
+        "brief": "单 Agent 的 loop、记忆、审批和评估还没稳，多 Agent 只会放大失败面。"
+      },
+      "skills": [
+        "Pregel 运行时",
+        "源码笔记",
+        "工程硬化"
+      ],
+      "title_lines": [
+        "沿着 runtime",
+        "再往下读一层"
+      ]
+    }
+  ],
+  "interludes": [
+    {
+      "after": "d2",
+      "quote": "不要急着做多 Agent；先把单 Agent 的 loop 和失败看清。",
+      "note": "框架越大，越需要一条能解释的执行链。",
+      "source": "这一周的主张"
+    },
+    {
+      "after": "d5",
+      "quote": "能跑不是完成；没有 trace 和 eval 的 Agent，只是随机行为。",
+      "note": "下一站把“看起来能用”换成“失败时知道为什么”。",
+      "source": "工程提醒"
+    }
+  ],
+  "not_now": [
+    {
+      "title": "所有 partner integrations",
+      "why": "LangChain 有大量模型/向量库/工具集成包；它们是查表，不是主线。需要时按 provider 查文档。"
+    },
+    {
+      "title": "LangChain JS / Deep Agents",
+      "why": "Python 主链路没读透前，换语言或换更高层封装只会增加变量。"
+    },
+    {
+      "title": "多 Agent / swarm",
+      "why": "先把单 Agent 的工具、记忆、审批和评估做稳，再讨论协作拓扑。"
+    },
+    {
+      "title": "旧版 AgentExecutor / 长链 LCEL 教程",
+      "why": "可以理解历史，但不要把旧教程当 1.x 的主入口；先读 create_agent 和 LangGraph。"
+    }
+  ],
+  "rabbit_holes": [
+    {
+      "title": "LangChain Academy: Introduction to LangChain",
+      "why": "官方 1.5 小时课程，适合想要一条 guided pass 的人；不能替代源码阅读。",
+      "url": "https://academy.langchain.com/courses/foundation-introduction-to-langchain-python"
+    },
+    {
+      "title": "LangChain Academy: Introduction to LangGraph",
+      "why": "想继续深入 runtime、子图、持久化和部署时再上；这一周先把 create_agent 读透。",
+      "url": "https://academy.langchain.com/courses/intro-to-langgraph"
+    },
+    {
+      "title": "Anthropic: Building effective agents",
+      "why": "用工程模式对照你的 Agent：什么时候用 workflow，什么时候用 agent，什么时候不该上 Agent。",
+      "url": "https://www.anthropic.com/research/building-effective-agents"
+    }
+  ],
+  "start": {
+    "today": [
+      "建一个独立 repo 和虚拟环境，锁定 LangChain 1.x / LangGraph 版本。",
+      "读 overview + quickstart，跑通一个只带 echo 工具的 create_agent。",
+      "打印一次 HumanMessage / AIMessage / ToolMessage，留下第一条消息轨迹。"
+    ],
+    "week_one": [
+      "Day 1：地图 + 最小 Agent + 消息轨迹。",
+      "Day 2：3 个工具 + ResearchBrief 结构化输出。",
+      "Day 3：自定义 middleware + save_note 人工审批。",
+      "Day 4：手写 StateGraph + thread memory。",
+      "Day 5：接 RAG、流式和记忆，做出研究助理 v0.1。",
+      "Day 6：10 条 eval + trace + failure log。",
+      "Day 7：读 Pregel、硬化、5 分钟演示和一页源码笔记。"
+    ]
+  },
+  "sources": {
+    "verified_at": "2026-10-22",
+    "note": "链接核验于 2026-10-22；LangChain 1.x 文档和 master/main 源码会移动，读前先看页面日期与版本。课程/视频只核验元数据，未观看；示例 Agent 未实际运行。"
+  },
+  "layout": "studio"
+}

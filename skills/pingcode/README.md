@@ -1,7 +1,8 @@
 # pingcode
 
 PingCode 项目与工作项 CLI，端点表来自官方 **REST API V2**（2026-10-14 快照）。
-Agent 操作规则见 [SKILL.md](SKILL.md)，完整参数见 [命令参考](references/commands.md)。
+Agent 操作规则见 [SKILL.md](SKILL.md)，完整参数见 [命令参考](references/commands.md)，
+需求拆分、描述模板和截图附件流程见 [需求录入](references/workitem-authoring.md)。
 依赖 Python 3.10+，仅用标准库。
 
 ## 配置
@@ -30,6 +31,9 @@ python3 skills/pingcode/scripts/pingcode.py worklog list SCR-12
 python3 skills/pingcode/scripts/pingcode.py worklog update <id> --duration 3
 python3 skills/pingcode/scripts/pingcode.py sprint create --project X --name 'Sprint 13' --start 2026-09-01 --end 2026-09-14 --dry-run
 python3 skills/pingcode/scripts/pingcode.py workitem create --project X --type bug --title '登录失败' --dry-run
+python3 skills/pingcode/scripts/pingcode.py workitem fill-dates --project X
+python3 skills/pingcode/scripts/pingcode.py workitem create --project X --type task \
+  --title '待分配任务' --unassigned --dry-run
 ```
 
 环境访问令牌优先于本地缓存令牌；其模式默认未知，可用 `PINGCODE_AUTH_MODE` 显式标记。

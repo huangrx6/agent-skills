@@ -78,6 +78,7 @@ DONE_STATE_TYPES = ("completed", "closed")
 MINE_SCAN_PAGE = 100
 MINE_SCAN_CAP = 1000
 BOOLEAN_TRUE = "true"
+UNASSIGNED_ALIASES = {"none", "unassigned", "未分配", "不分配", "无", "-", "—"}
 
 
 class CliError(Exception):
@@ -858,8 +859,62 @@ def _parse_property_value(raw: str) -> Any:
         return raw
 
 
+def _timestamp(value: Any) -> int | None:
+    """把日期对象/日期字符串/时间戳统一成秒级时间戳。"""
+    if value in (None, ""):
+        return None
+    if isinstance(value, dict):
+        value = value.get("date")
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        try:
+            return _fmt.parse_time(str(value))
+        except _fmt.TimeParseError:
+            return None
+
+
+def _sprint_pair(sprint: Any) -> tuple[int, int] | None:
+    if not isinstance(sprint, dict):
+        return None
+    norm = _compat.normalize_sprint(sprint)
+    start = _timestamp(norm.get("start_at"))
+    end = _timestamp(norm.get("end_at"))
+    return (start, end) if start and end else None
+
+
+def _item_pair(item: Any) -> tuple[int, int] | None:
+    if not isinstance(item, dict):
+        return None
+    start = _timestamp(item.get("start_at")) or _timestamp(item.get("start"))
+    end = _timestamp(item.get("end_at")) or _timestamp(item.get("due"))
+    return (start, end) if start and end else None
+
+
+def _project_pair(client: Any, project_id: str) -> tuple[int, int] | None:
+    try:
+        data = client.get(_api.build(_compat.PROJECT, project_id=project_id)).data
+        return _item_pair(_compat.normalize_project(dict(data or {})))
+    except (_client.ApiError, _config.ConfigError, _config.TokenError):
+        return None
+
+
+def _fill_dates(body: dict[str, Any], pair: tuple[int, int] | None) -> None:
+    """只补缺失的一侧，不覆盖用户显式给的时间。"""
+    if not pair:
+        return
+    if not body.get("start_at"):
+        body["start_at"] = pair[0]
+        body["_start_with_time"] = 0
+    if not body.get("end_at"):
+        body["end_at"] = pair[1]
+        body["_end_with_time"] = 0
+
+
 def _workitem_body(args: argparse.Namespace, client: Any, project_id: str,
-                   type_id: str) -> dict[str, Any]:
+                   type_id: str, *, fill_dates: bool = False) -> dict[str, Any]:
     body: dict[str, Any] = {}
     if getattr(args, "title", None):
         body["title"] = args.title
@@ -871,16 +926,21 @@ def _workitem_body(args: argparse.Namespace, client: Any, project_id: str,
     if getattr(args, "end", None):
         body["end_at"] = _fmt.parse_time(args.end)
         body["_end_with_time"] = 1 if _has_clock(args.end) else 0
-    if getattr(args, "assignee", None):
-        body["assignee_id"] = _resolve.user_id(client, args.assignee, force=args.no_cache)
+    assignee = str(getattr(args, "assignee", "") or "").strip()
+    if assignee and assignee.casefold() not in UNASSIGNED_ALIASES:
+        body["assignee_id"] = _resolve.user_id(client, assignee, force=args.no_cache)
     if getattr(args, "priority", None):
         body["priority_id"] = _resolve.find("priorities", client, args.priority,
                                             force=args.no_cache, project_id=project_id)["id"]
+    sprint_row = None
+    parent_row = None
     if getattr(args, "sprint", None):
-        body["sprint_id"] = _resolve.find("sprints", client, args.sprint,
-                                          force=args.no_cache, project_id=project_id)["id"]
+        sprint_row = _resolve.find("sprints", client, args.sprint,
+                                   force=args.no_cache, project_id=project_id)
+        body["sprint_id"] = sprint_row["id"]
     if getattr(args, "parent", None):
-        body["parent_id"] = fetch_workitem(client, args.parent)["id"]
+        parent_row = fetch_workitem(client, args.parent)
+        body["parent_id"] = parent_row["id"]
     if getattr(args, "state", None):
         body["state_id"] = _resolve.state_id_for(client, project_id, type_id, args.state,
                                                  force=args.no_cache)
@@ -925,6 +985,12 @@ def _workitem_body(args: argparse.Namespace, client: Any, project_id: str,
                 )
             values[key] = _parse_property_value(raw)
         body["properties"] = values
+    # 只有创建/计划才自动补日期；更新只改用户明确给的字段。
+    if fill_dates:
+        pair = _sprint_pair(sprint_row) or _item_pair(parent_row)
+        if pair is None and not getattr(args, "dry_run", False):
+            pair = _project_pair(client, project_id)
+        _fill_dates(body, pair)
     return body
 
 
@@ -946,9 +1012,16 @@ def cmd_workitem_create(args: argparse.Namespace) -> int:
     if not args.title:
         raise CliError("要一个标题：--title <标题>")
     body = {"project_id": pid, "type_id": tid, "title": args.title}
-    body.update(_workitem_body(args, client, pid, tid))
+    body.update(_workitem_body(args, client, pid, tid, fill_dates=True))
     body = _compat.workitem_body(body)
+    if not body.get("start") or not body.get("due"):
+        print("注意：这条工作项没有完整起止时间；建议加 --start/--end，"
+              "或给 --sprint / 带日期的 --parent 让它自动继承。", file=sys.stderr)
     summary = f"在「{pname}」创建 {_type_display(client, pid, tid)}：{args.title}"
+    assignee_text = str(getattr(args, "assignee", "") or "").strip().casefold()
+    if (not body.get("assignee_id") and not getattr(args, "unassigned", False)
+            and assignee_text not in UNASSIGNED_ALIASES):
+        print("注意：没有指定负责人；如确认先不分配，加 --unassigned。", file=sys.stderr)
     result = perform(args, client, "POST", WORKITEM, body=body, summary=summary)
     if result is not None:
         data = result.data if isinstance(result.data, dict) else {}
@@ -1078,7 +1151,8 @@ def _create_plan_node(args: argparse.Namespace, client: Any, project_id: str,
                                 "title": node["title"]}
         if parent_id:
             body["parent_id"] = parent_id
-        body.update(_workitem_body(_node_namespace(node, args.no_cache), client, project_id, type_id))
+        body.update(_workitem_body(_node_namespace(node, args.no_cache), client, project_id,
+                                   type_id, fill_dates=True))
         body = _compat.workitem_body(body)
         result = client.request("POST", WORKITEM, body=body)
     except (_client.ApiError, CliError) as exc:
@@ -1106,7 +1180,7 @@ def _preflight_plan_node(args: argparse.Namespace, client: Any, project_id: str,
         body: dict[str, Any] = {"project_id": project_id, "type_id": type_id,
                                 "title": node["title"]}
         body.update(_workitem_body(_node_namespace(node, args.no_cache), client,
-                                   project_id, type_id))
+                                   project_id, type_id, fill_dates=True))
         _compat.workitem_body(body)
     except (_client.ApiError, CliError, _resolve.NotFound, _resolve.Ambiguous,
             _fmt.TimeParseError, _config.ConfigError, _config.TokenError) as exc:
@@ -1125,6 +1199,75 @@ def _preflight_plan(args: argparse.Namespace, client: Any, project_id: str,
         _preflight_plan_node(args, client, project_id, node, str(index))
 
 
+def _apply_default_assignee(nodes: list[Any], value: str) -> None:
+    for node in nodes:
+        node.setdefault("assignee", value)
+        for child in node.get("children") or []:
+            _apply_default_assignee([child], value)
+
+
+def _plan_explicit_pair(node: dict[str, Any]) -> tuple[int, int] | None:
+    start = _timestamp(node.get("start"))
+    end = _timestamp(node.get("end"))
+    return (start, end) if start and end else None
+
+
+def _apply_plan_dates(args: argparse.Namespace, client: Any, project_id: str,
+                      nodes: list[Any]) -> list[str]:
+    """先按迭代/子项/父项推导计划里的起止时间，再进入预检。
+
+    父项通常在子项之前创建，但日期可以自底向上汇总：子项有迭代日期，父项取
+    最早开始和最晚结束；父项显式给了日期时，子项也可以继承。
+    """
+    pairs: dict[str, tuple[int, int]] = {}
+
+    def walk(node: dict[str, Any], path: str) -> tuple[int, int] | None:
+        child_pairs = [walk(child, f"{path}.{index}")
+                       for index, child in enumerate(node.get("children") or [], start=1)]
+        pair = _plan_explicit_pair(node)
+        if pair is None and node.get("sprint"):
+            try:
+                sprint = _resolve.find("sprints", client, str(node["sprint"]),
+                                       force=args.no_cache, project_id=project_id)
+                pair = _sprint_pair(sprint)
+            except (_resolve.NotFound, _resolve.Ambiguous):
+                pair = None
+        if pair is None and child_pairs and all(child_pairs):
+            starts = [item[0] for item in child_pairs if item]
+            ends = [item[1] for item in child_pairs if item]
+            pair = (min(starts), max(ends))
+        if pair:
+            pairs[path] = pair
+        return pair
+
+    def apply(node: dict[str, Any], path: str, inherited: tuple[int, int] | None) -> None:
+        pair = pairs.get(path) or inherited
+        if pair:
+            if _timestamp(node.get("start")) is None:
+                node["start"] = str(pair[0])
+            if _timestamp(node.get("end")) is None:
+                node["end"] = str(pair[1])
+        for index, child in enumerate(node.get("children") or [], start=1):
+            apply(child, f"{path}.{index}", pair)
+
+    for index, node in enumerate(nodes, start=1):
+        walk(node, str(index))
+    project_pair = _project_pair(client, project_id)
+    for index, node in enumerate(nodes, start=1):
+        apply(node, str(index), project_pair)
+    missing: list[str] = []
+
+    def collect(node: dict[str, Any], path: str) -> None:
+        if not _timestamp(node.get("start")) or not _timestamp(node.get("end")):
+            missing.append(f"{path}（{node['title']}）")
+        for index, child in enumerate(node.get("children") or [], start=1):
+            collect(child, f"{path}.{index}")
+
+    for index, node in enumerate(nodes, start=1):
+        collect(node, str(index))
+    return missing
+
+
 def cmd_workitem_create_plan(args: argparse.Namespace) -> int:
     client = build_client(args)
     plan = load_plan(args.file)
@@ -1141,7 +1284,13 @@ def cmd_workitem_create_plan(args: argparse.Namespace) -> int:
         # 「先打印整棵树再建」不靠自觉，靠接口：默认不建，--yes 才建
         print("以上只是计划 —— **没有建任何东西**。确认要建就加 --yes。")
         return 0
+    if getattr(args, "assignee", None) or getattr(args, "unassigned", False):
+        _apply_default_assignee(nodes, str(getattr(args, "assignee", "") or "none"))
     created: dict[str, str] = {}
+    missing_dates = _apply_plan_dates(args, client, pid, nodes)
+    if missing_dates:
+        print("注意：以下节点没有起止时间；建议补 start/end，或给 sprint/父项日期："
+              + "、".join(missing_dates), file=sys.stderr)
     _preflight_plan(args, client, pid, nodes)
     print("预检通过，开始创建…")
     try:
@@ -1154,6 +1303,122 @@ def cmd_workitem_create_plan(args: argparse.Namespace) -> int:
     print()
     print("建成的树：")
     print("\n".join(plan_lines(nodes, created=created)))
+    return 0
+
+
+def _set_item_dates(item: dict[str, Any], pair: tuple[int, int] | None) -> None:
+    if not pair:
+        return
+    if not _timestamp(item.get("start_at")):
+        item["start_at"] = pair[0]
+    if not _timestamp(item.get("end_at")):
+        item["end_at"] = pair[1]
+
+
+def cmd_workitem_fill_dates(args: argparse.Namespace) -> int:
+    """补齐项目里缺失的起止时间；默认只预览，--yes 才写。"""
+    client = build_client(args)
+    pid, pname = need_project(args, client)
+    if bool(args.start) != bool(args.end):
+        raise CliError("--start 和 --end 要一起给")
+    fallback = None
+    if args.start:
+        fallback = (_fmt.parse_time(args.start), _fmt.parse_time(args.end))
+
+    rows = client.paginate(WORKITEM, max_items=args.limit, project_id=pid)
+    if len(rows) >= args.limit:
+        print(f"注意：本次只读取了前 {args.limit} 条；项目更大时请调大 --limit。",
+              file=sys.stderr)
+    if not rows:
+        print(f"「{pname}」没有读取到工作项。")
+        return 0
+    items = [_compat.normalize_workitem(dict(row)) for row in rows]
+    originally_missing = {
+        str(item.get("id")): item for item in items
+        if not _timestamp(item.get("start_at")) or not _timestamp(item.get("end_at"))
+    }
+    children: dict[str, list[dict[str, Any]]] = {}
+    for item in items:
+        parent = item.get("parent")
+        parent_id = str(parent.get("id") or "") if isinstance(parent, dict) else ""
+        if parent_id:
+            children.setdefault(parent_id, []).append(item)
+
+    for item in items:
+        _set_item_dates(item, _sprint_pair(item.get("sprint")))
+
+    visiting: set[str] = set()
+
+    def rollup(item: dict[str, Any]) -> tuple[int, int] | None:
+        item_id = str(item.get("id") or "")
+        if item_id in visiting:
+            return _item_pair(item)
+        visiting.add(item_id)
+        for child in children.get(item_id, []):
+            rollup(child)
+        pair = _item_pair(item)
+        if pair is None:
+            child_pairs = [_item_pair(child) for child in children.get(item_id, [])]
+            if child_pairs and all(child_pairs):
+                starts = [part[0] for part in child_pairs if part]
+                ends = [part[1] for part in child_pairs if part]
+                pair = (min(starts), max(ends))
+                _set_item_dates(item, pair)
+        visiting.remove(item_id)
+        return _item_pair(item)
+
+    for item in items:
+        rollup(item)
+    for item in items:
+        created = _timestamp(item.get("created_at"))
+        if created and not _timestamp(item.get("start_at")):
+            item["start_at"] = created
+        completed = _timestamp(item.get("completed_at") or item.get("closed_at"))
+        if completed and not _timestamp(item.get("end_at")):
+            item["end_at"] = completed
+    project_pair = _project_pair(client, pid)
+    if project_pair:
+        for item in items:
+            _set_item_dates(item, project_pair)
+    if fallback:
+        for item in items:
+            _set_item_dates(item, fallback)
+
+    def inherit(item: dict[str, Any], pair: tuple[int, int] | None) -> None:
+        current = _item_pair(item) or pair
+        _set_item_dates(item, current)
+        for child in children.get(str(item.get("id") or ""), []):
+            inherit(child, current)
+
+    for item in items:
+        inherit(item, None)
+
+    pending = [item for item in items if str(item.get("id")) in originally_missing]
+    complete = [item for item in pending
+                if _timestamp(item.get("start_at")) and _timestamp(item.get("end_at"))]
+    if not pending:
+        print(f"「{pname}」所有工作项都已有起止时间。")
+        return 0
+    print(f"「{pname}」缺起止时间：{len(pending)} 条；可补：{len(complete)} 条")
+    for item in pending:
+        start = _fmt.show_time(item.get("start_at")) or "未设置"
+        end = _fmt.show_time(item.get("end_at")) or "未设置"
+        print(f"  {item.get('identifier') or item.get('id')}: {start} ~ {end}")
+    if not complete:
+        print("没有可推导的日期。给 --start/--end 兜底，或先给这些项加迭代/父项日期。")
+        return 0
+    if not args.yes:
+        print("以上只是预览，没有写入。确认要补日期就加 --yes。")
+        return 0
+    for item in complete:
+        body = _compat.workitem_body({"start_at": item["start_at"], "end_at": item["end_at"]})
+        perform(args, client, "PATCH", _api.build(_compat.WORKITEM,
+                                                  workitem_id=item["id"]),
+                body=body, summary=f"补 {item.get('identifier') or item['id']} 起止时间")
+    if args.dry_run:
+        print(f"dry-run：预览了 {len(complete)} 条，没有写入。")
+    else:
+        print(f"已补 {len(complete)} 条工作项的起止时间。")
     return 0
 
 
@@ -2419,7 +2684,10 @@ def build_parser() -> argparse.ArgumentParser:
     wc.add_argument("--title", required=True)
     wc.add_argument("--description")
     wc.add_argument("--description-file", help="从文件读描述（长文本用这个）")
-    wc.add_argument("--assignee")
+    assignee_group = wc.add_mutually_exclusive_group()
+    assignee_group.add_argument("--assignee")
+    assignee_group.add_argument("--unassigned", action="store_true",
+                                help="明确先不分配负责人")
     wc.add_argument("--priority")
     wc.add_argument("--sprint")
     wc.add_argument("--parent", help="父工作项：编号 / id")
@@ -2498,9 +2766,20 @@ def build_parser() -> argparse.ArgumentParser:
     wcd.add_argument("comment_id")
     wcd.add_argument("--yes", action="store_true", help="确认删除")
     wcd.set_defaults(func=cmd_workitem_comment_delete)
+    wfd = make(wsub, "fill-dates", help="补齐项目里缺失的起止时间（默认预览，--yes 才写）")
+    wfd.add_argument("--project")
+    wfd.add_argument("--start", help="兜底开始时间；和 --end 一起给")
+    wfd.add_argument("--end", help="兜底截止时间")
+    wfd.add_argument("--limit", type=int, default=500)
+    wfd.add_argument("--yes", action="store_true", help="确认写入")
+    wfd.set_defaults(func=cmd_workitem_fill_dates)
     wcp = make(wsub, "create-plan", help="按计划文件一次建一棵树（默认只打印，--yes 才建）")
     wcp.add_argument("--file", required=True, help="plan.json（字段集封闭：type/title/…/children）")
     wcp.add_argument("--project", help="建到哪个项目（也可写在计划文件的 project 里）")
+    plan_assignee = wcp.add_mutually_exclusive_group()
+    plan_assignee.add_argument("--assignee", help="给未写负责人的节点统一指定负责人；@me 可用")
+    plan_assignee.add_argument("--unassigned", action="store_true",
+                               help="未写负责人的节点明确不分配")
     wcp.add_argument("--yes", action="store_true", help="确认建（不加则只打印计划）")
     wcp.set_defaults(func=cmd_workitem_create_plan)
     wcl = make(wsub, "comments", help="列评论")

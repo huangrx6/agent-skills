@@ -46,6 +46,7 @@ WORKITEM = (
     ("assignee.display_name", "负责人"),
     ("sprint.name", "迭代"),
     ("project.name", "项目"),
+    ("start_at", "开始"),
     ("end_at", "截止"),
     ("html_url", "链接"),
 )

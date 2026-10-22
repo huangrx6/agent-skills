@@ -140,7 +140,8 @@ STATES = [{"id": "st1", "name": "新建", "type": "pending"},
           {"id": "st2", "name": "已完成", "type": "completed"}]
 # 项目状态是**另一张表**（/v2/pjm/project/states），与工作项状态不同
 PROJECT_STATES = [{"id": "ps1", "name": "未开始"}, {"id": "ps2", "name": "正常"}]
-SPRINTS = [{"id": "sp1", "name": "Sprint 12"}]
+SPRINTS = [{"id": "sp1", "name": "Sprint 12",
+           "start": {"date": 1577808000}, "due": {"date": 1578412799}}]
 PRIORITIES = [{"id": "pr1", "name": "高"}]
 
 
@@ -434,6 +435,41 @@ class CliCase(unittest.TestCase):
         self.assertEqual(0, body["start"]["with_time"])
         self.assertIn("DOC-9", out)
 
+    def test_创建时从迭代继承起止时间(self):
+        created = dict(WORKITEM, id="w9", identifier="DOC-9")
+        code, _out, err, router = self.run_cli(
+            ["workitem", "create", "--project", "演示项目", "--type", "task",
+             "--title", "跟随迭代", "--sprint", "Sprint 12"],
+            {("POST", "/v2/pjm/workitems"): created})
+        self.assertEqual(0, code, err)
+        body = router.find("POST", "/v2/pjm/workitems")[0][2]
+        self.assertEqual(1577808000, body["start"]["date"])
+        self.assertEqual(1578412799, body["due"]["date"])
+
+    def test_创建时从父项继承起止时间(self):
+        parent = dict(WORKITEM, id="w1", identifier="DOC-1", start_at=1577808000,
+                      end_at=1578412799)
+        created = dict(WORKITEM, id="w9", identifier="DOC-9")
+        code, _out, err, router = self.run_cli(
+            ["workitem", "create", "--project", "演示项目", "--type", "task",
+             "--title", "跟随父项", "--parent", "DOC-1"],
+            {("GET", "/v2/pjm/workitems"): {"values": [parent]},
+             ("POST", "/v2/pjm/workitems"): created})
+        self.assertEqual(0, code, err)
+        body = router.find("POST", "/v2/pjm/workitems")[0][2]
+        self.assertEqual(1577808000, body["start"]["date"])
+        self.assertEqual(1578412799, body["due"]["date"])
+
+    def test_创建可以明确不分配负责人(self):
+        created = dict(WORKITEM, id="w9", identifier="DOC-9")
+        code, _out, err, router = self.run_cli(
+            ["workitem", "create", "--project", "演示项目", "--type", "task",
+             "--title", "待分配", "--unassigned"],
+            {("POST", "/v2/pjm/workitems"): created})
+        self.assertEqual(0, code, err)
+        body = router.find("POST", "/v2/pjm/workitems")[0][2]
+        self.assertNotIn("assignee_id", body)
+
     def test_创建工作项_V2_日期和工作量字段(self):
         created = dict(WORKITEM, id="w9", identifier="DOC-9", title="登录报 500")
         code, _out, _err, router = self.run_cli(
@@ -495,6 +531,17 @@ class CliCase(unittest.TestCase):
         self.assertIn("属性方案", err)
         self.assertIn("risk", err)
         self.assertEqual([], router.find("POST", "/v2/pjm/workitems"))
+
+    def test_更新标题不会自动补日期(self):
+        updated = dict(WORKITEM, title="新标题")
+        code, _out, err, router = self.run_cli(
+            ["workitem", "update", "DOC-1", "--title", "新标题"],
+            {("GET", "/v2/pjm/workitems"): {"values": [WORKITEM]},
+             ("PATCH", "/v2/pjm/workitems/w1"): updated})
+        self.assertEqual(0, code, err)
+        body = router.find("PATCH", "/v2/pjm/workitems/w1")[0][2]
+        self.assertNotIn("start", body)
+        self.assertNotIn("due", body)
 
     def test_项目标签创建改名删除(self):
         code, out, err, router = self.run_cli(
@@ -1340,6 +1387,41 @@ class CliCase(unittest.TestCase):
         self.assertEqual(("u1", "pr1", "sp1", "st1"),
                          tuple(body[key] for key in ("assignee_id", "priority_id", "sprint_id", "state_id")))
 
+    def test_计划顶层负责人应用到未写负责人的节点(self):
+        plan = {"project": "演示项目", "nodes": [
+            {"type": "epic", "title": "史诗", "children": [
+                {"type": "task", "title": "任务"}]}]}
+        code, _out, err, router = self.run_cli(
+            ["workitem", "create-plan", "--file", self.write_plan(plan),
+             "--assignee", "John", "--yes"],
+            {("POST", "/v2/pjm/workitems"): {"id": "w1", "identifier": "DEMO-9"}})
+        self.assertEqual(0, code, err)
+        for call in router.find("POST", "/v2/pjm/workitems"):
+            self.assertEqual("u1", call[2]["assignee_id"])
+
+    def test_计划明确不分配(self):
+        plan = {"project": "演示项目", "nodes": [{"type": "task", "title": "待分配"}]}
+        code, _out, err, router = self.run_cli(
+            ["workitem", "create-plan", "--file", self.write_plan(plan),
+             "--unassigned", "--yes"],
+            {("POST", "/v2/pjm/workitems"): {"id": "w1", "identifier": "DEMO-9"}})
+        self.assertEqual(0, code, err)
+        body = router.find("POST", "/v2/pjm/workitems")[0][2]
+        self.assertNotIn("assignee_id", body)
+
+    def test_计划父项日期向子项继承(self):
+        plan = {"project": "演示项目", "nodes": [
+            {"type": "epic", "title": "有日期的史诗",
+             "start": "2026-09-01", "end": "2026-09-30", "children": [
+                 {"type": "task", "title": "子任务"}]}]}
+        code, _out, err, router = self.run_cli(
+            ["workitem", "create-plan", "--file", self.write_plan(plan), "--yes"],
+            {("POST", "/v2/pjm/workitems"): {"id": "w1", "identifier": "DEMO-9"}})
+        self.assertEqual(0, code, err)
+        for call in router.find("POST", "/v2/pjm/workitems"):
+            self.assertIn("start", call[2])
+            self.assertIn("due", call[2])
+
     def test_父项响应缺id时不得把子项建成无父根节点(self):
         code, out, err, router = self.run_cli(
             ["workitem", "create-plan", "--file", self.write_plan(self.GOOD_PLAN), "--yes"],
@@ -1446,6 +1528,29 @@ class CliCase(unittest.TestCase):
         self.assertIn("已建成的", err)
         self.assertIn("DEMO-1", err, "要说清楚已经建成了哪些")
         self.assertIn("剩下的子树", err, "要给出怎么接着做")
+
+    def test_补齐起止时间_默认预览_yes才写(self):
+        parent = dict(WORKITEM, id="w1", identifier="DOC-1", start_at=None, end_at=None)
+        child = dict(WORKITEM, id="w2", identifier="DOC-2", start_at=None, end_at=None,
+                     parent={"id": "w1"}, sprint=dict(SPRINTS[0]))
+        routes = {("GET", "/v2/pjm/workitems"): {"values": [parent, child], "total": 2},
+                  ("PATCH", "/v2/pjm/workitems/w1"): parent,
+                  ("PATCH", "/v2/pjm/workitems/w2"): child}
+        code, out, err, router = self.run_cli(
+            ["workitem", "fill-dates", "--project", "演示项目"], routes)
+        self.assertEqual(0, code, err)
+        self.assertIn("DOC-1", out)
+        self.assertIn("DOC-2", out)
+        self.assertEqual([], router.find("PATCH", "/v2/pjm/workitems"))
+
+        code, out, err, router = self.run_cli(
+            ["workitem", "fill-dates", "--project", "演示项目", "--yes"], routes)
+        self.assertEqual(0, code, err)
+        patches = router.find("PATCH", "/v2/pjm/workitems")
+        self.assertEqual(2, len(patches))
+        for call in patches:
+            self.assertIn("start", call[2])
+            self.assertIn("due", call[2])
 
     def test_计划建到一半时根节点就失败_要说已建成的是无(self):
         path = self.write_plan(self.GOOD_PLAN)

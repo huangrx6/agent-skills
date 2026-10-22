@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="{{LANG}}" data-theme="{{THEME}}" data-motif="{{MOTIF}}" data-layout="{{LAYOUT}}" data-plan="{{PLAN_ID}}" style="--accent-custom: {{ACCENT}}; color-scheme: {{COLOR_SCHEME}};">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="{{COLOR_SCHEME}}">
+<meta name="source-verified-at" content="{{VERIFIED_AT}}">
+<meta name="source-note" content="{{SOURCE_NOTE}}">
+<title>{{PAGE_TITLE}}</title>
+<style>{{CSS}}</style>
+</head>
+<body data-plan-id="{{PLAN_ID}}" data-total-pages="{{TOTAL_PAGES}}" data-stage-count="{{STAGE_COUNT}}">
+<header class="paged-topbar">
+  <a class="paged-mark" href="#p1" aria-label="回到封面">
+    <span class="paged-mark-dot" aria-hidden="true"></span>
+    <span>LEARNING NOTES</span>
+  </a>
+  <span class="paged-topic">{{TOPIC}}</span>
+  <div class="paged-progress" aria-label="阅读进度">
+    <span id="done-count">00 / {{STAGE_COUNT}}</span>
+    <span class="paged-progress-track"><i id="page-bar"></i></span>
+    <span id="page-current">01 / {{TOTAL_PAGES}}</span>
+  </div>
+</header>
+
+<nav class="page-rail" aria-label="章节导航">{{PAGE_RAIL}}</nav>
+
+<main class="paged-main">{{PAGES}}</main>
+
+<div class="page-corner" aria-hidden="true"><span>SCROLL</span><i></i></div>
+<script>{{JS}}</script>
+</body>
+</html>

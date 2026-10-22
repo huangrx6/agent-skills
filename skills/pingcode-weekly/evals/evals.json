@@ -1,0 +1,86 @@
+{
+  "skill_name": "pingcode-weekly",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "根据 PROJ 项目在 PingCode 里的需求和缺陷，生成本周周报。",
+      "expected_output": "使用 PingCode-only 流程：先 check 项目、需求类型、缺陷类型和窗口数据，再 weekly。周报按项目列本周完成/进行中需求、本周新增缺陷、未关闭缺陷和下周计划；每条带 PingCode 编号，只使用 PingCode 数据。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "这周有哪些缺陷？按严重程度给我列一下。",
+      "expected_output": "查询缺陷类型，按严重程度/优先级排序输出未关闭缺陷；缺严重程度标“未分级”，不猜级别，也不把已拒绝/已关闭缺陷写成已修复。",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "把下周计划也写进周报。",
+      "expected_output": "从 PingCode 的下一迭代或计划项读取；没有下一迭代时明确写“下周计划未在 PingCode 录入”，不根据描述、提交或常识推断计划。",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "周报格式我想改成先列缺陷、再列本周需求，标题用我们公司的写法。",
+      "expected_output": "让用户改 templates/default.toml 或指定 --template；用 [layout] body 调整章节顺序，用 [format] 调整项目和条目写法。未知占位符要报错，不静默留下。",
+      "files": [
+        "templates/default.toml",
+        "references/template.md"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "PingCode 里还没录，先按你的理解写一份周报吧。",
+      "expected_output": "不编造周报。说明本 skill 只读 PingCode，请先在 PingCode 录入需求/缺陷，再运行 check/weekly；不生成看似完整的替代报告。",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "这个项目里没有缺陷类型，周报还能生成吗？",
+      "expected_output": "check 会失败并列出项目可用的工作项类型；提示在 PingCode 启用缺陷类型或调整 defect_types 映射。需求部分可以单独检查，但不能声称缺陷清单完整。",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "我们有三四个项目，想合成一份周报。",
+      "expected_output": "使用 --workspace weekly.toml，为每个项目配置 pingcode_project、requirement_types、defect_types；按项目分组渲染。一个项目失败时在 gaps 中列出，不用其他项目替代。",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "生成完直接写回外部系统，不用给我看。",
+      "expected_output": "说明当前 skill 只读 PingCode、不写回；只输出 Markdown 到用户指定文件，不擅自修改其他系统。",
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "顺便把之前没录的历史工作也补进周报吧。",
+      "expected_output": "只按用户给定时间窗读取 PingCode；窗口外或未录入的内容不补，说明需要先录入或调整窗口。",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "周报生成到哪里了？不要放到项目目录里。",
+      "expected_output": "默认写到系统下载目录下的 pingcode-weekly/ 子目录：macOS/Linux 为 ~/Downloads/pingcode-weekly/，Windows 为 %USERPROFILE%\\\\Downloads\\\\pingcode-weekly\\\\。周报文件名带项目/工作区标签和窗口；--stdout 才只打印不落盘。",
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "这周只总结我自己的需求进展。",
+      "expected_output": "用 `weekly --mine`：解析当前登录人，按用户 ID/姓名过滤需求和缺陷，再重算统计。企业令牌无法识别当前用户时，说明原因并让用户用 `--assignee 姓名`。不要输出全员数据。",
+      "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "张三和李四这周的周报分开给我，一人一份。",
+      "expected_output": "用 `weekly --per-assignee`（可加 `--assignee 张三 --assignee 李四`），生成每人一个 Markdown 文件；文件名包含负责人。不能用 `--stdout`/`--out`，用 `--output-dir` 指定目录。",
+      "files": []
+    },
+    {
+      "id": 13,
+      "prompt": "月底把这一个月所有人的工作合成一份周报。",
+      "expected_output": "用 `weekly --month 2026-10`（或明确的 `--since/--until`），不要加 `--mine`/`--assignee`，默认合并所有人的需求和缺陷；自然月窗口不能和 `--week` 混用。",
+      "files": []
+    }
+  ]
+}

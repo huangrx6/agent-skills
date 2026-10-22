@@ -1,0 +1,363 @@
+{
+  "version": 1,
+  "topic": "RAG 实战",
+  "title": "从开卷考试到可评估系统",
+  "title_lines": ["从开卷考试", "到可评估系统"],
+  "subtitle": "一条从概念、最小闭环到评估迭代的路线，不是资料清单。",
+  "language": "中文为主 · 英文原文可读",
+  "audience": "有 Python 基础、调用过 API，想从 Demo 走到工程实践的人",
+  "duration": "10–14 天",
+  "effort": "每天 1–2 小时",
+  "promise": "不是把文档塞进 prompt，而是造一台会找、会答、会认错的机器。",
+  "why_now": "上下文窗口在变长，但你的私有知识、权限和更新节奏不会自动进入模型。RAG 仍然是把“你的数据”接进生成系统的常用方法；真正难的是检索、评估和工程化。",
+  "thesis": "检索决定上限，生成决定下限，评估决定你能不能继续变好。",
+  "theme": {
+    "name": "deep-field",
+    "accent": "#c8ff4d",
+    "motif": "orbit",
+    "reason": "深色像实验室，荧光绿像检索命中的信号；衬线标题保留一点阅读感。"
+  },
+  "stats": [
+    { "value": "05", "label": "个阶段" },
+    { "value": "10–14 天", "label": "总时长" },
+    { "value": "11", "label": "份主资源" },
+    { "value": "05", "label": "个动手任务" }
+  ],
+  "outcomes": [
+    {
+      "title": "判断该不该用 RAG",
+      "detail": "能区分知识过期、私有数据、权限隔离和长上下文各自的边界。"
+    },
+    {
+      "title": "跑通最小闭环",
+      "detail": "从切块、索引、检索到生成，能自己搭一条可复现的链路。"
+    },
+    {
+      "title": "定位失败层",
+      "detail": "答错时能判断是召回、排序、上下文还是生成的问题。"
+    },
+    {
+      "title": "用指标迭代",
+      "detail": "有一组固定问题集和至少两个指标，能比较改动前后。"
+    }
+  ],
+  "stages": [
+    {
+      "id": "s1",
+      "label": "STAGE 01",
+      "kicker": "建立地图",
+      "title": "先把 RAG 看成一场开卷考试",
+      "time": "60–90 分钟",
+      "orbit": "MAP",
+      "orbit_note": "FRAME",
+      "goal": "用自己的话解释 RAG 在解决什么，以及它不适合解决什么。",
+      "hook": "先别碰向量数据库。先搞清楚：什么问题值得用 RAG？",
+      "metaphor": "把 RAG 想成一场开卷考试：模型是考生，检索器是那个帮你翻书的人。翻错页，再聪明也会答偏。",
+      "resources": [
+        {
+          "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+          "url": "https://arxiv.org/abs/2005.11401",
+          "format": "paper",
+          "source": "arXiv · Lewis et al., 2020",
+          "tier": "primary",
+          "why": "原始论文。先看摘要、架构图和实验设置，不要从头推公式；它帮你判断一个系统到底在解决哪类问题。",
+          "time": "15–20 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "Introduction to RAG",
+          "url": "https://developers.llamaindex.ai/python/framework/understanding/rag/",
+          "format": "docs",
+          "source": "LlamaIndex Docs",
+          "tier": "primary",
+          "why": "把 ingestion、indexing、retrieval、generation 串成工程词汇表；适合建立第一张准确的地图。",
+          "time": "20 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "RAG From Scratch: Part 1 (Overview)",
+          "url": "https://www.youtube.com/watch?v=wd7TZ4w1mSw",
+          "format": "video",
+          "source": "YouTube · LangChain",
+          "tier": "video",
+          "why": "5 分钟把整体链路讲一遍。视频较早，但用来建立直觉仍然够用；不要把它当成完整课程。",
+          "time": "5 分钟",
+          "language": "英文",
+          "cost": "免费"
+        }
+      ],
+      "practice": {
+        "title": "画一张自己的 RAG 流水线",
+        "brief": "不抄框架图。用 7 个框画出从文档到答案的路径，再标出你最没把握的 3 个点。",
+        "deliverable": "一张手绘图 + 3 个失败点",
+        "time": "20 分钟"
+      },
+      "checkpoint": {
+        "question": "检索结果很差时，应该先怪模型吗？",
+        "pass": "能指出问题可能出在 query、切块、索引、召回、排序或生成，而不是笼统地说“模型不行”。"
+      },
+      "skills": ["问题边界", "RAG 词汇表", "流水线心智模型"]
+    },
+    {
+      "id": "s2",
+      "label": "STAGE 02",
+      "kicker": "最小闭环",
+      "title": "做一个会翻书的 Demo",
+      "time": "半天",
+      "orbit": "BUILD",
+      "orbit_note": "SHIP",
+      "goal": "用最小代码把文档变成可检索、可回答的闭环。",
+      "hook": "最小可用的 RAG，不需要一个平台，只需要一条能跑通的链路。",
+      "metaphor": "这像搭一条传送带：文档进去，切块、嵌入、索引、召回、拼上下文，最后才轮到模型说话。",
+      "resources": [
+        {
+          "title": "Learn RAG From Scratch – Python AI Tutorial from a LangChain Engineer",
+          "url": "https://www.youtube.com/watch?v=sVcwVQRHIc8",
+          "format": "video",
+          "source": "freeCodeCamp · YouTube",
+          "tier": "video",
+          "why": "从零实现的完整长课程。不必一次看完，先看 overview、retrieval、generation 三段，再跟着敲一遍。",
+          "time": "1 小时 27 分（可分段看）",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "All-in-RAG：RAG 技术全栈指南",
+          "url": "https://datawhalechina.github.io/all-in-rag/",
+          "format": "course",
+          "source": "Datawhale",
+          "tier": "community",
+          "why": "中文全栈课程，章节和练习多。用来补工程细节和中文术语；不必线性读完，按你卡住的地方查。",
+          "time": "按章节取用",
+          "language": "中文",
+          "cost": "免费"
+        }
+      ],
+      "practice": {
+        "title": "20 篇文档 + 10 个问题的最小 RAG",
+        "brief": "选你真正关心的 20 篇文档，不要求漂亮 UI；先让 10 个问题跑通，并记录答不出的。",
+        "deliverable": "可运行脚本 + 10 个问题的失败清单",
+        "time": "2–3 小时"
+      },
+      "checkpoint": {
+        "question": "回答不出来时，你能分清是没召回，还是没用好？",
+        "pass": "能拿出一次具体失败：召回列表里有没有正确 chunk；如果没有，是切块/索引/query 的问题；如果有，才看生成。"
+      },
+      "detour": {
+        "title": "先别上框架",
+        "brief": "用 30 行 Python + 一个向量库跑通；框架可以晚一点再引入，先看清每一段在做什么。"
+      },
+      "skills": ["最小闭环", "调试直觉", "文档切块"]
+    },
+    {
+      "id": "s3",
+      "label": "STAGE 03",
+      "kicker": "检索质量",
+      "title": "让检索器变聪明",
+      "time": "1 天",
+      "orbit": "SHARPEN",
+      "orbit_note": "TUNE",
+      "goal": "理解检索质量的上限，并做一次可比较的切块实验。",
+      "hook": "Demo 和生产的差距，常常不在模型，而在切块、上下文和排序。",
+      "metaphor": "检索器不是许愿池：你给它什么粒度的世界，它就还你什么粒度的答案。",
+      "resources": [
+        {
+          "title": "Contextual Retrieval",
+          "url": "https://www.anthropic.com/research/contextual-retrieval",
+          "format": "blog",
+          "source": "Anthropic Research",
+          "tier": "primary",
+          "why": "解释 chunk 缺少上下文时，如何用 contextual embedding 与 BM25 提升召回；适合理解“检索失败”不是模型问题。",
+          "time": "15 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "End-to-End RAG Workflow: How Retrieval Augmented Generation Works",
+          "url": "https://www.databricks.com/blog/rag-workflow",
+          "format": "blog",
+          "source": "Databricks Blog",
+          "tier": "practitioner",
+          "why": "从 ingestion、embedding 到 hybrid search、评估和部署的端到端视图，用来检查自己漏了哪一段。",
+          "time": "20 分钟",
+          "language": "英文",
+          "cost": "免费"
+        }
+      ],
+      "practice": {
+        "title": "切块实验：3 种粒度，同一组问题",
+        "brief": "固定 embedding 和生成模型，只改 chunk size / overlap；记录召回和一个失败案例。",
+        "deliverable": "一张对比表 + 一句结论",
+        "time": "2 小时"
+      },
+      "checkpoint": {
+        "question": "chunk 越大越好吗？",
+        "pass": "能说出召回率、上下文预算、噪声和定位精度之间的 trade-off，不把“更大”当默认答案。"
+      },
+      "skills": ["切块策略", "检索评估", "上下文预算"]
+    },
+    {
+      "id": "s4",
+      "label": "STAGE 04",
+      "kicker": "生产化",
+      "title": "从 Demo 到能定位失败的系统",
+      "time": "2 天",
+      "orbit": "SHIP",
+      "orbit_note": "HARDEN",
+      "goal": "把 Demo 变成能定位失败、能上线的系统。",
+      "hook": "生产系统不是“答得更像”，而是“失败时你知道为什么”。",
+      "metaphor": "把 RAG 当成一条可观测的流水线：每个环节都要留下证据，而不是只看最终答案。",
+      "resources": [
+        {
+          "title": "What Matters in Production RAG",
+          "url": "https://arpitbhayani.me/blogs/rag-production/",
+          "format": "blog",
+          "source": "Arpit Bhayani",
+          "tier": "practitioner",
+          "why": "讲生产 RAG 的失败模式：索引新鲜度、正确性、延迟、成本。不是又一个教程，而是一张检查表。",
+          "time": "15 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "Building Performant RAG Applications for Production",
+          "url": "https://developers.llamaindex.ai/python/framework/optimizing/production_rag/",
+          "format": "docs",
+          "source": "LlamaIndex Docs",
+          "tier": "primary",
+          "why": "官方 production 视角：检索质量、重排、评估、延迟和成本。适合把零散技巧放回系统里。",
+          "time": "25 分钟",
+          "language": "英文",
+          "cost": "免费"
+        },
+        {
+          "title": "高级 RAG 技术",
+          "url": "https://codelabs.developers.google.com/codelabs/production-ready-ai-with-gc/8-advanced-rag-methods/advanced-rag-methods?hl=zh-cn",
+          "format": "lab",
+          "source": "Google Codelabs",
+          "tier": "primary",
+          "why": "动手实验：chunking、reranking、query transformation。需要云账号；没有环境就只看实验步骤。",
+          "time": "60–90 分钟",
+          "language": "中文",
+          "cost": "需云账号"
+        }
+      ],
+      "practice": {
+        "title": "12 题评估集 + 失败归因",
+        "brief": "从真实用户问题里选 12 个，逐条记录正确 chunk 是否召回、答案是否被支持、失败属于哪一层。",
+        "deliverable": "hit rate / faithfulness / 12 条 failure log",
+        "time": "3 小时"
+      },
+      "checkpoint": {
+        "question": "你的系统在哪些问题上失败？",
+        "pass": "能把失败分成 retrieval、generation、indexing 三类，并说出下一项要改什么。"
+      },
+      "skills": ["评估集", "失败归因", "生产约束"]
+    },
+    {
+      "id": "s5",
+      "label": "STAGE 05",
+      "kicker": "迭代",
+      "title": "用一次有假设的实验收尾",
+      "time": "1 天",
+      "orbit": "EVOLVE",
+      "orbit_note": "LOOP",
+      "goal": "用一次有假设的迭代，证明改动真的有效。",
+      "hook": "没有评估集的 RAG，只是在凭感觉调参。",
+      "metaphor": "不要同时转三个旋钮：先提出一个假设，只改一个变量，再看指标。",
+      "resources": [
+        {
+          "title": "Ragas Documentation",
+          "url": "https://docs.ragas.io/en/stable/",
+          "format": "docs",
+          "source": "Ragas",
+          "tier": "primary",
+          "why": "把回答质量拆成可计算的指标。先理解指标定义，再选两个真正适合你场景的用。",
+          "time": "20 分钟",
+          "language": "英文",
+          "cost": "免费"
+        }
+      ],
+      "practice": {
+        "title": "一次有假设的迭代",
+        "brief": "选一个最痛的失败类型，只做一个改动；用同一组问题复测，写清楚改了什么、什么没变。",
+        "deliverable": "一页 before/after + 下一步实验",
+        "time": "2 小时"
+      },
+      "checkpoint": {
+        "question": "你能用数据说明改动有效吗？",
+        "pass": "能给出指标变化、样本量和反例；如果没变好，也能解释为什么。"
+      },
+      "skills": ["指标思维", "实验设计", "迭代闭环"]
+    }
+  ],
+  "interludes": [
+    {
+      "after": "s2",
+      "quote": "Demo 的尽头不是“看起来能答”，而是“答错时你知道该看哪一层”。",
+      "note": "下一站开始，你会把“感觉”换成“证据”。",
+      "source": "这条路线的主张"
+    },
+    {
+      "after": "s4",
+      "quote": "RAG 的对手不是另一个 RAG，而是长上下文、微调和更好的检索。",
+      "note": "知道什么时候不该用 RAG，和会用 RAG 一样重要。",
+      "source": "边界提醒"
+    }
+  ],
+  "not_now": [
+    {
+      "title": "微调 embedding / LLM",
+      "why": "先把检索和评估跑通；微调通常不是第一根杠杆。"
+    },
+    {
+      "title": "Agentic RAG",
+      "why": "先把单轮检索闭环做稳，再让 agent 决定检索几次。"
+    },
+    {
+      "title": "GraphRAG / 知识图谱",
+      "why": "当问题真的需要多跳关系时再上；不要因为图很酷。"
+    },
+    {
+      "title": "多模态 RAG",
+      "why": "文本链路没跑通前，图片和视频只会增加变量。"
+    }
+  ],
+  "rabbit_holes": [
+    {
+      "title": "GraphRAG",
+      "why": "多跳关系和全局摘要的另一种路线；学完主线再拆。",
+      "url": "https://github.com/microsoft/graphrag"
+    },
+    {
+      "title": "Late Chunking",
+      "why": "先嵌入长上下文，再切块，减少 chunk 失去上下文。",
+      "url": "https://jina.ai/news/late-chunking-in-long-context-embedding-models/"
+    },
+    {
+      "title": "RAG From Scratch 系列",
+      "why": "15 个短视频，按需补 multi-query、RAG-Fusion 等高级检索技巧。",
+      "url": "https://www.youtube.com/playlist?list=PLfaIDFEXuae2LXbO1_PKyVJiQ23ZztA0x"
+    }
+  ],
+  "start": {
+    "today": [
+      "读论文摘要 + 看 5 分钟 overview，写下你对 RAG 的一句话定义。",
+      "画出 7 个框的流水线，圈出你最没把握的一层。",
+      "写下你真正想回答的 3 个问题；它们会成为你的第一组评估样本。"
+    ],
+    "week_one": [
+      "完成最小闭环，先让 10 个问题跑通。",
+      "做一次切块对比，不追求最优，只记录差异。",
+      "把失败问题分成 retrieval / generation / indexing。",
+      "选一个改动，复测同一组问题。",
+      "写一页 before/after，决定下一轮学什么。"
+    ]
+  },
+  "sources": {
+    "verified_at": "2026-10-22",
+    "note": "链接核验于 2026-10-22；YouTube 只核验标题、频道与时长，未逐分钟观看；Google Codelab 需要云账号，未执行实验。"
+  }
+}
