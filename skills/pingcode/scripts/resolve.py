@@ -90,6 +90,12 @@ SOURCES: dict[str, dict[str, Any]] = {
         "needs": ("project_id",),
         "scopes": ("pcp:read:pjm:workitem",),
     },
+    "workitem_properties": {
+        "label": _compat.DICT_LABELS["workitem_properties"],
+        "url": _compat.DICT_PATHS["workitem_properties"],
+        "needs": ("project_id", "workitem_type_id"),
+        "scopes": ("pcp:read:pjm:workitem",),
+    },
     "users": {
         "label": _compat.DICT_LABELS["users"],
         "url": _compat.DICT_PATHS["users"],
@@ -305,6 +311,19 @@ def type_name(client: Any, project: str, workitem_type_id: str, force: bool = Fa
     except (NotFound, Ambiguous):
         return ""
     return str(item.get("name", "") or "")
+
+
+def property_keys(client: Any, project: str, workitem_type_id: str,
+                  force: bool = False) -> list[str]:
+    """该类型工作项的属性方案里有哪些 key。
+
+    V2 把 `story_points` 放进 `properties`，但**不是每种类型都有这个属性**：
+    任务没有，用户故事有。发一个不存在的属性会 400 code=100355，新建时甚至可能
+    被静默忽略。写之前先查一下，能当场说清楚。
+    """
+    values = items("workitem_properties", client, force=force,
+                   project_id=project, workitem_type_id=workitem_type_id)
+    return [str(v.get("id", "") or "") for v in values if v.get("id")]
 
 
 def identifier_params(client: Any, ref: str, force: bool = False) -> dict[str, Any]:

@@ -40,7 +40,7 @@
     {
       "id": 7,
       "prompt": "把 DEMO-1 的截止日期改到 2026-09-30，故事点改成 5。",
-      "expected_output": "用 `workitem update DEMO-1 --end 2026-09-30 --story-points 5`。V2 请求体里截止日期是 `due: {date, with_time: 0}`，故事点在 `properties.story_points`，不能把 `end_at` / 顶层 `story_points` 发给 V2。编号查询要拆成 `identifier=1` + `project_id`，不能把 `DEMO-1` 整个当数字。回显要出现编号和改后的字段。",
+      "expected_output": "用 `workitem update DEMO-1 --end 2026-09-30 --story-points 5`。V2 请求体里截止日期是 `due: {date, with_time: 0}`，故事点在 `properties.story_points`，不能把 `end_at` / 顶层 `story_points` 发给 V2。编号查询要拆成 `identifier=1` + `project_id`，不能把 `DEMO-1` 整个当数字。如果该类型的属性方案没有 `story_points`（例如任务类型），要先说明并拒绝，不能发一个必 400（code=100355）的请求。回显要出现编号和改后的字段。",
       "files": []
     },
     {

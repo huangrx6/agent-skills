@@ -37,6 +37,7 @@ pingcode.py project show X
 pingcode.py project progress [--project X]
 pingcode.py list projects|sprints|types|states|priorities|tags|users|project_states|processes \
     [--project X] [--type bug]
+pingcode.py list workitem_properties --project X --type 用户故事   # 看该类型能写哪些属性
 ```
 
 `--assignee @me`（或 `我` / `me`）需要**用户令牌**；企业令牌下请给人名或用户 ID。
@@ -77,6 +78,9 @@ pingcode.py workitem create --project X --type bug --title "登录页 500" \
     [--assignee @me] [--priority 高] [--sprint "Sprint 12"] [--parent SCR-1] \
     [--state 新建] [--start 2026-09-20] [--end 2026-09-30] \
     [--story-points 3] [--estimated-workload 8]
+
+# --story-points 只对该类型属性方案包含 story_points 的类型可用（用户故事等）。
+# 任务没有这个属性；CLI 会先查 workitem_properties 并拒绝，避免 400 code=100355。
 
 pingcode.py workitem update SCR-12 --description "…" --end 2026-09-30
 pingcode.py workitem set-state SCR-12 已完成
@@ -147,7 +151,7 @@ pingcode.py workitem create-plan --file plan.json --yes       # 确认才建
 pingcode.py config context --project 演示项目 --sprint "Sprint 12"
 pingcode.py config context                # 看当前
 pingcode.py config context --clear
-pingcode.py config refresh [--what projects,sprints,types,states,priorities,tags,users,project_states,processes]
+pingcode.py config refresh [--what projects,sprints,types,states,priorities,tags,users,project_states,processes,workitem_properties]
 pingcode.py config show                   # 凭据/令牌/上下文的完整状态
 ```
 

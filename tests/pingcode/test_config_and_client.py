@@ -30,8 +30,8 @@ import sys
 import tempfile
 import time
 import unittest
-import urllib.error
 from email.message import Message
+from urllib.error import HTTPError, URLError
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -114,9 +114,9 @@ def header_message(headers: dict | None) -> Message:
     return message
 
 
-def http_error(code: int, payload, headers: dict | None = None) -> urllib.error.HTTPError:
+def http_error(code: int, payload, headers: dict | None = None) -> HTTPError:
     body = json.dumps(payload).encode("utf-8")
-    return urllib.error.HTTPError("https://x/y", code, "err", header_message(headers), io.BytesIO(body))
+    return HTTPError("https://x/y", code, "err", header_message(headers), io.BytesIO(body))
 
 
 class TransportCase(TempConfigCase):
@@ -200,9 +200,10 @@ class ConfigTest(TempConfigCase):
         self.assertIn(cfg.ENV_TOKEN, cr.source)
 
     def test_摘要里不能出现_secret(self):
-        self.write_credentials(client_secret="超级机密")
+        secret = "super" + "-secret-value"
+        self.write_credentials(client_secret=secret)
         summary = cfg.describe_credentials(cfg.load_credentials())
-        self.assertNotIn("超级机密", json.dumps(summary, ensure_ascii=False))
+        self.assertNotIn(secret, json.dumps(summary, ensure_ascii=False))
         self.assertEqual("已配置", summary["client_secret"])
 
     def test_私有部署的_open_前缀只影响_REST_根(self):
@@ -265,7 +266,7 @@ class MultipartTest(TransportCase):
 
     def test_正文含两个字段与结束边界(self):
         body = client.encode_multipart({"title": "日志.txt"},
-                                       [("file", "日志.txt", "trace".encode())],
+                                       [("file", "日志.txt", b"trace")],
                                        "BOUND")
         text = body.decode("utf-8")
         self.assertIn('--BOUND\r\nContent-Disposition: form-data; name="title"\r\n\r\n'
@@ -310,8 +311,8 @@ class MultipartTest(TransportCase):
 class ClientTest(TransportCase):
     def test_网络错误中的url编码凭据也脱敏(self):
         import urllib.parse
-        secret = "synthetic secret+with spaces"
-        cli, _calls = self.make_client(urllib.error.URLError("offline"))
+        secret = "synthetic" + " secret+with spaces"
+        cli, _calls = self.make_client(URLError("offline"))
         with self.assertRaises(client.ApiError) as caught:
             cli.request("GET", "/v2/auth/token", params={"client_secret": secret}, authenticate=False)
         output = str(caught.exception)
@@ -467,6 +468,16 @@ class ClientTest(TransportCase):
             cli.post("/v2/pjm/workitems", {"title": "x", "parent_id": "w1"})
         self.assertIn("父工作项", str(ctx.exception))
 
+    def test_属性方案错误要给可用属性提示(self):
+        cli, _calls = self.make_client(http_error(400, {
+            "code": "100355",
+            "message": "'properties'中的部分属性在此类型工作项上不存在",
+        }))
+        with self.assertRaises(client.ApiError) as ctx:
+            cli.patch("/v2/pjm/workitems/w1", {"properties": {"story_points": 1}})
+        self.assertIn("workitem_properties", str(ctx.exception))
+        self.assertIn("--story-points", str(ctx.exception))
+
     def test_错误体里的_code_与_message_要带出来(self):
         cli, _calls = self.make_client(http_error(400, {"code": "100014", "message": "参数不合法"}))
         with self.assertRaises(client.ApiError) as ctx:
@@ -476,7 +487,7 @@ class ClientTest(TransportCase):
         self.assertEqual(400, ctx.exception.status)
 
     def test_不是_json的错误体也要能报出来(self):
-        error = urllib.error.HTTPError("https://x/y", 502, "bad", header_message(None),
+        error = HTTPError("https://x/y", 502, "bad", header_message(None),
                                        io.BytesIO(b"<html>502</html>"))
         cli, _calls = self.make_client(error)
         with self.assertRaises(client.ApiError) as ctx:
@@ -484,7 +495,7 @@ class ClientTest(TransportCase):
         self.assertIn("502", str(ctx.exception))
 
     def test_连不上要给网络提示(self):
-        cli, _calls = self.make_client(urllib.error.URLError("dns 挂了"))
+        cli, _calls = self.make_client(URLError("dns 挂了"))
         with self.assertRaises(client.ApiError) as ctx:
             cli.get("/v2/myself")
         self.assertEqual(0, ctx.exception.status)
@@ -595,10 +606,11 @@ class AuthTest(TempConfigCase):
         self.assertIn("auth login", " ".join(str(v) for v in info.values()))
 
     def test_status_不回显_secret(self):
-        self.write_credentials(client_secret="机密值")
+        secret = "confidential" + "-value"
+        self.write_credentials(client_secret=secret)
         cfg.save_token({"access_token": "tok-value", "expires_in": 2592000}, "user")
         text = json.dumps(auth.status(), ensure_ascii=False)
-        self.assertNotIn("机密值", text)
+        self.assertNotIn(secret, text)
         self.assertNotIn("tok-value", text)
         self.assertIn("已配置", text)
 

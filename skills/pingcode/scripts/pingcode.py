@@ -532,14 +532,15 @@ def cmd_dict_list(args: argparse.Namespace) -> int:
     client = build_client(args)
     kind = args.kind
     keys: dict[str, Any] = {}
-    if kind in ("states",) and not args.type:
-        raise CliError("列工作项状态要指定类型：--type bug / task / …（不同类型的状态表不一样）")
+    if kind in ("states", "workitem_properties") and not args.type:
+        raise CliError(f"列{_resolve.SOURCES[kind]['label']}要指定类型：--type bug / task / …")
     project = pick(args, "project", "project")
-    if kind in ("sprints", "types", "priorities", "tags", "states", "project_states"):
+    if kind in ("sprints", "types", "priorities", "tags", "states", "project_states",
+                "workitem_properties"):
         if not project:
             raise CliError(f"列{_resolve.SOURCES[kind]['label']}要指定项目：--project <名字>")
         keys["project_id"] = _resolve.project_id(client, project, force=args.no_cache)[0]
-    if kind == "states":
+    if kind in ("states", "workitem_properties"):
         keys["workitem_type_id"] = resolve_type(args, client, keys["project_id"])
     values = _resolve.items(kind, client, force=args.no_cache, **keys)
     # 字典各有自己的看头：成员要看**真名**（name 是手机号）、项目要看标识与类型、
@@ -587,6 +588,19 @@ def _workitem_body(args: argparse.Namespace, client: Any, project_id: str,
                         ("remaining_workload", "remaining_workload")):
         value = getattr(args, flag, None)
         if value is not None:
+            if field == "story_points" and type_id:
+                # V2 把故事点放进 properties，但任务类型没有这个属性；先查属性方案，
+                # 否则更新会 400 code=100355，新建甚至可能被静默忽略。
+                try:
+                    keys = _resolve.property_keys(client, project_id, type_id,
+                                                  force=getattr(args, "no_cache", False))
+                except (_resolve.NotFound, _client.ApiError):
+                    keys = []
+                if keys and field not in keys:
+                    raise CliError(
+                        f"{_type_display(client, project_id, type_id)}的属性方案里没有 {field}；"
+                        f"可用属性：{'、'.join(keys)}"
+                    )
             body[field] = value
     return body
 

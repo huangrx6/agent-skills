@@ -43,9 +43,15 @@ python3 skills/pingcode/dev-tools/gen_endpoints.py --check --input /path/to/api_
   改描述与截止、改状态、评论、附件、删除。
 - 2026-10-22 按官方 **V2** 文档重新生成端点表并迁移字段；单元测试覆盖 V2 编号、日期、
   `properties`、批量接口与项目 `template_type`。
-- **V2 尚未在真实租户复核**：`identifier` 查询是数字还是完整编号、`with_time` 是否必填、
-  `properties.story_points` 是否可写、附件代码段是否仍强制 `comment_id`，都需要在获授权后
-  用只读命令和一条可丢弃的测试数据验证。详细清单见 `docs/plans/pingcode-api-v2-migration.md`。
+- 2026-10-22 在真实租户跑过 V2 核心链路：令牌刷新 / `whoami`、项目列表/详情/进度、
+  字典、工作项 list/show/mine/search、创建任务与用户故事、更新故事点、改状态、
+  批量改标题、附件上传/列表/删除、删除与软删除确认。两条一次性测试数据已删除。
+- 实测发现：**任务类型没有 `story_points` 属性**，V2 更新会返回 400 `code=100355`。
+  CLI 现在先查 `workitem_properties`，不支持的属性当场拒绝，不再发必 400 的请求。
+- 尚未实测：项目创建/更新的真实写（只做过 dry-run）、代码段附件（需要先有评论）、
+  批量改状态的实写（只做过 dry-run）、评论创建（避免未经要求的外发）、
+  `mine --type` 有匹配数据的本地过滤、私有部署。
+- 详细清单见 `docs/plans/pingcode-api-v2-migration.md`。
 
 已封装项目、工作项、结构化搜索、树形创建、单字段批量更新、评论与附件。
 当前端点表无项目删除接口；成员/权限/部门/CI 管理不在 skill 的操作范围。

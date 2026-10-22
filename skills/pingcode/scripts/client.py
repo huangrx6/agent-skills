@@ -393,6 +393,12 @@ class Client:
             message = data.strip()[:200]
 
         kwargs = {"code": code, "hints": self._hints_for(method, url, exc.code, payload)}
+        if code == "100355":
+            kwargs["hints"].append(
+                "该类型的工作项属性方案不包含这个 properties 字段；"
+                "先 `list workitem_properties --project … --type …` 看可用属性，"
+                "去掉不支持的 --story-points 等"
+            )
         if exc.code == 429:
             retry_after, reason, header = parse_retry_after(exc.headers)
             hints = kwargs["hints"]

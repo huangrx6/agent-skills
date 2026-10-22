@@ -35,7 +35,7 @@
 | `--sprint` | `sprint_id` | 仅 scrum / hybrid |
 | `--parent` | `parent_id` | 父工作项的类型要支持这种子类型 |
 | `--state` | `state_id` | 必须同时满足该类型的「状态方案」与「状态流转」 |
-| `--story-points` | `properties.story_points` | ≥0 的整数或最多一位小数 |
+| `--story-points` | `properties.story_points` | 仅当该类型的属性方案包含 `story_points` 时可写（用户故事等）。任务类型没有这个属性，CLI 会先查 `workitem_properties` 并当场拒绝；V2 直接发会 400 `code=100355` |
 | `--estimated-workload` / `--remaining-workload` | `properties.estimated_workload` / `properties.remaining_workload` | V2 放在 `properties` 里，命令层仍按顶层字段接收 |
 | （未封装） | `board_id` / `entry_id` / `swimlane_id` | 仅 kanban / hybrid；走逃生口 |
 | （未封装） | `properties.{key}` | 自定义属性，需在该类型的属性方案里；走逃生口 |
@@ -96,6 +96,7 @@
 | 工作项状态 | `GET /v2/pjm/workitem/workitem_states?project_id=&workitem_type_id=` | 项目 + 类型 |
 | 优先级 | `GET /v2/pjm/workitem/workitem_priorities?project_id=` | 项目 |
 | 标签 | `GET /v2/pjm/workitem/workitem_tags?project_id=` | 项目 |
+| 工作项属性方案 | `GET /v2/pjm/workitem/workitem_properties?project_id=&workitem_type_id=` | 项目 + 类型 |
 | 成员 | `GET /v2/directory/users` | — |
 | 项目状态 | `GET /v2/pjm/project/project_states?project_id=` | 项目 |
 | 项目模板 | `GET /v2/pjm/project_templates` | — |

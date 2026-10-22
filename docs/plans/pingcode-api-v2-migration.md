@@ -1,6 +1,6 @@
 # PingCode REST API V2 迁移清单
 
-状态：**代码迁移完成，待在真实租户复核**（分支 `feat/pingcode-api-v2`）
+状态：**代码迁移完成，真实租户核心链路已验证**（分支 `feat/pingcode-api-v2`）
 范围：`skills/pingcode` 的项目 / 工作项 / 评论 / 附件 / 字典命令。
 不在本次范围：成员权限管理、测试管理、知识库、工单、发布、DevOps。
 
@@ -130,20 +130,25 @@ V2 文档仍把 `comment_id` 标为可选；V1 真实租户实测不带会 400 `
 V2 表生成后，`api --show/--list` 只认 V2 路径。V1 路径会被拦下并给候选；这是预期行为，
 不再用 `--force` 当版本兼容开关。
 
-## 5. 待真实租户验证
+## 5. 真实租户验证结果（2026-10-22）
 
-以下项目无法只靠文档确认，合并前至少要跑一次只读 + 一次可丢弃的写操作：
+已跑通：令牌刷新 → `whoami`；项目列表/详情/进度、`template_type` 过滤；类型/状态/优先级/标签/
+迭代/项目状态/项目模板/成员字典；工作项 list/show/mine/search；按编号查询（`ASKILL-70/71`）；
+创建任务与用户故事、更新故事点、改状态；批量改标题（`bulk/set`）；文件附件上传/列表/删除；
+删除与 `--all` 软删除确认。两条一次性测试数据已删除。
 
-1. 当前租户是否支持 `/v2`（项目、工作项、字典、进度）。
-2. `identifier` 查询到底收数字还是完整编号；`GET /v2/pjm/workitems/{ref}` 是否仍只收 id/short_id。
-3. `start` / `due` 的 `with_time` 是否必填，日期边界如何解释。
-4. `properties.story_points` / `properties.estimated_workload` 是否可写。
-5. `mine --type` 的本地过滤是否与 V1 结果一致。
-6. `state.type` 是否仍是 `pending` / `in_progress` / `completed` / `closed` 四个值。
-7. `bulk/set` 的 `property_name` 是否接受 `properties.story_points`。
-8. 附件代码段是否仍强制 `comment_id`。
-9. 项目创建是否必须补 `scope_type` / `scope_id`（文档标可选，默认 organization）。
-10. 错误码是否变化（尤其编号查询的 100317、软删除、父项类型约束）。
+| 待验证项 | 结果 |
+| --- | --- |
+| 当前租户支持 `/v2` | ✅ |
+| `identifier` 查询收数字；`GET /{ref}` 仍只收 id/short_id | ✅（CLI 走数字 + project_id；未再用完整编号直取） |
+| `start` / `due` 的 `with_time` | ✅ 带时分秒写入 `with_time=1`，日期写入 `0` |
+| `properties.story_points` | ✅ 用户故事可写；❌ 任务类型没有该属性，更新返回 400 `code=100355` |
+| `mine --type` 本地过滤 | ⚠ 路径已跑通（无匹配数据，结果为空） |
+| `state.type` 四个值 | ✅ `pending` / `in_progress` / `completed` / `closed` |
+| `bulk/set` | ✅ 改标题实写；改状态只做 dry-run |
+| 附件代码段强制 `comment_id` | ❌ 未测（需要先发评论，避免未经要求的外发） |
+| 项目创建/更新的真实写 | ❌ 只做 dry-run（避免改动正式项目） |
+| 错误码 | ✅ 100355；软删除；100317 未再触发 |
 
 ## 6. 实施与验收
 
@@ -152,11 +157,12 @@ V2 表生成后，`api --show/--list` 只认 V2 路径。V1 路径会被拦下�
 - [x] 工作项/项目响应规范化：编号、类型、日期、properties。
 - [x] 请求体适配：`start`/`due`、`template_type`、`properties.*`、`bulk/set`。
 - [x] 单测：现有测试迁移到 V2，新增编号/日期/类型/批量/`mine --type` 覆盖。
-- [ ] 真实租户只读冒烟 + 可丢弃写操作；记录实际响应。
+- [x] 真实租户只读冒烟 + 可丢弃写操作；记录实际响应。
 - [x] 文档：`fields.md`、`commands.md`、`api.md`、`auth.md`、README、evals。
 
-当前结果：459 个 V2 接口；207 个单元测试通过；`gen_endpoints.py --check` 无漂移；
-`validate_skill.py` / `check_pointers.py` / `preflight.py` 通过。真实租户验证缺口见上一节。
+当前结果：459 个 V2 接口；209 个单元测试通过；`gen_endpoints.py --check` 无漂移；
+`validate_skill.py` / `check_pointers.py` / `preflight.py` 通过。
+真实租户核心链路已跑通；剩余边缘项见上一节。
 
 验收标准：`gen_endpoints.py --check` 绿；单测绿；真实租户只读命令返回正确数据；
 创建/更新/改状态/删除在测试项目上成功；`--full` 能看出 V2 原始字段。

@@ -174,6 +174,11 @@ class CliCase(unittest.TestCase):
         resolve.store("sprints", {"project_id": "pj1"}, SPRINTS)
         resolve.store("priorities", {"project_id": "pj1"}, PRIORITIES)
         resolve.store("users", {}, [{"id": "u1", "name": "john", "display_name": "John"}])
+        # V2：故事点是否可写取决于该类型的属性方案。任务没有 story_points，缺陷有。
+        resolve.store("workitem_properties", {"project_id": "pj1", "workitem_type_id": "task"},
+                       [{"id": "description"}, {"id": "start"}])
+        resolve.store("workitem_properties", {"project_id": "pj1", "workitem_type_id": "bug"},
+                       [{"id": "description"}, {"id": "story_points"}])
 
     # ── 运行与断言 ──
     def run_cli(self, argv: list[str], routes: dict | None = None) -> tuple[int, str, str, Router]:
@@ -224,6 +229,21 @@ class CliCase(unittest.TestCase):
         self.assertEqual(0, code)
         self.assertIn("缺陷", out)
         self.assertIn("bug", out)
+
+    def test_列出某类型的属性方案(self):
+        code, _out, _err, router = self.run_cli(
+            ["list", "workitem_properties", "--project", "演示项目", "--type", "bug",
+             "--no-cache"],
+            {("GET", "/v2/pjm/projects"):
+                 {"values": PROJECTS, "total": len(PROJECTS)},
+             ("GET", "/v2/pjm/workitem/workitem_types"):
+                 {"values": TYPES, "total": len(TYPES)},
+             ("GET", "/v2/pjm/workitem/workitem_properties"):
+                 {"values": [{"id": "story_points", "name": "故事点"}], "total": 1}})
+        self.assertEqual(0, code)
+        url = router.find("GET", "/v2/pjm/workitem/workitem_properties")[0][1]
+        self.assertIn("project_id=pj1", url)
+        self.assertIn("workitem_type_id=bug", url)
 
     def test_看一个工作项_带描述(self):
         item = dict(WORKITEM, description="详细的复现步骤")
@@ -333,7 +353,15 @@ class CliCase(unittest.TestCase):
         self.assertNotIn("start_at", body)
         self.assertNotIn("story_points", body)
 
-    def test_创建项目_V2_字段(self):
+    def test_任务类型没有故事点要当场拒绝(self):
+        code, _out, err, router = self.run_cli(
+            ["workitem", "create", "--project", "演示项目", "--type", "task",
+             "--title", "x", "--story-points", "1"])
+        self.assertEqual(1, code)
+        self.assertIn("属性方案", err)
+        self.assertIn("story_points", err)
+        self.assertEqual([], router.find("POST", "/v2/pjm/workitems"), "不能发一个必 400 的请求")
+
         project = {"id": "pj9", "identifier": "NEW", "name": "新项目",
                    "template_type": "scrum"}
         code, _out, _err, router = self.run_cli(

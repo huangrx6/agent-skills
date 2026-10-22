@@ -44,6 +44,8 @@ DICT_PATHS: dict[str, str] = {
     "project_states": "/v2/pjm/project/project_states?project_id={project_id}",
     "priorities": "/v2/pjm/workitem/workitem_priorities?project_id={project_id}",
     "tags": "/v2/pjm/workitem/workitem_tags?project_id={project_id}",
+    "workitem_properties": ("/v2/pjm/workitem/workitem_properties"
+                           "?project_id={project_id}&workitem_type_id={workitem_type_id}"),
     "users": "/v2/directory/users",
     # V2 把项目流程改成了项目模板；保留 `list processes` 这个命令名，
     # 避免用户为了“看有哪些流程”再记一个新命令。
@@ -58,6 +60,7 @@ DICT_LABELS: dict[str, str] = {
     "project_states": "项目状态",
     "priorities": "优先级",
     "tags": "工作项标签",
+    "workitem_properties": "工作项属性方案",
     "users": "企业成员",
     "processes": "项目模板",
 }
