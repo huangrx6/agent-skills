@@ -58,7 +58,7 @@
     {
       "id": 10,
       "prompt": "把 SCR-1、SCR-2、SCR-3 这三条任务都标成已完成。",
-      "expected_output": "用 `workitem bulk-update --ids SCR-1,SCR-2,SCR-3 --state 已完成`。V2 走 `POST /v2/pjm/workitems/bulk/set`，body 是 `ids` + `property_name=state_id` + `property_value`；仍然一次只能改一个属性、最多 100 个 id。若三条类型不同，状态 id 不能共用，应分批或提示用户。不能逐条 PATCH 却说成批量接口。",
+      "expected_output": "用 `workitem bulk-update --ids SCR-1,SCR-2,SCR-3 --state 已完成`。V2 走 `POST /v2/pjm/workitems/bulk/set`，body 是 `ids` + `property_name=state_id` + `property_value`；仍然一次只能改一个属性、最多 100 个 id。若三条类型不同，状态 id 不能共用，应分批或提示用户。不能逐条 PATCH 却说成批量接口。 若这些 id 跨项目或跨类型，状态 id 不能共用，必须先拒绝并提示分批。",
       "files": []
     },
     {

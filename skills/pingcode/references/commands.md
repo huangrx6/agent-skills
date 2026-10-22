@@ -32,7 +32,7 @@ pingcode.py workitem search --filter '{"priority.id":{"in":["…"]}}'
 
 pingcode.py workitem show SCR-12            # 编号 / short_id / id 都收；带描述与链接
 pingcode.py workitem show SCR-12 --all      # 连已删除的一起看（DELETE 是软删除）
-pingcode.py project list [--keywords X] [--type scrum] [--all]
+pingcode.py project list [--keywords X] [--type scrum] [--all] [--limit 50]
 pingcode.py project show X
 pingcode.py project progress [--project X]
 pingcode.py list projects|sprints|types|states|priorities|tags|users|project_states|processes \
@@ -99,6 +99,7 @@ pingcode.py workitem attach-code SCR-12 --comment <评论 id> --title "ngx.conf"
 pingcode.py workitem attach-remove SCR-12 <附件 id> --yes
 
 # 批量改**一个**属性（官方限制：单属性 + 单值 + ≤100 个 id）
+# 改状态/优先级/迭代/工作量时，所有 id 必须在同一项目、同一类型；否则先分批。
 pingcode.py workitem bulk-update --ids SCR-1,SCR-2,SCR-3 --state 已完成
 pingcode.py workitem bulk-update --ids SCR-1,SCR-2 --assignee @me --dry-run
 
@@ -151,7 +152,9 @@ pingcode.py workitem create-plan --file plan.json --yes       # 确认才建
 pingcode.py config context --project 演示项目 --sprint "Sprint 12"
 pingcode.py config context                # 看当前
 pingcode.py config context --clear
-pingcode.py config refresh [--what projects,sprints,types,states,priorities,tags,users,project_states,processes,workitem_properties]
+pingcode.py config refresh [--what projects,sprints,types,states,priorities,tags,users,project_states,processes,workitem_properties] \
+    [--project X] [--type bug]
+# --type 只在刷新 states / workitem_properties 时需要
 pingcode.py config show                   # 凭据/令牌/上下文的完整状态
 ```
 

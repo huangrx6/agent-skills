@@ -3,7 +3,7 @@ name: pingcode
 description: >-
   Use when querying or updating PingCode projects and work items, including tasks, bugs, sprints,
   statuses, assignees, comments, and attachments. 中文：PingCode 里查待办、查缺陷、建任务、
-  改状态、看迭代或排查授权。Use for PingCode work tracking and authentication or API errors. Do NOT use for local Git work or administration of members,
+  改状态、看迭代、看项目进度、批量改、按条件搜索或排查授权。Use for PingCode work tracking and authentication or API errors. Do NOT use for local Git work or administration of members,
   permissions, or CI pipelines.
 ---
 
@@ -40,7 +40,7 @@ description: >-
 | 评论 / 附件 | `workitem comment/comments/attachments/attach/attach-code/attach-remove …` |
 | 删除工作项 | `workitem delete SCR-12 --yes` |
 | 项目列表 / 详情 / 进度 / 创建 / 更新 | `project list/show/progress/create/update …` |
-| 字典 / 默认项目 | `list projects\|sprints\|types\|states\|priorities\|tags\|users\|project_states\|processes` / `config context --project X` |
+| 字典 / 默认项目 | `list projects\|sprints\|types\|states\|priorities\|tags\|users\|project_states\|processes\|workitem_properties` / `config context --project X` |
 | 授权与诊断 | `auth login/status/logout` / `whoami` / `config show` |
 
 “未完成”按 `state.type` 排除 `completed` 和 `closed`，不能按中文状态名猜。

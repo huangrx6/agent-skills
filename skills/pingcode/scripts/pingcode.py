@@ -354,6 +354,12 @@ def cmd_config_refresh(args: argparse.Namespace) -> int:
         spec = _resolve.SOURCES.get(kind)
         if spec is None:
             raise CliError(f"未知字典 {kind!r}；可用：{'、'.join(sorted(_resolve.SOURCES))}")
+        if "project_id" in spec["needs"] and not keys.get("project_id"):
+            raise CliError(f"刷新{spec['label']}要指定 --project <名字或标识>")
+        if "workitem_type_id" in spec["needs"]:
+            if not getattr(args, "type", None):
+                raise CliError(f"刷新{spec['label']}要指定 --type bug / task / …")
+            keys["workitem_type_id"] = resolve_type(args, client, keys["project_id"])
         values = _resolve.items(kind, client, force=True, **keys)
         print(f"✓ {spec['label']}：{len(values)} 条")
     return 0
@@ -368,12 +374,10 @@ def cmd_project_list(args: argparse.Namespace) -> int:
         # 当初查 DEMO 去哪了，就是靠逃生口手动加这两个参数才看出来的。
         params["include_archived"] = BOOLEAN_TRUE
         params["include_deleted"] = BOOLEAN_TRUE
-    result = client.get(PROJECTS, **params)
-    values = result.values
+    values = client.paginate(PROJECTS, max_items=args.limit, **params)
     emit(_fmt.rows("project", values), args, "project", values)
-    total = result.total
-    if total is not None and not args.full and total > len(values):
-        print(f"（共 {total} 个，这里只列了第一页 {len(values)} 个；想看全部加 --limit）")
+    if not args.full and len(values) >= args.limit:
+        print(f"（最多显示 {args.limit} 个；要更多加 --limit）")
     return 0
 
 
@@ -942,14 +946,24 @@ def cmd_workitem_bulk_update(args: argparse.Namespace) -> int:
         raise CliError(f"官方限制单次最多 100 个，你给了 {len(refs)} 个 —— 分批跑")
     items = [fetch_workitem(client, ref, include_deleted=bool(args.all)) for ref in refs]
     types = {str(item.get("type", "")) for item in items}
-    pid = str(_fmt.dig(items[0], "project.id") or "")
-    if args.state and len(types) > 1:
+    pids = {str(_fmt.dig(item, "project.id") or "") for item in items}
+    type_scoped = (bool(args.state) or args.story_points is not None
+                   or getattr(args, "estimated_workload", None) is not None
+                   or getattr(args, "remaining_workload", None) is not None)
+    project_scoped = (type_scoped or bool(args.priority) or bool(args.sprint))
+    if project_scoped and (len(pids) > 1 or "" in pids):
+        raise CliError(
+            "这批工作项不在同一个项目（或项目 id 缺失）；"
+            "状态 / 优先级 / 迭代 / 工作量属性是按项目配置的，请分成几批改"
+        )
+    if type_scoped and (len(types) > 1 or "" in types):
         labels = sorted(str(item.get("type_name") or _fmt.type_label(str(item.get("type", ""))))
                         for item in items)
         raise CliError(
             f"这批工作项的类型不一样（{'、'.join(labels)}），"
-            "而状态 id 是按类型配的 —— 分成几批改，或换成别的属性"
+            "而状态 / 工作量属性是按类型配的 —— 分成几批改，或换成别的属性"
         )
+    pid = str(_fmt.dig(items[0], "project.id") or "")
     body = _workitem_body(args, client, pid, sorted(types)[0] if len(types) == 1 else "")
     visible_body = {key: value for key, value in body.items() if not key.startswith("_")}
     if len(visible_body) != 1:
@@ -1342,8 +1356,9 @@ def build_parser() -> argparse.ArgumentParser:
     ctx.add_argument("--clear", action="store_true", help="清空")
     ctx.set_defaults(func=cmd_config_context)
     refresh = make(cfg_sub, "refresh", help="刷新字典缓存")
-    refresh.add_argument("--what", help="projects,sprints,types,states,priorities,tags,users；不给就全清")
+    refresh.add_argument("--what", help="projects,sprints,types,states,priorities,tags,users,project_states,processes,workitem_properties；不给就全清")
     refresh.add_argument("--project")
+    refresh.add_argument("--type", help="刷新 states / workitem_properties 时要给工作项类型")
     refresh.set_defaults(func=cmd_config_refresh)
 
     project = make(sub, "project", help="项目")
@@ -1353,6 +1368,7 @@ def build_parser() -> argparse.ArgumentParser:
     pl.add_argument("--type", help="scrum / kanban / waterfall / hybrid")
     pl.add_argument("--all", action="store_true",
                      help="连已归档 / 已删除的项目一起列（默认看不到）")
+    pl.add_argument("--limit", type=int, default=50, help="最多列多少个（默认 50）")
     pl.set_defaults(func=cmd_project_list)
     ps = make(pj, "show", help="一个项目")
     ps.add_argument("project")

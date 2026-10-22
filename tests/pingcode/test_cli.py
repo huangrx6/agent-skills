@@ -230,6 +230,15 @@ class CliCase(unittest.TestCase):
         self.assertIn("缺陷", out)
         self.assertIn("bug", out)
 
+    def test_项目列表_limit_真的能限制条数(self):
+        code, out, _err, _router = self.run_cli(
+            ["project", "list", "--limit", "1"],
+            {("GET", "/v2/pjm/projects"): {"values": PROJECTS, "total": 2}})
+        self.assertEqual(0, code)
+        self.assertIn("演示项目", out)
+        self.assertNotIn("示例项目 B", out)
+        self.assertIn("最多显示 1 个", out)
+
     def test_列出某类型的属性方案(self):
         code, _out, _err, router = self.run_cli(
             ["list", "workitem_properties", "--project", "演示项目", "--type", "bug",
@@ -535,6 +544,30 @@ class CliCase(unittest.TestCase):
         self.assertEqual(1, code)
         self.assertIn("类型不一样", err)
         self.assertEqual([], router.find("PATCH", "/v2/pjm/workitems"))
+
+    def test_批量改跨项目要拒绝(self):
+        other = dict(WORKITEM, id="w2", identifier="DOC-2",
+                     project={"id": "pj2", "name": "示例项目 B"})
+        code, _out, err, router = self.run_cli(
+            ["workitem", "bulk-update", "--ids", "w1,w2", "--state", "已完成"],
+            {("GET", "/v2/pjm/workitems/w1"): WORKITEM,
+             ("GET", "/v2/pjm/workitems/w2"): other})
+        self.assertEqual(1, code)
+        self.assertIn("同一个项目", err)
+        self.assertEqual([], router.find("POST", "/v2/pjm/workitems/bulk/set"))
+
+    def test_批量改跨项目标题允许(self):
+        other = dict(WORKITEM, id="w2", identifier="DOC-2",
+                     project={"id": "pj2", "name": "示例项目 B"})
+        code, _out, _err, router = self.run_cli(
+            ["workitem", "bulk-update", "--ids", "w1,w2", "--title", "统一标题"],
+            {("GET", "/v2/pjm/workitems/w1"): WORKITEM,
+             ("GET", "/v2/pjm/workitems/w2"): other,
+             ("POST", "/v2/pjm/workitems/bulk/set"):
+                 [{"state": "success", "id": "w1"}, {"state": "success", "id": "w2"}]})
+        self.assertEqual(0, code)
+        body = router.find("POST", "/v2/pjm/workitems/bulk/set")[0][2]
+        self.assertEqual("title", body["property_name"])
 
     def test_批量改正常路径(self):
         code, out, _err, router = self.run_cli(
@@ -1056,6 +1089,26 @@ class CliCase(unittest.TestCase):
         self.assertEqual("演示项目", cfg.load_context()["project"])
         self.run_cli(["config", "context", "--clear"])
         self.assertEqual({}, cfg.load_context())
+
+    def test_config_refresh_states_要带_type(self):
+        code, out, err, router = self.run_cli(
+            ["config", "refresh", "--what", "states", "--project", "演示项目",
+             "--type", "bug", "--no-cache"],
+            {("GET", "/v2/pjm/workitem/workitem_types"):
+                 {"values": TYPES, "total": len(TYPES)},
+             ("GET", "/v2/pjm/workitem/workitem_states"):
+                 {"values": STATES, "total": len(STATES)}})
+        self.assertEqual(0, code, err)
+        self.assertIn("工作项状态", out)
+        url = router.find("GET", "/v2/pjm/workitem/workitem_states")[0][1]
+        self.assertIn("project_id=pj1", url)
+        self.assertIn("workitem_type_id=bug", url)
+
+    def test_config_refresh_states_缺_type_要报错(self):
+        code, _out, err, _router = self.run_cli(
+            ["config", "refresh", "--what", "states", "--project", "演示项目"])
+        self.assertEqual(1, code)
+        self.assertIn("--type", err)
 
     def test_没有上下文与参数时报错要说怎么补(self):
         code, _out, err, _router = self.run_cli(["workitem", "create", "--type", "bug", "--title", "x"])
