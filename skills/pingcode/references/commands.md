@@ -29,7 +29,7 @@ pingcode.py workitem list [--project X] [--type bug|缺陷] [--state 新建] \
 # 结构化搜索：GET 那套盖不住的场景（按创建时间、标题包含、组合条件…）
 pingcode.py workitem search --project X --type bug --created-after 2026-09-01
 pingcode.py workitem search --project X --type bug --title-contains 登录
-pingcode.py workitem search --filter '{"priority.id":{"in":["…"]}}'
+pingcode.py workitem search --filter '{"priority.id":{"in":["…"]}}' --page 1 --limit 50
 
 pingcode.py workitem show SCR-12            # 编号 / short_id / id 都收；带描述与链接
 pingcode.py workitem show SCR-12 --all      # 连已删除的一起看（DELETE 是软删除）

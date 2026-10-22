@@ -1077,7 +1077,7 @@ def cmd_workitem_search(args: argparse.Namespace) -> int:
         flt.update(extra)
 
     payload: dict[str, Any] = {"filter": flt, "page_size": min(max(1, args.limit), 100),
-                               "page_index": 0, "keywords": args.keywords}
+                               "page_index": max(0, args.page), "keywords": args.keywords}
     if args.all:
         payload["include_deleted"] = True
         payload["include_archived"] = True
@@ -2200,7 +2200,8 @@ def build_parser() -> argparse.ArgumentParser:
     ws2.add_argument("--created-before", help="创建时间不晚于")
     ws2.add_argument("--filter", help="原始过滤条件 JSON（操作符不带 $ 前缀，值必须是对象）")
     ws2.add_argument("--all", action="store_true", help="含已删除 / 已归档")
-    ws2.add_argument("--limit", type=int, default=30)
+    ws2.add_argument("--limit", type=int, default=30, help="每页条数，最大 100")
+    ws2.add_argument("--page", type=int, default=0, help="页码，从 0 开始")
     ws2.set_defaults(func=cmd_workitem_search)
     wbu = make(wsub, "bulk-update", help="批量改一个属性（官方限制：单属性 + 单值 + ≤100 个）")
     wbu.add_argument("--ids", required=True, help="逗号分隔的编号 / id，最多 100 个")

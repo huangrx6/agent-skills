@@ -559,6 +559,15 @@ class CliCase(unittest.TestCase):
     # ── 搜索 ──
     SEARCH_ROUTE = {("POST", "/v2/pjm/workitems/search"): {"values": [], "total": 0}}
 
+    def test_搜索支持页码(self):
+        code, _out, _err, router = self.run_cli(
+            ["workitem", "search", "--project", "演示项目", "--type", "bug",
+             "--page", "2", "--limit", "10"], dict(self.SEARCH_ROUTE))
+        self.assertEqual(0, code)
+        body = router.find("POST", "/v2/pjm/workitems/search")[0][2]
+        self.assertEqual(2, body["payload"]["page_index"])
+        self.assertEqual(10, body["payload"]["page_size"])
+
     def test_搜索的操作符写法与实测一致(self):
         """官方文档只列了操作符名字，没写格式 —— 这几条是实测出来的。"""
         code, _out, _err, router = self.run_cli(
