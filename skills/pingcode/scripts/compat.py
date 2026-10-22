@@ -29,6 +29,7 @@ PROJECT = "/v2/pjm/projects/{project_id}"
 PROJECT_PROGRESS = "/v2/pjm/projects/{project_id}/progress"
 COMMENTS = "/v2/comments"
 TRANSITION_HISTORIES = "/v2/pjm/workitems/{workitem_id}/transition_histories"
+WORKITEM_RELATIONS = "/v2/pjm/workitems/{workitem_id}/relations"
 ATTACHMENTS = "/v2/attachments"
 ATTACHMENT = ("/v2/attachments/{attachment_id}"
               "?principal_type={principal_type}&principal_id={principal_id}")

@@ -78,6 +78,12 @@
       "prompt": "SCR-5 这条工作项是怎么一步步改过来的？",
       "expected_output": "用 `workitem history SCR-5`，GET `/v2/pjm/workitems/{id}/transition_histories`，按时间列出原状态、新状态和操作人；不要用工作项的当前状态猜历史。已删除工作项的流转历史服务端不返回，要说明这一点。",
       "files": []
+    },
+    {
+      "id": 14,
+      "prompt": "SCR-5 和哪些工作项有关联？只看阻塞类的。",
+      "expected_output": "用 `workitem relations SCR-5 --type blocked_by`，GET `/v2/pjm/workitems/{id}/relations?relation_type=blocked_by`。当前工作项可能在 origin_workitem 也可能在 target_workitem，必须展示另一端，不能固定只显示 target。输出关联类型、另一端编号和标题；没有时说明还没有关联。",
+      "files": []
     }
   ]
 }

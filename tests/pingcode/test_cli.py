@@ -694,6 +694,51 @@ class CliCase(unittest.TestCase):
         self.assertIn("流转历史", err)
 
     # ── mine 缺 scope 时的替代做法 ──
+    def test_关联列表永远显示另一端(self):
+        relation = {
+            "id": "r1",
+            "relation_type": {"id": "rt1", "name": "阻塞", "category": "block"},
+            "origin_workitem": {"id": "w1", "whole_identifier": "DOC-1", "title": "登录页 500"},
+            "target_workitem": {"id": "w2", "whole_identifier": "DOC-2", "title": "支付回调"},
+        }
+        code, out, err, _router = self.run_cli(
+            ["workitem", "relations", "DOC-1"],
+            {("GET", "/v2/pjm/workitems"): {"values": [WORKITEM]},
+             ("GET", "/v2/pjm/workitems/w1/relations"):
+                 {"values": [relation], "total": 1}})
+        self.assertEqual(0, code, err)
+        self.assertIn("阻塞", out)
+        self.assertIn("DOC-2", out)
+        self.assertIn("支付回调", out)
+
+    def test_当前项是_target_时关联也显示另一端(self):
+        current = dict(WORKITEM, id="w2", identifier="DOC-2", title="支付回调")
+        relation = {
+            "id": "r1",
+            "relation_type": {"name": "被阻塞", "category": "blocked_by"},
+            "origin_workitem": {"id": "w1", "whole_identifier": "DOC-1", "title": "登录页 500"},
+            "target_workitem": {"id": "w2", "whole_identifier": "DOC-2", "title": "支付回调"},
+        }
+        code, out, err, _router = self.run_cli(
+            ["workitem", "relations", "DOC-2"],
+            {("GET", "/v2/pjm/workitems"): {"values": [current]},
+             ("GET", "/v2/pjm/workitems/w2/relations"):
+                 {"values": [relation], "total": 1}})
+        self.assertEqual(0, code, err)
+        self.assertIn("DOC-1", out)
+        self.assertIn("登录页 500", out)
+
+    def test_关联按类型过滤且空列表说人话(self):
+        code, out, _err, router = self.run_cli(
+            ["workitem", "relations", "DOC-1", "--type", "blocked_by"],
+            {("GET", "/v2/pjm/workitems"): {"values": [WORKITEM]},
+             ("GET", "/v2/pjm/workitems/w1/relations"):
+                 {"values": [], "total": 0}})
+        self.assertEqual(0, code)
+        self.assertIn("还没有关联", out)
+        url = router.find("GET", "/v2/pjm/workitems/w1/relations")[0][1]
+        self.assertIn("relation_type=blocked_by", url)
+
     def test_mine_缺_scope_时要给不改后台的办法(self):
         """实测：数据范围里没有 pcp:read:account:personal 时 /v2/myself 会 403。
         报错要点名 scope，并给出不用改后台的替代做法，否则「我的任务」是死胡同。

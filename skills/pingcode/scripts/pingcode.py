@@ -1112,6 +1112,35 @@ def cmd_workitem_history(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_workitem_relations(args: argparse.Namespace) -> int:
+    """列工作项内部关联：GET /v2/pjm/workitems/{id}/relations。"""
+    client = build_client(args)
+    current = fetch_workitem(client, args.ref)
+    path = _api.build(_compat.WORKITEM_RELATIONS, workitem_id=current["id"])
+    params = {"relation_type": args.type} if args.type else {}
+    values = client.paginate(path, max_items=args.limit, **params)
+    if args.full:
+        print(json.dumps(values, ensure_ascii=False, indent=2))
+        return 0
+    if not values:
+        print(f"{current.get('identifier', args.ref)} 还没有关联")
+        return 0
+    current_id = str(current.get("id") or "")
+    enriched: list[dict[str, Any]] = []
+    for value in values:
+        item = dict(value)
+        origin = value.get("origin_workitem") or {}
+        target = value.get("target_workitem") or {}
+        # 当前工作项可能在 origin，也可能在 target；永远展示“另一端”。
+        other = target if str(origin.get("id") or "") == current_id else origin
+        item["other_identifier"] = (other.get("whole_identifier")
+                                   or other.get("short_id") or other.get("id") or "")
+        item["other_title"] = other.get("title") or ""
+        enriched.append(item)
+    emit(_fmt.rows("relation", enriched), args, "relation", values)
+    return 0
+
+
 def cmd_workitem_attachments(args: argparse.Namespace) -> int:
     """列附件：GET /v2/attachments?principal_type=workitem&principal_id=<id>。
 
@@ -1598,6 +1627,11 @@ def build_parser() -> argparse.ArgumentParser:
     wh.add_argument("--limit", type=int, default=100)
     wh.add_argument("--all", action="store_true", help="按编号找时含已删除的")
     wh.set_defaults(func=cmd_workitem_history)
+    wr = make(wsub, "relations", help="工作项关联列表")
+    wr.add_argument("ref")
+    wr.add_argument("--type", help="关联类型：relate / block / blocked_by / … 或自定义类型 id")
+    wr.add_argument("--limit", type=int, default=100)
+    wr.set_defaults(func=cmd_workitem_relations)
     wat = make(wsub, "attachments", help="列附件")
     wat.add_argument("ref")
     wat.add_argument("--limit", type=int, default=50)

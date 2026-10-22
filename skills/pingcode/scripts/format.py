@@ -81,6 +81,12 @@ HISTORY = (
     ("created_by.display_name", "操作人"),
 )
 
+RELATION = (
+    ("relation_type.name", "类型"),
+    ("other_identifier", "关联项"),
+    ("other_title", "标题"),
+)
+
 # 这些字段按显示宽度截断（值是该列的最大显示宽度）。
 CLIP_FIELDS = {"content": 64, "title": 48, "download_url": 56}
 
@@ -126,6 +132,7 @@ SCHEMAS: dict[str, tuple[tuple[str, str], ...]] = {
     "comment": COMMENT,
     "attachment": ATTACHMENT,
     "history": HISTORY,
+    "relation": RELATION,
     "simple": SIMPLE,
 }
 

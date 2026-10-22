@@ -38,7 +38,7 @@ description: >-
 | 创建 / 更新 / 改状态 | `workitem create …` / `workitem update SCR-12 …` / `workitem set-state SCR-12 状态` |
 | 树形创建 / 单字段批量更新 | `workitem create-plan --file plan.json [--yes]` / `workitem bulk-update …` |
 | 评论 / 附件 | `workitem comment/comments/attachments/attach/attach-code/attach-remove …` |
-| 流转历史 | `workitem history SCR-12` |
+| 流转历史 / 内部关联 | `workitem history SCR-12` / `workitem relations SCR-12 [--type blocked_by]` |
 | 删除工作项 | `workitem delete SCR-12 --yes` |
 | 项目列表 / 详情 / 进度 / 创建 / 更新 | `project list/show/progress/create/update …` |
 | 字典 / 默认项目 | `list projects\|sprints\|types\|states\|priorities\|tags\|users\|project_states\|processes\|workitem_properties` / `config context --project X` |

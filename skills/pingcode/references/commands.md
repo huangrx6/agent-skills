@@ -34,6 +34,8 @@ pingcode.py workitem search --filter '{"priority.id":{"in":["…"]}}'
 pingcode.py workitem show SCR-12            # 编号 / short_id / id 都收；带描述与链接
 pingcode.py workitem show SCR-12 --all      # 连已删除的一起看（DELETE 是软删除）
 pingcode.py workitem history SCR-12         # 流转历史：时间 / 原状态 / 新状态 / 操作人
+pingcode.py workitem relations SCR-12       # 内部关联：类型 / 另一端编号 / 标题
+pingcode.py workitem relations SCR-12 --type blocked_by  # 只看某类关联
 pingcode.py project list [--keywords X] [--type scrum] [--all] [--limit 50]
 pingcode.py project show X
 pingcode.py project progress [--project X]
@@ -181,6 +183,7 @@ pingcode.py api --method POST --path /v2/comments --data '{"principal_type":"wor
 | --- | --- |
 | "我今天要做哪些事" | `workitem mine --open-only` ；企业令牌下用不了「我」，改 `workitem list --assignee <真名>` |
 | "这条怎么改过来的" | `workitem history SCR-12`；已删除工作项的流转历史服务端不返回 |
+| "这条和哪些工作项有关联" | `workitem relations SCR-12 [--type blocked_by]` |
 | "我名下某项目的任务" | `workitem mine --project X --open-only`（服务端按项目/类型过滤） |
 | "有哪些没修的缺陷" | `workitem mine --type bug --open-only`（指定项目时加 `--project X` 走服务端过滤） |
 | "把 SCR-12 关了" | 先 `workitem show SCR-12` 确认是它，再 `workitem set-state SCR-12 已完成`（状态名要真实存在，报错会列出可选项） |
