@@ -139,8 +139,11 @@ def out_path(name: str) -> str:
 
 def diff(root: str, want: dict | None = None, have: dict | None = None) -> dict[str, list[str]]:
     """返回 {缺登记, 哈希过期, 多出来的}。"""
-    have = (read_lock(root).get("skills") or {}) if have is None else have
-    want = expected(root) if want is None else want
+    if have is None:
+        have = read_lock(root).get("skills") or {}
+    if not isinstance(have, dict):
+        have = {}
+    want = want if isinstance(want, dict) else expected(root)
     missing = sorted(set(want) - set(have))
     extra = sorted(set(have) - set(want))
     stale = sorted(name for name in set(want) & set(have)

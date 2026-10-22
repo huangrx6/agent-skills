@@ -20,6 +20,7 @@ import random
 import re
 import sys
 import tempfile
+from typing import cast
 
 from PIL import Image, ImageDraw
 
@@ -76,7 +77,10 @@ def collage(seed: int, colors: dict, size: tuple[int, int]) -> Image.Image:
 def _has_transparency(path: str) -> bool:
     try:
         with Image.open(path) as image:
-            return image.convert("RGBA").getchannel("A").getextrema()[0] < 255
+            extrema = image.convert("RGBA").getchannel("A").getextrema()
+            if isinstance(extrema, tuple):
+                return cast(tuple[int, int], extrema)[0] < 255
+            return float(extrema) < 255
     except (OSError, ValueError):
         return False
 

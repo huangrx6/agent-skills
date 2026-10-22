@@ -574,6 +574,7 @@ def build_page(spec: dict, result: Any, boxes: dict,
     lines = [e["points"] for e in result.edges]
     router = _load_sibling("readable_routing") if ctx.preset != "fit" else None
     keepouts = [(p.x, p.y, p.width, p.height) for p in result.real_nodes().values()]
+    label_lines: list = []
     if router:
         for region in regions:
             if region.get("label"):

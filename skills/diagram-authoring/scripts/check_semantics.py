@@ -16,6 +16,8 @@ import sys
 def sibling(name):
     spec = importlib.util.spec_from_file_location(
         f"_semantic_{name}", Path(__file__).with_name(f"{name}.py"))
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"加载不了 {name}.py")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)

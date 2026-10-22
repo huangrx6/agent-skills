@@ -106,7 +106,7 @@ class SourceParser(HTMLParser):
             if tag == "meta" and (data.get("name") or "").lower() == "deck-media-policy":
                 raise SourceError("deck-media-policy is compiler-owned; use --raster-only instead")
             for key in ("src", "href", "xlink:href", "data", "poster", "background"):
-                if data.get(key) and svg_url(data[key]):
+                if data.get(key) and svg_url(str(data.get(key) or "")):
                     raise SourceError(f"Raster-only decks cannot use SVG in <{tag}> {key}")
             for key in ("srcset", "imagesrcset"):
                 if any(svg_url(value) for value in re.split(r"[\s,]+", data.get(key) or "")):
@@ -151,7 +151,7 @@ class SourceParser(HTMLParser):
                 f' {name}' + (f'="{html.escape(value, quote=True)}"' if value is not None else "")
                 for name, value in attrs if name != "class") + ">"
             pos = self.source_offset()
-            self.replacements.append((pos, pos + len(self.get_starttag_text()), canonical))
+            self.replacements.append((pos, pos + len(self.get_starttag_text() or ""), canonical))
         elif "data-slide" in data:
             raise SourceError('data-slide belongs only on <section class="slide">')
         if self.current is not None:
@@ -275,6 +275,8 @@ def main(argv=None):
         if args.image_plan:
             module_spec = importlib.util.spec_from_file_location(
                 "_deck_image_handoff", Path(__file__).with_name("image_handoff.py"))
+            if module_spec is None or module_spec.loader is None:
+                raise RuntimeError("加载不了 image_handoff.py")
             handoff = importlib.util.module_from_spec(module_spec)
             module_spec.loader.exec_module(handoff)
             try:
@@ -320,6 +322,8 @@ def main(argv=None):
         if args.check:
             module_spec = importlib.util.spec_from_file_location(
                 "_deck_web_check", Path(__file__).with_name("web_check.py"))
+            if module_spec is None or module_spec.loader is None:
+                raise RuntimeError("加载不了 web_check.py")
             checker = importlib.util.module_from_spec(module_spec)
             module_spec.loader.exec_module(checker)
             report = checker.inspect(args.out)

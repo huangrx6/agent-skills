@@ -28,6 +28,8 @@ OPTIONS = {
 def load_exporter(backend):
     spec = importlib.util.spec_from_file_location(
         f"_sync_export_{backend}", Path(__file__).with_name(f"export_{backend}.py"))
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"加载不了 export_{backend}.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

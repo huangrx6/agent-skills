@@ -103,7 +103,7 @@ def title_boxes(regions):
             for r in regions if r.get('label')]
 
 
-def _hits_rect(a, b, rect, pad=0):
+def _hits_rect(a, b, rect, pad: float = 0.0):
     x, y, w, h = rect
     lo, hi = 0., 1.
     for start, delta, low, high in ((a[0], b[0]-a[0], x-pad, x+w+pad),
@@ -274,6 +274,8 @@ def place_region_title(region, polylines, clearance=TEXT_CLEARANCE):
         hits=sum(_hits_rect(a,b,(x,y,width,height),clearance) for p in polylines for a,b in zip(p,p[1:]))
         if best is None or hits < best[0]: best=(hits,x,y)
         if not hits: break
+    if best is None:
+        return round(left,2),round(y,2),True
     return round(best[1],2),round(best[2],2),bool(best[0])
 
 
@@ -299,7 +301,9 @@ def place_label(points, width, height, polylines, keepouts, clearance=TEXT_CLEAR
                     penalty=line_hits+box_hits*10
                     if best is None or penalty < best[0]: best=(penalty,x,y)
                     if not penalty: return round(x,2),round(y,2),False
-    return (round(best[1],2),round(best[2],2),bool(best[0])) if best else (points[0][0],points[0][1],True)
+    if best is None:
+        return points[0][0], points[0][1], True
+    return round(best[1], 2), round(best[2], 2), bool(best[0])
 
 
 def path_midpoint(points):
@@ -333,6 +337,8 @@ def assess_scene(scene, layout=None):
         from pathlib import Path
         import sys
         spec=importlib.util.spec_from_file_location('_readable_audit_layout',Path(__file__).with_name('layout.py'))
+        if spec is None or spec.loader is None:
+            raise RuntimeError('加载不了 layout.py')
         layout=importlib.util.module_from_spec(spec); sys.modules[spec.name]=layout; spec.loader.exec_module(layout)
     for pair in layout.geometric_crossing_pairs(edges):
         findings.append({'code':'edge-crossing','edges':pair})
