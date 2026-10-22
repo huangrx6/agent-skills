@@ -108,6 +108,24 @@ SOURCES: dict[str, dict[str, Any]] = {
         "needs": (),
         "scopes": ("pcp:read:global:workload",),
     },
+    "user_groups": {
+        "label": _compat.DICT_LABELS["user_groups"],
+        "url": _compat.DICT_PATHS["user_groups"],
+        "needs": (),
+        "scopes": ("pcp:read:global:team",),
+    },
+    "roles": {
+        "label": _compat.DICT_LABELS["roles"],
+        "url": _compat.DICT_PATHS["roles"],
+        "needs": (),
+        "scopes": ("pcp:read:global:team",),
+    },
+    "boards": {
+        "label": _compat.DICT_LABELS["boards"],
+        "url": _compat.DICT_PATHS["boards"],
+        "needs": ("project_id",),
+        "scopes": ("pcp:read:pjm:board",),
+    },
     "users": {
         "label": _compat.DICT_LABELS["users"],
         "url": _compat.DICT_PATHS["users"],

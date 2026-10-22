@@ -156,6 +156,30 @@
       "prompt": "在项目里创建一个“后端”标签，改名为“服务端”，最后删掉。",
       "expected_output": "用 `tag create --project X --name 后端` POST `/v2/pjm/tags`；`tag update <tag_id> --name 服务端` PATCH；`tag delete <tag_id> --yes` DELETE。操作后刷新 tags 缓存，确认没有残留。",
       "files": []
+    },
+    {
+      "id": 27,
+      "prompt": "Open Team 这个团队里有谁在关注 SCR-5？",
+      "expected_output": "用 `workitem participants SCR-5`；关注人列表会区分 user / user_group。添加团队关注用 `workitem watch SCR-5 Open Team --group`，移除用 `unwatch … --group --yes`。",
+      "files": []
+    },
+    {
+      "id": 28,
+      "prompt": "看看项目里有哪些成员和角色。",
+      "expected_output": "用 `project members --project X`，GET `/v2/pjm/projects/{id}/members`；区分用户/用户组并显示 role.name。角色字典用 `list roles`。",
+      "files": []
+    },
+    {
+      "id": 29,
+      "prompt": "回复 SCR-5 上的评论 <id>，说“已修复”。",
+      "expected_output": "用 `workitem comment SCR-5 \"已修复\" --reply-to <id>`，POST `/v2/comments` 时带 reply_comment_id。评论会对外发送，只在明确要求时执行。",
+      "files": []
+    },
+    {
+      "id": 30,
+      "prompt": "看看 SCR-5 所在项目有哪些看板栏和泳道。",
+      "expected_output": "先 `list boards --project X`（仅 kanban/hybrid 支持看板），再用 `board entries --project X --board …` 和 `board swimlanes …`；scrum 项目返回“不支持看板”是正常限制。",
+      "files": []
     }
   ]
 }

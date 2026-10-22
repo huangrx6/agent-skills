@@ -37,6 +37,12 @@ pingcode.py workitem history SCR-12         # 流转历史：时间 / 原状态 
 pingcode.py workitem relations SCR-12       # 内部关联：类型 / 另一端编号 / 标题
 pingcode.py workitem relations SCR-12 --type blocked_by  # 只看某类关联
 pingcode.py workitem participants SCR-12    # 关注人 / 用户组
+pingcode.py list user_groups                # 团队（--group 关注/取消关注用）
+pingcode.py project members --project X     # 项目成员与角色
+pingcode.py list roles                      # 角色字典
+pingcode.py list boards --project X         # 看板（仅 kanban/hybrid）
+pingcode.py board entries --project X --board 默认看板
+pingcode.py board swimlanes --project X --board 默认看板
 pingcode.py workitem tags SCR-12            # 当前工作项已打的标签
 pingcode.py tag create --project X --name 后端   # 创建项目标签
 pingcode.py tag update <tag_id> --name 服务端   # 重命名
@@ -193,9 +199,11 @@ pingcode.py api --method POST --path /v2/comments --data '{"principal_type":"wor
 | "我今天要做哪些事" | `workitem mine --open-only` ；企业令牌下用不了「我」，改 `workitem list --assignee <真名>` |
 | "这条怎么改过来的" | `workitem history SCR-12`；已删除工作项的流转历史服务端不返回 |
 | "这条和哪些工作项有关联" | `workitem relations SCR-12 [--type blocked_by]` |
-| "谁在关注这条" | `workitem participants SCR-12` |
+| "谁在关注这条" | `workitem participants SCR-12` / `workitem watch SCR-12 Open Team --group` |
 | "给这条打/去标签" | `workitem tags SCR-12` / `workitem tag SCR-12 后端` / `workitem untag SCR-12 后端 --yes` |
 | "管理项目标签" | `tag create/update/delete …` |
+| "项目成员/角色" | `project members --project X` / `list roles` |
+| "看看看板栏/泳道" | `list boards --project X` / `board entries / swimlanes …` |
 | "登记/查看/修改工时" | `worklog add SCR-12 --duration 2` / `worklog list SCR-12` / `worklog update <id> --duration 3` |
 | "建/改迭代" | `sprint create …` / `sprint update …`（没有删除迭代接口） |
 | "删评论" | `workitem comment-delete SCR-12 <id> --yes`（官方没有评论编辑接口） |

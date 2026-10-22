@@ -94,6 +94,25 @@ PARTICIPANT = (
     ("id", "ID"),
 )
 
+MEMBER = (
+    ("kind", "类型"),
+    ("member", "成员"),
+    ("member_account", "账号"),
+    ("role.name", "角色"),
+    ("id", "ID"),
+)
+
+BOARD_ENTRY = (
+    ("name", "看板栏"),
+    ("wip_limit", "WIP"),
+    ("id", "ID"),
+)
+
+BOARD_SWIMLANE = (
+    ("name", "泳道"),
+    ("id", "ID"),
+)
+
 WORKLOG = (
     ("report_date", "日期"),
     ("type.name", "类型"),
@@ -150,6 +169,9 @@ SCHEMAS: dict[str, tuple[tuple[str, str], ...]] = {
     "history": HISTORY,
     "relation": RELATION,
     "participant": PARTICIPANT,
+    "member": MEMBER,
+    "board_entry": BOARD_ENTRY,
+    "board_swimlane": BOARD_SWIMLANE,
     "worklog": WORKLOG,
     "simple": SIMPLE,
 }

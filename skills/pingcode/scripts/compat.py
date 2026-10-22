@@ -27,6 +27,7 @@ WORKITEM_BULK = "/v2/pjm/workitems/bulk/set"
 PROJECTS = "/v2/pjm/projects"
 PROJECT = "/v2/pjm/projects/{project_id}"
 PROJECT_PROGRESS = "/v2/pjm/projects/{project_id}/progress"
+PROJECT_MEMBERS = "/v2/pjm/projects/{project_id}/members"
 COMMENTS = "/v2/comments"
 COMMENT_ONE = ("/v2/comments/{comment_id}"
                 "?principal_type={principal_type}&principal_id={principal_id}")
@@ -41,6 +42,9 @@ WORKITEM_TAG_ONE = "/v2/pjm/workitems/{workitem_id}/workitem_tags/{workitem_tag_
 WORKLOADS = "/v2/workloads"
 WORKLOAD_ONE = "/v2/workloads/{workload_id}"
 SPRINTS = "/v2/pjm/sprints"
+BOARDS = "/v2/pjm/boards?project_id={project_id}"
+BOARD_ENTRIES = "/v2/pjm/boards/{board_id}/entries"
+BOARD_SWIMLANES = "/v2/pjm/boards/{board_id}/swimlanes"
 SPRINT_ONE = "/v2/pjm/sprints/{sprint_id}"
 TAGS = "/v2/pjm/tags"
 TAG_ONE = "/v2/pjm/tags/{tag_id}"
@@ -64,6 +68,9 @@ DICT_PATHS: dict[str, str] = {
                            "?project_id={project_id}&workitem_type_id={workitem_type_id}"),
     "relation_types": "/v2/pjm/workitem_relation_types",
     "workload_types": "/v2/workload_types",
+    "user_groups": "/v2/directory/user_groups",
+    "roles": "/v2/directory/roles",
+    "boards": "/v2/pjm/boards?project_id={project_id}",
     "users": "/v2/directory/users",
     # V2 把项目流程改成了项目模板；保留 `list processes` 这个命令名，
     # 避免用户为了“看有哪些流程”再记一个新命令。
@@ -81,6 +88,9 @@ DICT_LABELS: dict[str, str] = {
     "workitem_properties": "工作项属性方案",
     "relation_types": "工作项关联类型",
     "workload_types": "工时类型",
+    "user_groups": "团队",
+    "roles": "角色",
+    "boards": "看板",
     "users": "企业成员",
     "processes": "项目模板",
 }

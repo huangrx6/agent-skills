@@ -185,6 +185,8 @@ class CliCase(unittest.TestCase):
         resolve.store("relation_types", {}, [{"id": "rt1", "name": "关联", "category": "relate"}])
         resolve.store("tags", {"project_id": "pj1"}, [{"id": "tag1", "name": "后端"}])
         resolve.store("workload_types", {}, [{"id": "wt1", "name": "研发"}])
+        resolve.store("user_groups", {}, [{"id": "g1", "name": "Open Team"}])
+        resolve.store("boards", {"project_id": "pj1"}, [{"id": "b1", "name": "默认看板"}])
 
     # ── 运行与断言 ──
     def run_cli(self, argv: list[str], routes: dict | None = None) -> tuple[int, str, str, Router]:
@@ -229,6 +231,46 @@ class CliCase(unittest.TestCase):
         url = router.find("GET", "/v2/pjm/projects")[0][1]
         self.assertIn("include_archived=true", url)
         self.assertIn("include_deleted=true", url)
+
+    def test_项目成员区分用户和用户组(self):
+        values = [
+            {"id": "u1", "type": "user",
+             "user": {"id": "u1", "name": "john", "display_name": "John"},
+             "role": {"name": "管理员"}},
+            {"id": "g1", "type": "user_group",
+             "user_group": {"id": "g1", "name": "Open Team"},
+             "role": {"name": "成员"}},
+        ]
+        code, out, err, _router = self.run_cli(
+            ["project", "members", "--project", "演示项目"],
+            {("GET", "/v2/pjm/projects/pj1/members"): {"values": values, "total": 2}})
+        self.assertEqual(0, code, err)
+        for text in ("John", "Open Team", "管理员", "成员"):
+            self.assertIn(text, out)
+
+    def test_看板栏目和泳道只读(self):
+        code, out, err, router = self.run_cli(
+            ["list", "boards", "--project", "演示项目", "--no-cache"],
+            {("GET", "/v2/pjm/projects"): {"values": PROJECTS, "total": len(PROJECTS)},
+             ("GET", "/v2/pjm/boards"): {"values": [{"id": "b1", "name": "默认看板"}], "total": 1}})
+        self.assertEqual(0, code, err)
+        self.assertIn("默认看板", out)
+        self.assertIn("project_id=pj1", router.find("GET", "/v2/pjm/boards")[0][1])
+
+        entries = [{"id": "e1", "name": "待办", "wip_limit": 3}]
+        code, out, err, _router = self.run_cli(
+            ["board", "entries", "--project", "演示项目", "--board", "默认看板"],
+            {("GET", "/v2/pjm/boards/b1/entries"): {"values": entries, "total": 1}})
+        self.assertEqual(0, code, err)
+        self.assertIn("待办", out)
+        self.assertIn("3", out)
+
+        lanes = [{"id": "s1", "name": "默认泳道"}]
+        code, out, err, _router = self.run_cli(
+            ["board", "swimlanes", "--project", "演示项目", "--board", "默认看板"],
+            {("GET", "/v2/pjm/boards/b1/swimlanes"): {"values": lanes, "total": 1}})
+        self.assertEqual(0, code, err)
+        self.assertIn("默认泳道", out)
 
     def test_列出某项目的类型(self):
         code, out, _err, _router = self.run_cli(["list", "types", "--project", "演示项目"])
@@ -704,6 +746,16 @@ class CliCase(unittest.TestCase):
         self.assertIn("principal_type=workitem", url)
         self.assertIn("principal_id=w1", url)
 
+    def test_评论可以带回复目标(self):
+        code, out, err, router = self.run_cli(
+            ["workitem", "comment", "DOC-1", "同意", "--reply-to", "c0"],
+            {("GET", "/v2/pjm/workitems"): {"values": [WORKITEM]},
+             ("POST", "/v2/comments"): {"id": "c1"}})
+        self.assertEqual(0, code, err)
+        self.assertIn("评论已创建", out)
+        body = router.find("POST", "/v2/comments")[0][2]
+        self.assertEqual("c0", body["reply_comment_id"])
+
     def test_列附件把大小变人看的(self):
         files = [{"id": "a1", "title": "控制台日志", "size": 2048, "type": "file",
                   "download_url": "https://x/a.log", "created_at": 1583290347,
@@ -968,6 +1020,23 @@ class CliCase(unittest.TestCase):
         url = router.find("DELETE", "/v2/participants/u1")[0][1]
         self.assertIn("principal_type=workitem", url)
         self.assertIn("principal_id=w1", url)
+
+        code, out, err, router = self.run_cli(
+            ["workitem", "watch", "w1", "Open Team", "--group"],
+            {("GET", "/v2/pjm/workitems/w1"): WORKITEM,
+             ("POST", "/v2/participants"): {"id": "g1", "type": "user_group"}})
+        self.assertEqual(0, code, err)
+        self.assertIn("关注人已添加", out)
+        body = router.find("POST", "/v2/participants")[0][2]
+        self.assertEqual("user_group", body["type"])
+        self.assertEqual("g1", body["participant_id"])
+
+        code, out, err, router = self.run_cli(
+            ["workitem", "unwatch", "w1", "Open Team", "--group", "--yes"],
+            {("GET", "/v2/pjm/workitems/w1"): WORKITEM,
+             ("DELETE", "/v2/participants/g1"): {}})
+        self.assertEqual(0, code, err)
+        self.assertIn("关注人已移除", out)
 
     def test_没有关注人时说一句人话(self):
         code, out, _err, _router = self.run_cli(

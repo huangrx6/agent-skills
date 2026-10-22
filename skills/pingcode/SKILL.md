@@ -40,10 +40,10 @@ description: >-
 | 创建 / 删除关联 | `workitem relate SCR-12 --to SCR-5 [--type relate]` / `workitem unrelate … --yes` |
 | 评论 / 附件 | `workitem comment/comments/comment-delete/attachments/attach/download/attach-code/attach-remove …` |
 | 流转历史 / 内部关联 / 关注人 | `workitem history SCR-12` / `workitem relations SCR-12` / `workitem participants SCR-12` |
-| 标签 / 关注人写入 | `workitem tags/tag/untag …` / `tag create/update/delete …` / `workitem watch/unwatch …` |
-| 工时 / 迭代 | `worklog list/add/update/delete …` / `sprint create/update …`（需要对应 scope） |
+| 标签 / 关注人写入 | `workitem tags/tag/untag …` / `tag create/update/delete …` / `workitem watch/unwatch … [--group]` |
+| 工时 / 迭代 / 看板 | `worklog …` / `sprint create/update …` / `list boards` / `board entries/swimlanes` |
 | 删除工作项 | `workitem delete SCR-12 --yes` |
-| 项目列表 / 详情 / 进度 / 创建 / 更新 | `project list/show/progress/create/update …` |
+| 项目列表 / 详情 / 进度 / 成员 / 创建 / 更新 | `project list/show/progress/members/create/update …` |
 | 字典 / 默认项目 | `list projects\|sprints\|types\|states\|priorities\|tags\|users\|project_states\|processes\|workitem_properties\|relation_types\|workload_types` / `config context --project X` |
 | 授权与诊断 | `auth login/status/logout` / `whoami` / `config show` |
 

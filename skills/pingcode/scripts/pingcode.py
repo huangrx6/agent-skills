@@ -428,6 +428,66 @@ def cmd_project_progress(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_project_members(args: argparse.Namespace) -> int:
+    """列项目成员：GET /v2/pjm/projects/{id}/members。"""
+    client = build_client(args)
+    pid, _pname = need_project(args, client)
+    path = _api.build(_compat.PROJECT_MEMBERS, project_id=pid)
+    values = client.paginate(path, max_items=args.limit)
+    if args.full:
+        print(json.dumps(values, ensure_ascii=False, indent=2))
+        return 0
+    if not values:
+        print("项目还没有成员")
+        return 0
+    enriched: list[dict[str, Any]] = []
+    for value in values:
+        item = dict(value)
+        user = value.get("user") or {}
+        group = value.get("user_group") or {}
+        kind = str(value.get("type") or "")
+        item["kind"] = {"user": "用户", "user_group": "用户组"}.get(kind, kind)
+        item["member"] = user.get("display_name") or group.get("name") or ""
+        item["member_account"] = user.get("name") or group.get("id") or ""
+        enriched.append(item)
+    emit(_fmt.rows("member", enriched), args, "member", values)
+    return 0
+
+
+def cmd_board_entries(args: argparse.Namespace) -> int:
+    """列看板栏：GET /v2/pjm/boards/{board_id}/entries。"""
+    client = build_client(args)
+    pid, _pname = need_project(args, client)
+    board = _resolve.find("boards", client, args.board, project_id=pid, force=args.no_cache)
+    path = _api.build(_compat.BOARD_ENTRIES, board_id=board["id"])
+    values = client.paginate(path, max_items=args.limit)
+    if args.full:
+        print(json.dumps(values, ensure_ascii=False, indent=2))
+        return 0
+    if not values:
+        print("看板还没有栏目")
+        return 0
+    emit(_fmt.rows("board_entry", values), args, "board_entry", values)
+    return 0
+
+
+def cmd_board_swimlanes(args: argparse.Namespace) -> int:
+    """列泳道：GET /v2/pjm/boards/{board_id}/swimlanes。"""
+    client = build_client(args)
+    pid, _pname = need_project(args, client)
+    board = _resolve.find("boards", client, args.board, project_id=pid, force=args.no_cache)
+    path = _api.build(_compat.BOARD_SWIMLANES, board_id=board["id"])
+    values = client.paginate(path, max_items=args.limit)
+    if args.full:
+        print(json.dumps(values, ensure_ascii=False, indent=2))
+        return 0
+    if not values:
+        print("看板还没有泳道")
+        return 0
+    emit(_fmt.rows("board_swimlane", values), args, "board_swimlane", values)
+    return 0
+
+
 def cmd_workitem_list(args: argparse.Namespace) -> int:
     client = build_client(args)
     params: dict[str, Any] = {"keywords": args.keywords}
@@ -582,7 +642,7 @@ def cmd_dict_list(args: argparse.Namespace) -> int:
         raise CliError(f"列{_resolve.SOURCES[kind]['label']}要指定类型：--type bug / task / …")
     project = pick(args, "project", "project")
     if kind in ("sprints", "types", "priorities", "tags", "states", "project_states",
-                "workitem_properties"):
+                "workitem_properties", "boards"):
         if not project:
             raise CliError(f"列{_resolve.SOURCES[kind]['label']}要指定项目：--project <名字>")
         keys["project_id"] = _resolve.project_id(client, project, force=args.no_cache)[0]
@@ -1289,16 +1349,24 @@ def cmd_workitem_untag(args: argparse.Namespace) -> int:
 
 
 def cmd_workitem_watch(args: argparse.Namespace) -> int:
-    """添加关注人：POST /v2/participants。"""
+    """添加关注人（用户或团队）：POST /v2/participants。"""
     client = build_client(args)
     current = fetch_workitem(client, args.ref)
-    user_id = _resolve.user_id(client, args.user, force=args.no_cache)
+    if args.group:
+        group = _resolve.find("user_groups", client, args.user, force=args.no_cache)
+        participant_id = str(group["id"])
+        kind = "user_group"
+        label = group.get("name") or participant_id
+    else:
+        participant_id = _resolve.user_id(client, args.user, force=args.no_cache)
+        kind = "user"
+        label = args.user
     body = {"principal_type": "workitem", "principal_id": current["id"],
-            "type": "user", "participant_id": user_id}
-    summary = f"把 {args.user} 加为 {current.get('identifier', args.ref)} 的关注人"
+            "type": kind, "participant_id": participant_id}
+    summary = f"把 {label} 加为 {current.get('identifier', args.ref)} 的关注人"
     result = perform(args, client, "POST", _compat.PARTICIPANTS, body=body, summary=summary)
     if result is not None and isinstance(result.data, dict):
-        print(f"✓ 关注人已添加（id={result.data.get('id', user_id)}）")
+        print(f"✓ 关注人已添加（id={result.data.get('id', participant_id)}）")
     return 0
 
 
@@ -1308,8 +1376,12 @@ def cmd_workitem_unwatch(args: argparse.Namespace) -> int:
     current = fetch_workitem(client, args.ref)
     if not args.yes and not args.dry_run:
         raise CliError(f"移除关注人会改变工作项。确认要移除 {args.user} 就加 --yes")
-    user_id = _resolve.user_id(client, args.user, force=args.no_cache)
-    path = _api.build(_compat.PARTICIPANT_ONE, participant_id=user_id,
+    if args.group:
+        participant_id = str(_resolve.find("user_groups", client, args.user,
+                                           force=args.no_cache)["id"])
+    else:
+        participant_id = _resolve.user_id(client, args.user, force=args.no_cache)
+    path = _api.build(_compat.PARTICIPANT_ONE, participant_id=participant_id,
                       principal_type="workitem", principal_id=current["id"])
     summary = f"把 {args.user} 从 {current.get('identifier', args.ref)} 的关注人移除"
     perform(args, client, "DELETE", path, summary=summary)
@@ -1598,6 +1670,8 @@ def cmd_workitem_comment(args: argparse.Namespace) -> int:
     client = build_client(args)
     current = fetch_workitem(client, args.ref)
     body = {"principal_type": "workitem", "principal_id": current["id"], "content": args.content}
+    if args.reply_to:
+        body["reply_comment_id"] = args.reply_to
     summary = f"给 {current.get('identifier', args.ref)} 加一条评论"
     result = perform(args, client, "POST", COMMENTS, body=body, summary=summary)
     if result is not None and isinstance(result.data, dict):
@@ -1944,6 +2018,10 @@ def build_parser() -> argparse.ArgumentParser:
     pp = make(pj, "progress", help="项目进度")
     pp.add_argument("--project")
     pp.set_defaults(func=cmd_project_progress)
+    pm = make(pj, "members", help="项目成员 / 用户组 / 角色")
+    pm.add_argument("--project")
+    pm.add_argument("--limit", type=int, default=100)
+    pm.set_defaults(func=cmd_project_members)
     pc = make(pj, "create", help="创建项目")
     pc.add_argument("--type", required=True, help="scrum / kanban / waterfall / hybrid")
     pc.add_argument("--name", required=True)
@@ -2000,6 +2078,19 @@ def build_parser() -> argparse.ArgumentParser:
     td.add_argument("tag_id")
     td.add_argument("--yes", action="store_true", help="确认删除")
     td.set_defaults(func=cmd_tag_delete)
+
+    board = make(sub, "board", help="看板只读（栏目 / 泳道）")
+    bsub = board.add_subparsers(dest="action", required=True)
+    be = make(bsub, "entries", help="列看板栏")
+    be.add_argument("--project")
+    be.add_argument("--board", required=True, help="看板名或 id（先用 list boards）")
+    be.add_argument("--limit", type=int, default=100)
+    be.set_defaults(func=cmd_board_entries)
+    bs = make(bsub, "swimlanes", help="列泳道")
+    bs.add_argument("--project")
+    bs.add_argument("--board", required=True, help="看板名或 id")
+    bs.add_argument("--limit", type=int, default=100)
+    bs.set_defaults(func=cmd_board_swimlanes)
 
     worklog = make(sub, "worklog", help="工时（/v2/workloads）")
     wlsub = worklog.add_subparsers(dest="action", required=True)
@@ -2127,6 +2218,7 @@ def build_parser() -> argparse.ArgumentParser:
     wcm = make(wsub, "comment", help="加评论")
     wcm.add_argument("ref")
     wcm.add_argument("content")
+    wcm.add_argument("--reply-to", help="回复的评论 id")
     wcm.set_defaults(func=cmd_workitem_comment)
     wcd = make(wsub, "comment-delete", help="删除一条评论（要 --yes）")
     wcd.add_argument("ref")
@@ -2169,11 +2261,13 @@ def build_parser() -> argparse.ArgumentParser:
     wp.set_defaults(func=cmd_workitem_participants)
     ww = make(wsub, "watch", help="添加关注人")
     ww.add_argument("ref")
-    ww.add_argument("user", help="成员名字 / id / @me")
+    ww.add_argument("user", help="成员/团队名字或 id；@me 仅对用户有效")
+    ww.add_argument("--group", action="store_true", help="按团队处理")
     ww.set_defaults(func=cmd_workitem_watch)
     wwu = make(wsub, "unwatch", help="移除关注人（要 --yes）")
     wwu.add_argument("ref")
-    wwu.add_argument("user", help="成员名字 / id / @me")
+    wwu.add_argument("user", help="成员/团队名字或 id")
+    wwu.add_argument("--group", action="store_true", help="按团队处理")
     wwu.add_argument("--yes", action="store_true", help="确认移除")
     wwu.set_defaults(func=cmd_workitem_unwatch)
     wt = make(wsub, "tags", help="工作项当前标签")
