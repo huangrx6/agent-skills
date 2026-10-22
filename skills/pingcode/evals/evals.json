@@ -186,6 +186,12 @@
       "prompt": "用结构化搜索查 SCR-5 所在的缺陷，但结果很多，给我看第二页。",
       "expected_output": "用 `workitem search --project … --type bug --page 1 --limit …`，POST `/v2/pjm/workitems/search` 的 payload 带 page_index=1、page_size≤100；不要每次只查第一页。",
       "files": []
+    },
+    {
+      "id": 32,
+      "prompt": "查这个项目里高优先级、带“后端”标签、父项是 SCR-1 的工作项；只看 9 月创建的。",
+      "expected_output": "用 `workitem list --project X --priority 高 --tag 后端 --parent SCR-1 --created-between 2026-09-01,2026-09-30`。优先级/标签按项目解析成 id，父项解析成真实 id，时间范围转成官方 created_between 的 start,end 时间戳；不要把这些条件静默丢掉。",
+      "files": []
     }
   ]
 }

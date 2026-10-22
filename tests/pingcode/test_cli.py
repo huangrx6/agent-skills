@@ -495,6 +495,28 @@ class CliCase(unittest.TestCase):
         self.assertIn("template_type=scrum", url)
         self.assertNotIn("&type=scrum", url)
 
+    def test_工作项列表的优先级标签父项与创建人过滤(self):
+        code, _out, err, router = self.run_cli(
+            ["workitem", "list", "--project", "演示项目", "--priority", "高",
+             "--tag", "后端", "--parent", "w1", "--created-by", "John"],
+            {("GET", "/v2/pjm/workitems/w1"): WORKITEM,
+             ("GET", "/v2/pjm/workitems"): {"values": [WORKITEM], "total": 1}})
+        self.assertEqual(0, code, err)
+        url = router.find("GET", "/v2/pjm/workitems")[-1][1]
+        for part in ("priority_id=pr1", "tag_id=tag1", "parent_id=w1", "created_by=u1"):
+            self.assertIn(part, url)
+
+    def test_工作项列表时间范围过滤(self):
+        code, _out, err, router = self.run_cli(
+            ["workitem", "list", "--project", "演示项目",
+             "--created-between", "2026-09-01,2026-09-30",
+             "--updated-between", "2026-09-01,2026-09-30"],
+            {("GET", "/v2/pjm/workitems"): {"values": [], "total": 0}})
+        self.assertEqual(0, code, err)
+        url = router.find("GET", "/v2/pjm/workitems")[0][1]
+        self.assertIn("created_between=", url)
+        self.assertIn("updated_between=", url)
+
     def test_编号查询_V2_拆成数字和项目_id(self):
         code, _out, _err, router = self.run_cli(
             ["workitem", "show", "DEMO-1"],

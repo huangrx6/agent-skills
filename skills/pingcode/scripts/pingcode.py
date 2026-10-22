@@ -522,6 +522,34 @@ def cmd_workitem_list(args: argparse.Namespace) -> int:
         params["sprint_id"] = _resolve.find("sprints", client, args.sprint,
                                             force=args.no_cache,
                                             project_id=params["project_id"])["id"]
+    if args.priority:
+        if not params.get("project_id"):
+            raise CliError("按优先级过滤要指定项目：--project")
+        params["priority_id"] = _resolve.find("priorities", client, args.priority,
+                                              force=args.no_cache,
+                                              project_id=params["project_id"])["id"]
+    if args.tag:
+        if not params.get("project_id"):
+            raise CliError("按标签过滤要指定项目：--project")
+        params["tag_id"] = _resolve.find("tags", client, args.tag,
+                                         force=args.no_cache,
+                                         project_id=params["project_id"])["id"]
+    if args.parent:
+        params["parent_id"] = fetch_workitem(client, args.parent)["id"]
+    if args.created_by:
+        params["created_by"] = _resolve.user_id(client, args.created_by, force=args.no_cache)
+    if args.participant:
+        params["participant_id"] = _resolve.user_id(client, args.participant, force=args.no_cache)
+    if args.created_between:
+        params["created_between"] = _time_range(args.created_between, "--created-between")
+    if args.updated_between:
+        params["updated_between"] = _time_range(args.updated_between, "--updated-between")
+    if args.board:
+        params["board_id"] = args.board
+    if args.entry:
+        params["entry_id"] = args.entry
+    if args.swimlane:
+        params["swimlane_id"] = args.swimlane
     if args.all:
         params["include_archived"] = BOOLEAN_TRUE
         params["include_deleted"] = BOOLEAN_TRUE
@@ -661,6 +689,14 @@ def cmd_dict_list(args: argparse.Namespace) -> int:
 def _has_clock(text: str) -> bool:
     """输入里有没有时分秒；决定 V2 日期对象的 `with_time`。"""
     return ":" in str(text or "")
+
+
+def _time_range(text: str, flag: str) -> str:
+    """`start,end` → `timestamp,timestamp`；官方 created_between/updated_between 的格式。"""
+    parts = [part.strip() for part in str(text or "").split(",")]
+    if len(parts) != 2 or not all(parts):
+        raise CliError(f"{flag} 要写成 开始,结束（例如 2026-09-01,2026-09-30）")
+    return ",".join(str(_fmt.parse_time(part)) for part in parts)
 
 
 def _parse_property_value(raw: str) -> Any:
@@ -2128,6 +2164,16 @@ def build_parser() -> argparse.ArgumentParser:
     wl.add_argument("--state")
     wl.add_argument("--assignee", help="负责人：名字 / id / @me")
     wl.add_argument("--sprint")
+    wl.add_argument("--priority")
+    wl.add_argument("--tag")
+    wl.add_argument("--parent", help="父工作项编号 / id")
+    wl.add_argument("--created-by", help="创建人：名字 / id / @me")
+    wl.add_argument("--participant", help="关注人：名字 / id / @me")
+    wl.add_argument("--created-between", help="创建时间范围：2026-09-01,2026-09-30")
+    wl.add_argument("--updated-between", help="更新时间范围：2026-09-01,2026-09-30")
+    wl.add_argument("--board", help="看板 id")
+    wl.add_argument("--entry", help="看板栏 id")
+    wl.add_argument("--swimlane", help="泳道 id")
     wl.add_argument("--keywords")
     wl.add_argument("--identifier", help="工作项编号，如 SCR-12")
     wl.add_argument("--limit", type=int, default=50)

@@ -24,6 +24,10 @@ pingcode.py workitem mine [--project X] [--type bug|缺陷] [--open-only] [--lim
 # 按条件查（--project 不给就用上下文里的当前项目）
 pingcode.py workitem list [--project X] [--type bug|缺陷] [--state 新建] \
                           [--assignee 张三|@me] [--sprint "Sprint 12"] \
+                          [--priority 高] [--tag 后端] [--parent SCR-1] \
+                          [--created-by 张三] [--participant 张三] \
+                          [--created-between 2026-09-01,2026-09-30] \
+                          [--updated-between 2026-09-01,2026-09-30] \
                           [--keywords 登录] [--identifier SCR-12] [--limit 50] [--all]
 
 # 结构化搜索：GET 那套盖不住的场景（按创建时间、标题包含、组合条件…）
