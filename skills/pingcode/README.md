@@ -21,6 +21,7 @@ python3 skills/pingcode/scripts/pingcode.py workitem show SCR-12
 python3 skills/pingcode/scripts/pingcode.py workitem history SCR-12
 python3 skills/pingcode/scripts/pingcode.py workitem relations SCR-12
 python3 skills/pingcode/scripts/pingcode.py workitem participants SCR-12
+python3 skills/pingcode/scripts/pingcode.py workitem tags SCR-12
 python3 skills/pingcode/scripts/pingcode.py workitem create --project X --type bug --title '登录失败' --dry-run
 ```
 

@@ -32,6 +32,10 @@ TRANSITION_HISTORIES = "/v2/pjm/workitems/{workitem_id}/transition_histories"
 WORKITEM_RELATIONS = "/v2/pjm/workitems/{workitem_id}/relations"
 WORKITEM_RELATION_ONE = "/v2/pjm/workitems/{workitem_id}/relations/{relation_id}"
 PARTICIPANTS = "/v2/participants"
+PARTICIPANT_ONE = ("/v2/participants/{participant_id}"
+                   "?principal_type={principal_type}&principal_id={principal_id}")
+WORKITEM_TAGS = "/v2/pjm/workitems/{workitem_id}/workitem_tags"
+WORKITEM_TAG_ONE = "/v2/pjm/workitems/{workitem_id}/workitem_tags/{workitem_tag_id}"
 ATTACHMENTS = "/v2/attachments"
 ATTACHMENT = ("/v2/attachments/{attachment_id}"
               "?principal_type={principal_type}&principal_id={principal_id}")

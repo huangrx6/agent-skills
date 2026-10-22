@@ -182,6 +182,7 @@ class CliCase(unittest.TestCase):
                        [{"id": "description"}, {"id": "story_points"},
                         {"id": "estimated_workload"}, {"id": "remaining_workload"}])
         resolve.store("relation_types", {}, [{"id": "rt1", "name": "关联", "category": "relate"}])
+        resolve.store("tags", {"project_id": "pj1"}, [{"id": "tag1", "name": "后端"}])
 
     # ── 运行与断言 ──
     def run_cli(self, argv: list[str], routes: dict | None = None) -> tuple[int, str, str, Router]:
@@ -827,6 +828,67 @@ class CliCase(unittest.TestCase):
         for text in ("用户", "John", "用户组", "Open Team"):
             self.assertIn(text, out)
         url = router.find("GET", "/v2/participants")[0][1]
+        self.assertIn("principal_type=workitem", url)
+        self.assertIn("principal_id=w1", url)
+
+    def test_标签列表添加和移除(self):
+        tagged = dict(WORKITEM, tags=[{"id": "tag1", "name": "后端"}])
+        code, out, _err, _router = self.run_cli(
+            ["workitem", "tags", "w1"],
+            {("GET", "/v2/pjm/workitems/w1"): tagged})
+        self.assertEqual(0, code)
+        self.assertIn("后端", out)
+
+        code, out, err, router = self.run_cli(
+            ["workitem", "tag", "w1", "后端"],
+            {("GET", "/v2/pjm/workitems/w1"): dict(WORKITEM, tags=[]),
+             ("POST", "/v2/pjm/workitems/w1/workitem_tags"):
+                 {"id": "tag1", "name": "后端"}})
+        self.assertEqual(0, code, err)
+        self.assertIn("标签已添加", out)
+        body = router.find("POST", "/v2/pjm/workitems/w1/workitem_tags")[0][2]
+        self.assertEqual({"tag_id": "tag1"}, body)
+
+        code, _out, err, router = self.run_cli(
+            ["workitem", "untag", "w1", "后端"],
+            {("GET", "/v2/pjm/workitems/w1"): tagged})
+        self.assertEqual(1, code)
+        self.assertIn("--yes", err)
+
+        code, out, err, router = self.run_cli(
+            ["workitem", "untag", "w1", "后端", "--yes"],
+            {("GET", "/v2/pjm/workitems/w1"): tagged,
+             ("DELETE", "/v2/pjm/workitems/w1/workitem_tags/tag1"): {}})
+        self.assertEqual(0, code, err)
+        self.assertIn("标签已移除", out)
+        self.assertEqual(1, len(router.find("DELETE", "/v2/pjm/workitems/w1/workitem_tags/tag1")))
+
+    def test_关注人添加和移除(self):
+        code, out, err, router = self.run_cli(
+            ["workitem", "watch", "w1", "John"],
+            {("GET", "/v2/pjm/workitems/w1"): WORKITEM,
+             ("POST", "/v2/participants"): {"id": "u1", "type": "user"}})
+        self.assertEqual(0, code, err)
+        self.assertIn("关注人已添加", out)
+        body = router.find("POST", "/v2/participants")[0][2]
+        self.assertEqual("workitem", body["principal_type"])
+        self.assertEqual("w1", body["principal_id"])
+        self.assertEqual("user", body["type"])
+        self.assertEqual("u1", body["participant_id"])
+
+        code, _out, err, _router = self.run_cli(
+            ["workitem", "unwatch", "w1", "John"],
+            {("GET", "/v2/pjm/workitems/w1"): WORKITEM})
+        self.assertEqual(1, code)
+        self.assertIn("--yes", err)
+
+        code, out, err, router = self.run_cli(
+            ["workitem", "unwatch", "w1", "John", "--yes"],
+            {("GET", "/v2/pjm/workitems/w1"): WORKITEM,
+             ("DELETE", "/v2/participants/u1"): {}})
+        self.assertEqual(0, code, err)
+        self.assertIn("关注人已移除", out)
+        url = router.find("DELETE", "/v2/participants/u1")[0][1]
         self.assertIn("principal_type=workitem", url)
         self.assertIn("principal_id=w1", url)
 

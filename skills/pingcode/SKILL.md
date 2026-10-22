@@ -40,6 +40,7 @@ description: >-
 | 创建 / 删除关联 | `workitem relate SCR-12 --to SCR-5 [--type relate]` / `workitem unrelate … --yes` |
 | 评论 / 附件 | `workitem comment/comments/attachments/attach/download/attach-code/attach-remove …` |
 | 流转历史 / 内部关联 / 关注人 | `workitem history SCR-12` / `workitem relations SCR-12` / `workitem participants SCR-12` |
+| 标签 / 关注人写入 | `workitem tags/tag/untag …` / `workitem watch/unwatch …` |
 | 删除工作项 | `workitem delete SCR-12 --yes` |
 | 项目列表 / 详情 / 进度 / 创建 / 更新 | `project list/show/progress/create/update …` |
 | 字典 / 默认项目 | `list projects\|sprints\|types\|states\|priorities\|tags\|users\|project_states\|processes\|workitem_properties` / `config context --project X` |

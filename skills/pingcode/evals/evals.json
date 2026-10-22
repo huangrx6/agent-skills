@@ -102,6 +102,18 @@
       "prompt": "把 SCR-5 关联到 SCR-12，用普通关联；之后如果建错了要能删掉。",
       "expected_output": "用 `workitem relate SCR-5 --to SCR-12 --type relate`，POST `/v2/pjm/workitems/{id}/relations`，body 是 target_workitem_id + relation_type_id。删除用 `workitem unrelate SCR-5 <relation_id> --yes`，DELETE 对应关系；不能把“删除关联”做成删除工作项。",
       "files": []
+    },
+    {
+      "id": 18,
+      "prompt": "给 SCR-5 打上“后端”标签，打完确认一下；如果打错了要能去掉。",
+      "expected_output": "先确认标签在项目标签字典里（`list tags --project … --no-cache` 可刷新缓存），用 `workitem tag SCR-5 后端` POST `/v2/pjm/workitems/{id}/workitem_tags`，body `tag_id`；用 `workitem tags SCR-5` 查看当前标签；移除用 `workitem untag SCR-5 后端 --yes`，DELETE `/v2/pjm/workitems/{id}/workitem_tags/{tag_id}`。",
+      "files": []
+    },
+    {
+      "id": 19,
+      "prompt": "帮我关注 SCR-5，之后再取消关注。",
+      "expected_output": "用 `workitem watch SCR-5 @me` POST `/v2/participants`，body 含 principal_type=workitem、principal_id、type=user、participant_id；用 `workitem participants SCR-5` 确认；取消用 `workitem unwatch SCR-5 @me --yes` DELETE 对应 participant。不要误删工作项。",
+      "files": []
     }
   ]
 }

@@ -37,6 +37,7 @@ pingcode.py workitem history SCR-12         # 流转历史：时间 / 原状态 
 pingcode.py workitem relations SCR-12       # 内部关联：类型 / 另一端编号 / 标题
 pingcode.py workitem relations SCR-12 --type blocked_by  # 只看某类关联
 pingcode.py workitem participants SCR-12    # 关注人 / 用户组
+pingcode.py workitem tags SCR-12            # 当前工作项已打的标签
 pingcode.py workitem download SCR-12 <附件 id> --out ./日志.txt  # 下载附件
 pingcode.py project list [--keywords X] [--type scrum] [--all] [--limit 50]
 pingcode.py project show X
@@ -187,6 +188,7 @@ pingcode.py api --method POST --path /v2/comments --data '{"principal_type":"wor
 | "这条怎么改过来的" | `workitem history SCR-12`；已删除工作项的流转历史服务端不返回 |
 | "这条和哪些工作项有关联" | `workitem relations SCR-12 [--type blocked_by]` |
 | "谁在关注这条" | `workitem participants SCR-12` |
+| "给这条打/去标签" | `workitem tags SCR-12` / `workitem tag SCR-12 后端` / `workitem untag SCR-12 后端 --yes` |
 | "把附件下载下来" | `workitem download SCR-12 <附件 id> --out ./文件` |
 | "把两条工作项关联起来" | `workitem relate SCR-12 --to SCR-5 [--type relate]` |
 | "我名下某项目的任务" | `workitem mine --project X --open-only`（服务端按项目/类型过滤） |
