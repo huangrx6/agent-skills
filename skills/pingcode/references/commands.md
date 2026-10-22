@@ -18,7 +18,8 @@
 # 我名下（--open-only 排除 state.type 为 completed / closed 的）
 # --type 可以用中文（缺陷 / 任务 …）；V2 的系统类型 id 是 24 位，
 # 没有项目上下文时按 type.group / type.name 本地过滤
-pingcode.py workitem mine [--type bug|缺陷] [--open-only] [--limit 100]
+pingcode.py workitem mine [--project X] [--type bug|缺陷] [--open-only] [--limit 100]
+# 有 --project 时解析 type_id 交给服务端过滤；没有时按页扫描本地过滤（最多 1000 条，超出会提示）
 
 # 按条件查（--project 不给就用上下文里的当前项目）
 pingcode.py workitem list [--project X] [--type bug|缺陷] [--state 新建] \
@@ -176,7 +177,8 @@ pingcode.py api --method POST --path /v2/comments --data '{"principal_type":"wor
 | 用户这么说 | 这样做 |
 | --- | --- |
 | "我今天要做哪些事" | `workitem mine --open-only` ；企业令牌下用不了「我」，改 `workitem list --assignee <真名>` |
-| "有哪些没修的缺陷" | `workitem mine --type bug --open-only` 或 `workitem list --type bug` |
+| "我名下某项目的任务" | `workitem mine --project X --open-only`（服务端按项目/类型过滤） |
+| "有哪些没修的缺陷" | `workitem mine --type bug --open-only`（指定项目时加 `--project X` 走服务端过滤） |
 | "把 SCR-12 关了" | 先 `workitem show SCR-12` 确认是它，再 `workitem set-state SCR-12 已完成`（状态名要真实存在，报错会列出可选项） |
 | "建一个需求 / 任务 / 缺陷" | `workitem create`，`--type story\|task\|bug`；缺的信息（项目、标题）先问，别编。不确定先 `--dry-run` |
 | "建一棵史诗 → 特性 → 故事 → 任务" | 写一份 `plan.json` 跑 `workitem create-plan --file plan.json`（先看树）→ 授权已覆盖该计划时加 `--yes`。比逐条 create 少一整轮编号传递 |

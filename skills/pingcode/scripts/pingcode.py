@@ -73,6 +73,8 @@ _IDENTIFIER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*-\d+$")
 # 判据用**黑名单**（不等于这几个就算未完成）：以后出现新的语义值时，
 # 会被算进「未完成」—— 宁可多列，也不要把活藏起来。
 DONE_STATE_TYPES = ("completed", "closed")
+MINE_SCAN_PAGE = 100
+MINE_SCAN_CAP = 1000
 BOOLEAN_TRUE = "true"
 
 
@@ -489,6 +491,34 @@ def _type_matches(item: dict[str, Any], want: str, original: str) -> bool:
             or str(item.get("type") or "") == want)
 
 
+def _mine_scan(client: Any, params: dict[str, Any], limit: int,
+               local_type: str, original: str, open_only: bool) -> tuple[list, int, bool]:
+    """没有项目上下文时，按页扫描直到凑够匹配项；避免只过滤第一页。"""
+    pairs: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    scanned = 0
+    page = 0
+    while len(pairs) < limit and scanned < MINE_SCAN_CAP:
+        result = client.get(WORKITEM, page_size=MINE_SCAN_PAGE, page_index=page, **params)
+        values = result.values
+        if not values:
+            break
+        scanned += len(values)
+        for value in values:
+            item = _compat.normalize_workitem(value)
+            if local_type and not _type_matches(item, local_type, original):
+                continue
+            if open_only and str(_fmt.dig(item, "state.type") or "") in DONE_STATE_TYPES:
+                continue
+            pairs.append((value, item))
+            if len(pairs) >= limit:
+                break
+        if len(values) < MINE_SCAN_PAGE:
+            break
+        page += 1
+    truncated = len(pairs) < limit and scanned >= MINE_SCAN_CAP
+    return pairs, scanned, truncated
+
+
 def cmd_workitem_mine(args: argparse.Namespace) -> int:
     client = build_client(args)
     try:
@@ -506,27 +536,37 @@ def cmd_workitem_mine(args: argparse.Namespace) -> int:
     params: dict[str, Any] = {"assignee_id": me}
     raw_type = str(args.type or "").strip()
     local_type = ""
+    project_id = ""
+    if args.project:
+        project_id, _ = _resolve.project_id(client, args.project, force=args.no_cache)
+        params["project_id"] = project_id
     if raw_type:
-        # V2 的系统类型 id 是 24 位，不能把 `bug` / `缺陷` 直接当 type_id 发。
-        # 有 id 就交给服务端过滤；没有项目上下文时按 type.group / type.name 本地过滤。
-        if _looks_like_id(raw_type):
+        # 有项目上下文就解析成 type_id 交给服务端；没有就只能本地按 group / name 过滤。
+        if project_id:
+            params["type_id"] = resolve_type(args, client, project_id)
+        elif _looks_like_id(raw_type):
             params["type_id"] = raw_type
         else:
             local_type = system_type_or_raw(raw_type)
-    raw_values = client.paginate(WORKITEM, max_items=args.limit, **params)
-    pairs = [(value, _compat.normalize_workitem(value)) for value in raw_values]
-    if local_type:
-        pairs = [(raw, value) for raw, value in pairs
-                 if _type_matches(value, local_type, raw_type)]
-    values = [value for _raw, value in pairs]
-    raw_values = [raw for raw, _value in pairs]
-    open_pairs = [(raw, value) for raw, value in pairs
-                  if str(_fmt.dig(value, "state.type") or "") not in DONE_STATE_TYPES]
-    open_items = [value for _raw, value in open_pairs]
-    if args.open_only:
-        values = open_items
-        raw_values = [raw for raw, _value in open_pairs]
+    limit = max(1, int(args.limit or 1))
+    scanned = 0
+    truncated = False
+    if local_type or args.open_only:
+        pairs, scanned, truncated = _mine_scan(
+            client, params, limit, local_type, raw_type, bool(args.open_only))
+        values = [value for _raw, value in pairs]
+        raw_values = [raw for raw, _value in pairs]
+    else:
+        raw_values = client.paginate(WORKITEM, max_items=limit, **params)
+        pairs = [(value, _compat.normalize_workitem(value)) for value in raw_values]
+        values = [value for _raw, value in pairs]
+    open_items = values if args.open_only else [
+        value for _raw, value in pairs
+        if str(_fmt.dig(value, "state.type") or "") not in DONE_STATE_TYPES]
     emit(_fmt.rows("workitem", values), args, "workitem", raw_values)
+    if truncated:
+        print(f"（只扫描了前 {scanned} 条，找到 {len(values)} 条；"
+              "加 --project 可让服务端按类型过滤，或调大 --limit）")
     if not args.full:
         print(f"（我名下 {len(values)} 条，其中未完成 {len(open_items)} 条）")
     return 0
@@ -1414,6 +1454,7 @@ def build_parser() -> argparse.ArgumentParser:
     ws.add_argument("--all", action="store_true", help="连已删除的一起看（默认看不到已删除的）")
     ws.set_defaults(func=cmd_workitem_show)
     wm = make(wsub, "mine", help="我名下的工作项")
+    wm.add_argument("--project", help="按项目过滤；给了就让服务端按类型过滤")
     wm.add_argument("--type")
     wm.add_argument("--limit", type=int, default=100)
     wm.add_argument("--open-only", action="store_true", help="只要未完成的")

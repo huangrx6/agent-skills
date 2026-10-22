@@ -680,6 +680,43 @@ class CliCase(unittest.TestCase):
         self.assertIn("D-1", out)
         self.assertNotIn("D-2", out, "本地过滤要排掉其他类型")
 
+    def test_mine_有项目时用服务端_type_id(self):
+        items = [
+            {"id": "1", "identifier": "D-1", "state": {"type": "pending"},
+             "type": {"id": "t1", "name": "缺陷", "group": "bug"}},
+        ]
+        code, out, err, router = self.run_cli(
+            ["workitem", "mine", "--project", "演示项目", "--type", "缺陷"],
+            {("GET", "/v2/myself"): {"id": "u1", "name": "john"},
+             ("GET", "/v2/pjm/workitems"): {"values": items, "total": 1}})
+        self.assertEqual(0, code, err)
+        url = router.find("GET", "/v2/pjm/workitems")[0][1]
+        self.assertIn("project_id=pj1", url)
+        self.assertIn("type_id=bug", url)
+        self.assertIn("D-1", out)
+
+    def test_mine_本地类型过滤会翻页(self):
+        """目标类型不在第一页时不能直接放弃；要按页扫描到凑够 --limit。"""
+        task = {"id": "t", "identifier": "TASK-1", "state": {"type": "pending"},
+                "type": {"id": "t2", "name": "任务", "group": "task"}}
+        bug = {"id": "b", "identifier": "BUG-101", "title": "目标的缺陷",
+               "state": {"type": "pending"},
+               "type": {"id": "t1", "name": "缺陷", "group": "bug"}}
+
+        def pages(request):
+            if "page_index=0" in request.full_url:
+                return {"values": [task] * 100, "total": 101}
+            return {"values": [bug], "total": 101}
+
+        code, out, err, router = self.run_cli(
+            ["workitem", "mine", "--type", "缺陷", "--limit", "1", "--open-only"],
+            {("GET", "/v2/myself"): {"id": "u1", "name": "john"},
+             ("GET", "/v2/pjm/workitems"): pages})
+        self.assertEqual(0, code, err)
+        self.assertEqual(2, len(router.find("GET", "/v2/pjm/workitems")))
+        self.assertIn("BUG-101", out)
+        self.assertNotIn("TASK-1", out)
+
     # ── 计划：一次建一棵树 ──
     def write_temp(self, name: str, text: str) -> str:
         path = os.path.join(self._tmp.name, name)

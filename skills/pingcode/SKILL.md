@@ -32,7 +32,7 @@ description: >-
 
 | 任务 | 命令 |
 | --- | --- |
-| 我的未完成任务 / 缺陷 | `workitem mine --open-only [--type bug]` |
+| 我的未完成任务 / 缺陷 | `workitem mine --open-only [--type bug] [--project X]` |
 | 条件列表 / 结构化搜索 | `workitem list …` / `workitem search …` |
 | 详情 | `workitem show SCR-12 [--all]` |
 | 创建 / 更新 / 改状态 | `workitem create …` / `workitem update SCR-12 …` / `workitem set-state SCR-12 状态` |
