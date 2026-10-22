@@ -120,6 +120,30 @@
       "prompt": "给 SCR-5 登记 2 小时研发工时，日期 2026-09-20；然后查一下再删掉。",
       "expected_output": "用 `worklog add SCR-5 --duration 2 --type 研发 --date 2026-09-20`，POST `/v2/workloads`，body 含 principal_type=workitem、principal_id、duration、report_at 日期对象；用 `worklog list SCR-5` 查，删除用 `worklog delete <id> --yes`。缺 workload scope 时说明需要 `pcp:write:global:workload` 与工作项主体作用域，不要伪造成功。",
       "files": []
+    },
+    {
+      "id": 21,
+      "prompt": "把工时 <id> 改成 3 小时，并补一句说明。",
+      "expected_output": "用 `worklog update <id> --duration 3 --description …`，PATCH `/v2/workloads/{id}`；只发改动字段，时长仍限制在 0–24 小时。",
+      "files": []
+    },
+    {
+      "id": 22,
+      "prompt": "在项目里建一个 2026-09-01 到 2026-09-14 的迭代，然后把它改成进行中。",
+      "expected_output": "用 `sprint create --project … --name … --start … --end …` POST `/v2/pjm/sprints`，日期用 `{date,with_time}`；再用 `sprint update --sprint … --status in_progress` PATCH。没有删除迭代接口，不要承诺清理。",
+      "files": []
+    },
+    {
+      "id": 23,
+      "prompt": "把 SCR-5 上那条评论 <id> 删掉。",
+      "expected_output": "用 `workitem comment-delete SCR-5 <id> --yes`，DELETE `/v2/comments/{id}?principal_type=workitem&principal_id=…`；官方没有评论编辑接口，不要伪造 PATCH。",
+      "files": []
+    },
+    {
+      "id": 24,
+      "prompt": "把 SCR-5 的风险属性设成 high，顺便把故事点设成 3。",
+      "expected_output": "用 `workitem update SCR-5 --property risk=high --property story_points=3`，按键查该类型属性方案，合并进 PATCH 的 `properties`；不支持的属性要拒绝，值按 JSON 解析失败则按字符串。",
+      "files": []
     }
   ]
 }

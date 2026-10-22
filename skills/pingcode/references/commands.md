@@ -39,6 +39,7 @@ pingcode.py workitem relations SCR-12 --type blocked_by  # 只看某类关联
 pingcode.py workitem participants SCR-12    # 关注人 / 用户组
 pingcode.py workitem tags SCR-12            # 当前工作项已打的标签
 pingcode.py worklog list SCR-12 [--start 2026-09-01 --end 2026-09-30]  # 工时
+pingcode.py worklog update <工时 id> --duration 3 --description 补记
 pingcode.py workitem download SCR-12 <附件 id> --out ./日志.txt  # 下载附件
 pingcode.py project list [--keywords X] [--type scrum] [--all] [--limit 50]
 pingcode.py project show X
@@ -85,7 +86,7 @@ pingcode.py workitem create --project X --type bug --title "登录页 500" \
     [--description "…"] [--description-file 描述.md] \
     [--assignee @me] [--priority 高] [--sprint "Sprint 12"] [--parent SCR-1] \
     [--state 新建] [--start 2026-09-20] [--end 2026-09-30] \
-    [--story-points 3] [--estimated-workload 8]
+    [--story-points 3] [--estimated-workload 8] [--property risk=high]
 
 # --story-points 只对该类型属性方案包含 story_points 的类型可用（用户故事等）。
 # 任务没有这个属性；CLI 会先查 workitem_properties 并拒绝，避免 400 code=100355。
@@ -162,7 +163,7 @@ pingcode.py workitem create-plan --file plan.json --yes       # 确认才建
 pingcode.py config context --project 演示项目 --sprint "Sprint 12"
 pingcode.py config context                # 看当前
 pingcode.py config context --clear
-pingcode.py config refresh [--what projects,sprints,types,states,priorities,tags,users,project_states,processes,workitem_properties] \
+pingcode.py config refresh [--what projects,sprints,types,states,priorities,tags,users,project_states,processes,workitem_properties,relation_types,workload_types] \
     [--project X] [--type bug]
 # --type 只在刷新 states / workitem_properties 时需要
 pingcode.py config show                   # 凭据/令牌/上下文的完整状态
@@ -190,7 +191,9 @@ pingcode.py api --method POST --path /v2/comments --data '{"principal_type":"wor
 | "这条和哪些工作项有关联" | `workitem relations SCR-12 [--type blocked_by]` |
 | "谁在关注这条" | `workitem participants SCR-12` |
 | "给这条打/去标签" | `workitem tags SCR-12` / `workitem tag SCR-12 后端` / `workitem untag SCR-12 后端 --yes` |
-| "登记/查看工时" | `worklog add SCR-12 --duration 2` / `worklog list SCR-12` |
+| "登记/查看/修改工时" | `worklog add SCR-12 --duration 2` / `worklog list SCR-12` / `worklog update <id> --duration 3` |
+| "建/改迭代" | `sprint create …` / `sprint update …`（没有删除迭代接口） |
+| "删评论" | `workitem comment-delete SCR-12 <id> --yes`（官方没有评论编辑接口） |
 | "把附件下载下来" | `workitem download SCR-12 <附件 id> --out ./文件` |
 | "把两条工作项关联起来" | `workitem relate SCR-12 --to SCR-5 [--type relate]` |
 | "我名下某项目的任务" | `workitem mine --project X --open-only`（服务端按项目/类型过滤） |

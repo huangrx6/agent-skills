@@ -603,6 +603,14 @@ def _has_clock(text: str) -> bool:
     return ":" in str(text or "")
 
 
+def _parse_property_value(raw: str) -> Any:
+    """尽量按 JSON 解析；普通字符串原样保留。"""
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError):
+        return raw
+
+
 def _workitem_body(args: argparse.Namespace, client: Any, project_id: str,
                    type_id: str) -> dict[str, Any]:
     body: dict[str, Any] = {}
@@ -648,6 +656,28 @@ def _workitem_body(args: argparse.Namespace, client: Any, project_id: str,
                         f"可用属性：{'、'.join(keys)}"
                     )
             body[field] = value
+    properties = getattr(args, "property", None) or []
+    if properties:
+        keys: list[str] = []
+        if type_id:
+            try:
+                keys = _resolve.property_keys(client, project_id, type_id,
+                                              force=getattr(args, "no_cache", False))
+            except (_resolve.NotFound, _client.ApiError):
+                keys = []
+        values: dict[str, Any] = {}
+        for assignment in properties:
+            key, sep, raw = assignment.partition("=")
+            key = key.strip()
+            if not sep or not key:
+                raise CliError(f"--property 要写成 KEY=VALUE，收到 {assignment!r}")
+            if keys and key not in keys:
+                raise CliError(
+                    f"{_type_display(client, project_id, type_id)}的属性方案里没有 {key}；"
+                    f"可用属性：{'、'.join(keys)}"
+                )
+            values[key] = _parse_property_value(raw)
+        body["properties"] = values
     return body
 
 
@@ -888,7 +918,8 @@ def cmd_workitem_update(args: argparse.Namespace) -> int:
     body = _workitem_body(args, client, pid, tid)
     if not body:
         raise CliError("没有要改的字段（--title / --description / --assignee / --priority / "
-                       "--sprint / --start / --end / --parent / --state / --story-points）")
+                       "--sprint / --start / --end / --parent / --state / --story-points / "
+                       "--property）")
     body = _compat.workitem_body(body)
     path = _api.build(_compat.WORKITEM, workitem_id=current["id"])
     summary = f"更新 {current.get('identifier', args.ref)}：{'、'.join(sorted(body))}"
@@ -1341,6 +1372,32 @@ def cmd_worklog_add(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_worklog_update(args: argparse.Namespace) -> int:
+    """更新工时：PATCH /v2/workloads/{id}。"""
+    client = build_client(args)
+    body: dict[str, Any] = {}
+    if args.duration is not None:
+        if not 0 < args.duration <= 24:
+            raise CliError("工时时长要在 0–24 小时之间")
+        body["duration"] = args.duration
+    if args.date:
+        body["report_at"] = _compat.date_object(_fmt.parse_time(args.date),
+                                                 _has_clock(args.date))
+    if args.type:
+        body["type_id"] = _resolve.find("workload_types", client, args.type,
+                                       force=args.no_cache)["id"]
+    if args.description is not None:
+        body["description"] = args.description
+    if not body:
+        raise CliError("没有要改的字段（--duration / --date / --type / --description）")
+    path = _api.build(_compat.WORKLOAD_ONE, workload_id=args.workload_id)
+    summary = f"更新工时 {args.workload_id}"
+    perform(args, client, "PATCH", path, body=body, summary=summary)
+    if not args.dry_run:
+        print("✓ 工时已更新")
+    return 0
+
+
 def cmd_worklog_delete(args: argparse.Namespace) -> int:
     """删除工时：DELETE /v2/workloads/{id}。"""
     client = build_client(args)
@@ -1351,6 +1408,71 @@ def cmd_worklog_delete(args: argparse.Namespace) -> int:
     perform(args, client, "DELETE", path, summary=summary)
     if not args.dry_run:
         print("✓ 工时已删除")
+    return 0
+
+
+def cmd_sprint_create(args: argparse.Namespace) -> int:
+    """创建迭代：POST /v2/pjm/sprints。"""
+    client = build_client(args)
+    ref = pick(args, "project", "project")
+    if not ref:
+        raise CliError("没说建到哪个项目：加 --project 或先 config context --project")
+    pid, pname = _resolve.project_id(client, ref, force=args.no_cache)
+    body: dict[str, Any] = {
+        "project_id": pid,
+        "name": args.name,
+        "start": _compat.date_object(_fmt.parse_time(args.start),
+                                     _has_clock(args.start)),
+        "due": _compat.date_object(_fmt.parse_time(args.end),
+                                   _has_clock(args.end)),
+        "assignee_id": _resolve.user_id(client, args.assignee or "@me",
+                                        force=args.no_cache),
+    }
+    if args.description:
+        body["description"] = args.description
+    if args.status:
+        body["status"] = args.status
+    summary = f"在「{pname}」创建迭代「{args.name}」"
+    result = perform(args, client, "POST", _compat.SPRINTS, body=body, summary=summary)
+    if result is not None:
+        _resolve.invalidate("sprints")
+        data = result.data if isinstance(result.data, dict) else {}
+        emit([_fmt.compact("sprint", data)], args, "sprint", [data])
+    return 0
+
+
+def cmd_sprint_update(args: argparse.Namespace) -> int:
+    """更新迭代：PATCH /v2/pjm/sprints/{id}。"""
+    client = build_client(args)
+    ref = pick(args, "project", "project")
+    if not ref:
+        raise CliError("没说哪个项目：加 --project 或先 config context --project")
+    pid, _pname = _resolve.project_id(client, ref, force=args.no_cache)
+    sprint = _resolve.find("sprints", client, args.sprint, force=args.no_cache,
+                           project_id=pid)
+    body: dict[str, Any] = {}
+    if args.name:
+        body["name"] = args.name
+    if args.start:
+        body["start"] = _compat.date_object(_fmt.parse_time(args.start),
+                                            _has_clock(args.start))
+    if args.end:
+        body["due"] = _compat.date_object(_fmt.parse_time(args.end),
+                                          _has_clock(args.end))
+    if args.assignee:
+        body["assignee_id"] = _resolve.user_id(client, args.assignee, force=args.no_cache)
+    if args.description is not None:
+        body["description"] = args.description
+    if args.status:
+        body["status"] = args.status
+    if not body:
+        raise CliError("没有要改的字段（--name / --start / --end / --assignee / "
+                       "--description / --status）")
+    path = _api.build(_compat.SPRINT_ONE, sprint_id=sprint["id"])
+    summary = f"更新迭代「{sprint.get('name') or sprint['id']}」"
+    perform(args, client, "PATCH", path, body=body, summary=summary)
+    if not args.dry_run:
+        _resolve.invalidate("sprints")
     return 0
 
 
@@ -1437,6 +1559,21 @@ def cmd_workitem_comment(args: argparse.Namespace) -> int:
     result = perform(args, client, "POST", COMMENTS, body=body, summary=summary)
     if result is not None and isinstance(result.data, dict):
         print(f"✓ 评论已创建（id={result.data.get('id', '?')}）")
+    return 0
+
+
+def cmd_workitem_comment_delete(args: argparse.Namespace) -> int:
+    """删除评论：DELETE /v2/comments/{comment_id}?principal_type=&principal_id=。"""
+    client = build_client(args)
+    current = fetch_workitem(client, args.ref)
+    if not args.yes and not args.dry_run:
+        raise CliError(f"删除评论会影响对外可见内容。确认要删 {args.comment_id} 就加 --yes")
+    path = _api.build(_compat.COMMENT_ONE, comment_id=args.comment_id,
+                      principal_type="workitem", principal_id=current["id"])
+    summary = f"删除 {current.get('identifier', args.ref)} 上的评论 {args.comment_id}"
+    perform(args, client, "DELETE", path, summary=summary)
+    if not args.dry_run:
+        print("✓ 评论已删除")
     return 0
 
 
@@ -1784,6 +1921,28 @@ def build_parser() -> argparse.ArgumentParser:
     pu.add_argument("--state", help="项目状态名（官方没有删除项目的接口，关闭靠状态）")
     pu.set_defaults(func=cmd_project_update)
 
+    sprint = make(sub, "sprint", help="迭代（/v2/pjm/sprints）")
+    spsub = sprint.add_subparsers(dest="action", required=True)
+    spc = make(spsub, "create", help="创建迭代")
+    spc.add_argument("--project")
+    spc.add_argument("--name", required=True)
+    spc.add_argument("--start", required=True)
+    spc.add_argument("--end", required=True)
+    spc.add_argument("--assignee", help="负责人，默认 @me")
+    spc.add_argument("--description")
+    spc.add_argument("--status", choices=("pending", "in_progress", "completed"))
+    spc.set_defaults(func=cmd_sprint_create)
+    spu = make(spsub, "update", help="更新迭代")
+    spu.add_argument("--project")
+    spu.add_argument("--sprint", required=True, help="迭代名或 id")
+    spu.add_argument("--name")
+    spu.add_argument("--start")
+    spu.add_argument("--end")
+    spu.add_argument("--assignee")
+    spu.add_argument("--description")
+    spu.add_argument("--status", choices=("pending", "in_progress", "completed"))
+    spu.set_defaults(func=cmd_sprint_update)
+
     worklog = make(sub, "worklog", help="工时（/v2/workloads）")
     wlsub = worklog.add_subparsers(dest="action", required=True)
     wll = make(wlsub, "list", help="列工作项工时")
@@ -1800,6 +1959,13 @@ def build_parser() -> argparse.ArgumentParser:
     wla.add_argument("--description")
     wla.add_argument("--report-by", help="登记人（企业令牌通常必填）")
     wla.set_defaults(func=cmd_worklog_add)
+    wlu = make(wlsub, "update", help="更新工时")
+    wlu.add_argument("workload_id")
+    wlu.add_argument("--duration", type=float, help="小时数，0–24")
+    wlu.add_argument("--date")
+    wlu.add_argument("--type")
+    wlu.add_argument("--description")
+    wlu.set_defaults(func=cmd_worklog_update)
     wld = make(wlsub, "delete", help="删除一个工时（要 --yes）")
     wld.add_argument("workload_id")
     wld.add_argument("--yes", action="store_true", help="确认删除")
@@ -1844,6 +2010,8 @@ def build_parser() -> argparse.ArgumentParser:
     wc.add_argument("--story-points", type=float)
     wc.add_argument("--estimated-workload", type=float)
     wc.add_argument("--remaining-workload", type=float)
+    wc.add_argument("--property", action="append", metavar="KEY=VALUE",
+                     help="自定义属性，可重复；值按 JSON 解析，失败则当字符串")
     wc.set_defaults(func=cmd_workitem_create)
 
     def add_update_flags(parser: argparse.ArgumentParser) -> None:
@@ -1861,6 +2029,8 @@ def build_parser() -> argparse.ArgumentParser:
         parser.add_argument("--story-points", type=float)
         parser.add_argument("--estimated-workload", type=float)
         parser.add_argument("--remaining-workload", type=float)
+        parser.add_argument("--property", action="append", metavar="KEY=VALUE",
+                            help="自定义属性，可重复；按属性方案校验")
 
     wu = make(wsub, "update", help="改工作项字段（标题 / 描述 / 起止 / 负责人 / 迭代 …）")
     add_update_flags(wu)
@@ -1900,6 +2070,11 @@ def build_parser() -> argparse.ArgumentParser:
     wcm.add_argument("ref")
     wcm.add_argument("content")
     wcm.set_defaults(func=cmd_workitem_comment)
+    wcd = make(wsub, "comment-delete", help="删除一条评论（要 --yes）")
+    wcd.add_argument("ref")
+    wcd.add_argument("comment_id")
+    wcd.add_argument("--yes", action="store_true", help="确认删除")
+    wcd.set_defaults(func=cmd_workitem_comment_delete)
     wcp = make(wsub, "create-plan", help="按计划文件一次建一棵树（默认只打印，--yes 才建）")
     wcp.add_argument("--file", required=True, help="plan.json（字段集封闭：type/title/…/children）")
     wcp.add_argument("--project", help="建到哪个项目（也可写在计划文件的 project 里）")

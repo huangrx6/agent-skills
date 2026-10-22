@@ -23,6 +23,8 @@ python3 skills/pingcode/scripts/pingcode.py workitem relations SCR-12
 python3 skills/pingcode/scripts/pingcode.py workitem participants SCR-12
 python3 skills/pingcode/scripts/pingcode.py workitem tags SCR-12
 python3 skills/pingcode/scripts/pingcode.py worklog list SCR-12
+python3 skills/pingcode/scripts/pingcode.py worklog update <id> --duration 3
+python3 skills/pingcode/scripts/pingcode.py sprint create --project X --name 'Sprint 13' --start 2026-09-01 --end 2026-09-14 --dry-run
 python3 skills/pingcode/scripts/pingcode.py workitem create --project X --type bug --title '登录失败' --dry-run
 ```
 

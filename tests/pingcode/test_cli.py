@@ -180,7 +180,8 @@ class CliCase(unittest.TestCase):
                        [{"id": "description"}, {"id": "start"}])
         resolve.store("workitem_properties", {"project_id": "pj1", "workitem_type_id": "bug"},
                        [{"id": "description"}, {"id": "story_points"},
-                        {"id": "estimated_workload"}, {"id": "remaining_workload"}])
+                        {"id": "estimated_workload"}, {"id": "remaining_workload"},
+                        {"id": "risk"}])
         resolve.store("relation_types", {}, [{"id": "rt1", "name": "关联", "category": "relate"}])
         resolve.store("tags", {"project_id": "pj1"}, [{"id": "tag1", "name": "后端"}])
         resolve.store("workload_types", {}, [{"id": "wt1", "name": "研发"}])
@@ -396,6 +397,24 @@ class CliCase(unittest.TestCase):
         self.assertEqual("scrum", body["template_type"])
         self.assertNotIn("type", body)
         self.assertEqual(0, body["start"]["with_time"])
+
+    def test_自定义属性按方案校验并写_properties(self):
+        created = dict(WORKITEM, id="w9", identifier="DOC-9")
+        code, _out, err, router = self.run_cli(
+            ["workitem", "create", "--project", "演示项目", "--type", "bug",
+             "--title", "x", "--property", "risk=high", "--property", "story_points=3"],
+            {("POST", "/v2/pjm/workitems"): created})
+        self.assertEqual(0, code, err)
+        body = router.find("POST", "/v2/pjm/workitems")[0][2]
+        self.assertEqual({"risk": "high", "story_points": 3}, body["properties"])
+
+        code, _out, err, router = self.run_cli(
+            ["workitem", "create", "--project", "演示项目", "--type", "task",
+             "--title", "x", "--property", "risk=high"])
+        self.assertEqual(1, code)
+        self.assertIn("属性方案", err)
+        self.assertIn("risk", err)
+        self.assertEqual([], router.find("POST", "/v2/pjm/workitems"))
 
     def test_项目列表按_template_type_过滤(self):
         code, _out, _err, router = self.run_cli(
@@ -639,6 +658,23 @@ class CliCase(unittest.TestCase):
              ("GET", "/v2/comments"): {"values": [], "total": 0}})
         self.assertEqual(0, code)
         self.assertIn("还没有评论", out)
+
+    def test_删除评论要_yes(self):
+        code, _out, err, _router = self.run_cli(
+            ["workitem", "comment-delete", "DOC-1", "c1"],
+            {("GET", "/v2/pjm/workitems"): {"values": [WORKITEM]}})
+        self.assertEqual(1, code)
+        self.assertIn("--yes", err)
+
+        code, out, err, router = self.run_cli(
+            ["workitem", "comment-delete", "DOC-1", "c1", "--yes"],
+            {("GET", "/v2/pjm/workitems"): {"values": [WORKITEM]},
+             ("DELETE", "/v2/comments/c1"): {}})
+        self.assertEqual(0, code, err)
+        self.assertIn("评论已删除", out)
+        url = router.find("DELETE", "/v2/comments/c1")[0][1]
+        self.assertIn("principal_type=workitem", url)
+        self.assertIn("principal_id=w1", url)
 
     def test_列附件把大小变人看的(self):
         files = [{"id": "a1", "title": "控制台日志", "size": 2048, "type": "file",
@@ -950,6 +986,43 @@ class CliCase(unittest.TestCase):
             {("GET", "/v2/pjm/workitems/w1"): WORKITEM})
         self.assertEqual(1, code)
         self.assertIn("--end", err)
+
+    def test_工时更新发_patch(self):
+        code, out, err, router = self.run_cli(
+            ["worklog", "update", "wl1", "--duration", "3", "--type", "研发",
+             "--description", "补记"],
+            {("PATCH", "/v2/workloads/wl1"): {"id": "wl1"}})
+        self.assertEqual(0, code, err)
+        self.assertIn("工时已更新", out)
+        body = router.find("PATCH", "/v2/workloads/wl1")[0][2]
+        self.assertEqual(3, body["duration"])
+        self.assertEqual("wt1", body["type_id"])
+        self.assertEqual("补记", body["description"])
+
+    def test_迭代创建发对_body(self):
+        created = {"id": "sp2", "name": "Sprint 13", "status": "pending"}
+        code, out, err, router = self.run_cli(
+            ["sprint", "create", "--project", "演示项目", "--name", "Sprint 13",
+             "--start", "2026-09-01", "--end", "2026-09-14",
+             "--assignee", "John", "--status", "pending"],
+            {("POST", "/v2/pjm/sprints"): created})
+        self.assertEqual(0, code, err)
+        self.assertIn("Sprint 13", out)
+        body = router.find("POST", "/v2/pjm/sprints")[0][2]
+        self.assertEqual("pj1", body["project_id"])
+        self.assertEqual("u1", body["assignee_id"])
+        self.assertEqual("pending", body["status"])
+        self.assertEqual(0, body["start"]["with_time"])
+
+    def test_迭代更新发_patch(self):
+        code, _out, err, router = self.run_cli(
+            ["sprint", "update", "--project", "演示项目", "--sprint", "Sprint 12",
+             "--name", "Sprint 12b", "--status", "in_progress"],
+            {("PATCH", "/v2/pjm/sprints/sp1"): {"id": "sp1"}})
+        self.assertEqual(0, code, err)
+        body = router.find("PATCH", "/v2/pjm/sprints/sp1")[0][2]
+        self.assertEqual("Sprint 12b", body["name"])
+        self.assertEqual("in_progress", body["status"])
 
     def test_mine_缺_scope_时要给不改后台的办法(self):
         """实测：数据范围里没有 pcp:read:account:personal 时 /v2/myself 会 403。
