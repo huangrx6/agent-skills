@@ -2,7 +2,7 @@
 name: obsidian-wiki
 description: >-
   用于在 Obsidian 中学习和维护个人 Wiki：吸收文章或课程、整理概念与实践、综合多个来源、
-  根据已有笔记回答问题、复习自测，以及笔记归位和链接维护。
+  根据已有笔记回答问题、复习自测、笔记配图与个人 IP 生图交接，以及笔记归位和链接维护。
   触发示例：把这份资料融入知识库、我之前学过什么、更新这个主题、检查知识冲突。
   不适用于： 不涉及知识库的普通问答、需求缺陷和任务分工的业务管理、外部平台操作。
 ---
@@ -34,6 +34,7 @@ python3 scripts/vault_path.py "/本次指定的知识库" --explain
 | 保存、吸收文章/课程/自己的理解 | 查重、定位相关知识、整合有价值的增量 | [知识模型](references/knowledge-model.md)、[资料与查询流程](references/wiki-operations.md) |
 | 根据知识库提问或复习自测 | 找到相关笔记和证据，在对话中回答；默认只读 | [资料与查询流程](references/wiki-operations.md)、[学习笔记](references/resource-notes.md) |
 | 写学习笔记、重组文章、改善排版 | 找到理解主线，按内容选择叙述与 Markdown；需要查证再读研究流程 | [学习笔记](references/resource-notes.md)、[写作规范](references/writing-conventions.md)、[研究与综合](references/research-and-synthesis.md) |
+| 给 Wiki 笔记做图、使用个人 IP、交接生图提示词或补回图片 | 先确定图要表达的知识；用内置角色参考，按实际工具能力生成或留下待生成块 | [技术配图](references/technical-visuals.md)、[个人 IP 与生图交接](references/personal-ip.md) |
 | 根据新资料修订、核对版本、纠正旧结论 | 对照受影响的判断，更新正文及相依示例，保留适用范围 | [知识模型](references/knowledge-model.md)、[知识更新](references/knowledge-updates.md) |
 | 审阅知识库、检查过期或矛盾 | 报告证据、受影响页面和修订建议；请求修复才写入 | [资料与查询流程](references/wiki-operations.md) |
 | 改文案、移动、改名、合并、整理索引 | 保留已有内容与属性，处理受影响的入链 | [归位规则](references/vault-map.md)、[写作规范](references/writing-conventions.md) |
@@ -49,7 +50,10 @@ python3 scripts/vault_path.py "/本次指定的知识库" --explain
 MOC 以所在目录及其子目录的引用列表为主，保持简洁，不默认扩展为学习说明或跨目录关联页。
 知识文章独立成篇，不提及或跳转其他库内文章；笔记间导航交给 MOC，外部证据来源正常保留。
 命名与独立成篇规则见 [写作规范](references/writing-conventions.md)。配图按内容灵活安排，
-采用统一但不固定配色、画幅的极简工程图解风格。完整写作、实质性扩写或重组文章时，
+默认采用与内置个人 IP 协调的清爽手绘知识图解，保留内容决定图形、配色与画幅的自由。
+角色以 `assets/personal-ip/researcher-v1-reference.png` 为视觉基准；需要人物时实际查看并传入参考图，
+不能仅用文字重造角色。无生图或参考图输入能力时，按个人 IP 交接规则留下原生 `[!todo]+` 待生成块。
+完整写作、实质性扩写或重组文章时，
 在安排结构阶段读取 [技术配图](references/technical-visuals.md)，完成配图判断再执行；
 局部改字、改名或只维护 MOC 不触发新增配图。
 
