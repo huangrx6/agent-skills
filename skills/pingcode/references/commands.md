@@ -36,10 +36,12 @@ pingcode.py workitem show SCR-12 --all      # 连已删除的一起看（DELETE 
 pingcode.py workitem history SCR-12         # 流转历史：时间 / 原状态 / 新状态 / 操作人
 pingcode.py workitem relations SCR-12       # 内部关联：类型 / 另一端编号 / 标题
 pingcode.py workitem relations SCR-12 --type blocked_by  # 只看某类关联
+pingcode.py workitem participants SCR-12    # 关注人 / 用户组
+pingcode.py workitem download SCR-12 <附件 id> --out ./日志.txt  # 下载附件
 pingcode.py project list [--keywords X] [--type scrum] [--all] [--limit 50]
 pingcode.py project show X
 pingcode.py project progress [--project X]
-pingcode.py list projects|sprints|types|states|priorities|tags|users|project_states|processes \
+pingcode.py list projects|sprints|types|states|priorities|tags|users|project_states|processes|relation_types \
     [--project X] [--type bug]
 pingcode.py list workitem_properties --project X --type 用户故事   # 看该类型能写哪些属性
 ```
@@ -184,6 +186,9 @@ pingcode.py api --method POST --path /v2/comments --data '{"principal_type":"wor
 | "我今天要做哪些事" | `workitem mine --open-only` ；企业令牌下用不了「我」，改 `workitem list --assignee <真名>` |
 | "这条怎么改过来的" | `workitem history SCR-12`；已删除工作项的流转历史服务端不返回 |
 | "这条和哪些工作项有关联" | `workitem relations SCR-12 [--type blocked_by]` |
+| "谁在关注这条" | `workitem participants SCR-12` |
+| "把附件下载下来" | `workitem download SCR-12 <附件 id> --out ./文件` |
+| "把两条工作项关联起来" | `workitem relate SCR-12 --to SCR-5 [--type relate]` |
 | "我名下某项目的任务" | `workitem mine --project X --open-only`（服务端按项目/类型过滤） |
 | "有哪些没修的缺陷" | `workitem mine --type bug --open-only`（指定项目时加 `--project X` 走服务端过滤） |
 | "把 SCR-12 关了" | 先 `workitem show SCR-12` 确认是它，再 `workitem set-state SCR-12 已完成`（状态名要真实存在，报错会列出可选项） |
@@ -200,3 +205,21 @@ pingcode.py api --method POST --path /v2/comments --data '{"principal_type":"wor
 - **不删项目**（当前随附端点表没有删除项目的接口）。`project update --state` 只能改状态。
 - 不按「不同值」批量改字段（官方批量接口只支持一个属性名 + 一个相同值）。
 - 不替你做状态流转判断：可用状态由该类型的「状态方案 + 状态流转」决定，CLI 查询该类型的状态表，具体流转仍由服务端校验。
+
+## evals 执行器
+
+`dev-tools/run_evals.py` 不内置模型，agent/judge 由命令行或环境变量提供：
+
+```sh
+python3 skills/pingcode/dev-tools/run_evals.py --check
+python3 skills/pingcode/dev-tools/run_evals.py --dry-run --agent-cmd 'pi -p {prompt}'
+python3 skills/pingcode/dev-tools/run_evals.py \
+    --agent-cmd 'pi -p {prompt}' \
+    --judge-cmd './judge.sh --expected {expected} --actual {actual}'
+```
+
+judge 退出 0 视为通过；不给 judge 时只记录 transcript。运行记录写到
+`skills/pingcode/evals/runs/<时间>/`。
+
+项目创建/更新的真实写链路没有在随附验证中执行：端点表没有项目删除接口，
+创建后无法保证“用完即删”；命令已有 mock/dry-run 覆盖，真实写需在专用测试租户进行。

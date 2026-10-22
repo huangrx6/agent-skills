@@ -84,6 +84,24 @@
       "prompt": "SCR-5 和哪些工作项有关联？只看阻塞类的。",
       "expected_output": "用 `workitem relations SCR-5 --type blocked_by`，GET `/v2/pjm/workitems/{id}/relations?relation_type=blocked_by`。当前工作项可能在 origin_workitem 也可能在 target_workitem，必须展示另一端，不能固定只显示 target。输出关联类型、另一端编号和标题；没有时说明还没有关联。",
       "files": []
+    },
+    {
+      "id": 15,
+      "prompt": "SCR-5 现在有哪些关注人？",
+      "expected_output": "用 `workitem participants SCR-5`，GET `/v2/participants?principal_type=workitem&principal_id=<id>`。区分用户和用户组；没有时明确说还没有关注人。",
+      "files": []
+    },
+    {
+      "id": 16,
+      "prompt": "把 SCR-5 上那个日志附件下载到本地 logs/app.log。",
+      "expected_output": "先按工作项取附件 metadata，再下载 `download_url`；使用 `workitem download SCR-5 <attachment_id> --out logs/app.log`。只允许 http/https，默认不覆盖已有文件，除非 --force；没有 download_url 要报错。",
+      "files": []
+    },
+    {
+      "id": 17,
+      "prompt": "把 SCR-5 关联到 SCR-12，用普通关联；之后如果建错了要能删掉。",
+      "expected_output": "用 `workitem relate SCR-5 --to SCR-12 --type relate`，POST `/v2/pjm/workitems/{id}/relations`，body 是 target_workitem_id + relation_type_id。删除用 `workitem unrelate SCR-5 <relation_id> --yes`，DELETE 对应关系；不能把“删除关联”做成删除工作项。",
+      "files": []
     }
   ]
 }

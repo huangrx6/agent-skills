@@ -35,6 +35,7 @@ import tempfile
 import unittest
 import urllib.error
 from email.message import Message
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时读的是
@@ -180,6 +181,7 @@ class CliCase(unittest.TestCase):
         resolve.store("workitem_properties", {"project_id": "pj1", "workitem_type_id": "bug"},
                        [{"id": "description"}, {"id": "story_points"},
                         {"id": "estimated_workload"}, {"id": "remaining_workload"}])
+        resolve.store("relation_types", {}, [{"id": "rt1", "name": "关联", "category": "relate"}])
 
     # ── 运行与断言 ──
     def run_cli(self, argv: list[str], routes: dict | None = None) -> tuple[int, str, str, Router]:
@@ -657,6 +659,47 @@ class CliCase(unittest.TestCase):
         self.assertEqual(0, code)
         self.assertIn("没有附件", out)
 
+    def test_下载附件并写出文件(self):
+        out = os.path.join(self._tmp.name, "out.txt")
+        meta = {"id": "a1", "title": "日志.txt", "ext": "txt", "size": 5,
+                "download_url": "https://example.test/a1"}
+
+        def fake_download(url, path):
+            with open(path, "wb") as fh:
+                fh.write(b"hello")
+
+        with mock.patch.object(pc, "_download_to", side_effect=fake_download) as download:
+            code, text, err, _router = self.run_cli(
+                ["workitem", "download", "DOC-1", "a1", "--out", out],
+                {("GET", "/v2/pjm/workitems"): {"values": [WORKITEM]},
+                 ("GET", "/v2/attachments/a1"): meta})
+        self.assertEqual(0, code, err)
+        self.assertIn("已下载", text)
+        with open(out, "rb") as fh:
+            self.assertEqual(b"hello", fh.read())
+        self.assertEqual("https://example.test/a1", download.call_args.args[0])
+
+    def test_下载附件默认不覆盖已存在文件(self):
+        out = os.path.join(self._tmp.name, "exists.txt")
+        with open(out, "wb") as fh:
+            fh.write(b"old")
+        meta = {"id": "a1", "title": "日志.txt", "ext": "txt",
+                "download_url": "https://example.test/a1"}
+        with mock.patch.object(pc, "_download_to") as download:
+            code, _text, err, _router = self.run_cli(
+                ["workitem", "download", "DOC-1", "a1", "--out", out],
+                {("GET", "/v2/pjm/workitems"): {"values": [WORKITEM]},
+                 ("GET", "/v2/attachments/a1"): meta})
+        self.assertEqual(1, code)
+        self.assertIn("已存在", err)
+        download.assert_not_called()
+        with open(out, "rb") as fh:
+            self.assertEqual(b"old", fh.read())
+
+    def test_附件下载只允许_http_或_https(self):
+        with self.assertRaises(pc.CliError):
+            pc._download_to("file:///etc/passwd", os.path.join(self._tmp.name, "x"))
+
     def test_流转历史列出状态变化(self):
         history = [
             {"id": "h1", "from_state": {"name": "新建"}, "to_state": {"name": "进行中"},
@@ -738,6 +781,62 @@ class CliCase(unittest.TestCase):
         self.assertIn("还没有关联", out)
         url = router.find("GET", "/v2/pjm/workitems/w1/relations")[0][1]
         self.assertIn("relation_type=blocked_by", url)
+
+    def test_创建关联发对_body(self):
+        target = dict(WORKITEM, id="w2", identifier="DOC-2", title="支付回调")
+        created = {"id": "r1", "relation_type": {"id": "rt1", "name": "关联"}}
+        code, out, err, router = self.run_cli(
+            ["workitem", "relate", "w1", "--to", "w2"],
+            {("GET", "/v2/pjm/workitems/w1"): WORKITEM,
+             ("GET", "/v2/pjm/workitems/w2"): target,
+             ("POST", "/v2/pjm/workitems/w1/relations"): created})
+        self.assertEqual(0, code, err)
+        posts = router.find("POST", "/v2/pjm/workitems/w1/relations")
+        self.assertEqual(1, len(posts))
+        self.assertEqual({"target_workitem_id": "w2", "relation_type_id": "rt1"},
+                         posts[0][2])
+        self.assertIn("关联已创建", out)
+
+    def test_删除关联要_yes(self):
+        code, _out, err, router = self.run_cli(
+            ["workitem", "unrelate", "w1", "r1"],
+            {("GET", "/v2/pjm/workitems/w1"): WORKITEM})
+        self.assertEqual(1, code)
+        self.assertIn("--yes", err)
+        self.assertEqual([], router.find("DELETE", "/v2/pjm/workitems/w1/relations/r1"))
+
+        code, _out, err, router = self.run_cli(
+            ["workitem", "unrelate", "w1", "r1", "--yes"],
+            {("GET", "/v2/pjm/workitems/w1"): WORKITEM,
+             ("DELETE", "/v2/pjm/workitems/w1/relations/r1"): {}})
+        self.assertEqual(0, code, err)
+        self.assertEqual(1, len(router.find("DELETE", "/v2/pjm/workitems/w1/relations/r1")))
+
+    def test_关注人列表区分用户和用户组(self):
+        values = [
+            {"id": "p1", "type": "user",
+             "user": {"id": "u1", "name": "john", "display_name": "John"}},
+            {"id": "p2", "type": "user_group",
+             "user_group": {"id": "g1", "name": "Open Team"}},
+        ]
+        code, out, err, router = self.run_cli(
+            ["workitem", "participants", "DOC-1"],
+            {("GET", "/v2/pjm/workitems"): {"values": [WORKITEM]},
+             ("GET", "/v2/participants"): {"values": values, "total": 2}})
+        self.assertEqual(0, code, err)
+        for text in ("用户", "John", "用户组", "Open Team"):
+            self.assertIn(text, out)
+        url = router.find("GET", "/v2/participants")[0][1]
+        self.assertIn("principal_type=workitem", url)
+        self.assertIn("principal_id=w1", url)
+
+    def test_没有关注人时说一句人话(self):
+        code, out, _err, _router = self.run_cli(
+            ["workitem", "participants", "DOC-1"],
+            {("GET", "/v2/pjm/workitems"): {"values": [WORKITEM]},
+             ("GET", "/v2/participants"): {"values": [], "total": 0}})
+        self.assertEqual(0, code)
+        self.assertIn("还没有关注人", out)
 
     def test_mine_缺_scope_时要给不改后台的办法(self):
         """实测：数据范围里没有 pcp:read:account:personal 时 /v2/myself 会 403。

@@ -24,6 +24,7 @@ import os
 import re
 import sys
 import urllib.parse
+import urllib.request
 from typing import Any
 
 
@@ -1141,6 +1142,118 @@ def cmd_workitem_relations(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_workitem_relate(args: argparse.Namespace) -> int:
+    """创建工作项内部关联：POST /v2/pjm/workitems/{id}/relations。"""
+    client = build_client(args)
+    current = fetch_workitem(client, args.ref)
+    target = fetch_workitem(client, args.to)
+    relation_type = _resolve.find("relation_types", client, args.type or "relate",
+                                  force=args.no_cache)
+    body = {"target_workitem_id": target["id"], "relation_type_id": relation_type["id"]}
+    path = _api.build(_compat.WORKITEM_RELATIONS, workitem_id=current["id"])
+    summary = (f"把 {current.get('identifier', args.ref)} 关联到 "
+               f"{target.get('identifier', args.to)}（{relation_type.get('name') or relation_type['id']}）")
+    result = perform(args, client, "POST", path, body=body, summary=summary)
+    if result is not None and isinstance(result.data, dict):
+        print(f"✓ 关联已创建（id={result.data.get('id', '?')}）")
+    return 0
+
+
+def cmd_workitem_unrelate(args: argparse.Namespace) -> int:
+    """删除工作项内部关联：DELETE /v2/pjm/workitems/{id}/relations/{relation_id}。"""
+    client = build_client(args)
+    current = fetch_workitem(client, args.ref)
+    if not args.yes and not args.dry_run:
+        raise CliError(f"删除关联会改变这条工作项。确认要删 {args.relation_id} 就加 --yes")
+    path = _api.build(_compat.WORKITEM_RELATION_ONE, workitem_id=current["id"],
+                      relation_id=args.relation_id)
+    summary = f"删除 {current.get('identifier', args.ref)} 上的关联 {args.relation_id}"
+    perform(args, client, "DELETE", path, summary=summary)
+    if not args.dry_run:
+        print("✓ 关联已删除")
+    return 0
+
+
+def cmd_workitem_participants(args: argparse.Namespace) -> int:
+    """列关注人：GET /v2/participants?principal_type=workitem&principal_id=<id>。"""
+    client = build_client(args)
+    current = fetch_workitem(client, args.ref)
+    values = client.paginate(_compat.PARTICIPANTS, max_items=args.limit,
+                             principal_type="workitem", principal_id=current["id"])
+    if args.full:
+        print(json.dumps(values, ensure_ascii=False, indent=2))
+        return 0
+    if not values:
+        print(f"{current.get('identifier', args.ref)} 还没有关注人")
+        return 0
+    enriched: list[dict[str, Any]] = []
+    for value in values:
+        item = dict(value)
+        user = value.get("user") or {}
+        group = value.get("user_group") or {}
+        kind = str(value.get("type") or "")
+        item["kind"] = {"user": "用户", "user_group": "用户组"}.get(kind, kind)
+        item["member"] = user.get("display_name") or group.get("name") or ""
+        item["member_account"] = user.get("name") or group.get("id") or ""
+        enriched.append(item)
+    emit(_fmt.rows("participant", enriched), args, "participant", values)
+    return 0
+
+
+def _download_to(url: str, path: str) -> None:
+    """下载到本地文件；只允许 http/https，避免 file:// 等意外协议。"""
+    scheme = urllib.parse.urlparse(url).scheme.lower()
+    if scheme not in ("http", "https"):
+        raise CliError(f"附件下载地址只允许 http/https，收到 {scheme or '空'}：{url}")
+    try:
+        with urllib.request.urlopen(url, timeout=60) as response, open(path, "wb") as handle:  # noqa: S310
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                handle.write(chunk)
+    except OSError as exc:
+        raise CliError(f"下载失败：{exc}") from exc
+
+
+def _attachment_filename(meta: dict[str, Any]) -> str:
+    title = os.path.basename(str(meta.get("title") or ""))
+    ext = str(meta.get("ext") or "").lstrip(".")
+    if not title:
+        title = f"attachment-{meta.get('id') or 'download'}"
+    if ext and not title.lower().endswith("." + ext.lower()):
+        title = f"{title}.{ext}"
+    return title
+
+
+def cmd_workitem_download(args: argparse.Namespace) -> int:
+    """下载附件：先取 metadata，再从 download_url 写本地文件。"""
+    client = build_client(args)
+    current = fetch_workitem(client, args.ref, include_deleted=bool(args.all))
+    params: dict[str, Any] = {"principal_type": "workitem", "principal_id": current["id"]}
+    if args.comment:
+        params["comment_id"] = args.comment
+    path = _api.build(ATTACHMENT_ONE, attachment_id=args.attachment_id, **params)
+    result = client.get(path)
+    meta = result.data if isinstance(result.data, dict) else {}
+    url = str(meta.get("download_url") or "")
+    if not url:
+        raise CliError(f"附件 {args.attachment_id} 没有 download_url，无法下载")
+    out = args.out or _attachment_filename(meta)
+    if os.path.exists(out) and not args.force:
+        raise CliError(f"{out} 已存在；确认覆盖就加 --force")
+    if args.dry_run:
+        print(f"→ 将下载 {meta.get('title') or args.attachment_id} 到 {out}")
+        return 0
+    try:
+        _download_to(url, out)
+    except OSError as exc:
+        raise CliError(f"下载失败：{exc}") from exc
+    size = os.path.getsize(out)
+    print(f"✓ 已下载到 {out}（{size} 字节）")
+    return 0
+
+
 def cmd_workitem_attachments(args: argparse.Namespace) -> int:
     """列附件：GET /v2/attachments?principal_type=workitem&principal_id=<id>。
 
@@ -1632,11 +1745,33 @@ def build_parser() -> argparse.ArgumentParser:
     wr.add_argument("--type", help="关联类型：relate / block / blocked_by / … 或自定义类型 id")
     wr.add_argument("--limit", type=int, default=100)
     wr.set_defaults(func=cmd_workitem_relations)
+    wa = make(wsub, "relate", help="创建一个工作项关联")
+    wa.add_argument("ref")
+    wa.add_argument("--to", required=True, help="目标工作项编号 / short_id / id")
+    wa.add_argument("--type", help="关联类型（默认 relate）")
+    wa.set_defaults(func=cmd_workitem_relate)
+    wu = make(wsub, "unrelate", help="删除一个工作项关联（要 --yes）")
+    wu.add_argument("ref")
+    wu.add_argument("relation_id")
+    wu.add_argument("--yes", action="store_true", help="确认删除")
+    wu.set_defaults(func=cmd_workitem_unrelate)
+    wp = make(wsub, "participants", help="工作项关注人列表")
+    wp.add_argument("ref")
+    wp.add_argument("--limit", type=int, default=100)
+    wp.set_defaults(func=cmd_workitem_participants)
     wat = make(wsub, "attachments", help="列附件")
     wat.add_argument("ref")
     wat.add_argument("--limit", type=int, default=50)
     wat.add_argument("--all", action="store_true", help="按编号找时含已删除的")
     wat.set_defaults(func=cmd_workitem_attachments)
+    wdl = make(wsub, "download", help="下载一个附件")
+    wdl.add_argument("ref")
+    wdl.add_argument("attachment_id")
+    wdl.add_argument("--out", help="保存路径（默认用附件标题）")
+    wdl.add_argument("--force", action="store_true", help="覆盖已存在文件")
+    wdl.add_argument("--comment", help="评论里的附件要带上评论 id")
+    wdl.add_argument("--all", action="store_true", help="按编号找时含已删除的")
+    wdl.set_defaults(func=cmd_workitem_download)
     waf = make(wsub, "attach", help="上传文件附件（multipart/form-data）")
     waf.add_argument("ref")
     waf.add_argument("--file", required=True, help="本地文件路径")

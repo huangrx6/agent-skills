@@ -20,6 +20,7 @@ python3 skills/pingcode/scripts/pingcode.py workitem mine --open-only
 python3 skills/pingcode/scripts/pingcode.py workitem show SCR-12
 python3 skills/pingcode/scripts/pingcode.py workitem history SCR-12
 python3 skills/pingcode/scripts/pingcode.py workitem relations SCR-12
+python3 skills/pingcode/scripts/pingcode.py workitem participants SCR-12
 python3 skills/pingcode/scripts/pingcode.py workitem create --project X --type bug --title '登录失败' --dry-run
 ```
 
@@ -31,6 +32,8 @@ python3 skills/pingcode/scripts/pingcode.py workitem create --project X --type b
 ```sh
 python3 -m unittest discover -s tests/pingcode -v
 python3 skills/pingcode/dev-tools/gen_endpoints.py --check
+python3 skills/pingcode/dev-tools/run_evals.py --check
+python3 skills/pingcode/dev-tools/run_evals.py --dry-run --agent-cmd 'pi -p {prompt}'
 # 有官方 JSON 快照时可离线比对
 python3 skills/pingcode/dev-tools/gen_endpoints.py --check --input /path/to/api_data.json
 ```

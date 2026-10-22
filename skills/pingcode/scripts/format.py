@@ -87,6 +87,13 @@ RELATION = (
     ("other_title", "标题"),
 )
 
+PARTICIPANT = (
+    ("kind", "类型"),
+    ("member", "成员"),
+    ("member_account", "账号"),
+    ("id", "ID"),
+)
+
 # 这些字段按显示宽度截断（值是该列的最大显示宽度）。
 CLIP_FIELDS = {"content": 64, "title": 48, "download_url": 56}
 
@@ -133,6 +140,7 @@ SCHEMAS: dict[str, tuple[tuple[str, str], ...]] = {
     "attachment": ATTACHMENT,
     "history": HISTORY,
     "relation": RELATION,
+    "participant": PARTICIPANT,
     "simple": SIMPLE,
 }
 

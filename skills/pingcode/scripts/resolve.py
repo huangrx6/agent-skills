@@ -96,6 +96,12 @@ SOURCES: dict[str, dict[str, Any]] = {
         "needs": ("project_id", "workitem_type_id"),
         "scopes": ("pcp:read:pjm:workitem",),
     },
+    "relation_types": {
+        "label": _compat.DICT_LABELS["relation_types"],
+        "url": _compat.DICT_PATHS["relation_types"],
+        "needs": (),
+        "scopes": ("pcp:read:pjm:workitem",),
+    },
     "users": {
         "label": _compat.DICT_LABELS["users"],
         "url": _compat.DICT_PATHS["users"],
@@ -222,7 +228,7 @@ def _aliases(item: dict[str, Any]) -> list[str]:
     用户写「黄任翔」会被告诉「没有这个成员」。邮箱/手机号也一并收进来，方便按邮箱指派。
     """
     return [str(item.get(key) or "") for key in
-            ("name", "display_name", "identifier", "email", "mobile")]
+            ("name", "display_name", "identifier", "email", "mobile", "category")]
 
 
 def _name_of(item: dict[str, Any], kind: str) -> str:
