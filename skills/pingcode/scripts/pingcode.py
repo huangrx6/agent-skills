@@ -1476,6 +1476,48 @@ def cmd_sprint_update(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_tag_create(args: argparse.Namespace) -> int:
+    """创建项目标签：POST /v2/pjm/tags。"""
+    client = build_client(args)
+    ref = pick(args, "project", "project")
+    if not ref:
+        raise CliError("没说标签属于哪个项目：加 --project 或先 config context --project")
+    pid, pname = _resolve.project_id(client, ref, force=args.no_cache)
+    result = perform(args, client, "POST", _compat.TAGS,
+                     body={"name": args.name, "project_id": pid},
+                     summary=f"在「{pname}」创建标签「{args.name}」")
+    if result is not None:
+        _resolve.invalidate("tags")
+        data = result.data if isinstance(result.data, dict) else {}
+        print(f"✓ 标签已创建（id={data.get('id', '?')}）")
+    return 0
+
+
+def cmd_tag_update(args: argparse.Namespace) -> int:
+    """重命名项目标签：PATCH /v2/pjm/tags/{id}。"""
+    client = build_client(args)
+    path = _api.build(_compat.TAG_ONE, tag_id=args.tag_id)
+    result = perform(args, client, "PATCH", path, body={"name": args.name},
+                     summary=f"把标签 {args.tag_id} 改名为「{args.name}」")
+    if result is not None and not args.dry_run:
+        _resolve.invalidate("tags")
+        print("✓ 标签已更新")
+    return 0
+
+
+def cmd_tag_delete(args: argparse.Namespace) -> int:
+    """删除项目标签：DELETE /v2/pjm/tags/{id}。"""
+    client = build_client(args)
+    if not args.yes and not args.dry_run:
+        raise CliError(f"删除标签会改变工作项可用标签。确认要删 {args.tag_id} 就加 --yes")
+    path = _api.build(_compat.TAG_ONE, tag_id=args.tag_id)
+    perform(args, client, "DELETE", path, summary=f"删除标签 {args.tag_id}")
+    if not args.dry_run:
+        _resolve.invalidate("tags")
+        print("✓ 标签已删除")
+    return 0
+
+
 def _download_to(url: str, path: str) -> None:
     """下载到本地文件；只允许 http/https，避免 file:// 等意外协议。"""
     scheme = urllib.parse.urlparse(url).scheme.lower()
@@ -1943,6 +1985,21 @@ def build_parser() -> argparse.ArgumentParser:
     spu.add_argument("--description")
     spu.add_argument("--status", choices=("pending", "in_progress", "completed"))
     spu.set_defaults(func=cmd_sprint_update)
+
+    tag = make(sub, "tag", help="项目标签（/v2/pjm/tags）")
+    tsub = tag.add_subparsers(dest="action", required=True)
+    tc = make(tsub, "create", help="创建项目标签")
+    tc.add_argument("--project")
+    tc.add_argument("--name", required=True)
+    tc.set_defaults(func=cmd_tag_create)
+    tu = make(tsub, "update", help="重命名项目标签")
+    tu.add_argument("tag_id")
+    tu.add_argument("--name", required=True)
+    tu.set_defaults(func=cmd_tag_update)
+    td = make(tsub, "delete", help="删除项目标签（要 --yes）")
+    td.add_argument("tag_id")
+    td.add_argument("--yes", action="store_true", help="确认删除")
+    td.set_defaults(func=cmd_tag_delete)
 
     worklog = make(sub, "worklog", help="工时（/v2/workloads）")
     wlsub = worklog.add_subparsers(dest="action", required=True)

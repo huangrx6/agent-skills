@@ -160,7 +160,7 @@ V2 表生成后，`api --show/--list` 只认 V2 路径。V1 路径会被拦下�
 - [x] 真实租户只读冒烟 + 可丢弃写操作；记录实际响应。
 - [x] 文档：`fields.md`、`commands.md`、`api.md`、`auth.md`、README、evals。
 
-当前结果：459 个 V2 接口；245 个单元测试通过；`gen_endpoints.py --check` 无漂移；
+当前结果：459 个 V2 接口；246 个单元测试通过；`gen_endpoints.py --check` 无漂移；
 `validate_skill.py` / `check_pointers.py` / `preflight.py` 通过。
 真实租户核心链路已跑通；剩余边缘项见上一节。
 

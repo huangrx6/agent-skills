@@ -42,6 +42,8 @@ WORKLOADS = "/v2/workloads"
 WORKLOAD_ONE = "/v2/workloads/{workload_id}"
 SPRINTS = "/v2/pjm/sprints"
 SPRINT_ONE = "/v2/pjm/sprints/{sprint_id}"
+TAGS = "/v2/pjm/tags"
+TAG_ONE = "/v2/pjm/tags/{tag_id}"
 ATTACHMENTS = "/v2/attachments"
 ATTACHMENT = ("/v2/attachments/{attachment_id}"
               "?principal_type={principal_type}&principal_id={principal_id}")

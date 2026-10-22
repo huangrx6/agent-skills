@@ -150,6 +150,12 @@
       "prompt": "看看 SCR-5 的评论里有没有代码段附件。",
       "expected_output": "用 `workitem attachments SCR-5 --comment <评论 id>`；评论附件必须带 comment_id，不能只查工作项直接附件就断言没有。代码段上传走 attach-code，删除走 attach-remove --comment … --yes。",
       "files": []
+    },
+    {
+      "id": 26,
+      "prompt": "在项目里创建一个“后端”标签，改名为“服务端”，最后删掉。",
+      "expected_output": "用 `tag create --project X --name 后端` POST `/v2/pjm/tags`；`tag update <tag_id> --name 服务端` PATCH；`tag delete <tag_id> --yes` DELETE。操作后刷新 tags 缓存，确认没有残留。",
+      "files": []
     }
   ]
 }

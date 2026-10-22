@@ -416,6 +416,34 @@ class CliCase(unittest.TestCase):
         self.assertIn("risk", err)
         self.assertEqual([], router.find("POST", "/v2/pjm/workitems"))
 
+    def test_项目标签创建改名删除(self):
+        code, out, err, router = self.run_cli(
+            ["tag", "create", "--project", "演示项目", "--name", "临时标签"],
+            {("POST", "/v2/pjm/tags"): {"id": "tag2", "name": "临时标签"}})
+        self.assertEqual(0, code, err)
+        self.assertIn("标签已创建", out)
+        body = router.find("POST", "/v2/pjm/tags")[0][2]
+        self.assertEqual({"name": "临时标签", "project_id": "pj1"}, body)
+
+        code, out, err, router = self.run_cli(
+            ["tag", "update", "tag2", "--name", "正式标签"],
+            {("PATCH", "/v2/pjm/tags/tag2"): {"id": "tag2"}})
+        self.assertEqual(0, code, err)
+        self.assertIn("标签已更新", out)
+        self.assertEqual({"name": "正式标签"},
+                         router.find("PATCH", "/v2/pjm/tags/tag2")[0][2])
+
+        code, _out, err, _router = self.run_cli(
+            ["tag", "delete", "tag2"], {})
+        self.assertEqual(1, code)
+        self.assertIn("--yes", err)
+
+        code, out, err, router = self.run_cli(
+            ["tag", "delete", "tag2", "--yes"],
+            {("DELETE", "/v2/pjm/tags/tag2"): {}})
+        self.assertEqual(0, code, err)
+        self.assertIn("标签已删除", out)
+
     def test_项目列表按_template_type_过滤(self):
         code, _out, _err, router = self.run_cli(
             ["project", "list", "--type", "scrum"],
