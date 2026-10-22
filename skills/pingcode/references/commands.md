@@ -97,7 +97,8 @@ pingcode.py workitem comment SCR-12 "已定位到网关超时"
 pingcode.py workitem delete SCR-12 --yes            # 需明确授权
 
 # 附件：列表默认不列软删除的（--all 才列）；上传两端点形状不同
-pingcode.py workitem attachments SCR-12
+pingcode.py workitem attachments SCR-12              # 直接附件
+pingcode.py workitem attachments SCR-12 --comment <评论 id>  # 评论附件/代码段
 pingcode.py workitem attach SCR-12 --file ./trace.log --title "网关日志" [--comment <评论 id>]
 # 代码段**实测必须带 --comment**（官方文档把 comment_id 标成可选，不带回 400 code=100039）：
 pingcode.py workitem comment SCR-12 "这段是根因"     # 先拿评论 id
@@ -195,6 +196,7 @@ pingcode.py api --method POST --path /v2/comments --data '{"principal_type":"wor
 | "建/改迭代" | `sprint create …` / `sprint update …`（没有删除迭代接口） |
 | "删评论" | `workitem comment-delete SCR-12 <id> --yes`（官方没有评论编辑接口） |
 | "把附件下载下来" | `workitem download SCR-12 <附件 id> --out ./文件` |
+| "看评论里的代码段" | `workitem attachments SCR-12 --comment <评论 id>` |
 | "把两条工作项关联起来" | `workitem relate SCR-12 --to SCR-5 [--type relate]` |
 | "我名下某项目的任务" | `workitem mine --project X --open-only`（服务端按项目/类型过滤） |
 | "有哪些没修的缺陷" | `workitem mine --type bug --open-only`（指定项目时加 `--project X` 走服务端过滤） |

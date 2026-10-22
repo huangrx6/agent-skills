@@ -689,6 +689,18 @@ class CliCase(unittest.TestCase):
         self.assertIn("2.0 KB", out, "字节数要变成人看的")
         self.assertIn("principal_id=w1", router.find("GET", "/v2/attachments")[0][1])
 
+    def test_列评论附件要带_comment_id(self):
+        files = [{"id": "a1", "title": "demo.py", "size": 12, "type": "code",
+                  "created_at": 1583290347, "created_by": {"display_name": "某甲"}}]
+        code, out, _err, router = self.run_cli(
+            ["workitem", "attachments", "DOC-1", "--comment", "c1"],
+            {("GET", "/v2/pjm/workitems"): {"values": [WORKITEM]},
+             ("GET", "/v2/attachments"): {"values": files, "total": 1}})
+        self.assertEqual(0, code, out)
+        self.assertIn("demo.py", out)
+        url = router.find("GET", "/v2/attachments")[0][1]
+        self.assertIn("comment_id=c1", url)
+
     def test_没有附件时说一句人话(self):
         code, out, _err, _router = self.run_cli(
             ["workitem", "attachments", "DOC-1"],

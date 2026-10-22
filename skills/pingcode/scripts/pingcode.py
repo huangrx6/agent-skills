@@ -1533,13 +1533,14 @@ def cmd_workitem_download(args: argparse.Namespace) -> int:
 def cmd_workitem_attachments(args: argparse.Namespace) -> int:
     """列附件：GET /v2/attachments?principal_type=workitem&principal_id=<id>。
 
-    只列不传 —— 上传是 multipart/form-data，字段名没法从文档确认，而且列附件才是
-    日常真正要看的那一半（“这个缺陷有没有附日志”）。
+    评论里的附件（如代码段）必须再带 comment_id；--comment 传它。
     """
     client = build_client(args)
     current = fetch_workitem(client, args.ref, include_deleted=bool(args.all))
-    values = visible(client.paginate(ATTACHMENTS, max_items=args.limit,
-                                     principal_type="workitem", principal_id=current["id"]),
+    params: dict[str, Any] = {"principal_type": "workitem", "principal_id": current["id"]}
+    if args.comment:
+        params["comment_id"] = args.comment
+    values = visible(client.paginate(ATTACHMENTS, max_items=args.limit, **params),
                      bool(args.all))
     if args.full:
         print(json.dumps(values, ensure_ascii=False, indent=2))
@@ -2133,6 +2134,7 @@ def build_parser() -> argparse.ArgumentParser:
     wat = make(wsub, "attachments", help="列附件")
     wat.add_argument("ref")
     wat.add_argument("--limit", type=int, default=50)
+    wat.add_argument("--comment", help="列某条评论下的附件（代码段等）")
     wat.add_argument("--all", action="store_true", help="按编号找时含已删除的")
     wat.set_defaults(func=cmd_workitem_attachments)
     wdl = make(wsub, "download", help="下载一个附件")

@@ -144,6 +144,12 @@
       "prompt": "把 SCR-5 的风险属性设成 high，顺便把故事点设成 3。",
       "expected_output": "用 `workitem update SCR-5 --property risk=high --property story_points=3`，按键查该类型属性方案，合并进 PATCH 的 `properties`；不支持的属性要拒绝，值按 JSON 解析失败则按字符串。",
       "files": []
+    },
+    {
+      "id": 25,
+      "prompt": "看看 SCR-5 的评论里有没有代码段附件。",
+      "expected_output": "用 `workitem attachments SCR-5 --comment <评论 id>`；评论附件必须带 comment_id，不能只查工作项直接附件就断言没有。代码段上传走 attach-code，删除走 attach-remove --comment … --yes。",
+      "files": []
     }
   ]
 }
