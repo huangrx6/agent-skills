@@ -4,57 +4,62 @@
     {
       "id": 1,
       "prompt": "我想在两周内系统学 RAG，最好能做出一个能回答自己文档问题的 Demo。每天大概 1 小时。",
-      "expected_output": "先把目标收窄成可交付结果，再研究并核验资源；输出一份可离线打开的 HTML 学习指南。路线至少包含概念地图、最小闭环、一次失败定位和一次小迭代；明确总时长、前置假设和核验日期，不能只给链接清单。",
+      "expected_output": "先把目标收窄成可交付结果，再研究并核验资源。输出一组 6–10 篇独立笔记（Markdown + 渲染页）和一个 index.html，不是单页链接清单。篇目按“失败现场 → 最小闭环 → 机制 → 迭代”组织；每篇按深度规范落在对应行数区间，含完整例子、故障矩阵、边界与核验声明；视频只核验元数据并内嵌到入口页；明确总时长、前置假设和核验日期。",
       "files": [
         "references/learning-design.md",
-        "references/plan-schema.md"
+        "references/depth-standard.md",
+        "references/plan-schema.md",
+        "references/video-sources.md"
       ]
     },
     {
       "id": 2,
       "prompt": "我只有 30 分钟，先让我搞懂 RAG 是什么，别给我一堆课。",
-      "expected_output": "给一个 30 分钟左右的短路线：一个短概念资源、一个 5–10 分钟视频或图解、一个可当场完成的小任务。不要塞完整课程；明确这是“建立地图”，不是系统学习。",
+      "expected_output": "给 2–3 篇的短系列：一篇建立心智模型、一篇最小闭环，长度按内容定（参考 220–400 行）；配一个可当场完成的小任务和 2–3 道自测。不塞完整课程；明确这是“建立地图”，不是系统学习。",
       "files": [
-        "references/learning-design.md"
+        "references/learning-design.md",
+        "references/depth-standard.md"
       ]
     },
     {
       "id": 3,
       "prompt": "帮我找几篇讲 RAG 生产实践的好博客，不要 CSDN 那种。",
-      "expected_output": "优先从官方工程博客、维护者博客和有生产案例的实践者博客中筛选；标注来源层级、作者/团队、日期、语言和为什么值得看。社区文章只能作为补充，不能作为唯一依据；不堆砌 20 个链接。",
+      "expected_output": "优先官方工程博客、维护者博客和有生产案例的实践者博客；标注来源层级、作者/团队、日期、语言和为什么值得看。社区文章只做补充，不作为唯一依据；不堆 20 个链接。",
       "files": [
         "references/source-quality.md"
       ]
     },
     {
       "id": 4,
-      "prompt": "给我推荐几个 RAG 视频，最好能直接看。",
-      "expected_output": "只从官方频道、会议频道、作者本人或可信课程中选；核验标题、频道、发布日期、时长和语言。没有看完整内容时只写“元数据核验”，不能评价讲得好不好，也不能声称看过。",
+      "prompt": "给我推荐几个 RAG 视频，最好能直接在页面里看。",
+      "expected_output": "只从官方频道、会议频道、作者本人或可信课程选；核验标题、频道、发布日期、时长、语言、付费与地区限制。YouTube/Bilibili/Vimeo 转成点击后加载的内嵌播放器，其他平台只给外链。没完整看过只写“元数据核验”，不评价讲得好不好。",
       "files": [
+        "references/video-sources.md",
         "references/source-quality.md"
       ]
     },
     {
       "id": 5,
       "prompt": "每个阶段都必须有学习目标、2–3 个资源、一个动手任务、一个检查点、预计时间，少一个都不行。",
-      "expected_output": "不要把阶段做成死板表单。说明阶段按叙事节拍组织：每个阶段至少有资源、练习或检查点之一；时间、类比、绕路等按需出现。整条路线至少有一个真正的动手任务；资源过多时拆站，而不是硬凑栏目。",
-      "files": [
-        "references/learning-design.md"
-      ]
-    },
-    {
-      "id": 6,
-      "prompt": "页面别老是一个样，我想要好看一点，最好跟学习内容的气质匹配。",
-      "expected_output": "先选结构，再选颜色：journey 用星图 + 纵向阶段，atlas 用目录式双栏，studio 用海报 + 卡片墙，paged 用一屏一页 + 滚动吸附 + 视差；再配 deep-field/paper-trail/citrus/blueprint。必须让版式产生结构差异，不能只换主题色；paged 每页只讲一个概念，正文要有解释与依据，不能只给链接；同时检查首屏不要过度下沉、手机不横向溢出。",
+      "expected_output": "说明 v2 以“篇”为单位而不是固定栏目：每篇只回答一个问题，有 goal、kind、可选视频与自测；整条系列至少一次动手任务。需要凑栏目时先判断是否该拆篇，而不是用空话填满模板。",
       "files": [
         "references/learning-design.md",
         "references/plan-schema.md"
       ]
     },
     {
+      "id": 6,
+      "prompt": "页面别老是一个样，我想要好看一点，最好跟学习内容的气质匹配。",
+      "expected_output": "v2 入口页按内容选纸感/工程感等视觉方向，但结构服务于“篇目 + 进度 + 视频 + 复习”；单页路线仍可用 journey / atlas / studio / paged 四种结构不同的版式。必须检查桌面 1440px 与手机 390px，无横向溢出；不能只换颜色。",
+      "files": [
+        "references/plan-schema.md",
+        "references/learning-design.md"
+      ]
+    },
+    {
       "id": 7,
       "prompt": "你上次给的一个链接打不开，还有一篇是 2021 年的，能不能换掉？",
-      "expected_output": "先重新打开并核验链接；替换失效资源，不要把旧链接继续留在主路线。对快速变化主题优先近 12–18 个月的材料；基础概念可以保留经典，但要说明原因。更新 sources.verified_at，并记录哪些资源未验证。",
+      "expected_output": "重新打开核验链接；替换失效资源，不把旧链接留在主路线。快速变化主题优先近 12–18 个月材料；基础概念可保留经典但说明原因。更新 sources.verified_at，并记录哪些资源未验证。",
       "files": [
         "references/source-quality.md"
       ]
@@ -62,13 +67,16 @@
     {
       "id": 8,
       "prompt": "直接给我 Markdown 就行，我不想看 HTML。",
-      "expected_output": "说明默认交付是自包含 HTML，因为路线需要视觉节奏、资源筛选和进度勾选；Markdown 不是主产物。可以保留 JSON 作为可复现源文件，但不把 Markdown 链接清单当学习指南。如果用户坚持，先确认是导出文本还是放弃交互，不要静默降级。",
-      "files": []
+      "expected_output": "Markdown 本来就是主产物之一：notes/*.md 是原文，index.html 只是入口。可以只交付 Markdown，去掉 HTML 与视频内嵌，但说明会失去进度、自测与视频墙；不要静默降级，也不要只给链接清单。",
+      "files": [
+        "references/plan-schema.md",
+        "SKILL.md"
+      ]
     },
     {
       "id": 9,
       "prompt": "给我 20 篇 RAG 必读，我慢慢看。",
-      "expected_output": "不按数量凑资源。先判断学习目标和阶段，每站保留 1–3 个主资源；其余放“备选/学完再跳”或明确不推荐。告诉用户先做哪一步，而不是给一个收藏夹。",
+      "expected_output": "不按数量凑资源。先判断目标与篇目，每篇 1–3 个主资源；其余放“备选/学完再跳”或明确不推荐。告诉用户先做哪一步，而不是给收藏夹。",
       "files": [
         "references/learning-design.md"
       ]
@@ -76,13 +84,15 @@
     {
       "id": 10,
       "prompt": "顺便把这份学习计划写进我的知识库，之后我直接在里面复习。",
-      "expected_output": "说明本流程只生成学习指南，不自动写入或修改知识库；先交付 HTML，是否沉淀、如何归档由用户决定。不要假装已经写入，也不要把知识库当成事实源。",
-      "files": []
+      "expected_output": "说明本流程只生成学习系列，不自动写入或修改任何知识库；notes/*.md 带 frontmatter，可直接导入，但是否导入、导入到哪由用户决定。不要假装已经写入，也不要把知识库当成事实源。",
+      "files": [
+        "SKILL.md"
+      ]
     },
     {
       "id": 11,
       "prompt": "我英文一般，给我一条中文为主、但也能看官方文档的 RAG 路线。",
-      "expected_output": "中文资料优先用于建立顺序和术语，关键结论仍回到官方文档或原始来源；标注每条资源的语言和阅读负担。不要把中文社区课程当成唯一权威，也不要把英文原文直接堆给用户。",
+      "expected_output": "中文资料用于建立顺序和术语，关键结论仍回到官方文档或源码；标注每条资源的语言和阅读负担。不把中文社区课程当唯一权威，也不把英文原文直接堆给用户。",
       "files": [
         "references/source-quality.md"
       ]
@@ -90,91 +100,65 @@
     {
       "id": 12,
       "prompt": "这些视频你都看过了吗？哪个讲得最好？",
-      "expected_output": "不能声称看过没看过的视频。说明只核验了标题、频道、时长等元数据；可以按来源、主题覆盖和课程结构给出选择建议，但不伪造内容评价。需要真实评价时，先看视频或读取可靠 transcript，并标注验证范围。",
+      "expected_output": "不能声称看过没看过的视频。说明只核验了标题、频道、时长等元数据；可以按来源、主题覆盖和课程结构给选择建议，但不伪造内容评价。需要真实评价时，先看视频或读取可靠 transcript，并标注验证范围。",
       "files": [
+        "references/video-sources.md",
         "references/source-quality.md"
       ]
     },
     {
       "id": 13,
-      "prompt": "为什么每次生成的 HTML 除了颜色不一样，版式都差不多？首页还太靠下。",
-      "expected_output": "提供并实际使用 journey / atlas / studio / paged 四种结构不同的版式，而不是只换色；根据内容选型。paged 需要一屏一页、滚动吸附、视差背景，正文有解释与依据，不能只给链接。首屏减少顶部留白，让标题和承诺尽快出现。渲染后分别检查桌面 1440px 和手机 390px，确认没有横向溢出，并至少截图比较两种版式。",
+      "prompt": "我不要一堆链接，我要能从头读到尾、看得懂的中文笔记；遇到概念就告诉我去哪看原文。",
+      "expected_output": "写独立成篇的 Markdown 笔记：先用自己的话解释概念和为什么重要，再给完整例子/源码，最后放可点的官方文档或源码链接。每篇只回答一个问题，按 kind 达到 250–650 行；入口页负责篇目、视频与进度，不把讲解塞回链接列表。",
       "files": [
-        "references/learning-design.md",
-        "references/plan-schema.md"
+        "references/depth-standard.md",
+        "references/learning-design.md"
       ]
     },
     {
       "id": 14,
-      "prompt": "我不想要一堆链接，我要一篇能从头读到尾、看得懂的中文笔记；遇到概念就告诉我去哪看原文。",
-      "expected_output": "用 paged 版式写逐页笔记：先用自己的话解释概念和它为什么重要，再给最小例子/源码，最后放可点的官方文档或源码链接。每页只讲一个概念；不要用“去看这篇”代替讲解。至少包含 learner、sections、每页 sources、阶段 quiz 和整条 review；代码与命令放在正文里，不要求用户自己猜。",
+      "prompt": "我每次读完就忘，过几天什么都没剩下，怎么办？",
+      "expected_output": "把“读完”改成“回忆 + 间隔复习”：每篇 1–3 道自测，整条系列放 review 卡片；复习按 1 / 3 / 7 天安排，记录在本机。答错要能回到对应段落。说明这是轻量间隔复习，不冒充完整 FSRS。",
       "files": [
-        "references/plan-schema.md",
-        "references/learning-design.md"
+        "references/learning-design.md",
+        "references/plan-schema.md"
       ]
     },
     {
       "id": 15,
-      "prompt": "我每次读完就忘，过几天什么都没剩下，怎么办？",
-      "expected_output": "把“读完”改成“回忆 + 间隔复习”：阶段末放 2–5 道 quiz，整条路线放 review 卡片；复习按 1 / 3 / 7 天评分，记录到期日。答错要能标成薄弱点，并出现在导出的学习记录里。说明这是轻量间隔复习，不冒充完整 FSRS，也不承诺过目不忘。",
+      "prompt": "我关掉页面之后，下次还能接着上次的地方学吗？进度会同步到云吗？",
+      "expected_output": "入口页用本机 localStorage 记录已读篇目与进度，重新打开能继续；明确换设备/换浏览器/清缓存会丢失，不能说成云同步。不自动写入知识库。",
       "files": [
-        "references/learning-design.md",
-        "references/plan-schema.md"
+        "references/plan-schema.md",
+        "SKILL.md"
       ]
     },
     {
       "id": 16,
-      "prompt": "我关掉页面之后，下次还能接着上次的地方学吗？进度会同步到云吗？",
-      "expected_output": "paged 页面应保存本机 lastPage、已完成章节、测验答案和复习评分，并在封面提供“继续上次”。明确记录只在浏览器 localStorage，换设备/换浏览器/清缓存会丢失，不能说成云同步。提供导出 progress.md；不要自动写入知识库。",
+      "prompt": "你写的内容看起来有解释，但我读完还是不知道重点，怎么办？",
+      "expected_output": "按深度规范重写而不是加篇幅：每篇一个核心问题；开场故障在结尾回收；给分层/步骤、完整例子、故障矩阵、三条边界；删掉任何“去掉也不影响执行”的段落。低于对应 kind 的行数下限就补实质内容，不要用链接或套话填充。",
       "files": [
-        "references/plan-schema.md"
+        "references/depth-standard.md",
+        "references/content-quality.md"
       ]
     },
     {
       "id": 17,
-      "prompt": "我还是新手，你别一次讲十个概念；每次讲一个，然后让我自己动手。",
-      "expected_output": "每章拆成少量 section，每页一个核心问题；先解释再给最小例子。practice.steps 用 do / expect / check 写清操作、预期现象和过关标准，让学习者自己做，而不是 AI 代做。阶段末用 quiz 检查回忆；不要把所有 API 塞进一页。",
+      "prompt": "这份学习笔记全面吗？会不会漏掉关键内容？",
+      "expected_output": "先明确范围和学完产物，再按“前置概念、核心对象、机制链、边界/失败模式、验证方式”检查；不把覆盖所有 integrations 当成全面。范围外内容写“不覆盖”，缺前置就补一段，而不是加资源数量。",
       "files": [
-        "references/learning-design.md",
-        "references/plan-schema.md"
+        "references/content-quality.md",
+        "references/depth-standard.md"
       ]
     },
     {
       "id": 18,
-      "prompt": "我想知道自己哪里没学懂，不要只给我一个总分。",
-      "expected_output": "按阶段和题目记录测验结果，区分结果与轨迹；答错进入薄弱点，导出 Markdown 时列出薄弱章节、测验分数和到期复习卡。不要用单一总分掩盖具体失败；也不要伪造没有做过的评估。",
-      "files": [
-        "references/learning-design.md",
-        "references/plan-schema.md"
-      ]
-    },
-    {
-      "id": 19,
-      "prompt": "你写的内容看起来有解释，但我读完还是不知道重点，怎么办？",
-      "expected_output": "按内容合同重写，而不是再加篇幅：每页只回答一个核心问题；先给一句话定义和为什么重要，再给机制链、最小例子、常见误解、依据和自测。每章至少一个 teach_back，让学习者不看笔记讲 2–3 分钟；必要时加 glossary 解释第一次出现的术语。不要用更多链接掩盖讲不清。",
-      "files": [
-        "references/content-quality.md",
-        "references/plan-schema.md",
-        "references/learning-design.md"
-      ]
-    },
-    {
-      "id": 20,
-      "prompt": "这份学习笔记全面吗？会不会漏掉关键内容？",
-      "expected_output": "先明确范围和学完产物，再按“前置概念、核心对象、机制链、边界/失败模式、验证方式”检查；不把覆盖所有 integrations 当成全面。缺前置就补 prerequisites，术语多就加 glossary，范围外内容明确写“不覆盖”。不要用资源数量冒充全面。",
-      "files": [
-        "references/content-quality.md",
-        "references/plan-schema.md"
-      ]
-    },
-    {
-      "id": 21,
       "prompt": "里面的代码和结论我能直接信吗？",
-      "expected_output": "不能默认可信。代码要标 tested / illustrative / pseudo，并写 tested_with 或版本；没有实际运行就明确说示例代码。关键结论要有官方文档或源码依据，链接要核验。不要把“看起来能跑”写成“已验证”，也不要把示例 Agent 说成生产可用。",
+      "expected_output": "不能默认可信。代码标 tested / illustrative / pseudo，并写运行环境或版本；关键结论要有官方文档或源码依据，链接要核验。不要把“看起来能跑”写成“已验证”，也不要把示例说成生产可用。",
       "files": [
+        "references/depth-standard.md",
         "references/content-quality.md",
-        "references/source-quality.md",
-        "references/plan-schema.md"
+        "references/source-quality.md"
       ]
     }
   ]

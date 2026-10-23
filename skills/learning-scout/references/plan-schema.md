@@ -1,4 +1,134 @@
-# 学习路线 JSON 合同
+# 计划合同
+
+当前默认是 v2：多篇笔记系列。v1 的单页路线字段保留在文末，仅供旧的 `render` 命令使用。
+
+## v2：多篇笔记系列合同（默认）
+
+v2 把交付物从“一个 HTML 页面”改成“**一组可独立阅读的 Markdown 笔记 + 一个 HTML 入口**”。
+`version: 2` 时用 `scripts/build_series.py` 构建；v1 的 `render` 继续可用，用于快速路线页，
+但主题学习默认走 v2。
+
+## 目录形状
+
+```text
+<workspace>/
+  index.html            # 入口：篇目、进度、视频、动手任务、复习卡、来源
+  plan.json             # 唯一的计划源文件
+  README.md             # 篇目与路径清单
+  notes/
+    01-<slug>.md        # 原文（可直接导入 Markdown 知识库）
+    01-<slug>.html      # 渲染页
+    02-<slug>.md
+    02-<slug>.html
+```
+
+默认输出目录：`~/Downloads/learning-scout/<topic>-<date>/`。
+`--out` 可指定任意目录。
+
+## 最小形状
+
+```json
+{
+  "version": 2,
+  "topic": "可靠队列入门",
+  "promise": "从一次丢消息的故障出发，做出一个重启不丢的最小队列。",
+  "learner": {
+    "level": "会一点 Python",
+    "goal": "能独立实现并入队与原子落盘",
+    "time_per_day": "40 分钟"
+  },
+  "notes": [
+    {
+      "id": "01",
+      "title": "先看一次真实失败",
+      "goal": "能指出消息在哪一段丢的",
+      "depth": "L2",
+      "kind": "concept",
+      "minutes": 25,
+      "file": "notes/01-what.md",
+      "videos": [],
+      "quiz": []
+    }
+  ],
+  "practice": {
+    "title": "做一个不丢消息的队列",
+    "brief": "50 行代码，入队 + 原子落盘。",
+    "steps": [{"do": "写内存队列", "expect": "重启丢失", "check": "能复现"}]
+  },
+  "review": [{"front": "为什么先写临时文件？", "back": "保证替换原子。", "source": "POSIX rename"}],
+  "sources": {"verified_at": "2026-10-23", "note": "视频只核验元数据。"}
+}
+```
+
+## 顶层字段
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `version` | 是 | 固定 `2`。 |
+| `topic` | 是 | 学习主题，页面主标题。 |
+| `promise` | 是 | 学完能做什么；一句话。 |
+| `learner` | 否 | `{level, goal, time_per_day, preferences, constraints}`。 |
+| `audience` | 否 | 适合谁、需要什么前置。 |
+| `notes` | 是 | 至少 2 篇；见下。 |
+| `practice` | 建议 | 整条系列的一次动手任务，`steps` 用 `do/expect/check`。 |
+| `review` | 否 | 复习卡：`{front, back, source}`；入口页按 1/3/7 天调度。 |
+| `start` | 否 | `{today: [...], week_one: [...]}`；入口页的“从这里开始”。 |
+| `prerequisites` | 否 | `[{skill, why}]`；开始前最好具备的能力。 |
+| `outcomes` | 否 | `[{title, detail}]`；学完能做什么。 |
+| `glossary` | 否 | `[{term, definition}]`；入口页术语表。 |
+| `sources` | 是 | `{verified_at, note}`。 |
+
+## 每篇笔记
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `id` | 是 | 两位数，决定顺序，如 `"01"`。 |
+| `title` | 是 | 与 Markdown 标题一致；只回答一个问题。 |
+| `goal` | 是 | 读完能做到什么，一句话。 |
+| `file` | 是 | 指向 `notes/*.md`，相对 plan.json。 |
+| `depth` | 否 | `L1`–`L4`，与深度规范一致。 |
+| `kind` | 否 | `concept` / `mechanism` / `practice` / `source-review`。 |
+| `minutes` | 否 | 预计阅读分钟数。 |
+| `videos` | 否 | 0–2 个，字段见 [视频](video-sources.md)。 |
+| `quiz` | 否 | `[{q, options, answer, explain}]`，`answer` 是下标。 |
+
+笔记正文的深度、长度参考、必备结构见 [笔记深度规范](depth-standard.md)；每篇必须独立成篇，
+不引用同系列其他篇。
+
+## Markdown 支持范围
+
+渲染器实现的是一个受控子集：标题、段落、有序/无序列表、任务列表、表格、围栏代码、
+引用、`> [!note]` / `> [!warning]` 提示块、行内代码/粗体/斜体/链接/图片、分隔线。
+
+不支持：嵌套列表（按平铺处理）、脚注、数学公式、HTML 原片。需要这些时改用 v1 的
+`paged` 页面，或把内容写成文字。
+
+## 校验原则
+
+- `version` 必须是 `2`；`notes` 少于 2 篇直接报错（单篇内容不属于系列）。
+- `file` 必须存在、必须是 `.md`、不能越出 plan 目录。
+- `id` 重复、`quiz.answer` 越界、`sources.verified_at` 缺失：错误。
+- 视频缺 `verified_at`、笔记缺 `goal`、整条系列没有 `practice`：警告。
+- 构建会复制 Markdown 原文到输出目录，导入任何 Markdown 知识库都不需要再转换。
+
+## 构建
+
+```sh
+python3 scripts/check_notes.py --plan plan.json        # 深度与独立性检查
+python3 scripts/build_series.py build --input plan.json
+python3 scripts/build_series.py build --input plan.json --out ./dist --force --open
+```
+
+构建会先跑 `check_notes.py` 的同款检查，失败则中止；`--no-check` 可跳过。
+`--force` 覆盖已存在的输出目录，`--open` 构建后打开入口页。成功后打印输出目录与
+`index.html` 路径，并生成合并全部篇目的 `print.html`。
+
+---
+
+# v1（legacy）：单页路线
+
+> 以下字段只被 `scripts/learning_scout.py` 使用；新内容请按上面的 v2 写。
+
 
 渲染器只读一个 JSON 文件。它负责把“研究结果”变成可发布的 HTML；agent 负责把研究做真。
 字段按“有就写，没有就省略”设计，不要求每个阶段凑齐同一组栏目。
@@ -190,3 +320,4 @@
 - `glossary` 缺 term/definition、term 重复、`misconceptions` 缺 wrong/right：错误。
 - 阶段过多、单站资源过多、全篇没有动手任务：警告，不阻止渲染。
 - 渲染器会转义文本，不把 JSON 当作 HTML。
+

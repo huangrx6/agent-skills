@@ -41,6 +41,9 @@ InfoQ 中文、Datawhale、BAAI、机器之心。
 
 ## 视频
 
+视频的核验字段、可信频道与内嵌平台见 [视频](video-sources.md)；本节只讲它在来源分层中的位置。
+
+
 优先：
 
 - 官方会议频道：CNCF、Google I/O、AWS re:Invent、QCon、Strange Loop、PyCon、NeurIPS。

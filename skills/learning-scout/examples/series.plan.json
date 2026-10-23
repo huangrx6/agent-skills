@@ -1,0 +1,77 @@
+{
+  "version": 2,
+  "topic": "可靠队列入门",
+  "promise": "从一次丢消息的故障出发，做出一个重启不丢的最小队列。",
+  "learner": {
+    "level": "会一点 Python",
+    "goal": "能实现入队与原子落盘",
+    "time_per_day": "40 分钟"
+  },
+  "notes": [
+    {
+      "id": "01",
+      "title": "先看一次真实失败",
+      "goal": "能指出消息在哪一段丢的",
+      "depth": "L2",
+      "minutes": 25,
+      "file": "series-notes/01-failure.md",
+      "videos": [
+        {
+          "title": "示例视频（仅演示字段）",
+          "url": "https://www.youtube.com/watch?v=XXXXXXXX",
+          "channel": "Example Channel",
+          "duration": "12:30",
+          "lang": "en",
+          "why": "补队列的基本直觉，前 3 分钟是背景。",
+          "verified_at": "2026-10-23"
+        }
+      ],
+      "quiz": [
+        {
+          "q": "入队成功代表消息安全了吗？",
+          "options": [
+            "是",
+            "还要看是否落盘"
+          ],
+          "answer": 1,
+          "explain": "入队只保证进入内存队列。"
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "title": "把消息写进磁盘",
+      "goal": "能写出原子落盘与恢复",
+      "depth": "L3",
+      "minutes": 30,
+      "file": "series-notes/02-persist.md"
+    }
+  ],
+  "practice": {
+    "title": "做一个不丢消息的队列",
+    "brief": "50 行代码，入队 + 原子落盘 + 恢复。",
+    "steps": [
+      {
+        "do": "先写内存队列并 kill -9",
+        "expect": "重启后消息丢失",
+        "check": "能复现丢失"
+      },
+      {
+        "do": "加入临时文件 + rename",
+        "expect": "重启后仍能读回",
+        "check": "kill -9 后数据完整"
+      }
+    ]
+  },
+  "review": [
+    {
+      "front": "为什么先写临时文件再重命名？",
+      "back": "保证替换是原子的，读者不会看到半个文件。",
+      "source": "POSIX rename 语义"
+    }
+  ],
+  "sources": {
+    "verified_at": "2026-10-23",
+    "note": "示例视频链接为占位，仅演示字段。"
+  }
+}

@@ -13,7 +13,7 @@
 | [obsidian-wiki](skills/obsidian-wiki/README.md) | 学习 Wiki：吸收资料、关联证据、更新主题知识、检索问答与复习，独立运行 |
 | [obsidian-work](skills/obsidian-work/README.md) | 独立工作台：需求、缺陷、任务分工、日常记录与 Bases 首页，支持外部来源快照 |
 | [git-dev-workflow](skills/git-dev-workflow/README.md) | 本地 Git 写操作的状态探查、风险检查、提交规划和结果核验 |
-| [learning-scout](skills/learning-scout/README.md) | 把学习需求研究成可离线打开的 HTML 学习笔记：四种版式、讲义式正文、测验、间隔复习、本机进度与导出 |
+| [learning-scout](skills/learning-scout/README.md) | 把学习需求研究成一组独立笔记与可离线打开的入口页：篇目、测验、复习、搜索、打印/导出 |
 | [pingcode](skills/pingcode/README.md) | 查询和维护 PingCode 项目、工作项和迭代，按真实接口（REST API V2）解析名称和 ID |
 | [pingcode-weekly](skills/pingcode-weekly/README.md) | 从 PingCode 的需求和缺陷生成项目周报；只读，需先在 PingCode 录入 |
 | [skill-builder](skills/skill-builder/README.md) | 设计新 skill、评审触发边界，提供仓库结构与引用检查工具 |
