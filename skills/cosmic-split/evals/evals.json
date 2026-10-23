@@ -1,5 +1,5 @@
 {
-  "skill_name": "cosmic-function-point-splitter",
+  "skill_name": "cosmic-split",
   "evals": [
     {
       "id": 1,
@@ -9,7 +9,7 @@
     {
       "id": 2,
       "prompt": "甲方给的是空白 xlsx 模板，第一页使用说明，第二页表头在第4行，按它出表。",
-      "expected_output": "先 inspect，build/audit 使用同一选中工作表，必要时 --sheet。空模板保留数据移动表头，不追加重复列。说明基础样式与追加追溯列、原始标题和辅助sheet不保留，输出自检及来源报告。"
+      "expected_output": "先 inspect，build/audit 使用同一选中工作表，必要时 --sheet。空模板保留数据移动表头，不追加重复列。说明基础样式、默认只写标准列、--trace 才追加追溯列、原始标题和辅助sheet不保留，输出自检及来源报告。"
     },
     {
       "id": 3,

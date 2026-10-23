@@ -1,7 +1,7 @@
 """模板探测、缺列补齐与回读。
 
 跑法：
-    python3 -m unittest discover -s tests/cosmic-function-point-splitter -v
+    python3 -m unittest discover -s tests/cosmic-split -v
 
 布局不假设是这个 skill 最核心的一条：上一版把列号写死在文档里，第一次拿到真实模板就错位。
 所以这里把实测见过的三种模板形态都构造成夹具，钉住探测行为。

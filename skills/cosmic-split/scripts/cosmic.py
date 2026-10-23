@@ -208,7 +208,8 @@ def command_build(args: argparse.Namespace) -> int:
     template = sheet.inspect(args.template, args.sheet) if args.template else sheet.Template()
     template.l1_value = args.l1 or spec["project"]
 
-    output = sheet.write(result.rows, args.output, template, user_format=args.user_format)
+    output = sheet.write(result.rows, args.output, template,
+                         user_format=args.user_format, trace=args.trace)
     summary = checks.summary(result.rows)
     print(f"已写出：{output}")
     print(f"  {summary['processes']} 个功能过程 / {summary['rows']} 行 / {summary['cfp']} CFP")
@@ -445,7 +446,7 @@ def read_existing_table(path: str, sheet_name: str | None = None) -> list[builde
         if not any(cell(k, r) not in (None, '') for k in ('move', 'desc', 'group', 'attrs')):
             row.read_issues.append(f"无法识别为数据移动的非空行 第 {r} 行：需核实是否为缺损过程或汇总行")
         rows.append(row)
-    required = ('l2', 'l3', 'user', 'event', 'func', 'desc', 'move', 'group', 'attrs', 'cfp', 'object')
+    required = ('l2', 'l3', 'user', 'event', 'func', 'desc', 'move', 'group', 'attrs', 'cfp')
     missing = [sheet.HEADER_LABELS[k] for k in required if k not in layout]
     if rows and missing:
         rows[0].read_issues.append('原表缺少核心列：' + '、'.join(missing))
@@ -548,6 +549,8 @@ def build_parser() -> argparse.ArgumentParser:
                               help="模块内过程顺序：spec 按声明（默认），crud 按送审增删改查惯例")
     build_parser.add_argument("--user-format", choices=sheet.USER_FORMATS, default="plain",
                               help="功能用户写法：plain 纯用户，dual 发起者/接收者两行")
+    build_parser.add_argument("--trace", action="store_true",
+                              help="在标准列后追加过程编号、来源、证据等追溯列（默认只写标准列，自检报告仍含来源）")
     build_parser.add_argument("--require-confirmed", action="store_true",
                               help="有未标 confirmed 的过程就不写出")
     build_parser.add_argument("--force", action="store_true", help="校验不通过也写出")

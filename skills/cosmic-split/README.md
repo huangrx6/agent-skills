@@ -1,4 +1,4 @@
-# cosmic-function-point-splitter
+# cosmic-split
 
 > 按需求、接口、页面或代码识别 COSMIC 数据移动，生成可核对、可审计的功能点拆分表。
 
@@ -12,12 +12,14 @@
 
 ```sh
 python3 -m pip install openpyxl
-python3 skills/cosmic-function-point-splitter/scripts/cosmic.py init spec.json
-python3 skills/cosmic-function-point-splitter/scripts/cosmic.py check spec.json
-python3 skills/cosmic-function-point-splitter/scripts/cosmic.py build spec.json -o 拆分表.xlsx --template 模板.xlsx
+python3 skills/cosmic-split/scripts/cosmic.py init spec.json
+python3 skills/cosmic-split/scripts/cosmic.py check spec.json
+python3 skills/cosmic-split/scripts/cosmic.py build spec.json -o 拆分表.xlsx --template 模板.xlsx
 ```
 
 `check` / `report` / `coverage` 只用标准库。模板可省略，工作表自动探测，可用 `--sheet` 指定。
+默认只写标准列；需要把过程编号、核实状态、来源、证据等也放进表时加 `--trace`。
+自检报告始终保留逐项来源与依据，不会因为表里没有追溯列而丢信息。
 `build` 自动生成 `.selfcheck.md` 来源报告，可用 `--selfcheck` 改路径。`init` 示例默认为待核实，
 需填写真实项目依据。表格与报告须使用不同路径，不能覆盖输入规格、模板、接口清单或自定义术语表；
 已有输出可正常重新生成。
@@ -26,11 +28,11 @@ python3 skills/cosmic-function-point-splitter/scripts/cosmic.py build spec.json 
 <summary><strong>全部命令</strong></summary>
 
 ```sh
-python3 skills/cosmic-function-point-splitter/scripts/cosmic.py inspect 模板.xlsx
-python3 skills/cosmic-function-point-splitter/scripts/cosmic.py audit 拆分表.xlsx
-python3 skills/cosmic-function-point-splitter/scripts/cosmic.py report spec.json -o 自检.md
-python3 skills/cosmic-function-point-splitter/scripts/cosmic.py coverage spec.json inventory.json
-python3 skills/cosmic-function-point-splitter/scripts/cosmic.py normalize 已有表.xlsx -o 新表.xlsx --write
+python3 skills/cosmic-split/scripts/cosmic.py inspect 模板.xlsx
+python3 skills/cosmic-split/scripts/cosmic.py audit 拆分表.xlsx
+python3 skills/cosmic-split/scripts/cosmic.py report spec.json -o 自检.md
+python3 skills/cosmic-split/scripts/cosmic.py coverage spec.json inventory.json
+python3 skills/cosmic-split/scripts/cosmic.py normalize 已有表.xlsx -o 新表.xlsx --write
 ```
 
 </details>
@@ -52,7 +54,8 @@ python3 skills/cosmic-function-point-splitter/scripts/cosmic.py normalize 已有
   新过程不继承上一过程的名称、用户或触发事件；公式不自动求值。
 - normalize 只改子过程描述（`--glossary` 时也改数据组/属性），复制原表后改单元格，
   保留合并与其他工作表；默认干跑，`--write` 需另给 `-o`，不会覆盖原表。
-- 表内保留操作类型、操作依据与接口证据，生成和回读审计使用同一份依据。
+- 默认表格只保留标准列；`--trace` 时追加过程编号、核实状态、来源、证据等追溯列。
+  标准表没有兴趣对象列时，audit 会跳过重复移动核对，不把缺失当错误；需要该证据时加 `--trace`。
 - 表格没有过程编号时按模块与名称分组，同名相邻过程无法可靠区分。
 - 模板只复用基础布局与样式，新建单 sheet；不复制标题内容、辅助表和复杂格式。
   详见 [模板行为](references/templates.md)。
@@ -76,9 +79,9 @@ python3 skills/cosmic-function-point-splitter/scripts/cosmic.py normalize 已有
 ## 验证
 
 ```sh
-python3 -m unittest discover -s tests/cosmic-function-point-splitter -v
-python3 tools/skill-builder/scripts/validate_skill.py skills/cosmic-function-point-splitter
-python3 tools/skill-builder/scripts/check_pointers.py skills/cosmic-function-point-splitter --root skills/cosmic-function-point-splitter
+python3 -m unittest discover -s tests/cosmic-split -v
+python3 tools/skill-builder/scripts/validate_skill.py skills/cosmic-split
+python3 tools/skill-builder/scripts/check_pointers.py skills/cosmic-split --root skills/cosmic-split
 ```
 
 测试覆盖字段保真、来源、多输入过程、计数篡改、审计缺损行、输出覆盖保护、模板与命令流程、

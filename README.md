@@ -20,7 +20,7 @@
 | --- | --- | --- |
 | [**deck-authoring**](skills/deck-authoring/README.md) | 从材料组织内容、设计版面与配图，用真实页面迭代 | HTML 演示 · PDF · PNG · PPTX · 视频 |
 | [**diagram-authoring**](skills/diagram-authoring/README.md) | 把结构描述变成可编辑的技术图，并检查布局与可读性 | Excalidraw · draw.io · Mermaid · PNG |
-| [**cosmic-function-point-splitter**](skills/cosmic-function-point-splitter/README.md) | 按需求、接口、页面或代码识别 COSMIC 数据移动 | 拆分表 · 自检报告 · 覆盖清单 |
+| [**cosmic-split**](skills/cosmic-split/README.md) | 按需求、接口、页面或代码识别 COSMIC 数据移动 | 拆分表 · 自检报告 · 覆盖清单 |
 
 ### 知识与工作
 

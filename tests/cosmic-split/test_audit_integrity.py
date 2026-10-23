@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPTS = Path(__file__).resolve().parents[2] / 'skills/cosmic-function-point-splitter/scripts'
+SCRIPTS = Path(__file__).resolve().parents[2] / 'skills/cosmic-split/scripts'
 sys.path.insert(0, str(SCRIPTS))
 
 import builder
@@ -30,7 +30,7 @@ class AuditIntegrityTests(unittest.TestCase):
             process.update(id='FP-002', name='地址修改', trigger='业务用户提交地址修改')
             value['processes'].append(process)
         sheet.write(builder.build(spec.load_from_dict(value)).rows, self.path,
-                    sheet.Template(l1_value='项目'))
+                    sheet.Template(l1_value='项目'), trace=True)
 
     def edit(self, change):
         workbook = openpyxl.load_workbook(self.path)
@@ -142,7 +142,7 @@ class AuditIntegrityTests(unittest.TestCase):
         self.assertEqual(issues, [])
 
     def test_核心列缺失需明确报告(self):
-        for key in ('l2', 'l3', 'user', 'event', 'object'):
+        for key in ('l2', 'l3', 'user', 'event'):
             with self.subTest(key=key):
                 self.write()
                 column = sheet.inspect(self.path).layout[key]
@@ -158,7 +158,7 @@ class AuditIntegrityTests(unittest.TestCase):
                                     for issue in issues), issues)
 
     def test_核心列存在但值为空也不能通过(self):
-        for key in ('l2', 'l3', 'user', 'event', 'object'):
+        for key in ('l2', 'l3', 'user', 'event'):
             with self.subTest(key=key):
                 self.write()
                 column = sheet.inspect(self.path).layout[key]

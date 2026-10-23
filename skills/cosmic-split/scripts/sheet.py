@@ -467,8 +467,12 @@ def _apply_row_heights(worksheet, template: Template, first_row: int, last_row: 
 
 
 def write(rows: list[Row], destination: str | Path, template: Template | None = None,
-          user_format: str = "plain") -> Path:
+          user_format: str = "plain", trace: bool = False) -> Path:
     """写出拆分表。
+
+    默认只写模板/标准 12 列；追溯字段留在自检报告里。需要把过程编号、核实状态、
+    需求依据、兴趣对象、重复移动理由、op/op_note、接口证据也写进表时，显式传
+    `trace=True`（CLI 的 `--trace`）。模板本来就有这些列时照常复用，不主动删列。
 
     功能用户列按「连续取值相同」合并，不按模块合并：同一个三级模块里，
     报表查询是操作员、采集入库是定时任务，整块合并会把两种取值糊在一起。
@@ -483,7 +487,9 @@ def write(rows: list[Row], destination: str | Path, template: Template | None = 
     if not template.l1_value:
         raise SystemExit("一级模块取值为空：用 --l1 指定，或让模板的数据行有内容")
 
-    if any(row.object for row in rows):
+    if not trace and not any(key in template.layout for key in TRACE_LABELS):
+        template.notes.append("默认只写标准列；追溯字段在自检报告里，需要写进表时加 --trace")
+    if trace:
         for key, label in TRACE_LABELS.items():
             if key not in template.layout:
                 template.layout[key] = max([template.source_width, *template.layout.values()]) + 1

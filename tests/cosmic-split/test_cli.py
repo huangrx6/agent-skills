@@ -1,7 +1,7 @@
 """CLI 行为与退出码。
 
 跑法：
-    python3 -m unittest discover -s tests/cosmic-function-point-splitter -v
+    python3 -m unittest discover -s tests/cosmic-split -v
 
 钉的是「承诺的行为」：校验不通过就不落盘、init 不覆盖已有文件、audit 能读回自己写出的表。
 """
@@ -152,6 +152,26 @@ class TestBuild(CliTestCase):
         worksheet = openpyxl.load_workbook(output).active
         self.assertEqual(worksheet.cell(row=2, column=1).value, "示例项目")
 
+    def test_默认只写标准列(self):
+        output = self._path("out.xlsx")
+        self.assertEqual(run("build", self._starter(), "-o", output)[0], 0)
+        import openpyxl
+
+        headers = [c.value for c in openpyxl.load_workbook(output).active[1]]
+        self.assertEqual(headers, ["一级模块", "二级模块", "三级模块", "功能用户", "触发事件",
+                                   "功能过程", "子过程描述", "数据移动类型", "数据组",
+                                   "数据属性", "复用度", "CFP"])
+
+    def test_trace_才追加追溯列(self):
+        output = self._path("out.xlsx")
+        self.assertEqual(run("build", self._starter(), "-o", output, "--trace")[0], 0)
+        import openpyxl
+
+        headers = [c.value for c in openpyxl.load_workbook(output).active[1]]
+        self.assertIn("过程编号", headers)
+        self.assertIn("接口证据", headers)
+        self.assertGreater(len(headers), 12)
+
     def test_report_缺省打到标准输出_给_o_时写文件(self):
         code, out, _err = run("report", self._starter())
         self.assertEqual(code, 0)
@@ -246,10 +266,10 @@ class TestInspectCli(CliTestCase):
         self.assertEqual(headers[:4], ["二级模块", "三级模块", "功能过程", "数据移动类型"])
         self.assertIn("CFP", headers, "缺的必填列应被追加")
         self.assertEqual(headers[4:], ["一级模块", "功能用户", "触发事件", "子过程描述",
-                                   "数据组", "数据属性", "CFP", "过程编号", "核实状态", "需求依据", "兴趣对象", "重复移动理由",
-                                   "操作类型", "操作依据", "接口证据"])
-        # 复用度是常量列，模板没有就不追加
+                                   "数据组", "数据属性", "CFP"])
+        # 复用度是常量列，模板没有就不追加；追溯列默认也不追加
         self.assertNotIn("复用度", headers)
+        self.assertNotIn("过程编号", headers)
 
 
 if __name__ == "__main__":

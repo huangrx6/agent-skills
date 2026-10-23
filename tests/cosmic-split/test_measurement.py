@@ -154,7 +154,7 @@ class AuditRegressions(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.path = self.root / 'out.xlsx'
         self.rows = build(fixture()).rows
-        sheet.write(self.rows, self.path, sheet.Template(l1_value='项目'))
+        sheet.write(self.rows, self.path, sheet.Template(l1_value='项目'), trace=True)
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -233,7 +233,7 @@ class AuditRegressions(unittest.TestCase):
         value = fixture(); proc = value['processes'][0]
         proc.update(status='confirmed', source='需求.md#新增地址')
         rows = build(value).rows
-        sheet.write(rows, self.path, sheet.Template(l1_value='项目'))
+        sheet.write(rows, self.path, sheet.Template(l1_value='项目'), trace=True)
         restored = cosmic.read_existing_table(self.path)
         for a, b in zip(rows, restored):
             self.assertEqual((a.process_id, a.status, a.source, a.object), (b.process_id, b.status, b.source, b.object))

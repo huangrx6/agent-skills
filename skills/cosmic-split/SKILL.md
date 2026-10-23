@@ -1,5 +1,5 @@
 ---
-name: cosmic-function-point-splitter
+name: cosmic-split
 description: >-
   Use when 按 COSMIC 度量软件功能规模、把需求/接口清单/页面或代码转成有来源依据的功能过程与
   E/R/W/X 拆分表、核对接口与页面覆盖，或核查与改写已有 COSMIC 表。中文触发：COSMIC、CFP 估算、
@@ -63,7 +63,8 @@ python3 <skill路径>/scripts/cosmic.py normalize 已有表.xlsx -o 新表.xlsx 
 ```
 
 - `check` 只校验与预估；`build` 默认检查失败不写表，`--force` 仅保留有问题的草稿。
-- `build` 每次同时写自检与逐项来源报告（默认输出文件名加 `.selfcheck.md`）。
+- `build` 默认只写标准列，并同时写自检与逐项来源报告（默认输出文件名加 `.selfcheck.md`）；
+  需要把过程编号、来源、证据写进表时加 `--trace`。
 - 结构问题阻塞；一致性提示与覆盖缺口默认不阻塞，`--strict` 时一并阻塞。
 - `--order crud` 只在模块内按送审增删改查惯例重排过程块；`--user-format dual` 写
   「发起者/接收者」两行；`--require-confirmed` 有未确认过程就不写表。

@@ -66,7 +66,7 @@ def structural_issues(rows: list[Row]) -> list[str]:
             if not row.func or not row.desc or not row.group:
                 issues.append(f"缺少功能过程、描述或数据组 第 {row.excel_row} 行")
             missing = [label for key, label in (('l2', '二级模块'), ('l3', '三级模块'),
-                       ('user', '功能用户'), ('event', '触发事件'), ('object', '兴趣对象'))
+                       ('user', '功能用户'), ('event', '触发事件'))
                        if not getattr(row, key).strip()]
             if missing:
                 issues.append(f"缺少核心字段 第 {row.excel_row} 行：{'、'.join(missing)}")

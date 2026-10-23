@@ -5,7 +5,7 @@ import sys
 import unittest
 from pathlib import Path
 
-SCRIPTS = Path(__file__).resolve().parents[2] / 'skills/cosmic-function-point-splitter/scripts'
+SCRIPTS = Path(__file__).resolve().parents[2] / 'skills/cosmic-split/scripts'
 sys.path.insert(0, str(SCRIPTS))
 import builder
 import checks

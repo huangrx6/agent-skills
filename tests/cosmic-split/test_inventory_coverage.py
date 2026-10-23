@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SCRIPTS = HERE.parents[1] / 'skills/cosmic-function-point-splitter/scripts'
+SCRIPTS = HERE.parents[1] / 'skills/cosmic-split/scripts'
 sys.path.insert(0, str(SCRIPTS))
 
 import cosmic  # noqa: E402

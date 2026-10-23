@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPTS = Path(__file__).resolve().parents[2] / "skills/cosmic-function-point-splitter/scripts"
+SCRIPTS = Path(__file__).resolve().parents[2] / "skills/cosmic-split/scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 import openpyxl
@@ -25,7 +25,7 @@ class ExportIntegrityTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def write(self, project="项目"):
-        return sheet.write(self.rows, self.path, sheet.Template(l1_value=project))
+        return sheet.write(self.rows, self.path, sheet.Template(l1_value=project), trace=True)
 
     def test_公式和错误字样在所有业务列保留为文本(self):
         for literal in ("=1+1", "#N/A", "#REF!", "=HYPERLINK(\"https://example.com\")"):
@@ -109,7 +109,7 @@ class ExportIntegrityTests(unittest.TestCase):
         self.assertFalse(self.path.exists())
 
     def heights(self, template=None):
-        sheet.write(self.rows, self.path, template or sheet.Template(l1_value="项目"))
+        sheet.write(self.rows, self.path, template or sheet.Template(l1_value="项目"), trace=True)
         workbook = openpyxl.load_workbook(self.path)
         try:
             return [workbook.active.row_dimensions[row].height for row in range(2, 6)]

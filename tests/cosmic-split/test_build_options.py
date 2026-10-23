@@ -183,14 +183,14 @@ class TestGates(BuildOptionsCase):
         value['processes'][0]['evidence'] = ['api-address-create']
         path = self.write_spec(value)
         output = self.output()
-        self.assertEqual(run('build', path, '-o', output)[0], 0)
+        self.assertEqual(run('build', path, '-o', output, '--trace')[0], 0)
         row = cosmic.read_existing_table(output)[0]
         self.assertEqual(row.op, 'insert')
         self.assertEqual(row.op_note, value['processes'][0]['op_note'])
         self.assertEqual(row.evidence, 'api-address-create')
         value['processes'][0].pop('op_note')
         self.write_spec(value)
-        self.assertEqual(run('build', path, '-o', output)[0], 0)
+        self.assertEqual(run('build', path, '-o', output, '--trace')[0], 0)
         self.assertEqual(run('check', path, '--strict')[0], 1)
         self.assertEqual(run('audit', output, '--strict')[0], 1)
         workbook = openpyxl.load_workbook(output)
