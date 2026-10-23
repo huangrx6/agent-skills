@@ -7,7 +7,7 @@ ROADMAP 里如果手抄一份「正文 147 行 / 缺 2 个 evals / 5 个 skill �
 它**必然过期** —— 而本仓库的规矩是「能机械校验的东西只有一处定义」。所以 ROADMAP
 只写方向，数字用这条命令现算。
 
-它**不复刻**结构校验：正文行数与上限直接读 `skills/skill-builder/scripts/validate_skill.py`
+它**不复刻**结构校验：正文行数与上限直接读 `tools/skill-builder/scripts/validate_skill.py`
 的常量与解析（那里是唯一一处定义）。这里只补 validate_skill.py 不看的几项：
 
   · 有没有 `README.md`（维护约定要求每个 skill 都有）
@@ -35,7 +35,7 @@ from typing import Any
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ROOT = os.path.dirname(HERE)
-VALIDATOR = os.path.join("skills", "skill-builder", "scripts", "validate_skill.py")
+VALIDATOR = os.path.join("tools", "skill-builder", "scripts", "validate_skill.py")
 
 # 扫「谁引用了这个文件」时看这些后缀（都是文本，能直接读）。
 SCAN_SUFFIXES = (".md", ".json", ".py", ".js", ".sh", ".yml", ".yaml", ".toml")
@@ -266,7 +266,7 @@ def render(report: dict[str, Any]) -> str:
     if not any(groups.values()):
         lines.append("  · 没有")
     lines.append("")
-    lines.append("结构硬错误请跑：python3 skills/skill-builder/scripts/validate_skill.py")
+    lines.append("结构硬错误请跑：python3 tools/skill-builder/scripts/validate_skill.py")
     return "\n".join(lines)
 
 

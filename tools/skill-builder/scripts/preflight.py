@@ -142,12 +142,13 @@ def hook_steps(root: str) -> list[str]:
 
 
 def checks(root: str) -> list[dict]:
-    sb = os.path.join(root, "skills", "skill-builder", "scripts")
+    sb = os.path.join(root, "tools", "skill-builder", "scripts")
     return [
         {"name": "结构校验", "cmd": [sys.executable, os.path.join(sb, "validate_skill.py")]},
-        {"name": "泄露扫描", "cmd": [sys.executable, os.path.join(sb, "check_leakage.py")]},
+        {"name": "泄露扫描", "cmd": [sys.executable, os.path.join(sb, "check_leakage.py"),
+                                     "skills", "tools"]},
         {"name": "指针目标", "cmd": [sys.executable, os.path.join(sb, "check_pointers.py"),
-                                     "--root", root, "skills"]},
+                                     "--root", root, "skills", "tools"]},
     ]
 
 

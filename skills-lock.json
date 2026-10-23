@@ -53,12 +53,6 @@
       "skillPath": "skills/pingcode-weekly/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
-    },
-    "skill-builder": {
-      "computedHash": "f154cb83c3521564b44bff19e1184ab3d4feb4bb09e3327e838f2d351f85d1bb",
-      "skillPath": "skills/skill-builder/SKILL.md",
-      "source": "huangrx6/agent-skills",
-      "sourceType": "github"
     }
   },
   "version": 1

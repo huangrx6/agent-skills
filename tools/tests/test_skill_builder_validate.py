@@ -15,10 +15,9 @@ import unittest
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时读的是
-# `skills/<skill>/` 那棵树，测试放在里面会被顺手读进去）。
-# 所以从 `tests/<skill>/` 往上两级到仓库根，再进 `skills/<skill>/`。
-SKILL = os.path.join(os.path.dirname(os.path.dirname(HERE)), "skills", os.path.basename(HERE))
+# 工具测试放在 tools/tests；被测对象在 tools/skill-builder。
+ROOT = os.path.dirname(os.path.dirname(HERE))
+SKILL = os.path.join(ROOT, "tools", "skill-builder")
 SCRIPTS = os.path.join(SKILL, "scripts")
 VALIDATE = os.path.join(SCRIPTS, "validate_skill.py")
 

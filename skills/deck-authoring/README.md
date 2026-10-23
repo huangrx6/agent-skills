@@ -236,7 +236,7 @@ python3 scripts/pptx_native.py /path/to/deck.html -o /path/to/editable.pptx
 
 ```bash
 python3 -m unittest discover -s tests/deck-authoring -v
-python3 skills/skill-builder/scripts/validate_skill.py skills/deck-authoring
+python3 tools/skill-builder/scripts/validate_skill.py skills/deck-authoring
 ```
 
 通用文件读写（文本、JSON、二进制、目录）优先走 `scripts/deckio.py`，错误路径集中处理；图像解码仍由各自模块负责。

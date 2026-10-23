@@ -26,7 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
 REPO = os.path.dirname(TOOLS)
 HEALTH = os.path.join(TOOLS, "skill_health.py")
-VALIDATOR = os.path.join(REPO, "skills", "skill-builder", "scripts", "validate_skill.py")
+VALIDATOR = os.path.join(REPO, "tools", "skill-builder", "scripts", "validate_skill.py")
 
 
 def _load(path: str, name: str):
@@ -69,11 +69,9 @@ class RepoCase(unittest.TestCase):
         os.makedirs(os.path.join(self.root, "skills"))
         # 把真的校验器拷进去：体检脚本复用它的常量，改名字了这里要一起红
         # （体检按固定的相对路径找它，所以假仓库里得照那个路径放一份）
-        validator_dir = os.path.join(self.root, "skills", "skill-builder")
+        validator_dir = os.path.join(self.root, "tools", "skill-builder")
         os.makedirs(os.path.join(validator_dir, "scripts"))
         shutil.copy(VALIDATOR, os.path.join(validator_dir, "scripts", "validate_skill.py"))
-        # 那个目录在真仓库里本来就是个 skill，这里也给它配上，免得成为“缺 README”的噪声
-        self.make_skill("skill-builder", body_lines=3, readme=True, evals=True)
 
     def make_skill(self, name: str, body_lines: int = 3, *, readme: bool = False,
                    evals: bool = True, assets: tuple[str, ...] = ()) -> str:
@@ -135,10 +133,10 @@ class ScanTest(RepoCase):
         self.assertEqual(0, code, "体检只报告，不判失败")
 
     def test_每个_skills_下的目录都会被当成一个条目(self):
-        """包括夹具里放校验器的那一个 —— 这样才不会出现“幽灵 skill”被漏掉。"""
+        """skill 目录才进快照；tools/ 下的工具不再伪装成 skill。"""
         self.make_skill("aaa")
         names = [s["name"] for s in health.scan_repo(self.root)["skills"]]
-        self.assertEqual(["aaa", "skill-builder"], names)
+        self.assertEqual(["aaa"], names)
 
 
 class AssetTest(RepoCase):
@@ -253,7 +251,7 @@ class ReportTest(RepoCase):
             code = health.main(["--root", self.root, "--json"])
         self.assertEqual(0, code)
         payload = json.loads(buf.getvalue())
-        self.assertEqual(["aaa", "skill-builder"], [s["name"] for s in payload["skills"]])
+        self.assertEqual(["aaa"], [s["name"] for s in payload["skills"]])
         self.assertEqual(["aaa"], payload["summary"]["缺 README.md"])
 
     def test_全是干净的时候要说没有(self):

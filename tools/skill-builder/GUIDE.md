@@ -1,18 +1,7 @@
----
-name: skill-builder
-description: >-
-  Use when creating a new skill or reviewing whether a skill's trigger description and
-  scope are clear. 中文触发：建一个 skill / 要不要包成 skill / 帮我起 SKILL.md /
-  这个 skill 老是不触发 / 触发描述太宽或太窄 / 评审 skill 边界。
-  Identify the reusable workflow, compare adjacent skills, and write an actionable entry
-  with realistic trigger examples. Do NOT use for: ordinary edits to an existing skill's
-  body, scripts, references or assets; one-off prompts; running a formal trigger benchmark.
----
+# Skill 写作指南
 
-# skill-builder
-
-把可复用的工作方法写成容易触发、能执行、能核验的 skill。用户已明确要求创建或调整时，
-在授权范围内直接推进；缺少历史使用次数不是拒绝工作的理由。
+把可复用的工作方法写成容易触发、能执行、能核验的 skill。用于创建新 skill、评审触发描述或范围；
+普通正文或脚本修改直接进行，不需要重新论证。用户已明确要求创建或调整时，在授权范围内直接推进。
 
 ## 先确定范围
 

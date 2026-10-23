@@ -77,8 +77,8 @@ python3 skills/cosmic-function-point-splitter/scripts/cosmic.py normalize 已有
 
 ```sh
 python3 -m unittest discover -s tests/cosmic-function-point-splitter -v
-python3 skills/skill-builder/scripts/validate_skill.py skills/cosmic-function-point-splitter
-python3 skills/skill-builder/scripts/check_pointers.py skills/cosmic-function-point-splitter --root skills/cosmic-function-point-splitter
+python3 tools/skill-builder/scripts/validate_skill.py skills/cosmic-function-point-splitter
+python3 tools/skill-builder/scripts/check_pointers.py skills/cosmic-function-point-splitter --root skills/cosmic-function-point-splitter
 ```
 
 测试覆盖字段保真、来源、多输入过程、计数篡改、审计缺损行、输出覆盖保护、模板与命令流程、

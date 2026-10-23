@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <code>10 skills</code> &nbsp;·&nbsp; <code>Python 3.10+</code> &nbsp;·&nbsp; <code>MIT</code>
+  <code>9 skills</code> &nbsp;·&nbsp; <code>Python 3.10+</code> &nbsp;·&nbsp; <code>MIT</code>
 </p>
 
 每个 skill 都是一个独立目录：`SKILL.md` 说明什么时候触发、怎么执行，`README.md` 交代依赖、用法和边界。
@@ -44,12 +44,24 @@
 | --- | --- | --- |
 | [**git-dev-workflow**](skills/git-dev-workflow/README.md) | 本地 Git 状态、破坏性操作预检、提交与 worktree | 状态快照 · 风险结论 · 操作建议 |
 | [**learning-scout**](skills/learning-scout/README.md) | 把学习需求研究成一组独立笔记与离线入口页 | 笔记 · HTML 入口 · 打印版 · PDF |
-| [**skill-builder**](skills/skill-builder/README.md) | 设计 skill、评审触发边界、检查结构与引用 | SKILL.md · 检查报告 |
 
 Obsidian 两项能力各自独立，通过笔记数据关联；取舍见 [学习 Wiki 与工作台架构](docs/obsidian-architecture.md)。
 
 例如：“使用 `$deck-authoring` 把材料做成演示文稿”，或“使用 `$learning-scout` 给我一条两周的 RAG 学习路线”。
 是否自动发现、如何显式调用，取决于使用的 Agent。
+
+## 维护工具
+
+技能之外的仓库工具放在 `tools/`，不会被安装到 agent：
+
+| 工具 | 作用 |
+| --- | --- |
+| [**skill-builder**](tools/skill-builder/README.md) | 编写 / 评审 skill 的指南，以及结构、引用、名称泄露检查器 |
+| `install_skills.py` | 把 `skills/` 软链或复制到 agent 发现目录 |
+| `skills_lock.py` | 记录并校验各个 `SKILL.md` 的哈希 |
+| `migrate_skill_home.py` | 把旧配置 / 缓存迁到 `~/.agent-skills` |
+| `skill_health.py` | 仓库体检与维护建议 |
+| `skill_trigger_log.py` | 分析本机会话日志，不做触发效果承诺 |
 
 ## 安装
 
@@ -125,7 +137,7 @@ python3 tools/migrate_skill_home.py --apply
 ```text
 agent-skills/
 ├── skills/        # 10 个可独立安装的 skill
-├── tools/         # 安装、锁文件、迁移、体检
+├── tools/         # 安装、锁文件、迁移、体检、skill 编写
 ├── tests/         # 回归测试，按 skill 分目录
 ├── docs/          # 架构、目录约定与迁移记录
 ├── assets/        # 仓库图标等共享素材
@@ -136,8 +148,7 @@ agent-skills/
 ## 开发与验证
 
 ```sh
-python3 skills/skill-builder/scripts/preflight.py
-python3 -m unittest discover -s tests/skill-builder -v
+python3 tools/skill-builder/scripts/preflight.py
 python3 -m unittest discover -s tools/tests -v
 python3 tools/skills_lock.py --check
 ```
@@ -145,6 +156,7 @@ python3 tools/skills_lock.py --check
 修改其他 skill 时，把测试目录换成对应名称。`preflight.py` 只做结构、泄露、指针与文件快照，
 不执行回归，也不证明产物质量；Deck 的浏览器与 PDF 测试需要其运行依赖。
 `tools/skill_health.py` 提供维护建议，`tools/skill_trigger_log.py` 分析本机会话日志。
+`skill-builder` 的写作方法在 [GUIDE.md](tools/skill-builder/GUIDE.md)，检查器命令见其 README。
 
 提交涉及 `skills/`、`tests/`、`tools/` 或 `.githooks/` 时，可启用仓库 hook：
 
