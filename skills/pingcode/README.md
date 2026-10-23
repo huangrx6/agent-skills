@@ -82,7 +82,7 @@ python3 skills/pingcode/dev-tools/gen_endpoints.py --check --input /path/to/api_
 - 尚未实测：项目创建 / 更新的真实写（只做过 dry-run）、代码段附件（需要先有评论）、
   批量改状态的实写（只做过 dry-run）、评论创建（避免未经要求的外发）、
   `mine --type` 有匹配数据的本地过滤、私有部署。
-- 详细清单见 [V2 迁移记录](../../docs/plans/pingcode-api-v2-migration.md)。
+- 更早的迁移记录保留在 Git 历史中。
 
 ## 范围与限制
 

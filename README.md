@@ -1,10 +1,3 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/icons/agent-skills-dark.svg">
-    <img src="assets/icons/agent-skills-light.svg" width="84" alt="agent-skills">
-  </picture>
-</p>
-
 <h1 align="center">Agent Skills</h1>
 
 <p align="center">
@@ -45,7 +38,7 @@
 | [**git-dev-workflow**](skills/git-dev-workflow/README.md) | 本地 Git 状态、破坏性操作预检、提交与 worktree | 状态快照 · 风险结论 · 操作建议 |
 | [**learning-scout**](skills/learning-scout/README.md) | 把学习需求研究成一组独立笔记与离线入口页 | 笔记 · HTML 入口 · 打印版 · PDF |
 
-Obsidian 两项能力各自独立，通过笔记数据关联；取舍见 [学习 Wiki 与工作台架构](docs/obsidian-architecture.md)。
+Obsidian 两项能力各自独立，通过笔记数据关联。
 
 例如：“使用 `$deck-authoring` 把材料做成演示文稿”，或“使用 `$learning-scout` 给我一条两周的 RAG 学习路线”。
 是否自动发现、如何显式调用，取决于使用的 Agent。
@@ -123,7 +116,7 @@ python3 tools/install_skills.py --copy
 python3 tools/migrate_skill_home.py --apply
 ```
 
-细节见 [本机目录](docs/agent-skills-home.md)。令牌、账号和实际 vault 路径不随 skill 分发。
+迁移与覆盖变量见 `python3 tools/migrate_skill_home.py --help`。令牌、账号和实际 vault 路径不随 skill 分发。
 
 ## 设计原则
 
@@ -136,11 +129,9 @@ python3 tools/migrate_skill_home.py --apply
 
 ```text
 agent-skills/
-├── skills/        # 10 个可独立安装的 skill
+├── skills/        # 9 个可独立安装的 skill
 ├── tools/         # 安装、锁文件、迁移、体检、skill 编写
 ├── tests/         # 回归测试，按 skill 分目录
-├── docs/          # 架构、目录约定与迁移记录
-├── assets/        # 仓库图标等共享素材
 ├── .githooks/     # 提交检查
 └── skills-lock.json
 ```
