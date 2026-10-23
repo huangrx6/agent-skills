@@ -169,6 +169,16 @@
         "references/depth-standard.md",
         "references/learning-design.md"
       ]
+    },
+    {
+      "id": 20,
+      "prompt": "写一篇讲“系统提示词和工具怎么进入请求”的机制笔记。别只贴构造函数，也别用一句“AgentSession 每次请求前算好”带过。",
+      "expected_output": "区分 source of truth、派生视图、持久化增量与请求投影；说明 prompt 分节差分、SystemMessage 重放、工具声明与可执行实现的区别、两个注入点及请求前对齐；给对象所有权、时序、代码位置和失败/边界；不把依赖注入写成纯函数，不滥用“唯一/每次”。",
+      "files": [
+        "references/depth-standard.md",
+        "references/content-quality.md",
+        "references/note-templates.md"
+      ]
     }
   ]
 }
