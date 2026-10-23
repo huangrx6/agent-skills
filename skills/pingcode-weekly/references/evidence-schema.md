@@ -116,11 +116,28 @@
 
 顶层 `quality` 是跨项目汇总，含 `projects`、需求/缺陷计数、`empty` 和 `errors`。
 
-顶层筛选后会带 `scope`：
+- `missing_assignee`：窗口内**和周报内容相关**的条目（未关闭、窗口内完成/新增、
+  已排入下一迭代）没有负责人；早已完成且不在窗口内的历史条目不计入。
+- `warnings`：采集层提示（空窗口、截断，以及按人过滤的排除情况），
+  会同时出现在周报的“数据缺口”里。
+
+按 `--mine` / `--assignee` 过滤后，每个项目会带 `scope`：
 
 ```json
-{"scope": {"assignees": ["示例负责人"]}}
+{
+  "scope": {
+    "assignees": ["示例负责人"],
+    "matched": 4,
+    "excluded_unassigned": ["PROJ-3", "PROJ-5"],
+    "excluded_other": 7
+  }
+}
 ```
+
+- `matched`：过滤后保留的需求/缺陷总数。
+- `excluded_unassigned`：窗口内因**未分配负责人**被排除的条目 ID；
+  它们不匹配任何人，不会出现在任何按人周报里，`quality.warnings` 会同步提醒。
+- `excluded_other`：分配给了其他人的条目数（含不相关窗口的历史条目）。
 
 `assignee_id` 用于同名负责人消歧；没有 ID 时退回显示名。`--mine` / `--assignee`
 过滤后，项目 `quality` 会按过滤后的条目重算，不沿用全量统计。

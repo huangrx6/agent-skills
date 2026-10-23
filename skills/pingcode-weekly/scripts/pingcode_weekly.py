@@ -207,6 +207,7 @@ def _collect(args: argparse.Namespace) -> int:
           f"缺陷 {quality.get('bugs', 0)} 条", file=sys.stderr)
     for error in quality.get("errors") or []:
         print(f"注意：{error}", file=sys.stderr)
+    _print_quality_warnings(payload)
     return 0
 
 
@@ -229,9 +230,15 @@ def _weekly(args: argparse.Namespace) -> int:
         print("PingCode 数据不足，未生成周报：", file=sys.stderr)
         for line in lines:
             print(line, file=sys.stderr)
-        print("先在 PingCode 录入需求和缺陷，或加 --allow-empty 生成空周报。", file=sys.stderr)
+        if _scope_excluded_unassigned(payload):
+            print("窗口内有工作项因未分配负责人被按人过滤排除；"
+                  "先在 PingCode 补负责人，或去掉 --mine/--assignee 生成全量周报。",
+                  file=sys.stderr)
+        else:
+            print("先在 PingCode 录入需求和缺陷，或加 --allow-empty 生成空周报。", file=sys.stderr)
         return 2
     text = render_weekly(payload, template_path=_template(args, workspace))
+    _print_quality_warnings(payload)
     if args.stdout:
         print(text, end="")
         return 0
@@ -263,9 +270,10 @@ def _scope_values(args: argparse.Namespace) -> list[str]:
     me = None
     if getattr(args, "mine", False):
         me = current_user(open_client())
+        # id 和姓名都作为匹配键；显示时只留人名
         if me.get("id"):
             values.append(str(me["id"]))
-        elif me.get("name"):
+        if me.get("name"):
             values.append(str(me["name"]))
         if not values:
             raise CollectError("拿不到当前登录人信息；请用 --assignee 指定负责人")
@@ -278,7 +286,7 @@ def _scope_values(args: argparse.Namespace) -> list[str]:
                     me = current_user(open_client())
                 if me.get("id"):
                     values.append(str(me["id"]))
-                elif me.get("name"):
+                if me.get("name"):
                     values.append(str(me["name"]))
             elif part:
                 values.append(part)
@@ -288,6 +296,17 @@ def _scope_values(args: argparse.Namespace) -> list[str]:
 def _apply_scope(args: argparse.Namespace, payload: dict) -> dict:
     wanted = _scope_values(args)
     return filter_payload(payload, wanted) if wanted else payload
+
+
+def _scope_excluded_unassigned(payload: dict) -> bool:
+    return any((project.get("scope") or {}).get("excluded_unassigned")
+               for project in payload.get("projects") or [])
+
+
+def _print_quality_warnings(payload: dict) -> None:
+    for project in payload.get("projects") or []:
+        for warning in (project.get("quality") or {}).get("warnings") or []:
+            print(f"注意：{warning}", file=sys.stderr)
 
 
 def _weekly_per_assignee(args: argparse.Namespace, workspace: dict, payload: dict,
@@ -313,6 +332,7 @@ def _weekly_per_assignee(args: argparse.Namespace, workspace: dict, payload: dic
         )
         _write(target, text)
         print(f"已写出 {target}")
+        _print_quality_warnings(part)
         written += 1
     if not written:
         raise CollectError("按负责人拆分后没有可输出的工作项")

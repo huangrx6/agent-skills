@@ -121,6 +121,10 @@ python3 scripts/pingcode_weekly.py weekly --project PROJ --month 2026-10
 一起用。`--month` 是自然月，不能与 `--week` / `--since` / `--until` 同时使用。
 `--mine` 需要用户令牌；企业令牌下改用人名。
 
+注意：**未分配负责人的工作项不匹配任何人**，不会出现在按人结果里；
+窗口内有这类条目时，`weekly` 会在 stderr 和“数据缺口”里列出被排除的 ID，
+`check` 显示“未分配被排除 N 条”。按人生成前先跑 `check`，先补负责人。
+
 ## 多项目
 
 ```toml

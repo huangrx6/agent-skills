@@ -105,6 +105,10 @@ python3 scripts/pingcode_weekly.py weekly --project PROJ --month 2026-10
   `--per-assignee` 只用于 `weekly`。
 - `--mine` 需要用户令牌；企业令牌拿不到当前登录人时，改用 `--assignee 姓名`。
 - `--assignee` 同时过滤需求和缺陷；拆分后每个文件仍按项目分组。
+- **未分配负责人的工作项不匹配任何人**：不会出现在 `--mine` / `--assignee`
+  结果里，`--per-assignee` 也不会输出它们。窗口内有这类条目时，`weekly` 会在
+  stderr 和“数据缺口”里列出被排除的 ID（`check` 显示“未分配被排除 N 条”）。
+  按人生成前先跑 `check`；看到未分配条目先去 PingCode 补负责人，否则周报会缺任务。
 - `--per-assignee` 不能和 `--stdout` / `--out` 一起用，用 `--output-dir` 指定目录。
 - `--month` 不能和 `--week` / `--since` / `--until` 同时用。
 - `--per-assignee` 没有匹配到负责人时直接失败，不生成空文件。
@@ -215,6 +219,8 @@ next_item = "- {summary}（{id}）"
 
 - 项目、需求类型、缺陷类型无法解析：`check` 失败并列出可用值。
 - 窗口内没有需求/缺陷：`weekly` 默认失败；`--allow-empty` 才生成空报告。
+- `--mine` / `--assignee` 只匹配有负责人的条目；窗口内未分配条目被排除时会在
+  stderr 和周报“数据缺口”里显式警告，不静默缩水。首次生成建议先跑全量或 `check`。
 - 缺少下一迭代：周报写“下周计划未在 PingCode 录入”，不根据描述推断计划。
 - 达到 `--limit`：标记 `truncated`，不声称覆盖全部历史。
 - 只读：不创建、不修改 PingCode 工作项，不写评论、不写回。

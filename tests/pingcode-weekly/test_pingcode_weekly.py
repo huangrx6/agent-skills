@@ -9,7 +9,7 @@ import sys
 import tempfile
 import unittest
 from datetime import datetime, timezone
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -47,6 +47,7 @@ def _epoch(value: datetime) -> int:
 def _item(number: int, title: str, *, kind: str = "requirement",
           state: str = "处理中", state_type: str = "in_progress",
           assignee: str | None = "张三", updated: datetime | None = None,
+          created: datetime | None = None,
           completed: datetime | None = None, sprint: str = "s1",
           severity: str | None = None, description: str = "") -> dict:
     type_id = "t-story" if kind == "requirement" else "t-bug"
@@ -64,7 +65,7 @@ def _item(number: int, title: str, *, kind: str = "requirement",
         "priority": {"name": "普通"},
         "properties": {"severity": severity} if severity else {},
         "description": description,
-        "created_at": _epoch(SINCE),
+        "created_at": _epoch(created or SINCE),
         "updated_at": _epoch(updated or NOW),
         "completed_at": _epoch(completed) if completed else None,
         "sprint": {"id": sprint, "name": sprint},
@@ -189,11 +190,19 @@ class TestCollect(unittest.TestCase):
         self.assertIn("DOC-4", project["quality"]["missing_severity"])
         self.assertFalse(project["quality"]["missing_next_week"])
 
-    def test_missing_assignee_only_counts_open_items(self):
+    def test_missing_assignee_covers_completed_in_window(self):
         item = _item(11, "完成但无负责人", state="已完成", state_type="completed",
                      assignee=None, completed=datetime(2026, 10, 21, tzinfo=timezone.utc))
         project = _payload([item])
-        self.assertNotIn("DOC-11", project["quality"]["missing_assignee"])
+        self.assertIn("DOC-11", project["quality"]["missing_assignee"])
+
+    def test_missing_assignee_ignores_items_outside_report_scope(self):
+        item = _item(12, "很久以前完成", state="已完成", state_type="completed",
+                     assignee=None, created=datetime(2026, 9, 1, tzinfo=timezone.utc),
+                     updated=datetime(2026, 9, 2, tzinfo=timezone.utc),
+                     completed=datetime(2026, 9, 3, tzinfo=timezone.utc))
+        project = _payload([item])
+        self.assertNotIn("DOC-12", project["quality"]["missing_assignee"])
 
     def test_completion_time_can_come_from_history(self):
         item = _item(7, "历史完成", state="已完成", state_type="completed")
@@ -234,6 +243,42 @@ class TestCollect(unittest.TestCase):
         self.assertEqual(1, project["quality"]["completed_requirements"])
         self.assertEqual("张三", project["requirements"][0]["assignee"])
         self.assertEqual(["张三", "李四"], COLLECT.assignee_names(payload))
+
+    def test_filter_records_excluded_unassigned_items(self):
+        items = [
+            _item(1, "张三的完成项", state="已完成", state_type="completed",
+                  completed=datetime(2026, 10, 21, tzinfo=timezone.utc)),
+            _item(3, "没人负责的完成项", state="已完成", state_type="completed",
+                  assignee=None, completed=datetime(2026, 10, 22, tzinfo=timezone.utc)),
+            _item(4, "李四的进行中项", assignee="李四"),
+        ]
+        payload = {"version": 1, "projects": [_payload(items)], "quality": {}}
+        filtered = COLLECT.filter_payload(payload, ["张三"])
+        project = filtered["projects"][0]
+        scope = project["scope"]
+        self.assertEqual(1, scope["matched"])
+        self.assertIn("DOC-3", scope["excluded_unassigned"])
+        self.assertEqual(1, scope["excluded_other"])
+        self.assertTrue(any("按负责人过滤" in warning
+                            for warning in project["quality"]["warnings"]))
+        text = WEEKLY.render_weekly(filtered)
+        self.assertIn("按负责人过滤", text)
+        self.assertIn("DOC-3", text)
+
+    def test_check_surfaces_scope_and_filter_warning(self):
+        items = [
+            _item(1, "张三的完成项", state="已完成", state_type="completed",
+                  completed=datetime(2026, 10, 21, tzinfo=timezone.utc)),
+            _item(3, "没人负责的完成项", state="已完成", state_type="completed",
+                  assignee=None, completed=datetime(2026, 10, 22, tzinfo=timezone.utc)),
+        ]
+        payload = {"version": 1, "projects": [_payload(items)], "quality": {}}
+        filtered = COLLECT.filter_payload(payload, ["张三"])
+        ok, lines = COLLECT.build_check(filtered)
+        self.assertTrue(ok)
+        self.assertTrue(any("按人过滤" in line and "张三" in line for line in lines))
+        self.assertTrue(any("未分配被排除 1 条" in line for line in lines))
+        self.assertTrue(any("按负责人过滤" in line for line in lines))
 
     def test_assignee_id_is_part_of_filter_key(self):
         item = _item(3, "按 id 匹配", assignee="王五")
@@ -474,6 +519,34 @@ class TestCliOutput(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("DOC-1", out.getvalue())
         self.assertNotIn("DOC-2", out.getvalue())
+
+    def test_weekly_warns_when_filter_excludes_unassigned(self):
+        payload = self._assigned_payload()
+        extra = {
+            "id": "DOC-3", "title": "未分配需求", "kind": "requirement",
+            "type": "用户故事", "state": "处理中", "state_type": "in_progress",
+            "assignee": None, "assignee_id": None, "priority": "普通",
+            "severity": None, "summary": "没人负责的事项", "summary_source": "title",
+            "created_at": "2026-10-20T10:00:00+08:00",
+            "updated_at": "2026-10-21T10:00:00+08:00",
+            "completed_at": None, "sprint": "2026-W43", "parent": None,
+            "url": "https://example.test/DOC-3", "open": True,
+            "created_in_window": True, "updated_in_window": True,
+            "completed_in_window": False, "planned": False, "age_days": 1,
+        }
+        payload["projects"][0]["requirements"].append(extra)
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(CLI, "collect_workspace", return_value=payload), \
+                mock.patch.dict(os.environ, {OUTPUT.OUTPUT_ENV: tmp}), \
+                redirect_stdout(io.StringIO()) as out, \
+                redirect_stderr(io.StringIO()) as err:
+            code = CLI.main(["weekly", "--project", "PROJ", "--week", "2026-W43",
+                             "--assignee", "张三", "--stdout"])
+        self.assertEqual(code, 0)
+        self.assertIn("DOC-1", out.getvalue())
+        self.assertIn("按负责人过滤", err.getvalue())
+        self.assertIn("DOC-3", err.getvalue())
+        self.assertIn("按负责人过滤", out.getvalue())
 
     def test_per_assignee_writes_one_file_per_person(self):
         payload = self._assigned_payload()

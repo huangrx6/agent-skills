@@ -264,6 +264,14 @@ def single_project_workspace(project: str) -> dict[str, Any]:
     return {"projects": [{"name": project, "pingcode_project": project}]}
 
 
+def _scope_display(assignees: list[str] | None) -> str:
+    """优先显示人名，过滤掉纯 ID 形式的匹配键。"""
+    values = [str(value) for value in assignees or [] if str(value).strip()]
+    names = [value for value in values
+             if not re.fullmatch(r"[0-9a-f]{16,}", value.casefold())]
+    return "、".join(names or values or ["指定负责人"])
+
+
 def build_check(payload: dict[str, Any]) -> tuple[bool, list[str]]:
     lines: list[str] = []
     ok = True
@@ -303,6 +311,17 @@ def build_check(payload: dict[str, Any]) -> tuple[bool, list[str]]:
             lines.append("  - 下周计划：没有找到下一迭代或计划项")
         if quality.get("truncated"):
             lines.append("  - 采集达到上限，结果可能被截断")
+        scope = project.get("scope")
+        if scope:
+            excluded = scope.get("excluded_unassigned") or []
+            detail = f"，未分配被排除 {len(excluded)} 条" if excluded else ""
+            lines.append(f"  按人过滤（{_scope_display(scope.get('assignees'))}）："
+                         f"匹配 {scope.get('matched', 0)} 条{detail}")
+        duplicate_of_above = {"窗口内没有 PingCode 需求和缺陷记录",
+                              "PingCode 工作项达到采集上限，结果可能被截断"}
+        for warning in quality.get("warnings") or []:
+            if warning not in duplicate_of_above:
+                lines.append(f"  - {warning}")
     return ok, lines
 
 
@@ -433,6 +452,12 @@ def _completion_from_history(api: Any, raw: dict[str, Any],
     return found
 
 
+def _report_relevant(item: dict[str, Any]) -> bool:
+    """和本周报内容相关的条目：未关闭、窗口内完成/新增，或已排入下一迭代。"""
+    return bool(item.get("open") or item.get("completed_in_window")
+                or item.get("created_in_window") or item.get("planned"))
+
+
 def _quality(requirements: list[dict[str, Any]], bugs: list[dict[str, Any]],
              current_sprint: dict[str, Any] | None, next_sprint: dict[str, Any] | None,
              *, done_state_types: tuple[str, ...], truncated: bool) -> dict[str, Any]:
@@ -441,7 +466,7 @@ def _quality(requirements: list[dict[str, Any]], bugs: list[dict[str, Any]],
             if item["state_type"] in done_state_types]
     missing_completion = [item["id"] for item in done if not item["completed_at"]]
     missing_assignee = [item["id"] for item in requirements + bugs
-                        if item["open"] and not item["assignee"]]
+                        if not item["assignee"] and _report_relevant(item)]
     missing_severity = [item["id"] for item in open_bugs if not item["severity"]]
     unmapped_state = [item["id"] for item in requirements + bugs if not item["state_type"]]
     warnings = []
@@ -493,7 +518,11 @@ def assignee_names(payload: dict[str, Any]) -> list[str]:
 
 
 def filter_payload(payload: dict[str, Any], wanted: list[str]) -> dict[str, Any]:
-    """按负责人 id/名字过滤，并重算每个项目和顶层的 quality。"""
+    """按负责人 id/名字过滤，并重算每个项目和顶层的 quality。
+
+    未分配负责人的条目不匹配任何人；窗口内这类条目会计入 scope，
+    并在 quality.warnings 里显式披露，避免按人周报静默缩水。
+    """
     wanted_keys = {str(value).strip().casefold() for value in wanted if str(value).strip()}
     if not wanted_keys:
         return payload
@@ -512,15 +541,36 @@ def filter_payload(payload: dict[str, Any], wanted: list[str]) -> dict[str, Any]
             item for item in project.get("bugs") or []
             if _assignee_matches(item, wanted_keys)
         ]
+        dropped = [
+            item for item in (project.get("requirements") or []) + (project.get("bugs") or [])
+            if not _assignee_matches(item, wanted_keys)
+        ]
+        excluded_unassigned = [item["id"] for item in dropped
+                               if not item.get("assignee") and _report_relevant(item)]
         row["requirements"] = requirements
         row["bugs"] = bugs
-        row["quality"] = _quality(
+        row["scope"] = {
+            "assignees": list(wanted),
+            "matched": len(requirements) + len(bugs),
+            "excluded_unassigned": excluded_unassigned,
+            "excluded_other": len(dropped) - len(excluded_unassigned),
+        }
+        quality = _quality(
             requirements, bugs,
             (project.get("sprints") or {}).get("current"),
             (project.get("sprints") or {}).get("next"),
             done_state_types=tuple(project.get("done_state_types") or DONE_STATE_TYPES),
             truncated=bool((project.get("quality") or {}).get("truncated")),
         )
+        if excluded_unassigned:
+            shown = "、".join(excluded_unassigned[:8])
+            more = "…" if len(excluded_unassigned) > 8 else ""
+            quality["warnings"].append(
+                f"按负责人过滤：{len(excluded_unassigned)} 条窗口内工作项未分配负责人，"
+                f"不匹配任何人被排除（{shown}{more}）；"
+                "它们不会出现在按人周报里，先在 PingCode 补负责人"
+            )
+        row["quality"] = quality
         projects.append(row)
     out["projects"] = projects
     out["quality"] = _aggregate_quality(projects)
