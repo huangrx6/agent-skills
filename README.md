@@ -75,11 +75,10 @@ python3 tools/install_skills.py --check  # 检查安装状态
 
 ```sh
 # 全局安装到 Claude Code / Codex
-npx skills add ./skills -a claude-code -a codex -g
+npx skills add https://github.com/huangrx6/agent-skills -a claude-code -a codex -g
 
-# 装到某个项目的工作区（落到该项目的 .agents/skills）
-cd <project>
-npx skills add <本仓库路径>/skills -a cursor
+# 装到当前项目的 .agents/skills
+npx skills add https://github.com/huangrx6/agent-skills -a cursor
 ```
 
 官方安装器维护各 Agent 的路径与更新；本地 `--copy` 只复制 Git 跟踪的内容，
