@@ -81,8 +81,22 @@ npx skills add https://github.com/huangrx6/agent-skills -a claude-code -a codex 
 npx skills add https://github.com/huangrx6/agent-skills -a cursor
 ```
 
-官方安装器维护各 Agent 的路径与更新；本地 `--copy` 只复制 Git 跟踪的内容，
-不会带上 `.venv` 或 IDE 配置。仓库可能移动、需要固定副本时：
+只装一个或选装几个：
+
+```sh
+# 先看仓库里有哪些 skill 名称（不安装）
+npx skills add https://github.com/huangrx6/agent-skills --list
+
+# 只装 learning-scout
+npx skills add https://github.com/huangrx6/agent-skills -a cursor --skill learning-scout
+
+# 选装多个：--skill 可重复，'*' 表示全部
+npx skills add https://github.com/huangrx6/agent-skills -a claude-code -g \
+  --skill learning-scout --skill pingcode --skill pingcode-weekly
+```
+
+官方安装器维护各 Agent 的路径与更新；本仓库的 `tools/install_skills.py` 仍然一次安装全部 9 个。
+本地 `--copy` 只复制 Git 跟踪的内容，不会带上 `.venv` 或 IDE 配置。仓库可能移动、需要固定副本时：
 
 ```sh
 python3 tools/install_skills.py --copy
