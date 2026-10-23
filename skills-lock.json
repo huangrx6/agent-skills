@@ -25,13 +25,13 @@
       "sourceType": "github"
     },
     "learning-scout": {
-      "computedHash": "e58229b71812003935ab5d6a25104a6622ba22457caf62308ce0990a029a9606",
+      "computedHash": "7a0320039936f4a223d601e7b0eb006407e9e605de73f03abf0330730b7549b9",
       "skillPath": "skills/learning-scout/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
     "obsidian-wiki": {
-      "computedHash": "1a8eabbb9a169b5db878e26a7d3cec8917c282157e5b204b6cf37f4e4e1a4e83",
+      "computedHash": "f262e2d3c08470c31a96f70a1d720585cf909a446bd90df0902fb6cf7410d3ef",
       "skillPath": "skills/obsidian-wiki/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"

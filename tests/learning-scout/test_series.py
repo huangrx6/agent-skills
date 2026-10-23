@@ -192,6 +192,17 @@ class CheckerTests(unittest.TestCase):
             errors, _ = check_notes.check_note(note, "concept", strict=False)
             self.assertTrue(any("跨篇引用" in error for error in errors))
 
+    def test_other_note_references_are_errors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            plan_path = write_series(base)
+            note = base / "notes" / "01-a.md"
+            original = note.read_text()
+            for phrase in ("见另一篇", "详见另一篇", "其他笔记"):
+                note.write_text(original + f"\n{phrase}。\n", encoding="utf-8")
+                errors, _ = check_notes.check_note(note, "concept", strict=False)
+                self.assertTrue(any("跨篇引用" in error for error in errors), phrase)
+
     def test_personal_path_is_error(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)

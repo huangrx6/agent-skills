@@ -145,7 +145,7 @@
     {
       "id": 17,
       "prompt": "这份学习笔记全面吗？会不会漏掉关键内容？",
-      "expected_output": "先明确范围和学完产物，再按“前置概念、核心对象、机制链、边界/失败模式、验证方式”检查；不把覆盖所有 integrations 当成全面。范围外内容写“不覆盖”，缺前置就补一段，而不是加资源数量。",
+      "expected_output": "先明确范围和学完产物，再按“核心对象、机制链、边界/失败模式、验证方式”检查；不把覆盖所有 integrations 当成全面。范围外内容写“不覆盖”；只补本篇真正依赖的前置概念，不要求从零讲起，也不靠加资源数量充完整。",
       "files": [
         "references/content-quality.md",
         "references/depth-standard.md"
@@ -159,6 +159,15 @@
         "references/depth-standard.md",
         "references/content-quality.md",
         "references/source-quality.md"
+      ]
+    },
+    {
+      "id": 19,
+      "prompt": "这几篇笔记不要互相引用，也不要每篇都从头补前置知识；简单的地方带过，名词和流程讲清楚。",
+      "expected_output": "每篇独立成篇，正文不出现上一篇/下一篇/见第 N 篇/见另一篇/其他笔记；导航只放 index.html。不要求补齐所有前置知识，只补本篇真正依赖的概念；简单步骤保持简短，首次出现的名词、复杂流程和关键代码讲透。",
+      "files": [
+        "references/depth-standard.md",
+        "references/learning-design.md"
       ]
     }
   ]

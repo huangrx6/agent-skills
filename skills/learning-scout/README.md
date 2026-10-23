@@ -27,7 +27,7 @@ python3 scripts/build_series.py build --input plan.json --out ./dist --force --o
 ├── plan.json       # 计划源文件
 ├── README.md       # 篇目与路径清单
 └── notes/
-    ├── 01-xxx.md   # 独立成篇的深度笔记，可导入任意 Markdown 知识库
+    ├── 01-xxx.md   # 独立成篇的深度笔记，可导入知识库或直接发布到博客/公众号
     └── 01-xxx.html # 渲染页：目录、视频、自测、上一篇/下一篇
 ```
 
@@ -63,10 +63,10 @@ python3 scripts/build_series.py build --input plan.json --out ./dist --force --o
 | `scripts/build_series.py` | 构建入口：校验、质检、渲染、复制原文与图片、生成 index 与 print |
 | `scripts/render_md.py` | Markdown 引擎（markdown-it + Pygments；无依赖时回退） |
 | `scripts/series_theme.py` | 简洁样式（亮/暗）与前端脚本（进度、测验、复习、搜索） |
-| `scripts/check_notes.py` | 结构与独立性检查（必备节、代码量、跨篇引用、个人路径；长度仅提示） |
+| `scripts/check_notes.py` | 结构与独立性检查（默认节、代码量、跨篇引用、个人路径；长度仅提示） |
 | `scripts/setup.sh` | 可选的 venv 安装 |
 | `tests/learning-scout/`（仓库根目录） | 渲染、视频地址、校验、构建、图片复制、检查器 |
-| `references/depth-standard.md` | 每篇写多深、多少行、必须有哪些节 |
+| `references/depth-standard.md` | 每篇写多深、多少行、默认有哪些节 |
 | `references/note-templates.md` | 四类笔记的起步骨架 |
 | `references/learning-design.md` | 承诺、篇目节奏、独立性与练习 |
 | `references/plan-schema.md` | v2 系列合同；v1 单页字段在文末 |

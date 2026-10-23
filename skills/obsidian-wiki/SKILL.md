@@ -33,10 +33,11 @@ python3 scripts/vault_path.py "/本次指定的知识库" --explain
 | --- | --- | --- |
 | 保存、吸收文章/课程/自己的理解 | 查重、定位相关知识、整合有价值的增量 | [知识模型](references/knowledge-model.md)、[资料与查询流程](references/wiki-operations.md) |
 | 根据知识库提问或复习自测 | 找到相关笔记和证据，在对话中回答；默认只读 | [资料与查询流程](references/wiki-operations.md)、[学习笔记](references/resource-notes.md) |
-| 写学习笔记、重组文章、改善排版 | 找到理解主线，按内容选择叙述与 Markdown；需要查证再读研究流程 | [学习笔记](references/resource-notes.md)、[写作规范](references/writing-conventions.md)、[研究与综合](references/research-and-synthesis.md) |
+| 写学习笔记、重组文章、改善排版 | 找到理解主线，简单处省略，名词/流程/代码讲透；按可直接发布标准组织叙述与 Markdown | [学习笔记](references/resource-notes.md)、[写作规范](references/writing-conventions.md)、[研究与综合](references/research-and-synthesis.md) |
+| 写源码/机制解读、审阅技术长文 | 先给可检验的心智模型与具体场景，再落到源码；区分读取/加载/消费/执行，核对跨篇一致性 | [机制与源码解读](references/source-review.md)、[学习笔记](references/resource-notes.md)、[研究与综合](references/research-and-synthesis.md) |
 | 给 Wiki 笔记做图、使用个人 IP、交接生图提示词或补回图片 | 先确定图要表达的知识；用内置角色参考，按实际工具能力生成或留下待生成块 | [技术配图](references/technical-visuals.md)、[个人 IP 与生图交接](references/personal-ip.md) |
 | 根据新资料修订、核对版本、纠正旧结论 | 对照受影响的判断，更新正文及相依示例，保留适用范围 | [知识模型](references/knowledge-model.md)、[知识更新](references/knowledge-updates.md) |
-| 审阅知识库、检查过期或矛盾 | 报告证据、受影响页面和修订建议；请求修复才写入 | [资料与查询流程](references/wiki-operations.md) |
+| 审阅知识库、检查过期或矛盾 | 报告证据、受影响页面和修订建议，检查正文是否依赖其他文章；请求修复才写入 | [资料与查询流程](references/wiki-operations.md) |
 | 改文案、移动、改名、合并、整理索引 | 保留已有内容与属性，处理受影响的入链 | [归位规则](references/vault-map.md)、[写作规范](references/writing-conventions.md) |
 | 改写项目说明、整理会议材料或润色已有周报 | 按阅读目的重组文字，保留事实、分工及确定程度；区分记录与工作项变更 | [工作材料编辑](references/work-note-editing.md) |
 
@@ -48,8 +49,8 @@ python3 scripts/vault_path.py "/本次指定的知识库" --explain
 需要保持文件列表顺序的学习笔记，使用目录内独立的两位数编号（如 `01 主题.md`、`02 主题.md`），
 不用 `01.02` 式多级章节号，也不只靠 MOC 顺序而删除文件排序号。
 MOC 以所在目录及其子目录的引用列表为主，保持简洁，不默认扩展为学习说明或跨目录关联页。
-知识文章独立成篇，不提及或跳转其他库内文章；笔记间导航交给 MOC，外部证据来源正常保留。
-命名与独立成篇规则见 [写作规范](references/writing-conventions.md)。配图按内容灵活安排，
+知识文章按可直接发布到公众号/博客的标准写：不提及、不链接、不依赖其他库内文章；本文真正依赖的名词、流程和代码在本文讲清，用不到的前置知识不必补；笔记间导航只放 MOC，外部证据来源正常保留。
+命名与独立成篇规则见 [写作规范](references/writing-conventions.md)。详略按理解难点分配：简单处省略，名词、繁琐流程与关键代码讲透；纯文字讲不清时用例子、表、图或逐行说明。机制与源码长文先给可检验的心智模型和具体场景，再引源码；区分读取、加载、消费与执行。审阅这类文章时优先核对绝对化措辞、步骤顺序与跨篇一致性，详见 [机制与源码解读](references/source-review.md)。配图按内容灵活安排，
 默认采用与内置个人 IP 协调的清爽手绘知识图解，保留内容决定图形、配色与画幅的自由。
 角色以 `assets/personal-ip/researcher-v1-reference.png` 为视觉基准；需要人物时实际查看并传入参考图，
 不能仅用文字重造角色。无生图或参考图输入能力时，按个人 IP 交接规则留下原生 `[!todo]+` 待生成块。
@@ -85,4 +86,5 @@ python3 scripts/check_paths.py --vault "/知识库路径"
 原有断链与本次新增问题分开，不能为通过检查编造笔记或删除有意预留的链接。
 
 交付说明本次理解了什么、实际更新的笔记和依据、仍有的疑问及检查范围。
+知识文章还要说明是否仍引用其他库内文章、是否按可直接发布标准检查；有依赖就指出具体段落。
 迁移学习方式时读 [渐进采用](references/adoption.md)，不把每次笔记编辑扩大成全库重构。

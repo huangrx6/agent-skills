@@ -27,7 +27,11 @@ RANGES = {
     "source-review": (450, 650),
 }
 
-CROSS_REFS = re.compile(r"(上一篇|下一篇|见第\s*\d+\s*篇|本系列第\s*\d+|参见第\s*\d+\s*篇)")
+# 跨篇引用：正文不得依赖同系列或库内其他文章。
+CROSS_REFS = re.compile(
+    r"(上一篇|下一篇|前一篇|后一篇|见第\s*\d+\s*篇|本系列第\s*\d+|参见第\s*\d+\s*篇|"
+    r"见另一篇|详见另一篇|另一篇笔记|其他笔记|其他文章)"
+)
 PERSONAL_PATHS = re.compile(r"(/Users/[^/\s]+|/home/[^/\s]+|[A-Z]:\\\\Users\\\\[^\\\\\s]+)")
 HEADING_RE = re.compile(r"^#{1,3}\s+(.*)$", re.M)
 FENCE_RE = re.compile(r"^```", re.M)

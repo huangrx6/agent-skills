@@ -92,8 +92,8 @@ v2 把交付物从“一个 HTML 页面”改成“**一组可独立阅读的 Ma
 | `videos` | 否 | 0–2 个，字段见 [视频](video-sources.md)。 |
 | `quiz` | 否 | `[{q, options, answer, explain}]`，`answer` 是下标。 |
 
-笔记正文的深度、长度参考、必备结构见 [笔记深度规范](depth-standard.md)；每篇必须独立成篇，
-不引用同系列其他篇。
+笔记正文的深度、长度参考、默认结构见 [笔记深度规范](depth-standard.md)；每篇必须独立成篇，
+不引用同系列其他篇；不需要为独立性补齐所有前置知识。
 
 ## Markdown 支持范围
 
