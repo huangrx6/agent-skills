@@ -1,5 +1,7 @@
 # First-Pass 可用性基准
 
+> [← 返回 diagram-authoring](../../README.md)
+
 测一个产品问题：**普通模型第一次生成的规格，不经人工修补能不能用？**
 
 这是一道交付门，不是模型排行榜。`first_pass_usable = true` 当且仅当三门全过：

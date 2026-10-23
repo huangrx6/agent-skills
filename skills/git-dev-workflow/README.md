@@ -1,9 +1,16 @@
 # git-dev-workflow
 
-本地 Git 状态、破坏性动作预检、提交信息检查与 worktree 管理。Agent 的选择规则见
-[SKILL.md](SKILL.md)，详细操作按其中的参考链接读取。
+> 本地 Git 写操作的状态探查、破坏性动作预检、提交检查与 worktree 管理。
 
-依赖：Python 3.10+ 与 Git。下面命令从本仓库根目录运行；检查别的仓库时加 `--repo`。
+| 适合 | 产物 | 依赖 |
+| --- | --- | --- |
+| 提交、建分支、清理、worktree、误操作恢复 | 状态快照 · 风险结论 · 可执行建议 | Python 3.10+ · Git |
+
+Agent 的选择规则见 [SKILL.md](SKILL.md)，详细操作按其中的参考链接读取。
+
+## 快速开始
+
+命令从本仓库根目录运行；检查别的仓库时加 `--repo`。
 
 ```sh
 python3 skills/git-dev-workflow/scripts/git_state.py --repo /path/to/repo
@@ -13,6 +20,8 @@ python3 skills/git-dev-workflow/scripts/commit_style.py --check 'fix(api): 修�
 python3 skills/git-dev-workflow/scripts/worktree.py list --repo /path/to/repo
 ```
 
+## 边界
+
 `git_guard.py` 只输出证据和建议命令，不执行。SAFE/WARN/BLOCK 的退出码为 0/3/4。
 `worktree.py remove` 只自动执行 SAFE；WARN 时会给出预检结果及可供授权后使用的命令。
 仓库不需要安装钩子才能使用本 skill；若已有钩子，`bypass-hooks` 会报告它们。
@@ -21,7 +30,9 @@ python3 skills/git-dev-workflow/scripts/worktree.py list --repo /path/to/repo
 默认快照放在 Git 公共元数据目录，多个 worktree 共用；并行审计请各自指定 `--file`。
 没有事前快照时，可以报告当前状态和已知提交，但不能倒造“操作前”的证据。
 
-验证从本仓库根目录运行：
+## 验证
+
+从本仓库根目录运行：
 
 ```sh
 python3 -m unittest discover -s tests/git-dev-workflow -v

@@ -1,9 +1,14 @@
 # skill-builder
 
-用于创建 skill、评审触发描述与范围；包含仓库维护需要的结构、引用和名称泄露检查器。
+> 设计新的 Agent skill，评审触发边界，并提供结构、引用与名称泄露检查。
+
+| 适合 | 产物 | 依赖 |
+| --- | --- | --- |
+| 建 skill · 评审 description · 检查仓库一致性 | SKILL.md · README · 检查报告 | Python 3.10+；解析 frontmatter 时可选 PyYAML |
+
 普通正文或脚本修改直接进行，不需要重新论证“要不要建 skill”。
 
-## 使用
+## 什么时候用
 
 - “把这个可复用流程整理成 skill。”
 - “这个 skill 经常误触发，帮我检查 description。”

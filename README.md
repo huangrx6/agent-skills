@@ -1,122 +1,168 @@
-# ![agent-skills](assets/icons/agent-skills-light.svg#gh-light-mode-only) ![agent-skills](assets/icons/agent-skills-dark.svg#gh-dark-mode-only) Agent Skills
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/icons/agent-skills-dark.svg">
+    <img src="assets/icons/agent-skills-light.svg" width="84" alt="agent-skills">
+  </picture>
+</p>
 
-个人维护的 Agent 工作流：演示文稿、技术图、COSMIC 功能点拆分、Obsidian 知识管理、Git、PingCode、学习路线和 skill 设计。
-每个目录都以 `SKILL.md` 描述触发条件与操作流程，`README.md` 提供依赖、用法和限制。
+<h1 align="center">Agent Skills</h1>
+
+<p align="center">
+  <strong>把重复的工作方法，写成 Agent 能执行、能验证的 skill。</strong><br>
+  <sub>演示文稿 · 技术图 · COSMIC · Obsidian · Git · PingCode · 学习路线</sub>
+</p>
+
+<p align="center">
+  <code>10 skills</code> &nbsp;·&nbsp; <code>Python 3.10+</code> &nbsp;·&nbsp; <code>MIT</code>
+</p>
+
+每个 skill 都是一个独立目录：`SKILL.md` 说明什么时候触发、怎么执行，`README.md` 交代依赖、用法和边界。
+能力之间可以组合，但安装和配置互不依赖。
 
 ## Skills
 
-| Skill | 用途 |
-| --- | --- |
-| [cosmic-function-point-splitter](skills/cosmic-function-point-splitter/README.md) | 按需求或接口识别 COSMIC 数据移动，生成带来源的拆分表，核对接口/页面覆盖并审计、改写已有表 |
-| [deck-authoring](skills/deck-authoring/README.md) | 从主题推导构图、留白与视觉节奏，用真实内容试排和截图修订，制作 HTML 演示并导出 PDF、PNG、PPTX 或视频 · [成品示例](skills/deck-authoring/README.md#成品示例) |
-| [diagram-authoring](skills/diagram-authoring/README.md) | 从结构描述生成技术图，支持 Excalidraw、draw.io 与 Mermaid，并检查布局、语义和观看尺寸 · [成品示例](skills/diagram-authoring/README.md#成品示例) |
-| [obsidian-wiki](skills/obsidian-wiki/README.md) | 学习 Wiki：吸收资料、关联证据、更新主题知识、检索问答与复习，独立运行 |
-| [obsidian-work](skills/obsidian-work/README.md) | 独立工作台：需求、缺陷、任务分工、日常记录与 Bases 首页，支持外部来源快照 |
-| [git-dev-workflow](skills/git-dev-workflow/README.md) | 本地 Git 写操作的状态探查、风险检查、提交规划和结果核验 |
-| [learning-scout](skills/learning-scout/README.md) | 把学习需求研究成一组独立笔记与可离线打开的入口页：篇目、测验、复习、搜索、打印/导出 |
-| [pingcode](skills/pingcode/README.md) | 查询和维护 PingCode 项目、工作项和迭代，按真实接口（REST API V2）解析名称和 ID |
-| [pingcode-weekly](skills/pingcode-weekly/README.md) | 从 PingCode 的需求和缺陷生成项目周报；只读，需先在 PingCode 录入 |
-| [skill-builder](skills/skill-builder/README.md) | 设计新 skill、评审触发边界，提供仓库结构与引用检查工具 |
+### 内容与表达
 
-Obsidian 两项能力各自独立，通过笔记数据关联；理念和工具取舍见 [学习 Wiki 与工作台架构](docs/obsidian-architecture.md)。
+| Skill | 做什么 | 产出 |
+| --- | --- | --- |
+| [**deck-authoring**](skills/deck-authoring/README.md) | 从材料组织内容、设计版面与配图，用真实页面迭代 | HTML 演示 · PDF · PNG · PPTX · 视频 |
+| [**diagram-authoring**](skills/diagram-authoring/README.md) | 把结构描述变成可编辑的技术图，并检查布局与可读性 | Excalidraw · draw.io · Mermaid · PNG |
+| [**cosmic-function-point-splitter**](skills/cosmic-function-point-splitter/README.md) | 按需求、接口、页面或代码识别 COSMIC 数据移动 | 拆分表 · 自检报告 · 覆盖清单 |
+
+### 知识与工作
+
+| Skill | 做什么 | 产出 |
+| --- | --- | --- |
+| [**obsidian-wiki**](skills/obsidian-wiki/README.md) | 吸收资料、关联证据、按笔记问答与复习 | 可持续维护的学习 Wiki |
+| [**obsidian-work**](skills/obsidian-work/README.md) | 管理需求、缺陷、任务、周报与发布记录 | 工作项主档 · Bases 工作台 |
+| [**pingcode**](skills/pingcode/README.md) | 查询和维护 PingCode 项目、工作项与迭代 | CLI 输出 · 结构化工作项 |
+| [**pingcode-weekly**](skills/pingcode-weekly/README.md) | 从需求与缺陷生成项目周报，只读 PingCode | Markdown 周报 · 证据 JSON |
+
+### 开发与学习
+
+| Skill | 做什么 | 产出 |
+| --- | --- | --- |
+| [**git-dev-workflow**](skills/git-dev-workflow/README.md) | 本地 Git 状态、破坏性操作预检、提交与 worktree | 状态快照 · 风险结论 · 操作建议 |
+| [**learning-scout**](skills/learning-scout/README.md) | 把学习需求研究成一组独立笔记与离线入口页 | 笔记 · HTML 入口 · 打印版 · PDF |
+| [**skill-builder**](skills/skill-builder/README.md) | 设计 skill、评审触发边界、检查结构与引用 | SKILL.md · 检查报告 |
+
+Obsidian 两项能力各自独立，通过笔记数据关联；取舍见 [学习 Wiki 与工作台架构](docs/obsidian-architecture.md)。
 
 例如：“使用 `$deck-authoring` 把材料做成演示文稿”，或“使用 `$learning-scout` 给我一条两周的 RAG 学习路线”。
-是否自动发现和如何显式调用，取决于使用的 Agent。
-
-本仓库原创代码与文档采用 [MIT License](LICENSE)。第三方依赖、字体、引用图片与品牌素材按各自许可使用，
-不能因为本仓库使用 MIT 就重新授权这些资源。
+是否自动发现、如何显式调用，取决于使用的 Agent。
 
 ## 安装
 
-克隆仓库后，在仓库根目录执行：
+### 本机开发：软链
 
 ```sh
-python3 tools/install_skills.py
-python3 tools/install_skills.py --check
+git clone https://github.com/huangrx6/agent-skills.git
+cd agent-skills
+
+python3 tools/install_skills.py          # 装成软链，改仓库立即生效
+python3 tools/install_skills.py --check  # 检查安装状态
 ```
 
-默认安装到 `~/.agents/skills/`，使用指向当前仓库的软链，修改即时可见。
-目标 Agent 使用其他目录时，通过 `--install-dir` 指定；安装器的 `--help` 提供完整选项。
+默认安装到 `~/.agents/skills/`。`~/.agents` 是 Pi、Codex、Zed 等共享的发现目录，
+本项目只往里放安装位，不放配置和缓存。换目录用 `--install-dir`。
 
-`~/.agents` 是 Pi / Codex / skills CLI 等约定发现 skill 的目录，本项目只往里放安装位。
-要装到其他 agent 或项目工作区，用官方跨 agent 安装器：
+### 其他 Agent 或项目：官方 CLI
 
 ```sh
-npx skills add ./skills -a claude-code -a codex -g   # 全局
-cd <project> && npx skills add <本仓库>/skills -a cursor   # 项目级
+# 全局安装到 Claude Code / Codex
+npx skills add ./skills -a claude-code -a codex -g
+
+# 装到某个项目的工作区（落到该项目的 .agents/skills）
+cd <project>
+npx skills add <本仓库路径>/skills -a cursor
 ```
 
-本地 `--copy` 只复制 Git 跟踪的内容，不会把 `.venv`、IDE 配置带过去；
-在非 Git 工作区会明确拒绝，而不是猜。仓库可能移动或需要固定副本时使用 `--copy`，
-更新后再次安装并检查。已有安装内容有差异时，先查看安装器提示，避免覆盖本机定制。
+官方安装器维护各 Agent 的路径与更新；本地 `--copy` 只复制 Git 跟踪的内容，
+不会带上 `.venv` 或 IDE 配置。仓库可能移动、需要固定副本时：
 
-Python 是维护工具的基础依赖；各 skill 所需的浏览器、图形工具、Python 包和外部服务配置，
-见各自 README。安装 skill 不等于安装这些运行依赖。
+```sh
+python3 tools/install_skills.py --copy
+```
+
+> [!NOTE]
+> 安装 skill 不等于安装运行依赖。浏览器、LibreOffice、字体、Python 包和 PingCode 令牌
+> 见各 skill 的 README。
 
 ## 配置
 
-本项目所有 skill 的配置与运行数据放在一个家目录，默认 `~/.agent-skills`
-（用 `AGENT_SKILLS_HOME` 改位置）：
+所有配置与运行数据收在一个家目录：
 
 ```text
 ~/.agent-skills/
-  config/     # 词表、vault 路径、PingCode 凭据与令牌、deck 索引
-  data/       # venv、字体、图标库等可重建数据
+├── config/     # 词表、vault 路径、PingCode 凭据与令牌
+└── data/       # venv、字体、图标库等可重建数据
 ```
 
+| 变量 | 默认 | 用途 |
+| --- | --- | --- |
+| `AGENT_SKILLS_HOME` | `~/.agent-skills` | 项目家目录根 |
+| `AGENT_SKILLS_CONFIG_DIR` | `$AGENT_SKILLS_HOME/config` | 共享配置根 |
+| `AGENT_SKILLS_DATA_DIR` | `$AGENT_SKILLS_HOME/data` | 共享运行数据根 |
+
 输出目录例外：报告和构建产物仍写到 `~/Downloads/<skill>/`。
-旧位置（`~/.config/agent-skills`、`~/.cache/diagram-authoring` 等）只读兼容；
-迁移一次即可：
+旧位置（`~/.config/agent-skills`、`~/.cache/diagram-authoring` 等）只读兼容，迁移一次即可：
 
 ```sh
 python3 tools/migrate_skill_home.py --apply
 ```
 
-细节与环境变量见 [本机目录](docs/agent-skills-home.md)。令牌、账号和实际 vault 路径
-不随 skill 分发；各解析器的覆盖变量以对应 README 为准。
+细节见 [本机目录](docs/agent-skills-home.md)。令牌、账号和实际 vault 路径不随 skill 分发。
 
-`skills-lock.json` 是仓库派生文件，记录 SKILL.md 的哈希；
-被忽略的 `.skill-lock.json` 是本机安装状态，两者用途不同。
+## 设计原则
+
+- **独立可装**：每个目录都能单独复制运行，不依赖相邻 skill 或仓库里的维护工具。
+- **可验证**：结论要能回到命令、测试、源码行号或外部快照；不把“检查通过”当成品质量。
+- **状态收拢**：配置与运行数据进 `~/.agent-skills`，仓库只留可分发内容。
+- **产物落地**：默认写 `~/Downloads/<skill>/`，用普通文件交付，不锁在对话里。
+
+## 仓库结构
+
+```text
+agent-skills/
+├── skills/        # 10 个可独立安装的 skill
+├── tools/         # 安装、锁文件、迁移、体检
+├── tests/         # 回归测试，按 skill 分目录
+├── docs/          # 架构、目录约定与迁移记录
+├── assets/        # 仓库图标等共享素材
+├── .githooks/     # 提交检查
+└── skills-lock.json
+```
 
 ## 开发与验证
-
-- `SKILL.md` 保留入口和必要流程，`references/` 按需放详细说明，避免重复维护规则。
-- `scripts/`、`assets/` 只放实际使用的程序或素材；目录不是必须凑齐的清单。
-- 回归测试放在根目录的 `tests/<skill>/`，仓库工具测试在 `tools/tests/`。
-- `evals/evals.json` 保存触发和行为场景，不代表这些场景已自动执行或通过。
-- 删除文件前检查代码、文档和动态加载的消费者；忽略的本机文件不作为普通清理对象。
-
-从仓库根目录运行：
 
 ```sh
 python3 skills/skill-builder/scripts/preflight.py
 python3 -m unittest discover -s tests/skill-builder -v
 python3 -m unittest discover -s tools/tests -v
-python3 tools/skills_lock.py --update
 python3 tools/skills_lock.py --check
 ```
 
-修改其他 skill 时，将测试目录替换为对应名称。Deck 的浏览器和 PDF 测试需要其运行依赖。
-`preflight.py` 执行结构、名称泄露与本地引用检查，并统计测试文件；它不执行回归或视觉验收。
-`tools/skill_health.py` 给出维护建议；`tools/skill_trigger_log.py` 可分析所支持的本机会话日志，
-覆盖范围取决于日志来源，不能代表所有 Agent 的使用情况。
+修改其他 skill 时，把测试目录换成对应名称。`preflight.py` 只做结构、泄露、指针与文件快照，
+不执行回归，也不证明产物质量；Deck 的浏览器与 PDF 测试需要其运行依赖。
+`tools/skill_health.py` 提供维护建议，`tools/skill_trigger_log.py` 分析本机会话日志。
 
-## 提交检查
-
-如需启用仓库 hook，执行一次：
+提交涉及 `skills/`、`tests/`、`tools/` 或 `.githooks/` 时，可启用仓库 hook：
 
 ```sh
 git config core.hooksPath .githooks
 ```
 
-提交涉及 `skills/`、`tests/`、`tools/` 或 `.githooks/` 时运行：
-
 | 检查 | 行为 |
 | --- | --- |
-| 结构、敏感名称、引用目标、文档中的测试数字 | 发现错误时阻塞；敏感名称词表未配置则跳过该扫描 |
-| 各 skill 与仓库工具回归 | 默认失败只提示；`AGENT_SKILLS_GATE=1` 时阻塞；跳过项单独报告 |
+| 结构、敏感名称、引用目标、文档测试数字 | 发现错误时阻塞；词表未配置则跳过该扫描 |
+| 各 skill 与仓库工具回归 | 默认只提示；`AGENT_SKILLS_GATE=1` 时阻塞 |
 | 仓库体检 | 维护建议，不阻塞 |
-| 锁文件同步 | 按暂存区的 SKILL.md 直接更新锁文件的暂存版本，保留工作区未暂存内容 |
+| 锁文件同步 | 按暂存区的 SKILL.md 更新锁文件 |
 
-检查上限与具体规则以脚本为准。通过静态检查不代表外部服务可用、视觉产物合格或所有集成测试已执行。
 后续方向见 [ROADMAP.md](ROADMAP.md)。
+
+---
+
+<p align="center">
+  <sub>原创代码与文档采用 <a href="LICENSE">MIT License</a>；第三方依赖、字体与品牌素材按各自许可使用。</sub>
+</p>

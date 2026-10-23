@@ -1,30 +1,41 @@
 # cosmic-function-point-splitter
 
-根据需求、接口、页面或代码识别 COSMIC 数据移动，生成带来源的拆分表，核对素材覆盖，
-审计并改写已有表。只保留一套显式规格；规则见 [SKILL.md](SKILL.md)，
-字段见 [规格格式](references/spec-format.md)。
+> 按需求、接口、页面或代码识别 COSMIC 数据移动，生成可核对、可审计的功能点拆分表。
 
-## 使用
+| 适合 | 产物 | 依赖 |
+| --- | --- | --- |
+| 需求 / 接口 / 页面 / 代码 → COSMIC 拆分 | xlsx 拆分表 · Markdown 自检 · 覆盖清单 | Python 3.10+；xlsx 需 openpyxl |
 
-Python 3.10+；读写 xlsx 需要 openpyxl。check/report/coverage 仅需标准库。
+规则见 [SKILL.md](SKILL.md)，字段见 [规格格式](references/spec-format.md)。
+
+## 快速开始
 
 ```sh
 python3 -m pip install openpyxl
 python3 skills/cosmic-function-point-splitter/scripts/cosmic.py init spec.json
 python3 skills/cosmic-function-point-splitter/scripts/cosmic.py check spec.json
-python3 skills/cosmic-function-point-splitter/scripts/cosmic.py inspect 模板.xlsx
 python3 skills/cosmic-function-point-splitter/scripts/cosmic.py build spec.json -o 拆分表.xlsx --template 模板.xlsx
+```
+
+`check` / `report` / `coverage` 只用标准库。模板可省略，工作表自动探测，可用 `--sheet` 指定。
+`build` 自动生成 `.selfcheck.md` 来源报告，可用 `--selfcheck` 改路径。`init` 示例默认为待核实，
+需填写真实项目依据。表格与报告须使用不同路径，不能覆盖输入规格、模板、接口清单或自定义术语表；
+已有输出可正常重新生成。
+
+<details>
+<summary><strong>全部命令</strong></summary>
+
+```sh
+python3 skills/cosmic-function-point-splitter/scripts/cosmic.py inspect 模板.xlsx
 python3 skills/cosmic-function-point-splitter/scripts/cosmic.py audit 拆分表.xlsx
 python3 skills/cosmic-function-point-splitter/scripts/cosmic.py report spec.json -o 自检.md
 python3 skills/cosmic-function-point-splitter/scripts/cosmic.py coverage spec.json inventory.json
 python3 skills/cosmic-function-point-splitter/scripts/cosmic.py normalize 已有表.xlsx -o 新表.xlsx --write
 ```
 
-模板可省略，工作表自动探测，可用 `--sheet` 指定。build 自动生成 `.selfcheck.md` 来源报告，
-可用 `--selfcheck` 改路径。init 示例默认为待核实，需填写真实项目依据。
-表格与报告须使用不同路径，不能覆盖输入规格、模板、接口清单或自定义术语表；已有输出可正常重新生成。
+</details>
 
-## 行为
+## 关键行为
 
 - CFP 按显式移动计算，支持同一过程多个输入；目标点数不参与计算。
 - 字段完整保留，不自动补造；允许跨行重复属性和单字段数据组。
@@ -48,7 +59,7 @@ python3 skills/cosmic-function-point-splitter/scripts/cosmic.py normalize 已有
 
 只做 COSMIC 功能规模，不计算金额或工时。结构检查通过不等于标准认证或可送审。
 
-## 实现
+## 代码结构
 
 | 文件 | 职责 |
 | --- | --- |
