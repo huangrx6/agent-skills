@@ -8,7 +8,7 @@ Agent 操作规则见 [SKILL.md](SKILL.md)，完整参数见 [命令参考](refe
 ## 配置
 
 按照 [授权与配置](references/auth.md) 设置应用凭据和 scope。
-默认配置在 `~/.config/agent-skills/pingcode/`，可用 `PINGCODE_CONFIG_DIR` 单独指定，
+默认配置在 `~/.agent-skills/config/pingcode/`，可用 `PINGCODE_CONFIG_DIR` 单独指定，
 或用 `AGENT_SKILLS_CONFIG_DIR` 指定共享配置根。新目录不存在时兼容沿用旧 `~/.config/pingcode/`。
 令牌与程序生成的配置采用 0600 原子写；用户手填凭据文件也应设为 0600。
 

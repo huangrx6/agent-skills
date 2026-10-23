@@ -24,7 +24,7 @@ python3 scripts/vault_path.py "/本次指定的知识库" --explain
 ```
 
 路径来源依次为本次显式路径、`OBSIDIAN_VAULT_PATH`、
-`$AGENT_SKILLS_CONFIG_DIR/obsidian-vault-path`（配置目录默认 `~/.config/agent-skills`），
+`$AGENT_SKILLS_CONFIG_DIR/obsidian-vault-path`（配置目录默认 `~/.agent-skills/config`），
 再兼容旧配置 `~/.config/obsidian-vault-path`。未配置时仍可处理用户给出的材料，不能猜库写入。
 
 ## 先选本次动作

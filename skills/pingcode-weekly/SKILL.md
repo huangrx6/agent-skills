@@ -38,7 +38,7 @@ export PINGCODE_ACCESS_TOKEN=...
 export PINGCODE_HOST=open.pingcode.com
 ```
 
-令牌缓存默认在 `~/.config/agent-skills/pingcode/token.json`，凭据文件同目录；
+令牌缓存默认在 `~/.agent-skills/config/pingcode/token.json`，凭据文件同目录；
 详细格式和 scope 见
 [PingCode 数据合同](references/data-contract.md)。本 skill 内置只读客户端。
 

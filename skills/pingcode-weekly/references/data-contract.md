@@ -28,7 +28,7 @@
 }
 ```
 
-路径：`~/.config/agent-skills/pingcode/credentials.json`；令牌缓存同目录。
+路径：`~/.agent-skills/config/pingcode/credentials.json`；令牌缓存同目录。
 不把 secret/token 写进证据或周报。
 
 ## 输出位置

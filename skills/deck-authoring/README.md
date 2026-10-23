@@ -205,7 +205,7 @@ python3 scripts/pptx_native.py /path/to/deck.html -o /path/to/editable.pptx
 | MP4 / GIF | 逐页演示动画，不包含多镜头剪辑与配乐 |
 
 命令、依赖与能力差异统一见 [交付格式](references/delivery-formats.md)。`fonts.py --embed` 可内嵌本地字体，
-图片与其他资源仍需核对；字体缓存位于 `DECK_FONT_DIR` 或 `~/.config/deck-authoring/fonts/`。
+图片与其他资源仍需核对；字体缓存位于 `DECK_FONT_DIR` 或 `~/.agent-skills/data/deck-authoring/fonts/`。
 
 最终看整套缩略图、逐页目标观看尺寸、动态播放和实际导出。先看主次与构图，再处理排印、素材和细节；
 留白用于组织注意力，必要的事实、条件与证据须保全。灵动可以来自尺度、偏心构图、裁切与页间接续，动效按用途添加。

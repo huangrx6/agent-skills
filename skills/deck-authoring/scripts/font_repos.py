@@ -38,7 +38,18 @@ REPOS = {
     },
 }
 EXT = (".ttf", ".otf", ".ttc", ".woff2", ".woff")
-INDEX_PATH = Path(os.environ.get("DECK_FONT_INDEX", Path.home() / ".config/deck-authoring/font-index.json"))
+def _index_path() -> Path:
+    explicit = os.environ.get("DECK_FONT_INDEX", "").strip()
+    if explicit:
+        return Path(explicit).expanduser()
+    home = Path(os.environ.get("AGENT_SKILLS_HOME", "~/.agent-skills")).expanduser()
+    data = Path(os.environ.get("AGENT_SKILLS_DATA_DIR", home / "data")).expanduser()
+    new = data / "deck-authoring" / "font-index.json"
+    legacy = Path.home() / ".config" / "deck-authoring" / "font-index.json"
+    return legacy if not new.exists() and legacy.exists() else new
+
+
+INDEX_PATH = _index_path()
 # 语言只用来"标注"和"按需筛选"，不是默认限制：拉丁字体同样经常需要
 ZH_HINTS = ("中文", "chinese", "han", "cjk", "思源", "黑体", "宋", "楷", "明", "圓", "圆", "漢", "汉", "繁", "简")
 EN_HINTS = ("英文", "english", "latin", "serif", "display", "handwriting", "script")

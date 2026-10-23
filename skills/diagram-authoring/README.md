@@ -38,7 +38,7 @@ python3 tools/install_skills.py
 | Excalidraw 官方 PNG/SVG 导出 | Chrome/Chromium 等受支持浏览器；加载官方 JS 包需要网络 |
 | Mermaid 官方语法检查与 PNG/SVG 导出 | Chrome/Chromium；固定版本 Mermaid ESM 加载需网络 |
 | draw.io PNG/SVG/PDF/JPG 导出 | draw.io 桌面版，支持 `DRAWIO_BIN` / `--binary` 指定路径 |
-| 官方图标库搜索/下载 | 网络；缓存默认在 `~/.cache/diagram-authoring/libraries/` |
+| 官方图标库搜索/下载 | 网络；缓存默认在 `~/.agent-skills/data/diagram-authoring/libraries/` |
 
 ## 作图前逐步确认
 
@@ -114,7 +114,7 @@ python3 scripts/check_presentation.py /project/docs/diagrams/system/system.excal
 未做真实渲染审查须如实说明；Excalidraw 可能重新折行，字体与应用版本也可能改变结果。
 
 默认在当前项目交付文件，不自动写 Obsidian。用户指定 vault 后才解析环境变量
-`OBSIDIAN_VAULT_PATH` 或 `~/.config/agent-skills/obsidian-vault-path`。
+`OBSIDIAN_VAULT_PATH` 或 `~/.agent-skills/config/obsidian-vault-path`。
 
 详见 [使用入口](SKILL.md)、[校验](references/validation.md) 与两份后端说明。
 `evals/evals.json` 覆盖代理行为；`benchmarks/first-pass/` 保留首轮可用性的协议、验证器与历史证据，

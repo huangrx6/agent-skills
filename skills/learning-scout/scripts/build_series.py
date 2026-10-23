@@ -727,16 +727,32 @@ def build(plan_path: Path, out: str | None, force: bool = False, check: bool = T
     return out_dir
 
 
+def _venv_candidates() -> list[Path]:
+    """Where the optional renderer may live, newest convention first."""
+    explicit = os.environ.get("LEARNING_SCOUT_VENV", "").strip()
+    if explicit:
+        return [Path(explicit).expanduser()]
+    home = Path(os.environ.get("AGENT_SKILLS_HOME", "~/.agent-skills")).expanduser()
+    return [
+        home / "data" / "learning-scout" / "venv",
+        Path(__file__).resolve().parent.parent / ".venv",  # 旧版 skill 内 venv
+    ]
+
+
 def _ensure_engine() -> None:
-    """Re-run with the skill's venv when the optional renderer is installed there."""
+    """Re-run with the project venv when the optional renderer is installed there."""
     if render_md.ENGINE != "fallback":
         return
-    venv = Path(__file__).resolve().parent.parent / ".venv"
-    candidates = [venv / "bin" / "python", venv / "Scripts" / "python.exe"]
-    venv_python = next((path for path in candidates if path.exists()), None)
-    if venv_python and Path(sys.executable).resolve() != venv_python.resolve():
+    for venv in _venv_candidates():
+        candidates = [venv / "bin" / "python", venv / "Scripts" / "python.exe"]
+        venv_python = next((path for path in candidates if path.exists()), None)
+        if venv_python and Path(sys.executable).resolve() != venv_python.resolve():
             os.execv(str(venv_python), [str(venv_python), str(Path(__file__).resolve()), *sys.argv[1:]])
-    print("note: 未找到 markdown-it-py，使用内置渲染器（嵌套列表会被拍平）；运行 sh scripts/setup.sh 可启用完整 Markdown。", file=sys.stderr)
+    print(
+        "note: 未找到 markdown-it-py，使用内置渲染器（嵌套列表会被拍平）；"
+        "运行 sh scripts/setup.sh 可启用完整 Markdown。",
+        file=sys.stderr,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:

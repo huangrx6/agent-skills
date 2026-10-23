@@ -74,19 +74,32 @@ def _as_int(value: object, default: int = 0) -> int:
 
 
 def shared_config_dir() -> str:
-    """**统一配置根**：所有 skill 的配置都在这儿，跨平台同一个路径。
+    """**统一配置根**：本项目所有 skill 的配置都在 `$AGENT_SKILLS_HOME/config`。
 
     `AGENT_SKILLS_CONFIG_DIR` 可以把它整体搬走（换机器、放加密盘都行）。
     """
     override = os.environ.get("AGENT_SKILLS_CONFIG_DIR", "").strip()
     if override:
         return os.path.abspath(os.path.expanduser(override))
-    return os.path.expanduser(os.path.join("~", ".config", "agent-skills"))
+    home = os.environ.get("AGENT_SKILLS_HOME", "~/.agent-skills")
+    return os.path.expanduser(os.path.join(home, "config"))
+
+
+def legacy_config_dirs() -> list[str]:
+    """旧位置：共享配置根与更早的独立目录；新目录不存在时兼容沿用。"""
+    home = os.path.join(os.path.expanduser("~"), ".config")
+    return [
+        os.path.join(home, "agent-skills", "pingcode"),
+        os.path.join(home, "pingcode"),
+    ]
 
 
 def legacy_config_dir() -> str:
-    """旧位置 `~/.config/pingcode`；新目录尚不存在时兼容沿用。"""
-    return os.path.join(os.path.expanduser("~"), ".config", "pingcode")
+    """返回第一个存在的旧目录；都不存在时返回老的独立目录。"""
+    for candidate in legacy_config_dirs():
+        if os.path.isdir(candidate):
+            return candidate
+    return legacy_config_dirs()[-1]
 
 
 def config_dir() -> str:
@@ -99,8 +112,10 @@ def config_dir() -> str:
     if override:
         return os.path.abspath(os.path.expanduser(override))
     new = os.path.join(shared_config_dir(), "pingcode")
-    if not os.path.isdir(new) and os.path.isdir(legacy_config_dir()):
-        return legacy_config_dir()
+    if not os.path.isdir(new):
+        for candidate in legacy_config_dirs():
+            if os.path.isdir(candidate):
+                return candidate
     return new
 
 

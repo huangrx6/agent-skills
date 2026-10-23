@@ -35,7 +35,7 @@ python3 scripts/pingcode_weekly.py auth status
   `auth login --code <code>`。
 - 企业令牌：`auth login --mode enterprise`。
 - 也可以直接提供令牌：`PINGCODE_ACCESS_TOKEN`、`PINGCODE_HOST`。
-- 配置目录默认是 `~/.config/agent-skills/pingcode/`，可用 `PINGCODE_CONFIG_DIR` 改。
+- 配置目录默认是 `~/.agent-skills/config/pingcode/`，可用 `PINGCODE_CONFIG_DIR` 改。
 - 凭据格式和所需 scope 见 [references/data-contract.md](references/data-contract.md)。
 
 认证代码是内置的只读副本；配置目录只用于保存凭据和令牌。

@@ -46,8 +46,8 @@ CATALOG = os.path.join(SKILL, "fonts", "catalog.json")
 MAPPING = os.path.join(SKILL, "fonts", "mapping.json")
 # 字体文件**不落在 skill 目录里**。三个候选位置，按需选：
 #   · `$DECK_FONT_DIR`           —— 显式指定（CI / 一次性用临时目录就靠它）
-#   · `~/.config/deck-authoring/fonts` —— 默认。**持久**：单款 CJK 5–28MB，
-#     每次重下太浪费；换台机器也就下一次。
+#   · `$AGENT_SKILLS_HOME/data/deck-authoring/fonts` —— 默认。**持久**：
+#     单款 CJK 5–28MB，每次重下太浪费；换台机器也就下一次。
 #   · `tempfile.gettempdir()/...` —— 给 `--temp` 用：不在这台机器上留东西。
 #
 # 为什么不在 skill 目录：skill 目录是**可分发的代码**，不该长出自下载的二进制。
@@ -184,12 +184,25 @@ def owner_of(name: str) -> dict | None:
     return None
 
 
+def _home() -> str:
+    return os.path.expanduser(os.environ.get("AGENT_SKILLS_HOME", "~/.agent-skills"))
+
+
+def _data_dir() -> str:
+    root = os.environ.get("AGENT_SKILLS_DATA_DIR", "").strip()
+    return os.path.abspath(os.path.expanduser(root)) if root else os.path.join(_home(), "data")
+
+
+def legacy_cache_dir() -> str:
+    """迁移前的位置，只读兜底。"""
+    return os.path.join(os.path.expanduser("~"), ".config", CACHE_DIRNAME, "fonts")
+
+
 def cache_dir(temp: bool = False) -> str:
     """字体文件该放（该找）哪个目录。
 
-    优先级：`$DECK_FONT_DIR` > `~/.config/deck-authoring/fonts` > 临时目录。
-    环境变量排第一，是为了让"下载到哪"这件事**可被调用方决定** —— 做 PPT 的 AI
-    可以按实际情况选持久目录或临时目录，不用改代码。
+    优先级：`$DECK_FONT_DIR` > `$AGENT_SKILLS_HOME/data/deck-authoring/fonts`
+    > 临时目录。新目录不存在但旧目录存在时，继续读旧目录，避免迁移前失效。
     """
     env = os.environ.get("DECK_FONT_DIR")
     if env:
@@ -198,12 +211,19 @@ def cache_dir(temp: bool = False) -> str:
         import tempfile  # noqa: PLC0415
 
         return os.path.join(tempfile.gettempdir(), CACHE_DIRNAME, "fonts")
-    return os.path.join(os.path.expanduser("~"), ".config", CACHE_DIRNAME, "fonts")
+    new = os.path.join(_data_dir(), CACHE_DIRNAME, "fonts")
+    if not os.path.isdir(new) and os.path.isdir(legacy_cache_dir()):
+        return legacy_cache_dir()
+    return new
 
 
 def search_dirs(temp: bool = False) -> list[str]:
-    """按顺序找字体的所有目录（缓存在前，旧的 skill 目录兜底只读）。"""
-    return [cache_dir(temp), LEGACY_DIR]
+    """按顺序找字体的所有目录（缓存在前，旧位置和 skill 目录只读兜底）。"""
+    dirs = [cache_dir(temp)]
+    for extra in (legacy_cache_dir(), LEGACY_DIR):
+        if extra not in dirs:
+            dirs.append(extra)
+    return dirs
 
 
 def local_files(temp: bool = False) -> list[str]:
@@ -729,7 +749,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--license", default=None, help="--list 只列这个授权级")
     ap.add_argument("--urls", action="store_true", help="--list 时带上来源页地址")
     ap.add_argument("--temp", action="store_true",
-                    help="字体放临时目录（不在这台机器上留东西），而不是 ~/.config")
+                    help="字体放临时目录（不在这台机器上留东西），而不是项目家目录")
     ap.add_argument("--where", action="store_true", help="打印字体该放哪儿（含解析顺序）")
     args = ap.parse_args(argv[1:])
 
@@ -737,7 +757,7 @@ def main(argv: list[str]) -> int:
         print(f"当前会用的目录：{cache_dir(args.temp)}")
         print(f"  解析顺序：$DECK_FONT_DIR"
               f"{' > 临时目录（--temp）' if args.temp else ''} "
-              f"> ~/.config/{CACHE_DIRNAME}/fonts")
+              f"> {os.path.join(_data_dir(), CACHE_DIRNAME, 'fonts')}")
         print(f"  旧的 skill 目录（只读兜底）：{LEGACY_DIR}")
         files = local_files(args.temp)
         print(f"  这里找到 {len(files)} 个字体文件")

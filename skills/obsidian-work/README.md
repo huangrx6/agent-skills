@@ -28,7 +28,7 @@ export OBSIDIAN_VAULT_PATH="/path/to/your/vault"
 python3 skills/obsidian-work/scripts/vault_path.py --explain
 ```
 
-也可在 `~/.config/agent-skills/obsidian-vault-path` 保存一行路径；`AGENT_SKILLS_CONFIG_DIR` 可覆盖配置目录。
+也可在 `~/.agent-skills/config/obsidian-vault-path` 保存一行路径；`AGENT_SKILLS_CONFIG_DIR` 可覆盖配置目录。
 解析优先级是显式路径、环境变量、配置文件，旧配置 `~/.config/obsidian-vault-path` 仅作兼容回退。
 各检查器可传 `--vault PATH` 指定临时目录或本次知识库；路径解析器本身用位置参数 `PATH`。
 这些配置键沿用旧版，但读取配置和运行脚本不依赖任何相邻 skill。

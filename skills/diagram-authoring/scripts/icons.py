@@ -113,11 +113,37 @@ class LibraryError(ValueError):
 ICON_CACHE_ENV = "DIAGRAM_ICON_CACHE"
 
 
+def _home() -> str:
+    return os.path.expanduser(os.environ.get("AGENT_SKILLS_HOME", "~/.agent-skills"))
+
+
+def legacy_cache_dir() -> str:
+    return os.path.join(os.path.expanduser("~"), ".cache", "diagram-authoring", "libraries")
+
+
+def default_cache_dir() -> str:
+    root = os.environ.get("AGENT_SKILLS_DATA_DIR", "").strip()
+    data = os.path.expanduser(root) if root else os.path.join(_home(), "data")
+    new = os.path.join(data, "diagram-authoring", "libraries")
+    if not os.path.isdir(new) and os.path.isdir(legacy_cache_dir()):
+        return legacy_cache_dir()
+    return new
+
+
 def cache_dir(explicit: str | None = None) -> str:
     env = os.environ.get(ICON_CACHE_ENV, "").strip()
-    base = explicit or env or os.path.join(
-        os.path.expanduser("~"), ".cache", "diagram-authoring", "libraries")
+    base = explicit or env or default_cache_dir()
     return os.path.expanduser(base)
+
+
+def library_config_paths() -> list[str]:
+    """素材库路径配置：新位置优先，旧位置只读兼容。"""
+    shared = os.environ.get("AGENT_SKILLS_CONFIG_DIR", "").strip()
+    base = os.path.abspath(os.path.expanduser(shared)) if shared else os.path.join(_home(), "config")
+    return [
+        os.path.join(base, "excalidraw-library-path"),
+        os.path.expanduser("~/.config/excalidraw-library-path"),
+    ]
 
 
 def cached_libraries(where: str | None = None) -> dict[str, str]:
@@ -143,7 +169,7 @@ def library_path(explicit: str | None = None) -> tuple[str | None, str]:
     写 `--library it-icons` 与写全路径等价 —— 名字对不上时把缓存里有什么列出来。
     """
     env = os.environ.get("EXCALIDRAW_LIBRARY", "").strip()
-    config = os.path.expanduser("~/.config/excalidraw-library-path")
+    configs = library_config_paths()
     if explicit:
         if os.path.isfile(explicit):
             return explicit, "命令行参数"
@@ -158,14 +184,17 @@ def library_path(explicit: str | None = None) -> tuple[str | None, str]:
                       f"--get <库名> 下载")
     if env:
         return env, "环境变量 EXCALIDRAW_LIBRARY"
-    if os.path.isfile(config):
+    for config in configs:
+        if not os.path.isfile(config):
+            continue
         try:
             with open(config, encoding="utf-8") as fh:
                 got = fh.read().strip()
         except OSError as exc:
             return None, f"配置文件读取失败：{exc}"
         if got:
-            return os.path.expanduser(got), f"配置文件 {config}"
+            where = "配置文件" if config == configs[0] else "配置文件（旧位置）"
+            return os.path.expanduser(got), f"{where} {config}"
     return None, "未配置"
 
 
@@ -459,7 +488,7 @@ def _main(argv: list[str] | None = None) -> int:
     path, source = library_path(args.library)
     if not path:
         print(f"没找到素材库（{source}）。"
-              f"用 --library 指定，或写一行路径到 ~/.config/excalidraw-library-path")
+              f"用 --library 指定，或写一行路径到 {library_config_paths()[0]}")
         return 2
     try:
         lib = load(path)

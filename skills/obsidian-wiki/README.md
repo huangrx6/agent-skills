@@ -34,7 +34,7 @@ export OBSIDIAN_VAULT_PATH="/path/to/your/vault"
 python3 skills/obsidian-wiki/scripts/vault_path.py --explain
 ```
 
-也可把路径写为 `~/.config/agent-skills/obsidian-vault-path` 的一行文本；
+也可把路径写为 `~/.agent-skills/config/obsidian-vault-path` 的一行文本；
 `AGENT_SKILLS_CONFIG_DIR` 可覆盖配置目录，旧文件 `~/.config/obsidian-vault-path` 仅兼容回退。
 显式路径优先于环境变量，环境变量优先于配置文件；可以单独指定本次库，不要求与其他能力共用库。
 

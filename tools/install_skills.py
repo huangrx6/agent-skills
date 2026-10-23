@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""把仓库里的 skills 装到 pi 的全局目录（默认 `~/.agents/skills`）。
+"""把仓库里的 skills 装到 agent 的发现目录（默认 `~/.agents/skills`）。
 
 ## 为什么需要这个脚本
 
@@ -26,7 +26,10 @@ pi 认不认软链**不能靠猜**，两处证据：
 ## 边界
 
 - 只动 `<install>/<skill>/` 这几个条目，别处一律不碰；
-- `__pycache__` / `.DS_Store` 这类本地产物不参与比对、也不参与复制；
+- 副本的**可分发内容以 Git 索引为准**，不靠 ignore 名单猜：`.venv`、IDE 配置、
+  本地缓存天然不在清单里；工作区有未跟踪文件时只提示，不阻塞；
+- 不在 Git 工作区时 `--copy` 明确拒绝（改用 `--link`），避免把整台机器的状态拷进去；
+- `__pycache__` / `.DS_Store` / `*.pyc` 只是安装位的短暂噪声，不参与比对；
 - **安装位不存在**时 `--check` 报「未安装」并退出码 0 —— 这是唯一一个不算失败的
   情况（换台机器、CI 里没装都很正常）。显式 `--link` / `--copy` 会创建缺失的安装目录；
   `--check` 只读，不创建。除上述情况外任何不一致都是失败。
@@ -38,6 +41,7 @@ import argparse
 import filecmp
 import os
 import shutil
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -45,11 +49,6 @@ REPO = os.path.dirname(HERE)
 SKILLS = os.path.join(REPO, "skills")
 
 DEFAULT_INSTALL = os.path.join(os.path.expanduser("~"), ".agents", "skills")
-
-# 本地产物：不比对、不复制、不算漂移。
-IGNORE_DIRS = {"__pycache__", ".pytest_cache", ".mypy_cache"}
-IGNORE_FILES = {".DS_Store", ".skill-lock.json"}
-
 
 def _same_path(left: str, right: str) -> bool:
     """两个路径是不是同一个东西。
@@ -60,23 +59,96 @@ def _same_path(left: str, right: str) -> bool:
     return os.path.realpath(left) == os.path.realpath(right)
 
 
-def _managed_files(root: str) -> dict[str, str]:
-    """目录下所有该参与比对的相对路径 → 绝对路径。"""
+def _git(cwd: str, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", "-C", cwd, *args], capture_output=True, text=True, check=False
+    )
+
+
+def distributable_files(skill_dir: str) -> dict[str, str]:
+    """**可分发内容以 Git 索引为准**：相对路径 → 绝对路径。
+
+    为什么不用 os.walk：那等于默认“目录里的一切都属于 skill”，`.venv`、IDE 配置、
+    缓存都会被算进去；想排除就得维护一张永远会漏的 ignore 名单。Git 索引已经是
+    “作者决定要发布的东西”，`.gitignore` 也自动生效。
+
+    不在 Git 工作区时不做猜测 —— 猜错的代价是往安装位塞几十 MB 本机文件。
+    """
+    top = _git(skill_dir, "rev-parse", "--show-toplevel")
+    if top.returncode != 0:
+        raise RuntimeError(
+            f"{skill_dir} 不在 Git 工作区，无法确定可分发内容；"
+            "请用 --link，或在 Git 仓库内安装"
+        )
+    repo = os.path.realpath(top.stdout.strip())
+    prefix = os.path.relpath(os.path.realpath(skill_dir), repo)
+    listed = _git(repo, "ls-files", "-z", "--", prefix)
+    if listed.returncode != 0:
+        raise RuntimeError(f"读取 Git 索引失败：{listed.stderr.strip()}")
+    files: dict[str, str] = {}
+    for name in listed.stdout.split("\0"):
+        if not name:
+            continue
+        full = os.path.join(repo, name)
+        # 索引里还有、工作区已删：副本跟随工作区，不复制幽灵。
+        if not os.path.isfile(full):
+            continue
+        files[os.path.relpath(name, prefix)] = full
+    if not files:
+        raise RuntimeError(f"{prefix} 在 Git 索引里没有文件；先 git add，再安装副本")
+    return files
+
+
+# 安装位里的文件系统噪声：不是 skill 内容，也不该反复报漂移。
+# 这是一份“短暂产物”清单，不是可分发内容的白/黑名单 —— 后者以 Git 索引为准。
+_EPHEMERAL_DIRS = {"__pycache__"}
+_EPHEMERAL_FILES = {".DS_Store"}
+
+
+def _walk_files(root: str) -> dict[str, str]:
+    """安装位里的实际文件；用于找出多余/过期的副本。"""
     out: dict[str, str] = {}
     for base, dirs, files in os.walk(root):
-        dirs[:] = sorted(d for d in dirs if d not in IGNORE_DIRS)
+        dirs[:] = [d for d in dirs if d not in _EPHEMERAL_DIRS]
         for name in sorted(files):
-            if name in IGNORE_FILES:
+            if name in _EPHEMERAL_FILES or name.endswith(".pyc"):
                 continue
             full = os.path.join(base, name)
             out[os.path.relpath(full, root)] = full
     return out
 
 
+def untracked_files(skill_dir: str) -> list[str]:
+    """工作区里没进 Git 的文件；副本不会包含它们，需要提醒作者。"""
+    top = _git(skill_dir, "rev-parse", "--show-toplevel")
+    if top.returncode != 0:
+        return []
+    repo = os.path.realpath(top.stdout.strip())
+    prefix = os.path.relpath(os.path.realpath(skill_dir), repo)
+    status = _git(repo, "status", "--porcelain", "--untracked-files=all", "--", prefix)
+    if status.returncode != 0:
+        return []
+    out = []
+    for line in status.stdout.splitlines():
+        if not line.startswith("??"):
+            continue
+        path = line[3:].strip()
+        out.append(os.path.relpath(path, prefix) if path.startswith(prefix + "/") else path)
+    return out
+
+
+def _warn_untracked(skill_dir: str, name: str) -> None:
+    extra = untracked_files(skill_dir)
+    if extra:
+        shown = "、".join(extra[:5])
+        more = f" 等 {len(extra)} 个" if len(extra) > 5 else ""
+        print(f"  · {name}：未跟踪文件不会进副本（{shown}{more}）")
+
+
 def compare(repo_skill: str, inst_skill: str) -> tuple[list[str], list[str], list[str]]:
     """返回 (内容不同的文件, 只缺在安装位的, 安装位多出来的)。**按内容比**，不比 mtime。"""
-    repo_files = _managed_files(repo_skill)
-    inst_files = _managed_files(inst_skill)
+    repo_files = distributable_files(repo_skill)
+    inst_files = _walk_files(inst_skill)
     changed, missing = [], []
     for rel, path in repo_files.items():
         other = inst_files.get(rel)
@@ -126,8 +198,8 @@ def install_copy(repo_skill: str, inst_skill: str) -> None:
             os.remove(inst_skill)          # 旧软链：先摘掉，否则会往仓库里拷
         except OSError as exc:
             raise RuntimeError(f"摘掉旧软链失败（{inst_skill}）：{exc}") from exc
-    repo_files = _managed_files(repo_skill)
-    inst_files = _managed_files(inst_skill) if os.path.isdir(inst_skill) else {}
+    repo_files = distributable_files(repo_skill)
+    inst_files = _walk_files(inst_skill) if os.path.isdir(inst_skill) else {}
     try:
         for rel in sorted(set(inst_files) - set(repo_files)):
             os.remove(inst_files[rel])
@@ -171,7 +243,7 @@ def main(argv: list[str] | None = None, skills_dir: str | None = None) -> int:
     mode.add_argument("--link", action="store_true",
                       help="装成软链（默认）—— 装的就是仓库那一份，永不漂移")
     mode.add_argument("--copy", action="store_true",
-                      help="装成副本（仓库会被移走时用这个）")
+                      help="装成副本（仓库会被移走时用这个；只复制 Git 跟踪的内容）")
     parser.add_argument("--install-dir", default=DEFAULT_INSTALL,
                         help=f"安装位（默认 {DEFAULT_INSTALL}）")
     args = parser.parse_args(argv)
@@ -207,7 +279,12 @@ def main(argv: list[str] | None = None, skills_dir: str | None = None) -> int:
                     problems.append(f"{name}：软链指向别处 → {target}")
                     print(f"  ✗ {name}：软链指向别处 → {target}")
             else:
-                changed, missing, extra = compare(repo_skill, inst_skill)
+                try:
+                    changed, missing, extra = compare(repo_skill, inst_skill)
+                except RuntimeError as exc:
+                    problems.append(f"{name}：{exc}")
+                    print(f"  ✗ {name}：{exc}")
+                    continue
                 if changed or missing or extra:
                     problems.append(f"{name}：副本与仓库不一致")
                     print(f"  ✗ {name}：副本与仓库不一致（内容不同 {len(changed)}、"
@@ -218,6 +295,8 @@ def main(argv: list[str] | None = None, skills_dir: str | None = None) -> int:
                     print(f"  ✓ {name}：副本与仓库一致")
             continue
 
+        if not as_link:
+            _warn_untracked(repo_skill, name)
         try:
             if as_link:
                 if kind == "link" and _same_path(inst_skill, repo_skill):

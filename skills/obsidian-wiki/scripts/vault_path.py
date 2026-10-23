@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """解析 vault：显式参数 > OBSIDIAN_VAULT_PATH > 配置文件 > 旧位置配置。
 
-AGENT_SKILLS_CONFIG_DIR 默认 ~/.config/agent-skills，文件名 obsidian-vault-path。
+AGENT_SKILLS_CONFIG_DIR 默认 $AGENT_SKILLS_HOME/config，文件名 obsidian-vault-path。
 用法：vault_path.py [PATH] [--explain]；退出码 0 目录存在，2 解析失败或目录不存在。
 """
 
@@ -12,17 +12,26 @@ import sys
 
 ENV_VAR = "OBSIDIAN_VAULT_PATH"
 CONFIG_DIR_VAR = "AGENT_SKILLS_CONFIG_DIR"
-# 配置目录可由环境变量覆盖。
-CONFIG_DIR = os.path.expanduser(
-    (os.environ.get(CONFIG_DIR_VAR) or "").strip() or "~/.config/agent-skills")
+
+
+def _home() -> str:
+    return os.path.expanduser(os.environ.get("AGENT_SKILLS_HOME", "~/.agent-skills"))
+
+
+# 配置目录可由环境变量覆盖；默认落在项目家目录的 config/。
+CONFIG_DIR = os.path.abspath(os.path.expanduser(
+    (os.environ.get(CONFIG_DIR_VAR) or "").strip() or os.path.join(_home(), "config")))
 CONFIG_PATH = os.path.join(CONFIG_DIR, "obsidian-vault-path")
 # 旧位置：只**兼容读取**，不再作为首选（老机器不用改配置）。
-LEGACY_PATH = os.path.expanduser("~/.config/obsidian-vault-path")
+LEGACY_PATHS = [
+    os.path.expanduser("~/.config/agent-skills/obsidian-vault-path"),
+    os.path.expanduser("~/.config/obsidian-vault-path"),
+]
 
 
 def config_candidates() -> list[str]:
     """按优先级给出要读的配置文件：新位置 → 旧位置。"""
-    both = [CONFIG_PATH, LEGACY_PATH]
+    both = [CONFIG_PATH, *LEGACY_PATHS]
     seen, out = set(), []
     for p in both:
         if os.path.abspath(p) not in seen:

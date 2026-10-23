@@ -10,8 +10,8 @@
 blocklist 不放在本仓库里（放进去它自己就泄露了），按序解析：
   1. --blocklist PATH
   2. 环境变量 SKILL_NAME_BLOCKLIST
-  3. ~/.config/agent-skills/skill-name-blocklist.txt
-     （一行一个词，# 开头为注释；所有 skill 的配置统一放在这个目录里）
+  3. $AGENT_SKILLS_HOME/config/skill-name-blocklist.txt
+     （一行一个词，# 开头为注释；默认 ~/.agent-skills/config）
 
 用法：
     python3 check_leakage.py                    # 扫 skills/ 工作区
@@ -30,9 +30,18 @@ import subprocess
 import sys
 
 ENV_VAR = "SKILL_NAME_BLOCKLIST"
-CONFIG_PATH = os.path.expanduser("~/.config/agent-skills/skill-name-blocklist.txt")
-# 旧位置（只兼容读取）
-LEGACY_CONFIG_PATH = os.path.expanduser("~/.config/skill-name-blocklist.txt")
+def _config_paths() -> list[str]:
+    home = os.path.expanduser(os.environ.get("AGENT_SKILLS_HOME", "~/.agent-skills"))
+    shared = os.environ.get("AGENT_SKILLS_CONFIG_DIR", "").strip()
+    base = os.path.abspath(os.path.expanduser(shared)) if shared else os.path.join(home, "config")
+    return [
+        os.path.join(base, "skill-name-blocklist.txt"),
+        os.path.expanduser("~/.config/agent-skills/skill-name-blocklist.txt"),
+        os.path.expanduser("~/.config/skill-name-blocklist.txt"),
+    ]
+
+
+CONFIG_PATH = _config_paths()[0]
 DEFAULT_TARGET = "skills"
 
 # 扫哪些文本文件
@@ -47,10 +56,12 @@ def load_blocklist(explicit: str | None = None) -> tuple[list[str], str]:
         path, source = explicit, "命令行参数"
     elif os.environ.get(ENV_VAR, "").strip():
         path, source = os.environ[ENV_VAR].strip(), f"环境变量 {ENV_VAR}"
-    elif os.path.isfile(CONFIG_PATH):
-        path, source = CONFIG_PATH, f"配置文件 {CONFIG_PATH}"
-    elif os.path.isfile(LEGACY_CONFIG_PATH):
-        path, source = LEGACY_CONFIG_PATH, f"配置文件（旧位置）{LEGACY_CONFIG_PATH}"
+    else:
+        for candidate in _config_paths():
+            if os.path.isfile(candidate):
+                where = "配置文件" if candidate == CONFIG_PATH else "配置文件（旧位置）"
+                path, source = candidate, f"{where} {candidate}"
+                break
 
     if not path or not os.path.isfile(path):
         return [], "未配置"

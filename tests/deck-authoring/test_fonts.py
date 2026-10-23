@@ -415,7 +415,7 @@ class TestFontCacheLocation(unittest.TestCase):
         d = fonts.cache_dir()
         self.assertNotIn(SKILL, d, f"默认字体目录落在 skill 里了：{d}")
         self.assertIn(os.path.expanduser("~"), d)
-        self.assertIn(".config", d)
+        self.assertIn(os.path.join(".agent-skills", "data"), d)
 
     def test_temp_stays_outside_the_skill_too(self) -> None:
         d = fonts.cache_dir(temp=True)

@@ -29,11 +29,11 @@ python3 scripts/emit_excalidraw.py system.diagram.json --library it-icons
 ```
 
 查询/下载使用官方社区素材目录，需要网络。缓存默认在
-`~/.cache/diagram-authoring/libraries/`，旁边元数据记录作者和来源。
+`~/.agent-skills/data/diagram-authoring/libraries/`，旁边元数据记录作者和来源。
 目录中的作品不等于已获任意用途许可；按具体库许可使用，不把下载缓存写入 skill。
 
 本地库选择顺序：`--library` 路径或缓存库名 → `EXCALIDRAW_LIBRARY` →
-`~/.config/excalidraw-library-path`。`icons.py --size <项名>` 可检查尺寸。
+`~/.agent-skills/config/excalidraw-library-path`。`icons.py --size <项名>` 可检查尺寸。
 未知项名会报错并列出可用项，不能静默换成另一个图标。
 
 支持 `.excalidrawlib` v1 与 v2：v2 有名称；v1 没有名称，只能按 `#序号` 引用。

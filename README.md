@@ -37,17 +37,43 @@ python3 tools/install_skills.py --check
 
 默认安装到 `~/.agents/skills/`，使用指向当前仓库的软链，修改即时可见。
 目标 Agent 使用其他目录时，通过 `--install-dir` 指定；安装器的 `--help` 提供完整选项。
-仓库可能移动或需要固定副本时使用 `--copy`，更新后再次安装并检查。
-已有安装内容有差异时，先查看安装器提示，避免覆盖本机定制。
+
+`~/.agents` 是 Pi / Codex / skills CLI 等约定发现 skill 的目录，本项目只往里放安装位。
+要装到其他 agent 或项目工作区，用官方跨 agent 安装器：
+
+```sh
+npx skills add ./skills -a claude-code -a codex -g   # 全局
+cd <project> && npx skills add <本仓库>/skills -a cursor   # 项目级
+```
+
+本地 `--copy` 只复制 Git 跟踪的内容，不会把 `.venv`、IDE 配置带过去；
+在非 Git 工作区会明确拒绝，而不是猜。仓库可能移动或需要固定副本时使用 `--copy`，
+更新后再次安装并检查。已有安装内容有差异时，先查看安装器提示，避免覆盖本机定制。
 
 Python 是维护工具的基础依赖；各 skill 所需的浏览器、图形工具、Python 包和外部服务配置，
 见各自 README。安装 skill 不等于安装这些运行依赖。
 
 ## 配置
 
-本机配置放在用户配置目录，令牌、账号和实际 vault 路径不随 skill 分发。
-主要配置包括 Obsidian vault 路径、PingCode 凭据与令牌缓存、名称泄露词表。
-各解析器的环境变量、文件位置和兼容路径以对应 README 为准。
+本项目所有 skill 的配置与运行数据放在一个家目录，默认 `~/.agent-skills`
+（用 `AGENT_SKILLS_HOME` 改位置）：
+
+```text
+~/.agent-skills/
+  config/     # 词表、vault 路径、PingCode 凭据与令牌、deck 索引
+  data/       # venv、字体、图标库等可重建数据
+```
+
+输出目录例外：报告和构建产物仍写到 `~/Downloads/<skill>/`。
+旧位置（`~/.config/agent-skills`、`~/.cache/diagram-authoring` 等）只读兼容；
+迁移一次即可：
+
+```sh
+python3 tools/migrate_skill_home.py --apply
+```
+
+细节与环境变量见 [本机目录](docs/agent-skills-home.md)。令牌、账号和实际 vault 路径
+不随 skill 分发；各解析器的覆盖变量以对应 README 为准。
 
 `skills-lock.json` 是仓库派生文件，记录 SKILL.md 的哈希；
 被忽略的 `.skill-lock.json` 是本机安装状态，两者用途不同。

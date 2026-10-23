@@ -47,7 +47,7 @@ python3 scripts/fonts.py --installed
 python3 scripts/fonts.py --where
 ```
 
-下载目录由 `DECK_FONT_DIR` 指定，默认 `~/.config/deck-authoring/fonts/`；
+下载目录由 `DECK_FONT_DIR` 指定，默认 `~/.agent-skills/data/deck-authoring/fonts/`；
 `--temp` 可临时下载。旧 fonts/ttf 目录如果存在仍作为读取兜底，新下载不写入 skill。
 
 ```sh
@@ -186,7 +186,7 @@ python3 scripts/font_repos.py --get "dengcao/free-fonts:路径/字体.ttf" -o as
 - 体积 8–10MB 的单个文件通常是**完整字库**，2–4MB 的多半是子集或单字重；封面大字要 Black/Heavy 时别拿子集凑。
 - 一个项目优先选**同一家族的 3–4 个字重**（400/500/700/900），不要混搭两个家族冒充字重。
 - 仓库只做收集和分类，**不构成授权判断**；商用前回到字体发行方核对。
-- 索引缓存默认在 `~/.config/deck-authoring/font-index.json`，换机器或有新字体入库时重新 `--index`。
+- 索引缓存默认在 `~/.agent-skills/data/deck-authoring/font-index.json`，换机器或有新字体入库时重新 `--index`。
 
 ## 中文 webfont：要单文件分片，不要百片 CSS
 

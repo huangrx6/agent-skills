@@ -1,6 +1,7 @@
 """Markdown rendering for learning-scout notes.
 
-Preferred engine: markdown-it-py + Pygments (installed in `.venv/`).
+Preferred engine: markdown-it-py + Pygments (installed by `scripts/setup.sh`
+under `$AGENT_SKILLS_HOME/data/learning-scout/venv`).
 Fallback: a small built-in renderer, used when the optional packages are absent.
 
 Public API:

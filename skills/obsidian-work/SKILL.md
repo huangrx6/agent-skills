@@ -23,7 +23,7 @@ python3 scripts/vault_path.py --explain
 ```
 
 路径依次取显式参数、`OBSIDIAN_VAULT_PATH`、`$AGENT_SKILLS_CONFIG_DIR/obsidian-vault-path`
-（默认配置目录 `~/.config/agent-skills`），兼容旧文件 `~/.config/obsidian-vault-path`。
+（默认配置目录 `~/.agent-skills/config`），兼容旧文件 `~/.config/obsidian-vault-path`。
 未配置或目录不存在时可先整理草稿，说明缺口，不猜其他知识库。
 
 先看目标项目目录的直接子项、项目主页和近期记录，沿用现有命名、属性与模板。工作项可以在任意

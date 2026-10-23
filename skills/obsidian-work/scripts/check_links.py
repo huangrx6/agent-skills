@@ -168,7 +168,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--vault",
         default=DEFAULT_VAULT,
-        help="vault 路径；省略时从 $OBSIDIAN_VAULT_PATH 或 ~/.config/agent-skills/obsidian-vault-path 解析",
+        help="vault 路径；省略时从 $OBSIDIAN_VAULT_PATH 或 $AGENT_SKILLS_CONFIG_DIR/obsidian-vault-path 解析",
     )
     ap.add_argument("--json", action="store_true", help="输出 JSON")
     ap.add_argument("--quiet", action="store_true", help="只输出统计")

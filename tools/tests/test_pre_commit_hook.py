@@ -71,7 +71,7 @@ class HookCase(unittest.TestCase):
                    "    def test_ok(self):\n        self.assertTrue(True)\n")
         self.write("skills/foo/README.md",
                    "```sh\npython3 -m unittest discover -s tests   # 99 条\n```\n")
-        result = self.run_hook()
+        result = self.run_hook(gate="1")
         self.assertEqual(1, result.returncode, "写错了数字就该挡住")
         self.assertIn("99", result.stdout + result.stderr)
         self.assertIn("1 条", result.stdout + result.stderr, "要给实际值")
@@ -144,13 +144,12 @@ class HookCase(unittest.TestCase):
         self.assertEqual(0, result.returncode)
         self.assertNotIn("体检提示", result.stdout, "没改 skills/tools 就不跑体检")
 
-    def test_tests_only_failure_runs_and_is_advisory_by_default(self):
+    def test_tests_are_skipped_by_default(self):
         self.write("tests/foo/test_fail.py", "import unittest\nclass T(unittest.TestCase):\n    def test_fail(self):\n        self.fail('fixture failure')\n")
         result = self.run_hook()
         self.assertEqual(0, result.returncode, result.stderr)
-        self.assertIn("1 个目录失败", result.stdout)
-        self.assertNotIn("1 个目录通过", result.stdout)
-        self.assertIn("fixture failure", result.stderr)
+        self.assertIn("回归测试已跳过", result.stdout)
+        self.assertNotIn("fixture failure", result.stderr)
 
     def test_tests_only_failure_blocks_when_gate_enabled(self):
         self.write("tests/foo/test_fail.py", "import unittest\nclass T(unittest.TestCase):\n    def test_fail(self):\n        self.fail('fixture failure')\n")
@@ -160,7 +159,7 @@ class HookCase(unittest.TestCase):
 
     def test_skip_count_is_reported_separately(self):
         self.write("tests/foo/test_skip.py", "import unittest\nclass T(unittest.TestCase):\n    @unittest.skip('missing optional dependency')\n    def test_skip(self):\n        pass\n")
-        result = self.run_hook()
+        result = self.run_hook(gate="1")
         self.assertEqual(0, result.returncode)
         self.assertIn("跳过 1 条", result.stdout)
 

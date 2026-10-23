@@ -124,7 +124,7 @@ python3 scripts/scheme_preview.py -o /tmp/schemes.drawio
 - 图标方案先查实际素材，再提交确认；常见语义可推荐内置 sigil，需要品牌图标再查素材库。draw.io/Mermaid 生成器不支持图标，不能悄悄删除。
 - 实测布局与真实渲染分开报告：自研 preview 只能看布局模型；官方导出后仍需目视核对文字、连线和重点。
 - 只在用户要求放入 Obsidian 时解析 `$OBSIDIAN_VAULT_PATH`，其次读取
-  `~/.config/agent-skills/obsidian-vault-path`；不能因默认后端是 Excalidraw 就写入外部 vault。
+  `~/.agent-skills/config/obsidian-vault-path`；不能因默认后端是 Excalidraw 就写入外部 vault。
   官网打开工具也仅在需要官网编辑时使用。
 
 ## 按需阅读

@@ -158,7 +158,7 @@ class ConfigTest(TempConfigCase):
         saved = os.environ.pop(cfg.ENV_DIR, None)
         try:
             self.assertTrue(cfg.config_dir().endswith(
-            os.path.join(".config", "agent-skills", "pingcode")))
+                os.path.join(".agent-skills", "config", "pingcode")))
         finally:
             if saved is not None:
                 os.environ[cfg.ENV_DIR] = saved
@@ -647,7 +647,7 @@ class AuthTest(TempConfigCase):
             # 测试环境里它是指向临时目录的（我第一版忘了清，断言拿到的是它）。
             with mock.patch.dict(os.environ, {cfg.ENV_DIR: ""}), \
                  mock.patch.object(cfg, "shared_config_dir", lambda: new_root), \
-                 mock.patch.object(cfg, "legacy_config_dir", lambda: legacy):
+                 mock.patch.object(cfg, "legacy_config_dirs", lambda: [legacy]):
                 self.assertEqual(legacy, cfg.config_dir())
                 os.makedirs(os.path.join(new_root, "pingcode"))
                 self.assertEqual(os.path.join(new_root, "pingcode"), cfg.config_dir())

@@ -17,13 +17,15 @@
 
 - Python 3.11+。
 - **可选**：`markdown-it-py`、`mdit-py-plugins`、`pygments`，提供完整 Markdown
-  （嵌套列表、表格对齐）与代码高亮。装在 skill 自己的 `.venv` 里：
+  （嵌套列表、表格对齐）与代码高亮。装在项目家目录，不放进 skill：
 
   ```sh
   sh scripts/setup.sh
+  # 默认 → ${AGENT_SKILLS_HOME:-~/.agent-skills}/data/learning-scout/venv
   ```
 
-  没装时自动回退到内置渲染器：基本 Markdown 可用，嵌套列表会被拍平、代码不高亮。
+  可用 `LEARNING_SCOUT_VENV` 指定别处。没装时自动回退到内置渲染器：
+  基本 Markdown 可用，嵌套列表会被拍平、代码不高亮。
 
 ## 命令
 
@@ -33,7 +35,7 @@ python3 scripts/check_notes.py --plan plan.json      # 质量闸门
 python3 scripts/build_series.py build --input plan.json
 python3 scripts/build_series.py build --input plan.json --out ./dist --force --open
 python3 scripts/build_series.py build --input plan.json --no-check   # 跳过质量检查
-python3 -m unittest discover -s tests/learning-scout -v   # 54 条：全绿（从仓库根目录）
+python3 -m unittest discover -s tests/learning-scout -v   # 54 条：全绿（未装可选依赖时跳过 2 条）
 ```
 
 默认输出到 `~/Downloads/learning-scout/<topic>-<date>/`。

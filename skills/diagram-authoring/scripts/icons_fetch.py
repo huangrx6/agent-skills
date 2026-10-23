@@ -19,7 +19,7 @@ Excalidraw 官方维护着一个社区素材库目录 —— `libraries.excalidr
 ## 为什么不把库放进仓库
 
 素材库是第三方作品（几十 KB 到几 MB，授权各不相同）。入库既有体积问题也有许可问题，
-所以**只下载到本地缓存**（默认 `~/.cache/diagram-authoring/libraries/`），
+所以**只下载到本地缓存**（默认 `$AGENT_SKILLS_HOME/data/diagram-authoring/libraries/`），
 并把出处（作者 / 官方来源 / 官方页面）写在 `.meta.json` 旁边 —— 谁的作品一目了然。
 
 ## 联网说明
@@ -275,7 +275,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--search", metavar="关键词", help="在图形名里搜，告诉你哪个库里有")
     ap.add_argument("--get", metavar="库名", help="下载某个库到本地缓存")
     ap.add_argument("--url", help="直接按 URL 下载一个 .excalidrawlib（索引里没有的库）")
-    ap.add_argument("--dir", help="缓存目录（默认 ~/.cache/diagram-authoring/libraries）")
+    ap.add_argument("--dir", help="缓存目录（默认 $AGENT_SKILLS_HOME/data/diagram-authoring/libraries）")
     ap.add_argument("--refresh", action="store_true", help="强制刷新官方索引缓存")
     ap.add_argument("--force", action="store_true", help="重下已缓存的库")
     ap.add_argument("--json", action="store_true", help="输出机器可读回执")

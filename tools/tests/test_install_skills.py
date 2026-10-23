@@ -16,6 +16,7 @@ import io
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -51,6 +52,9 @@ class InstallCase(unittest.TestCase):
         os.makedirs(self.install)
         self.write("SKILL.md", "---\nname: demo-skill\ndescription: 用例用\n---\n")
         self.write("references/note.md", "内容\n")
+        # 可分发内容以 Git 索引为准：测试仓库也要有索引，未跟踪文件才是“本地产物”。
+        subprocess.run(["git", "init", "-q", self.repo], check=True)
+        subprocess.run(["git", "-C", self.repo, "add", "skills"], check=True)
 
     def write(self, rel: str, text: str) -> None:
         path = os.path.join(self.skills_dir, self.skill, rel)
@@ -153,6 +157,53 @@ class TestCopyMode(InstallCase):
         self.assertEqual(0, self.run_tool("--copy"))
         self.assertFalse(os.path.exists(os.path.join(self.installed, "references", "ghost.md")))
         self.assertEqual(0, self.run_tool("--check"))
+
+
+class TestGitManifest(InstallCase):
+    """副本只复制作者放进 Git 的东西，不靠 ignore 名单猜。"""
+
+    def test_untracked_local_artifacts_never_reach_the_copy(self):
+        os.makedirs(os.path.join(self.skills_dir, self.skill, ".venv", "bin"))
+        self.write(".venv/bin/python", "fake binary")
+        os.makedirs(os.path.join(self.skills_dir, self.skill, ".idea"))
+        self.write(".idea/workspace.xml", "<project/>")
+        self.assertEqual(0, self.run_tool("--copy"))
+        self.assertFalse(os.path.exists(os.path.join(self.installed, ".venv")))
+        self.assertFalse(os.path.exists(os.path.join(self.installed, ".idea")))
+        self.assertIn("未跟踪", self._output)
+
+    def test_untracked_source_file_is_reported(self):
+        self.write("references/new.md", "还没 git add\n")
+        self.assertEqual(0, self.run_tool("--copy"))
+        self.assertIn("references/new.md", self._output)
+        self.assertFalse(os.path.exists(os.path.join(self.installed, "references", "new.md")))
+
+
+class TestNonGitSource(unittest.TestCase):
+    """没有 Git 就不猜：要么软链，要么明确拒绝复制。"""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.mkdtemp(prefix="install-skills-nogit-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.skills_dir = os.path.join(self.tmp, "skills")
+        self.install = os.path.join(self.tmp, "install")
+        os.makedirs(os.path.join(self.skills_dir, "demo-skill"))
+        os.makedirs(self.install)
+        with open(os.path.join(self.skills_dir, "demo-skill", "SKILL.md"), "w",
+                  encoding="utf-8") as fh:
+            fh.write("---\nname: demo-skill\ndescription: no git\n---\n")
+
+    def run_tool(self, *args: str) -> int:
+        with contextlib.redirect_stdout(io.StringIO()):
+            return I.main([*args, "--install-dir", self.install], skills_dir=self.skills_dir)
+
+    def test_link_works_without_git(self):
+        self.assertEqual(0, self.run_tool("--link"))
+        self.assertTrue(os.path.islink(os.path.join(self.install, "demo-skill")))
+
+    def test_copy_refuses_without_a_manifest(self):
+        self.assertEqual(2, self.run_tool("--copy"))
+        self.assertFalse(os.path.exists(os.path.join(self.install, "demo-skill")))
 
 
 class TestMissingInstallDir(InstallCase):

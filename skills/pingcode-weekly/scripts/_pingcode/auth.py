@@ -2,7 +2,7 @@
 
 这里只保留授权、刷新和身份查询。
 用户授权沿用 PingCode OAuth2 的 authorization_code；企业授权用
-client_credentials。令牌缓存格式与 `~/.config/agent-skills/pingcode` 兼容。
+client_credentials。令牌缓存格式与旧 `~/.config/agent-skills/pingcode` 兼容。
 """
 
 from __future__ import annotations

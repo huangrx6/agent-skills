@@ -74,7 +74,7 @@ python3 scripts/pingcode.py auth logout                # 只删本地令牌，�
 默认放在用户目录，不进仓库。每个租户使用独立 `PINGCODE_CONFIG_DIR`，避免上下文与字典缓存串用：
 
 ```text
-~/.config/agent-skills/pingcode/
+~/.agent-skills/config/pingcode/
 ├── credentials.json    # 你手填：host / auth_mode / client_id / client_secret / redirect_uri
 ├── token.json          # 程序写：access_token / refresh_token / 到期时间
 ├── context.json        # 程序写：当前项目、当前迭代
@@ -107,7 +107,7 @@ python3 scripts/pingcode.py auth logout                # 只删本地令牌，�
 | `PINGCODE_AUTH_MODE` | `user` / `enterprise` |
 | `PINGCODE_ACCESS_TOKEN` | **直接给一个令牌**，优先于本地缓存；模式未知时由服务端判断权限 |
 | `PINGCODE_CONFIG_DIR` | 换配置目录（每个企业一套配置、跑测试时隔离） |
-| `AGENT_SKILLS_CONFIG_DIR` | 共享配置根（默认 `~/.config/agent-skills`） |
+| `AGENT_SKILLS_CONFIG_DIR` | 共享配置根（默认 `~/.agent-skills/config`） |
 | `PINGCODE_REDIRECT_URI` | 覆盖配置里的回调地址 |
 
 ## 排错
