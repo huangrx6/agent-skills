@@ -119,7 +119,8 @@ python3 scripts/pingcode_weekly.py weekly --project PROJ --month 2026-10
 
 ```toml
 [workspace]
-template = "templates/weekly.toml"
+# 省略 template 就用内置模板；要自定义，把 templates/default.toml 复制到本文件同目录再打开这行
+# template = "templates/default.toml"
 # output_dir = "~/Downloads/pingcode-weekly"
 
 [[projects]]
@@ -174,44 +175,14 @@ defect_types = ["缺陷"]
 
 ## 模板
 
-默认模板在 `templates/default.toml`，由 `[layout] body` 和 `[format]` 组成：
-
-```toml
-[layout]
-body = """
-# {week_start} ~ {week_end} 周报
-
-## 本周任务
-{this_week}
-
-## 本周新增/待开始
-{new_items}
-
-## 本周新增缺陷
-{new_bugs}
-
-## 缺陷清单
-{bugs}
-
-## 下周计划
-{next_week}
-
-{gaps}
-"""
-
-[format]
-project = "**{name}**："
-requirement = "- [需求] {summary}（{id}，{state}）"
-bug = "- [缺陷] {summary}（{id}，{state}）"
-new_bug = "- [{severity}] {summary}（{id}，{state}）"
-open_bug = "- [{severity}] {summary}（{id}，{state}，{assignee}，已存在 {age_days} 天）"
-next_item = "- {summary}（{id}）"
-```
+默认模板在 `templates/default.toml`，由 `[layout] body` 和 `[format]` 两组键组成；
+直接打开那份文件改，不要在输出目录里复制第三份。
 
 可用块：`this_week`、`new_items`、`requirements`、`new_bugs`、`bugs`、`next_week`、`gaps`，以及
 `week_start`、`week_end`、`generated_at`。可用条目字段：`id`、`link`、`title`、
 `summary`、`state`、`assignee`、`severity`、`priority`、`age_days`、`type`。
-块和格式的完整说明见 [模板说明](references/template.md)。
+默认模板的逐行内容、块和格式的完整说明、项目分组与报错规则见
+[模板说明](references/template.md)。
 
 模板里出现未知 `{字段}` 会直接报错，不静默留占位符。
 

@@ -121,7 +121,8 @@ description: >-
 
 ## 四、写 plan.json
 
-按 [计划合同](references/plan-schema.md) 的 v2 形状写。最小例子：
+按 [计划合同](references/plan-schema.md) 的 v2 形状写。正文只留骨架，字段表、`videos` 与
+`quiz` 的完整对象、v1 兼容说明都在那份文档里：
 
 ```json
 {
@@ -131,27 +132,13 @@ description: >-
   "learner": {"level": "会一点 Python", "time_per_day": "40 分钟"},
   "notes": [
     {
-      "id": "01",
-      "title": "先看一次真实失败",
-      "goal": "能指出消息在哪一段丢的",
-      "depth": "L2",
-      "kind": "concept",
-      "minutes": 25,
-      "file": "notes/01-what.md",
-      "videos": [
-        {
-          "title": "原视频标题",
-          "url": "https://www.youtube.com/watch?v=XXXXXXXX",
-          "channel": "频道名",
-          "duration": "12:30",
-          "lang": "en",
-          "why": "补队列的基本直觉。",
-          "verified_at": "2026-10-23"
-        }
-      ],
-      "quiz": [
-        {"q": "入队成功代表消息安全了吗？", "options": ["是", "还要看落盘"], "answer": 1, "explain": "入队只在内存里。"}
-      ]
+      "id": "01", "title": "先看一次真实失败",
+      "goal": "能指出消息在哪一段丢的", "depth": "L2",
+      "kind": "concept", "minutes": 25, "file": "notes/01-what.md",
+      "videos": [{"title": "原视频标题", "url": "https://www.youtube.com/watch?v=XXXXXXXX",
+                  "channel": "频道名", "duration": "12:30", "lang": "en",
+                  "why": "补队列的基本直觉。", "verified_at": "2026-10-23"}],
+      "quiz": [{"q": "入队成功代表消息安全了吗？", "options": ["是", "还要看落盘"], "answer": 1, "explain": "入队只在内存里。"}]
     }
   ],
   "practice": {"title": "做一个不丢消息的队列", "brief": "50 行代码。", "steps": []},

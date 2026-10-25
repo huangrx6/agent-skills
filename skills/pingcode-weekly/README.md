@@ -36,7 +36,7 @@
 | `scripts/pingcode_read.py` | 项目/类型/状态/迭代/工作项/history 只读接口 |
 | `scripts/weekly.py` | 模板加载与 Markdown 渲染 |
 | `scripts/output_paths.py` | 跨平台下载目录、文件名清洗和原子写入 |
-| `scripts/_pingcode/` | 内置只读认证与 HTTP 客户端 |
+| `scripts/_pingcode/` | 内置只读认证与 HTTP 客户端；来源与上游差异见 `_pingcode/VENDOR.md` |
 | `templates/default.toml` | 默认周报模板 |
 | `references/` | 数据合同、模板和证据 JSON |
 
@@ -129,7 +129,8 @@ python3 scripts/pingcode_weekly.py weekly --project PROJ --month 2026-10
 
 ```toml
 [workspace]
-template = "templates/weekly.toml"
+# 省略 template 就用内置模板；要自定义，把 templates/default.toml 复制到本文件同目录再打开这行
+# template = "templates/default.toml"
 # output_dir = "~/Downloads/pingcode-weekly"
 
 [[projects]]

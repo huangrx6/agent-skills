@@ -84,7 +84,7 @@ python3 scripts/build_series.py build --input plan.json --out ./dist --force --o
 ## 验证
 
 ```sh
-python3 -m unittest discover -s tests/learning-scout -v   # 54 条：全绿（未装可选依赖时跳过渲染用例）
+python3 -m unittest discover -s tests/learning-scout -v   # 55 条：全绿（未装可选依赖时跳过渲染用例）
 ```
 
 ## 限制

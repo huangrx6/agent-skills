@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import io
 import os
+import re
 import sys
 import tempfile
+import tomllib
 import unittest
 from datetime import datetime, timezone
 from contextlib import redirect_stderr, redirect_stdout
@@ -444,6 +447,53 @@ class TestWorkspaceConfig(unittest.TestCase):
             data = COLLECT.load_workspace(path)
             self.assertEqual(data["workspace"]["output_dir"],
                              "~/Downloads/pingcode-weekly")
+
+
+class TestDocumentedWorkspaceExamples(unittest.TestCase):
+    """文档里的工作区示例要能被真实解析器读取；写了 template 就必须指向存在的文件。
+
+    模板路径相对**工作区文件所在目录**解析，读者照抄时最容易在这里出错。
+    """
+
+    def test_examples_resolve_template_to_existing_file(self):
+        blocks = []
+        for doc in (SKILL / "SKILL.md", SKILL / "README.md"):
+            text = doc.read_text(encoding="utf-8")
+            blocks += [m.group(1) for m in re.finditer(r"```toml\n(.*?)```", text, re.S)
+                       if "[[projects]]" in m.group(1)]
+        self.assertTrue(blocks, "文档里应有多项目工作区示例")
+        for block in blocks:
+            with tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "weekly.toml"
+                path.write_text(block, encoding="utf-8")
+                workspace = COLLECT.load_workspace(path)
+                args = argparse.Namespace(template=None, workspace=str(path))
+                template = CLI._template(args, workspace)
+                if template is not None:
+                    self.assertTrue(Path(template).is_file(),
+                                    f"示例的 template 不存在：{template}")
+
+    def test_readme_模板示例与默认模板一致(self):
+        """README 里给人看的 `[layout] body` 不能与 `templates/default.toml` 走样。
+
+        正文只留指针，模板只剩 `templates/default.toml` 与 `references/template.md` 两处权威；
+        README 为了让人看懂保留半份拷贝，就得有东西盯着它。
+        """
+        default = tomllib.loads(
+            (SKILL / "templates" / "default.toml").read_text(encoding="utf-8"))
+        readme = (SKILL / "README.md").read_text(encoding="utf-8")
+        bodies = []
+        for match in re.finditer(r"```toml\n(.*?)```", readme, re.S):
+            try:
+                data = tomllib.loads(match.group(1))
+            except tomllib.TOMLDecodeError:
+                continue
+            if isinstance(data.get("layout"), dict):
+                bodies.append(data["layout"]["body"])
+        self.assertTrue(bodies, "README 应给出 [layout] body 示例")
+        for body in bodies:
+            self.assertEqual(default["layout"]["body"], body,
+                             "README 的 body 与 templates/default.toml 不一致")
 
 
 class TestReadHelpers(unittest.TestCase):
