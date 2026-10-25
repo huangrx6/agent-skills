@@ -1,0 +1,27 @@
+{
+  "note": "pingcode-weekly 内置的只读 PingCode 客户端来源。上游一改就由 tests/pingcode-weekly/test_vendor_sync.py 报出来。",
+  "upstream": "skills/pingcode/scripts",
+  "vendored_at": "2026-10-26",
+  "files": {
+    "auth.py": {
+      "upstream_sha256": "65b7c056d8a990023e525e9e0a690bcd68745aa6cbffe40e99d00ebffeb794fe",
+      "vendored_sha256": "410847ee2644bd1504a98087f50afc90f2cb69fec2eb1f8ba50b3b25fed70f9e",
+      "note": "只保留只读认证：去掉 OAuth 回调服务器（_CallbackHandler / wait_for_code / grant_entry）与 _load_sibling 的写入路径"
+    },
+    "client.py": {
+      "upstream_sha256": "6a0fedb4c962b2c7abde4c704f069fcce205ab74dac811864d85dfd2ea65d961",
+      "vendored_sha256": "682e4bbc13a00a2bcf0f3dfa70530bd5b04f5d6ff99fc44f6b740ffe34916151",
+      "note": "行为一致（http/https 白名单两侧都有）；差异只在 boundary 前缀与少量写法"
+    },
+    "compat.py": {
+      "upstream_sha256": "05ea204613d741791b5f9bbaa86b0d77735582a57f3fd354830d38af69960797",
+      "vendored_sha256": "05ea204613d741791b5f9bbaa86b0d77735582a57f3fd354830d38af69960797",
+      "note": "与上游逐字相同"
+    },
+    "config.py": {
+      "upstream_sha256": "97d749d0fa1dbf6ef80b050ecc361aea98b5172e59d81b0e16fb64ffcfa835ee",
+      "vendored_sha256": "e68bdb3d94e130e1e464768bbed304f79edae773651bc358e2d8cc00964ddc1d",
+      "note": "只改常量名（TOKEN→AUTH_CACHE 等），行为一致"
+    }
+  }
+}
