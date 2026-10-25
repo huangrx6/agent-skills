@@ -155,10 +155,31 @@ class AssetTest(RepoCase):
             health.scan_repo(self.root))["死文件"])
 
     def test_素材不会因为自己提到自己而变成活文件(self):
-        """扫引用时要把 assets 目录自身排除掉，否则每个文件都'引用'了自己。"""
-        self.make_skill("aaa", assets=("icons/only.svg",))
+        """自己的正文提到自己的名字不算引用。"""
+        skill = self.make_skill("aaa", assets=("icons/only.svg",))
+        with open(os.path.join(skill, "assets", "icons", "only.svg"), "w", encoding="utf-8") as fh:
+            fh.write("这是 icons/only.svg 自己的内容\n")
         assets = health.scan_repo(self.root)["assets"]
         self.assertFalse(assets["skills/aaa/assets/icons/only.svg"])
+
+    def test_URL_编码的空格文件名算被引用(self):
+        """Markdown 链接把空格写成 `%20`；不解码就会把活文件报成死文件。"""
+        skill = self.make_skill("aaa", assets=("模板/模板 - 需求.md",))
+        os.makedirs(os.path.join(skill, "references"))
+        with open(os.path.join(skill, "references", "views.md"), "w", encoding="utf-8") as fh:
+            fh.write("见 [需求模板](../assets/模板/模板%20-%20需求.md)。\n")
+        assets = health.scan_repo(self.root)["assets"]
+        self.assertTrue(assets["skills/aaa/assets/模板/模板 - 需求.md"])
+
+    def test_assets_内部互相引用算被引用(self):
+        """工作台首页用 `[[...]]` 指向同目录模板；整棵 assets 排除会漏掉这类引用。"""
+        self.make_skill("aaa", assets=("workbench/index.md", "workbench/模板 - 任务.md"))
+        path = os.path.join(self.root, "skills", "aaa", "assets", "workbench", "index.md")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("[[模板 - 任务|任务模板]]\n")
+        assets = health.scan_repo(self.root)["assets"]
+        self.assertTrue(assets["skills/aaa/assets/workbench/模板 - 任务.md"])
+        self.assertFalse(assets["skills/aaa/assets/workbench/index.md"], "没人引用首页")
 
     def test_根目录的_assets_也算进来(self):
         target = os.path.join(self.root, "assets", "icons", "root.svg")

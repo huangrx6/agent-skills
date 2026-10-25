@@ -32,6 +32,7 @@ import os
 import re
 import sys
 from typing import Any
+from urllib.parse import unquote
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_ROOT = os.path.dirname(HERE)
@@ -93,19 +94,35 @@ def walk_files(base: str) -> list[str]:
     return out
 
 
-def collect_repo_text(root: str, exclude_prefixes: tuple[str, ...]) -> str:
-    """把仓库里所有文本拼起来（用于判断某个素材文件有没有被引用）。
+def collect_docs(root: str) -> dict[str, str]:
+    """按路径收起仓库里的文本，用于检查「谁引用了谁」。
 
-    排除掉被检查的那些素材目录本身 —— 否则文件会「引用自己」而永远不算死文件。
+    整棵 `assets/` 不排除：素材目录内部的相互引用（工作台笔记里给模板用的 `[[...]]`）
+    也是真实引用。自引用在 `asset_report` 里逐个文件排除，比整棵子树排除更准。
     """
-    chunks: list[str] = []
-    for path in walk_files(root):
-        if any(path.startswith(prefix) for prefix in exclude_prefixes):
-            continue
-        if not path.endswith(SCAN_SUFFIXES):
-            continue
-        chunks.append(read_text(path))
-    return "\n".join(chunks)
+    return {path: read_text(path) for path in walk_files(root)
+            if path.endswith(SCAN_SUFFIXES)}
+
+
+def reference_names(rel: str) -> tuple[str, ...]:
+    """一个素材文件可能被写成哪几种样子。
+
+    - 原样相对路径、`./` 开头的相对路径、文件名
+    - 去掉 `.md` 后缀的文件名：Obsidian 的 `[[链接]]` 不写后缀，而正文里的
+      `[[99 System/模板/工作台/模板 - 需求|需求模板]]` 正是这种写法
+    非 `.md` 文件不试去后缀的名字：`logo.svg` 的 `logo` 太容易在散文里误中，
+    体检宁可漏报（提醒删活文件比漏一个死文件危险）。
+    """
+    name = os.path.basename(rel)
+    names = {rel, f"./{rel}", name}
+    stem, ext = os.path.splitext(name)
+    if ext == ".md":
+        names.add(stem)
+    return tuple(sorted(names))
+
+
+def _mentioned(names: tuple[str, ...], haystacks: tuple[str, ...]) -> bool:
+    return any(name in text for name in names for text in haystacks)
 
 
 def asset_report(root: str, skills_dir: str) -> dict[str, Any]:
@@ -116,16 +133,19 @@ def asset_report(root: str, skills_dir: str) -> dict[str, Any]:
         if os.path.isdir(candidate):
             assets_roots.append(candidate)
 
-    corpus = collect_repo_text(root, tuple(assets_roots))
+    # 每份文本准备两个版本：原样，与 URL 解码后的。Markdown 链接里的空格写作 `%20`
+    # （`模板%20-%20需求.md`），不解码就永远匹配不到文件名。
+    docs = {path: (text, unquote(text)) for path, text in collect_docs(root).items()}
+
     files: dict[str, bool] = {}
     for base in assets_roots:
         if not os.path.isdir(base):
             continue
         for path in walk_files(base):
             rel = os.path.relpath(path, root)
-            filename = os.path.basename(path)
-            used = rel in corpus or filename in corpus or f"./{rel}" in corpus
-            files[rel] = used
+            names = reference_names(rel)
+            files[rel] = any(_mentioned(names, haystacks)
+                             for other, haystacks in docs.items() if other != path)
     return files
 
 
