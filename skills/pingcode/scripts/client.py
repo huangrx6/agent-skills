@@ -355,6 +355,10 @@ class Client:
 
     def _once(self, method: str, url: str, payload: bytes | None,
               authenticate: bool = True, content_type: str | None = None) -> Result:
+        # host 来自配置，`api_base` 会原样放行带 scheme 的值；不在这里挡一道，
+        # `file:///...` 之类的地址会被 urllib 真正打开。
+        if urllib.parse.urlsplit(url).scheme not in ("http", "https"):
+            raise ApiError(0, f"只允许 http/https：{url}", method, url)
         request = urllib.request.Request(
             url, data=payload, method=method,
             headers=self._headers(payload is not None, authenticate, content_type)

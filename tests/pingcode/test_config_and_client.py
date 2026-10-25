@@ -310,6 +310,14 @@ class MultipartTest(TransportCase):
 
 
 class ClientTest(TransportCase):
+    def test_非_http_scheme_的_host_直接拒绝(self):
+        """`api_base` 会原样放行带 scheme 的 host，不挡就会真的去读本地文件。"""
+        cli, calls = self.make_client(FakeResponse({}), host="file:///etc")
+        with self.assertRaises(client.ApiError) as caught:
+            cli.request("GET", "/v2/projects", authenticate=False)
+        self.assertIn("http/https", caught.exception.message)
+        self.assertEqual([], calls, "不该发出任何请求")
+
     def test_网络错误中的url编码凭据也脱敏(self):
         secret = "synthetic" + " secret+with spaces"
         cli, _calls = self.make_client(URLError("offline"))
