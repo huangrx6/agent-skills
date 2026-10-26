@@ -132,6 +132,13 @@ V2 列表接口的 `identifier` 查询参数在文档里是 **Number**；CLI 把
 越级挂会返回 **400「父工作项的类型不正确」**。这是项目的类型配置，CLI 不替你猜 ——
 报错提示里已写明这一条。
 
+## 迭代字段的类型可用性
+
+默认 scrum 模板实测：**只有用户故事能挂迭代**；特性/史诗 `--sprint` 返回 400 code=100355。
+`list workitem_properties` 不显示迭代字段，不能用属性表判断可用性。
+bulk 挂迭代实测不可用（exit=0 但 0 条成功），可靠做法是单条
+`workitem update <编号> --sprint …`；详见 [batch-migration.md](batch-migration.md)。
+
 ## 分页
 
 - `page_size` 默认 30、**上限 100**；`page_index` **从 0 开始**。
@@ -163,3 +170,7 @@ CLI 在边界上转换。CLI 收 `2026-09-20`、`2026-09-20 18:30` 或时间戳�
 `expires_in` 兼容相对秒数和绝对时间戳（大于等于 10^9 按绝对时间处理）。
 缺少有效值时，访问令牌按 30 天回退；refresh_token 的存在不会延长访问令牌寿命。
 实际可用性仍由服务端判断，401 时按授权流程处理。
+
+**读回格式有两种**：列表接口（`GET /v2/pjm/workitems`）的 `start`/`due` 是 ISO 字符串或
+`null`；单条详情（`GET /v2/pjm/workitems/{id}`）是 `{date: 秒级时间戳, with_time}`。
+写对账/校验脚本时要兼容两种表示。

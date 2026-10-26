@@ -131,6 +131,8 @@ pingcode.py workitem update SCR-12 --description "…" --end 2026-09-30
 
 # 回填缺失起止时间：默认只预览，--yes 才写
 # 推导顺序：迭代 → 子项汇总 → 创建时间/完成时间 → 项目日期 → 兜底日期
+# ⚠ 兑底陷阱：迭代没挂上时会用「创建时间/项目日期」安静写出错误日期——
+#   先抽查迭代真的挂上再跑；跑完核对故事日期 == 迭代起止；fill-dates 只补缺不纠错。
 # 超过 --limit 时结果可能截断；项目很大时先调大 --limit
 pingcode.py workitem fill-dates --project X
 pingcode.py workitem fill-dates --project X --yes
@@ -154,6 +156,9 @@ pingcode.py workitem attach-remove SCR-12 <附件 id> --yes
 
 # 批量改**一个**属性（官方限制：单属性 + 单值 + ≤100 个 id）
 # 改状态/优先级/迭代/工作量时，所有 id 必须在同一项目、同一类型；否则先分批。
+# ⚠ 退出码 0 ≠ 全部成功：输出里有「✓ 已更新 X 条 / ✗ N 条失败」，按条数核对，不能只看退出码。
+# ⚠ 迭代字段按类型可用（默认 scrum 只有用户故事能挂，特性/史诗报 100355），
+#   且 workitem_properties 不显示迭代字段；bulk 挂迭代实测不可用 → 用单条 update。
 pingcode.py workitem bulk-update --ids SCR-1,SCR-2,SCR-3 --state 已完成
 pingcode.py workitem bulk-update --ids SCR-1,SCR-2 --assignee @me --dry-run
 pingcode.py workitem bulk-update --ids SCR-1,SCR-2 --property risk=high
@@ -193,6 +198,7 @@ pingcode.py workitem create-plan --file plan.json --unassigned
 - **深度优先建（父先子后）** —— 子项要父项的 id。
 - **预检通过后中途 API 失败不静默** —— 报出**已建成的编号**与失败的节点，让你把剩下的
   子树单独放一个计划文件接着跑（不要整棵重跑；CLI 没有持久化断点或自动去重）。
+- **百条级以上的树按史诗拆成多个计划文件** —— 失败半径小、重跑代价低；实测单文件 500 节点可行。
 
 若剩余节点要挂到已经创建的父项，改用 `workitem create --parent <现有编号>`；
 `create-plan` 的根节点没有“接到既有父项”的参数。
@@ -253,7 +259,8 @@ pingcode.py api --method POST --path /v2/comments --data '{"principal_type":"wor
 | "看看板栏/泳道" | `list boards --project X` / `board entries / swimlanes …` |
 | "建/改/删看板栏或泳道" | `board entry-create/update/delete …` / `board swimlane-create/update/delete …` |
 | "登记/查看/修改工时" | `worklog add SCR-12 --duration 2` / `worklog list SCR-12` / `worklog update <id> --duration 3` |
-| "建/改迭代" | `sprint create …` / `sprint update …`（没有删除迭代接口） |
+| "建/改迭代" | `sprint create …` / `sprint update …`（没有删除接口；多余迭代改名+completed 收纳，见 [batch-migration.md](batch-migration.md)） |
+| "几百条任务排进迭代/逐日先后排期" | 见 [batch-migration.md](batch-migration.md)：迭代只挂故事、并行单条写三字段、fill-dates 前先抽查 |
 | "删评论" | `workitem comment-delete SCR-12 <id> --yes`（官方没有评论编辑接口） |
 | "把附件下载下来" | `workitem download SCR-12 <附件 id> --out ./文件` |
 | "看评论里的代码段" | `workitem attachments SCR-12 --comment <评论 id>` |

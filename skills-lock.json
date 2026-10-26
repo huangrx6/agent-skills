@@ -13,7 +13,7 @@
       "sourceType": "github"
     },
     "diagram-authoring": {
-      "computedHash": "45b6c745ad25740cad4f21e1863802e132daca3dd4842b4de331fec6a71351da",
+      "computedHash": "935e0245350463a77476bdf1b83b3a225ec47d289cd4c1af2486b4cdd650b894",
       "skillPath": "skills/diagram-authoring/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
@@ -43,7 +43,7 @@
       "sourceType": "github"
     },
     "pingcode": {
-      "computedHash": "1e5fab2791d208f33d4d7fd3598e961828e2221e3379b99088388fda06ce90de",
+      "computedHash": "5bf884fe5dd5503b16101293f6b26b2706c4b01f3302e6cce6ec353c0d82d2a5",
       "skillPath": "skills/pingcode/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"

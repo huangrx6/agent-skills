@@ -32,6 +32,9 @@ compatibility: Requires Python 3.10+ and a PingCode account (API token or OAuth)
   `--unassigned`（`--assignee none` 同义）。不写会按未分配处理并提示，不要自己猜人。
 - 写操作失败或超时后先检查是否已生效，再决定重试，避免重复创建。批量/树形操作报告已完成部分，
   不宣称自动回滚或可直接整棵重跑。
+- 批量写操作（bulk-update）退出码 0 不等于逐条成功：按输出里的「已更新/失败」条数核对。
+  迭代字段按类型可用（默认 scrum 只有用户故事能挂），bulk 挂迭代不可用；
+  大批量迁移、排期与逐日先后顺序的做法见 [batch-migration.md](references/batch-migration.md)。
 - 凭据与令牌不回显；状态只用 `auth status` / `config show`，不要读取或粘贴凭据文件内容。
 - 工作项不缓存；字典默认缓存 6 小时。目标刚改名、新建或状态配置变化时用 `--no-cache`。
 
@@ -62,6 +65,7 @@ compatibility: Requires Python 3.10+ and a PingCode account (API token or OAuth)
 
 - [commands.md](references/commands.md)：参数、搜索语法、树形计划与批量操作。
 - [workitem-authoring.md](references/workitem-authoring.md)：需求拆分、描述模板和截图附件流程。
+- [batch-migration.md](references/batch-migration.md)：大批量建树/迁移、迭代排期、并行提速与校验闭环（实战沉淀）。
 - [fields.md](references/fields.md)：字段映射、状态、编号解析和分页。
 - [auth.md](references/auth.md)：配置路径、两种令牌与错误处理。
 - [api.md](references/api.md)：端点表、参数来源、维护和通用 API。

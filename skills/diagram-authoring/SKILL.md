@@ -2,11 +2,12 @@
 name: diagram-authoring
 description: >-
   Create editable technical diagrams from a structure-only spec: architecture,
-  dependencies, flows, states, topology, and mind maps. Use when the user asks to
+  dependencies, flows, states, topology, and mind maps — nodes and edges only,
+  not data charts, gantt charts or UI mockups. Use when the user asks to
   画架构图 / 画流程图 / 画依赖图 / 把说明画成图 / draw a system or flow diagram.
   Scripts calculate layout and generate .excalidraw, .drawio or Mermaid .mmd files, with optional
   image exports. Do NOT use for decorative illustrations, posters, UI wireframes,
-  slide decks, or organizing notes and release records.
+  slide decks, gantt charts / 甘特图排期, or organizing notes and release records.
 compatibility: Requires Python 3.10+; PNG/SVG/PDF exports need a browser or draw.io.
 ---
 
