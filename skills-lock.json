@@ -31,7 +31,7 @@
       "sourceType": "github"
     },
     "obsidian-wiki": {
-      "computedHash": "3dd830d297090ba5659ae7f86e05adf06a987f4ac36a111d50849fa57f0407b1",
+      "computedHash": "21c930dd06609d066d845a0b2a3e78a0997c3887e5c655592f46a44e22ce08b6",
       "skillPath": "skills/obsidian-wiki/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
@@ -49,7 +49,7 @@
       "sourceType": "github"
     },
     "pingcode-weekly": {
-      "computedHash": "9881dac571a28447e5b40a5fd4494229e9695dd3e4cf87daf1a525e2e4bf5b90",
+      "computedHash": "fd86cc0721f7405efe5c72f7aa4ae81acdc692541bee0563490ec187ee79038c",
       "skillPath": "skills/pingcode-weekly/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"

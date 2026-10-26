@@ -2,9 +2,10 @@
 name: obsidian-wiki
 description: >-
   用于在 Obsidian 中学习和维护个人 Wiki：吸收文章或课程、整理概念与实践、综合多个来源、
-  根据已有笔记回答问题、复习自测、笔记配图与个人 IP 生图交接，以及笔记归位和链接维护。
+  根据已有笔记回答问题、复习自测、把散篇重组成可直接发布的长文、核对笔记与代码的版本、
+  笔记配图与个人 IP 生图交接，以及笔记归位和链接维护。
   触发示例：把这份资料融入知识库、我之前学过什么、更新这个主题、检查知识冲突。
-  Do NOT use for: 不涉及知识库的普通问答、需求缺陷与任务分工的业务管理、周报与工作项汇总、外部平台操作。
+  Do NOT use for: 不涉及知识库的普通问答、需求缺陷与任务分工的业务管理、周报与工作项汇总、外部平台操作、不涉及知识库的纯文字改写。
 compatibility: Requires Python 3.10+ (standard library only) and an Obsidian vault path.
 ---
 
@@ -40,7 +41,7 @@ python3 scripts/vault_path.py "/本次指定的知识库" --explain
 | 根据新资料修订、核对版本、纠正旧结论 | 对照受影响的判断，更新正文及相依示例，保留适用范围 | [知识模型](references/knowledge-model.md)、[知识更新](references/knowledge-updates.md) |
 | 审阅知识库、检查过期或矛盾 | 报告证据、受影响页面和修订建议，检查正文是否依赖其他文章；请求修复才写入 | [资料与查询流程](references/wiki-operations.md) |
 | 改文案、移动、改名、合并、整理索引 | 保留已有内容与属性，处理受影响的入链 | [归位规则](references/vault-map.md)、[写作规范](references/writing-conventions.md) |
-| 改写项目说明、整理会议材料，或润色已有周报的文字 | 只动已有文字：不汇总工作项、不改状态与负责人、不生成周期周报；保留事实、分工及确定程度 | [工作材料编辑](references/work-note-editing.md) |
+| 改写**库内已有**的项目说明、会议纪要或周报笔记 | 只动已有文字：不汇总工作项、不改状态与负责人、不生成周期周报；库外的纯文字整理不需要本 skill | [工作材料编辑](references/work-note-editing.md) |
 
 用户已说“融入知识库”“保存答案”时直接在相应范围写入，无需再次确认。
 只说“帮我理解”“考考我”“检查一下”不自动创建页面或操作日志。
