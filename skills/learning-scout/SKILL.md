@@ -7,6 +7,7 @@ description: >-
   产出是一组可独立阅读的 Markdown 深度笔记，外加可离线打开的 HTML 入口：篇目链接、
   内嵌视频、进度、测验与复习卡。不是链接清单，也不是单页提纲。
   Do NOT use for: 维护已有笔记或知识库、没有学习目标的纯搜索、课程制作、学术论文写作。
+compatibility: Requires Python 3.11+; optional renderer dependencies improve Markdown fidelity.
 ---
 
 # learning-scout
@@ -90,7 +91,7 @@ description: >-
 
 ## 三、写笔记：按深度规范来
 
-每篇的默认结构、示例标准、源码要求，按 [笔记深度规范](references/depth-standard.md)。
+每篇的默认结构、示例标准、源码要求，按 [笔记深度规范](references/depth-standard.md)；写什么、覆盖哪些概念按 [内容质量](references/content-quality.md)。
 摘要版：
 
 | `kind` | 参考长度 | 默认检查项 |
@@ -180,7 +181,7 @@ python3 scripts/build_series.py build --input plan.json --out ./dist --force --o
 
 内容：
 
-- [ ] `scripts/check_notes.py` 通过（或只剩可解释的警告）。
+- [ ] `python3 scripts/check_notes.py` 通过（或只剩可解释的警告）。
 - [ ] 每篇长度偏离参考区间时能说清原因，开场问题在结尾有答案。
 - [ ] 按主题需要给了完整示例、故障矩阵和边界；省略时说明原因，不为凑结构补节。
 - [ ] 没有跨篇引用，没有个人环境信息。

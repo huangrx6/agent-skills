@@ -5,6 +5,7 @@ description: >-
   根据已有笔记回答问题、复习自测、笔记配图与个人 IP 生图交接，以及笔记归位和链接维护。
   触发示例：把这份资料融入知识库、我之前学过什么、更新这个主题、检查知识冲突。
   Do NOT use for: 不涉及知识库的普通问答、需求缺陷与任务分工的业务管理、周报与工作项汇总、外部平台操作。
+compatibility: Requires Python 3.10+ (standard library only) and an Obsidian vault path.
 ---
 
 # Obsidian 学习 Wiki

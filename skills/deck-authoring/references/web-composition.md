@@ -148,7 +148,7 @@ python3 scripts/animate.py /path/to/deck.html -o /path/to/deck.mp4
 这些资源变更后也要重新验收，不能仅凭 HTML 哈希相同复用旧报告。
 几何检查不验证用户是否选过风格、是否满足配图要求或审美质量，交付时分别核对。
 
-`scripts/design_signals.py` 另读完成态帧，报告字阶、字体家族、色彩数量、对齐轴、留白、
+`python3 scripts/design_signals.py` 另读完成态帧，报告字阶、字体家族、色彩数量、对齐轴、留白、
 图像面积、行长、等宽卡片和连续页轮廓等可观测信号。它是审稿提醒，不是审美分数；
 逐条判断是否成立，不能为了清零机械改值。扩展条件与证据要求见 [审美闸门](design-review.md)。
 

@@ -1,7 +1,7 @@
 # Mermaid 后端
 
 用于希望在文档或代码仓库维护文本图的用户；默认交付 `.mmd`，不是图片。
-现有 JSON 规格通过 `scripts/emit_mermaid.py` 转换；已有 `.mmd` 可以直接编辑并校验，
+现有 JSON 规格通过 `python3 scripts/emit_mermaid.py` 转换；已有 `.mmd` 可以直接编辑并校验，
 目前没有 Mermaid → JSON spec 的反向转换。不要从旧 JSON 重生成后覆盖用户手工编辑而不比对。
 
 ## 生成与检查

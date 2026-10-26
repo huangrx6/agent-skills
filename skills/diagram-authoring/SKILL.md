@@ -7,6 +7,7 @@ description: >-
   Scripts calculate layout and generate .excalidraw, .drawio or Mermaid .mmd files, with optional
   image exports. Do NOT use for decorative illustrations, posters, UI wireframes,
   slide decks, or organizing notes and release records.
+compatibility: Requires Python 3.10+; PNG/SVG/PDF exports need a browser or draw.io.
 ---
 
 # 技术图
@@ -44,16 +45,16 @@ description: >-
    用户要求整块区域底色时，逐一核对涉及的分组都有填充，不能只给入口和基础设施上色；中间层的 neutral 名称不应使明确指定的区域配色失效。
    配色确认后，Excalidraw 提交图标方案：是否使用、具体素材/风格、节点覆盖数量与比例、大小/位置、颜色处理；
    等待用户确认后才设置 icon。draw.io/Mermaid 不支持图标，此节点说明为不适用；有图标诉求先解决后端选择。
-5. 适用节点均确认后，校验规格并运行 `scripts/check_semantics.py`，对照来源处理语义提示；不自动删改事实。
+5. 适用节点均确认后，校验规格并运行 `python3 scripts/check_semantics.py`，对照来源处理语义提示；不自动删改事实。
    Mermaid 路径先读 [Mermaid 后端](references/mermaid-backend.md)：使用 `emit_mermaid.py`，再用 `check_mermaid.py` 做官方语法检查；不运行下面的几何/观看检查，完成后进入第 8 步。
    Excalidraw/draw.io 的 emit 会校验规格、计算布局、有限调参，再原子写入；有阻塞项时不写成品。
 6. 看诊断修复受影响的节点、标签、关系或分组，保留内容事实。先处理阻塞项，再看可读性和视觉。
    两轮聚焦修复仍没有进展时，报告具体限制，考虑拆成总览与细节图，不反复盲试。
-7. 运行 `scripts/check_presentation.py 成品 --preset 场景` 检查预计观看字号；
+7. 运行 `python3 scripts/check_presentation.py 成品 --preset 场景` 检查预计观看字号；
    生成器提示装不下时调整方向、拆视图或换观看场景，不缩字删边。默认不为验收额外导出 PNG/SVG；
    可在编辑器中目检，未做真实渲染检查时如实标明。需要导出时再检查实际渲染；能力边界见 [观看场景](references/output-presets.md)。
-   Excalidraw 密集图另跑 `scripts/readable_routing.py 成品.excalidraw`，检查近距离平行线、实际交叉及标签到线/边框的间隔；它检查原生几何，不代替真实字体审查。
-8. 新建或更新原生图后运行 `dev-tools/sync_exports.py 成品`：没有已有导出时不生成任何图片；
+   Excalidraw 密集图另跑 `python3 scripts/readable_routing.py 成品.excalidraw`，检查近距离平行线、实际交叉及标签到线/边框的间隔；它检查原生几何，不代替真实字体审查。
+8. 新建或更新原生图后运行 `python3 dev-tools/sync_exports.py 成品`：没有已有导出时不生成任何图片；
    有同名 PNG/SVG（Mermaid 同样适用，draw.io 还支持 PDF/JPG）则同步全部已有格式，失败要明确提示旧图未同步。
    用户本次要求的新格式用 `--format` 添加；没有导出需求时交付原生图，并简短提示“需要时可导出 PNG/SVG”，无需为此停下来追问。
 
@@ -88,7 +89,7 @@ python3 dev-tools/sync_exports.py /path/to/diagrams/system/system.drawio
 横向流水线、阶段推进、分支并排或 16:9 幻灯片优先 `LR`；纵向步骤、窄栏文档或移动端优先 `TB`。
 用户说“横着/竖着”时按其选择执行；拿不准可用 `python3 scripts/direction_preview.py` 对比，
 不要每次都落回 `flow`/`dependency` 的默认 `TB`。
-同一画布需要横竖混排时，用 `scripts/compose_panels.py` 把独立面板拼起来；跨面板连线不自动生成。
+同一画布需要横竖混排时，用 `python3 scripts/compose_panels.py` 把独立面板拼起来；跨面板连线不自动生成。
 
 | 后端 | 适用 | 当前边界 |
 | --- | --- | --- |

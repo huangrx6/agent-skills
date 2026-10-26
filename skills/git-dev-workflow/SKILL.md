@@ -5,6 +5,7 @@ description: >-
   rewriting history, force pushes, repository sync checks, and recovery after Git mistakes.
   中文：提交、建分支、清理改动或 worktree、改写历史、确认是否已推送、恢复误操作。
   Provides read-only state and destructive-action guards. Do NOT use for PR reviews, CI, or hosting UI operations.
+compatibility: Requires Python 3.10+ and git.
 ---
 
 # Git 本地工作流

@@ -6,6 +6,7 @@ description: >-
   整理项目任务分工、更新工作台、设计 Bases 视图、补本周工作记录；应有明确的 Obsidian 或本地工作笔记上下文。
   Do NOT use for: 普通知识学习、任务结束但未要求记录、没有工作笔记上下文的泛泛咨询，
   或没有本地笔记需求的远端项目系统操作。
+compatibility: Requires Python 3.10+ (standard library only) and Obsidian with Bases.
 ---
 
 # Obsidian 工作台

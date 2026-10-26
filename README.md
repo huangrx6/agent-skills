@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <code>9 skills</code> &nbsp;·&nbsp; <code>Python 3.10+</code> &nbsp;·&nbsp; <code>MIT</code>
+  <code>9 skills</code> &nbsp;·&nbsp; <code>Python 3.10+（learning-scout、pingcode-weekly 需 3.11+）</code> &nbsp;·&nbsp; <code>MIT</code>
 </p>
 
 每个 skill 都是一个独立目录：`SKILL.md` 说明什么时候触发、怎么执行，`README.md` 交代依赖、用法和边界。
@@ -161,6 +161,14 @@ python3 tools/skills_lock.py --check
 不执行回归，也不证明产物质量；Deck 的浏览器与 PDF 测试需要其运行依赖。
 `tools/skill_health.py` 提供维护建议，`tools/skill_trigger_log.py` 分析本机会话日志。
 `skill-builder` 的写作方法在 [GUIDE.md](tools/skill-builder/GUIDE.md)，检查器命令见其 README。
+
+CI 在 [`.github/workflows/gate.yml`](.github/workflows/gate.yml)：推送与 PR 时跑结构、泄露、
+指针、锁文件校验，并按 `Python 3.10 / 3.11` 跑各 skill 与 `tools/` 的回归——版本声明要能被验证。
+Deck 与 diagram 的重型套件需要 Chrome / LibreOffice，不在 CI 里跑，仍由发布前的人工闸门覆盖：
+
+```sh
+AGENT_SKILLS_GATE=1 git commit --allow-empty -m "release gate"
+```
 
 提交涉及 `skills/`、`tests/`、`tools/` 或 `.githooks/` 时，可启用仓库 hook：
 

@@ -73,9 +73,9 @@ draw.io 的文字、边标签位置与 Excalidraw 不完全一致。官方导出
 
 ## 表达与观看检查
 
-结构校验后运行 `scripts/check_semantics.py`。默认提示不阻塞；`--strict` 可用于受控样例。
+结构校验后运行 `python3 scripts/check_semantics.py`。默认提示不阻塞；`--strict` 可用于受控样例。
 它不验证来源事实，也不进入布局调参循环。生成后按 [观看场景](output-presets.md)
-运行 `scripts/check_presentation.py`；该结果是名义尺寸估算，不能冒充官方渲染通过。
+运行 `python3 scripts/check_presentation.py`；该结果是名义尺寸估算，不能冒充官方渲染通过。
 新检查不会让旧规格因缺少 intent 而失败，也不改变已有两后端的默认产物。
 
 
@@ -85,7 +85,7 @@ draw.io 的文字、边标签位置与 Excalidraw 不完全一致。官方导出
 非 fit 场景在生成后检查预计观看字号，装不下时记录 `presentation` 提示，
 不通过扩大间距反复重试，也不删除事实。showcase 结构通过与观看通过分别判断。
 
-官方 SVG 导出后可以运行 `dev-tools/check_render.py`，对照可编辑源文件，在真实浏览器测量
+官方 SVG 导出后可以运行 `python3 dev-tools/check_render.py`，对照可编辑源文件，在真实浏览器测量
 可见文字、箭头路径、画布边界及字号。结果区分 pass / failed / skipped / unmeasurable；
 无浏览器不是通过。单页、字体可用性启发式及其他限制见 [观看场景](output-presets.md)。
 它不证明节点内部裁切、字形回退或 PNG 等价，目视审查仍然保留。

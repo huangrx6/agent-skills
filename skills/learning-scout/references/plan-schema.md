@@ -5,7 +5,7 @@
 ## v2：多篇笔记系列合同（默认）
 
 v2 把交付物从“一个 HTML 页面”改成“**一组可独立阅读的 Markdown 笔记 + 一个 HTML 入口**”。
-`version: 2` 时用 `scripts/build_series.py` 构建；v1 的 `render` 继续可用，用于快速路线页，
+`version: 2` 时用 `python3 scripts/build_series.py` 构建；v1 的 `render` 继续可用，用于快速路线页，
 但主题学习默认走 v2。
 
 ## 目录形状

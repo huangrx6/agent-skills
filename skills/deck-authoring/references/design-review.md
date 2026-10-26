@@ -176,10 +176,10 @@ python3 scripts/rhythm_check.py source.html
    把缩略图缩小到看不清字：是否仍认得出同一个视觉世界（母题、图像处理、节奏）？
 2. **逐页目标尺寸**：用 [视觉审稿](visual-quality.md) 的观察表，看第一眼、路径、
    空间、排印、素材、风格落地和语义完整性。
-3. **设计信号**：运行 `scripts/design_signals.py` 读取字号/字体/颜色/对齐/留白/
+3. **设计信号**：运行 `python3 scripts/design_signals.py` 读取字号/字体/颜色/对齐/留白/
    图像/行长/卡片等可观测信号。它是提醒，不是分数；逐条判断是否成立，
    不要为了让信号消失而机械改值。
-4. **字族**：运行 `scripts/type_audit.py`。它按选择器判断字族用途，代码语境与图标之外
+4. **字族**：运行 `python3 scripts/type_audit.py`。它按选择器判断字族用途，代码语境与图标之外
    出现第二个文本字族就失败；第二族只有用户或品牌授权才用 `--allow` 放行。
 5. **最终格式**：打开 PDF/PPTX 回读；HTML 正确不等于导出正确。
 
@@ -218,7 +218,7 @@ python3 scripts/rhythm_check.py source.html
 - [视觉审稿](visual-quality.md)：怎么看、先修什么、哪些不能算。
 - 本篇：什么时候算过闸门、要留下什么证据。
 - [视觉 craft](visual-craft.md)：尺度、网格、色彩、图像、材质和反 slop 的具体杠杆。
-- `scripts/design_signals.py`：把“像文档/像模板”的可观测信号列出来，供审稿参考。
+- `python3 scripts/design_signals.py`：把“像文档/像模板”的可观测信号列出来，供审稿参考。
 
 ## 系统层自检：八轴看不到的整套问题
 

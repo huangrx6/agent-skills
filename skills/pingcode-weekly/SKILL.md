@@ -5,6 +5,7 @@ description: >-
   中文触发：PingCode 周报、按人周报、月度总结、这周需求进展、缺陷清单、项目周报、下周计划、周报数据检查。
   只读 PingCode；工作项必须先在 PingCode 录入。
   Do NOT use for: 非 PingCode 数据源的周报或 PingCode 写入。
+compatibility: Requires Python 3.11+ (standard library only) and a PingCode token.
 ---
 
 # pingcode-weekly：PingCode 周报

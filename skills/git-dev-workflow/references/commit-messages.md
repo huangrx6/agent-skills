@@ -1,7 +1,7 @@
 # 提交信息检查
 
 优先遵循目标仓库的明确约定。需要 Conventional Commits 时，使用
-[规范 v1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) 与 `scripts/commit_style.py`。
+[规范 v1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) 与 `python3 scripts/commit_style.py`。
 
 ```text
 fix(parser): 修正空输入处理

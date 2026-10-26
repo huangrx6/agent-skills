@@ -1,55 +1,55 @@
 {
   "skills": {
     "cosmic-split": {
-      "computedHash": "a721c9a21621c7d7a26357d28dc666c0d05ede115b2b7b26fa27d0f7160b39f4",
+      "computedHash": "6e193274feb180ed3c8b753864a2b70288479f4a27e627bc958b66ee1e244d04",
       "skillPath": "skills/cosmic-split/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
     "deck-authoring": {
-      "computedHash": "c91c4942e5297653dc5ca600b8adcb44b34d6314a17c04b5cc3b3bf3b80c8e06",
+      "computedHash": "a04f6417122b8c3d6274681c49add08ea22e43174f2757d4dd0f7490bfcb3991",
       "skillPath": "skills/deck-authoring/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
     "diagram-authoring": {
-      "computedHash": "f419171b913f77b2d7917f2e685ec152043816e19df86a6c2c2f5dd6eb6e60b6",
+      "computedHash": "45b6c745ad25740cad4f21e1863802e132daca3dd4842b4de331fec6a71351da",
       "skillPath": "skills/diagram-authoring/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
     "git-dev-workflow": {
-      "computedHash": "fcd4b3575632dd1f907992300df0cb39ab39bdc6e0efd33042940f0a9ec230e6",
+      "computedHash": "ac70b39b0a49c08e2629919c315822ae0911bc9e351ae653a71b2db9ffb53144",
       "skillPath": "skills/git-dev-workflow/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
     "learning-scout": {
-      "computedHash": "f08d65ea02222acee1524db39c8382c82f3eac46c564bec99ecc8836b0ff0edb",
+      "computedHash": "ca401783eb3bba9ba4b681568dc4e8102fe7aaa1e5fbb6b65977b9962b2b62ea",
       "skillPath": "skills/learning-scout/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
     "obsidian-wiki": {
-      "computedHash": "8079dbe46ae6c78391738c539ce0220a8298c22ec1b9fe64dbac952e59eca212",
+      "computedHash": "3dd830d297090ba5659ae7f86e05adf06a987f4ac36a111d50849fa57f0407b1",
       "skillPath": "skills/obsidian-wiki/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
     "obsidian-work": {
-      "computedHash": "a624b42d2c7be130ebd426e0ad4486de08c2506cbacdf08ab9e26740d105ed7c",
+      "computedHash": "677dcacf7ed0b9ca38629373608d5c975d735175092b0557a95faa58d2542043",
       "skillPath": "skills/obsidian-work/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
     "pingcode": {
-      "computedHash": "6d92cde767121ac65bcf95f41e99cf22a0e1fe2cc3f9f849fcc5e666780bde87",
+      "computedHash": "1e5fab2791d208f33d4d7fd3598e961828e2221e3379b99088388fda06ce90de",
       "skillPath": "skills/pingcode/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
     "pingcode-weekly": {
-      "computedHash": "3c1bf60eee54ad5955b092ee7947f29fafe66fddeb4ebc1a24cb608d6d4a65ee",
+      "computedHash": "9881dac571a28447e5b40a5fd4494229e9695dd3e4cf87daf1a525e2e4bf5b90",
       "skillPath": "skills/pingcode-weekly/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"

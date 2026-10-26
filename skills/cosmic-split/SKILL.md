@@ -5,6 +5,7 @@ description: >-
   E/R/W/X 拆分表、核对接口与页面覆盖，或核查与改写已有 COSMIC 表。中文触发：COSMIC、CFP 估算、
   功能点拆分、功能点清单、拆分表、接口清单、送审自检、规模度量。Do NOT use for: IFPUG/NESMA、
   金额报价或工时评估、普通需求与测试文档。
+compatibility: Requires Python 3.10+ and openpyxl for .xlsx output.
 ---
 
 # COSMIC 功能点拆分

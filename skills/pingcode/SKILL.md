@@ -5,6 +5,7 @@ description: >-
   statuses, assignees, comments, and attachments. 中文：PingCode 里查待办、查缺陷、拆需求、
   建史诗/故事/任务、改状态、看迭代、看项目进度、看流转历史、看关联/关注人、下载附件、批量改、按条件搜索或排查授权。Use for PingCode work tracking and authentication or API errors. Do NOT use for local Git work or administration of members,
   permissions, or CI pipelines.
+compatibility: Requires Python 3.10+ and a PingCode account (API token or OAuth).
 ---
 
 # PingCode 项目与工作项

@@ -38,7 +38,7 @@ python3 scripts/readable_routing.py view.excalidraw -o "$diagram_check_dir/view-
 
 ## 生成与覆盖核对
 
-作者先写视图计划，再用 `scripts/split_views.py` 提取。脚本不猜哪些边“重要”，不重写业务事实。
+作者先写视图计划，再用 `python3 scripts/split_views.py` 提取。脚本不猜哪些边“重要”，不重写业务事实。
 计划使用源 edges 数组的 **0 起始下标**，避免同起终点的不同关系被误合并。
 
 ```json

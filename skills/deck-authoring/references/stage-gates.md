@@ -5,7 +5,7 @@
 而是「图位还会变就交给用户出图」「样页还没确认就铺 28 页」这类错误的唯一拦法。
 
 状态写在 `design.md` 的 `## 阶段闸门` 表里（不是新的状态 JSON），
-用 `scripts/gate_check.py` 核验：
+用 `python3 scripts/gate_check.py` 核验：
 
 ```bash
 python3 scripts/gate_check.py /path/to/v2-.../          # 当前在哪一关、下一关缺什么
