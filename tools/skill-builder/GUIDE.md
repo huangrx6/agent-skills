@@ -56,6 +56,8 @@
   `python3 tools/trigger_eval.py --template results.json` 生成模板，
   跑完用 `--score results.json` 算触发率；正例 ≥ 0.5 通过，反例 < 0.5 通过。
 - 评测不过先改 description 的触发词与排除项，不要改用例凑数；0.5 的边界值两边都算没过。
+- 记 `triggered` 时数的是**这个 skill 自己被加载**的次数，不是「有没有加载任何 skill」：
+  反例请求往往应该唤醒**别的** skill（画图那条会唤醒 diagram），把它算成命中等于把评测做废。
 - 跑的方式：一条请求一个**干净的 pi 会话**（`pi -p "<请求>" --tools read --session-dir <临时目录>`），
   会话里的 `loaded-skill` / `inline-skill` 记录就是「触发了」。用 `--tools read` 是为了不产生
   副作用：这一步只测「会不会选它」，不测能不能把活干完。
