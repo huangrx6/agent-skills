@@ -34,7 +34,7 @@ CROSS_REFS = re.compile(
 )
 PERSONAL_PATHS = re.compile(r"(/Users/[^/\s]+|/home/[^/\s]+|[A-Z]:\\\\Users\\\\[^\\\\\s]+)")
 HEADING_RE = re.compile(r"^#{1,3}\s+(.*)$", re.M)
-# 本库 53/53 篇都以「## N. 参考资料」收尾，且二级标题 1..N 连续（见 references/house-style.md）。
+# 知识笔记的默认骨架：二级标题 1..N 连续、以「## N. 参考资料」收尾（见 references/house-style.md）。
 REFS_RE = re.compile(r"^##\s*(?:\d+\.\s*)?参考资料\s*$", re.M)
 NUMBERED_H2_RE = re.compile(r"^##\s+(\d+)\.\s+", re.M)
 # 开场禁语：读者要结论，不要目录。
@@ -91,7 +91,7 @@ def check_note(path: Path, kind: str, strict: bool) -> tuple[list[str], list[str
         errors.append(f"{path.name}: 没有核验落点（核验节 / frontmatter reviewed_at / 参考资料节）")
 
     if not has_refs:
-        warnings.append(f"{path.name}: 缺少「## N. 参考资料」一节（本库 53/53 篇都有）")
+        warnings.append(f"{path.name}: 缺少「## N. 参考资料」一节，读者无法核验来源")
     if not numbered:
         warnings.append(f"{path.name}: 二级标题没有按 1..N 编号")
     elif numbered != list(range(1, len(numbered) + 1)):

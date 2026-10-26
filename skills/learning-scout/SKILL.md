@@ -93,7 +93,7 @@ compatibility: Requires Python 3.11+; optional renderer dependencies improve Mar
 
 每篇的默认结构、示例标准、源码要求，按 [笔记深度规范](references/depth-standard.md)；
 写什么、覆盖哪些概念按 [内容质量](references/content-quality.md)；frontmatter 键、编号章节与
-参考资料收尾按 [成文风格](references/house-style.md)（来自 53 篇已成稿笔记的实测）。
+参考资料收尾按 [成文风格](references/house-style.md)。
 摘要版：
 
 | `kind` | 参考长度 | 默认检查项 |
