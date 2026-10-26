@@ -2,10 +2,12 @@
 name: deck-authoring
 license: MIT
 description: >-
-  制作有视觉设计的演示文稿：从材料组织内容，设计 HTML 页面、配图与播放，
-  并导出 PDF、PNG、贴图 PPTX 或逐页视频；已有结构化项目支持有限的原生可编辑 PPTX。
-  触发：做一份演示、做 PPT、把材料做成幻灯片、设计演示风格或配图。
-  Do NOT use for: 编辑已有 PowerPoint 文件、只做一张图表或无演示结构的单图、多镜头影视制作。
+  从零做一份有视觉设计的演示：把材料组织成 HTML 页面，设计版式、页内配图与播放，
+  再导出 PDF、PNG、贴图 PPTX，或把每页录成视频（幻灯片录制，不是剪辑）。只接「新做一份演示」，
+  改已有文件、出单张图、剪片子都不接。
+  触发：做一份演示、做 PPT、把材料做成幻灯片、定演示的视觉风格。
+  Do NOT use for: 编辑已有 PowerPoint 文件、单张配图或单张图表、用 LaTeX/beamer 排论文
+  （交付物是 .tex 源码）、影视剪辑（这里的视频只指把幻灯片逐页录下来）。
 compatibility: Requires Python 3.10+ and Chrome/Chromium; PPTX and video exports need extra dependencies.
 ---
 
