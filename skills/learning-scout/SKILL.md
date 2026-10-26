@@ -91,7 +91,9 @@ compatibility: Requires Python 3.11+; optional renderer dependencies improve Mar
 
 ## 三、写笔记：按深度规范来
 
-每篇的默认结构、示例标准、源码要求，按 [笔记深度规范](references/depth-standard.md)；写什么、覆盖哪些概念按 [内容质量](references/content-quality.md)。
+每篇的默认结构、示例标准、源码要求，按 [笔记深度规范](references/depth-standard.md)；
+写什么、覆盖哪些概念按 [内容质量](references/content-quality.md)；frontmatter 键、编号章节与
+参考资料收尾按 [成文风格](references/house-style.md)（来自 53 篇已成稿笔记的实测）。
 摘要版：
 
 | `kind` | 参考长度 | 默认检查项 |
@@ -165,7 +167,7 @@ python3 scripts/build_series.py build --input plan.json
 python3 scripts/build_series.py build --input plan.json --out ./dist --force --open
 ```
 
-`check_notes.py` 按 `kind` 检查默认节、源码证据、跨篇引用与个人路径；长度只在明显偏离参考区间时提示；
+`check_notes.py` 按 `kind` 检查默认节、源码证据、跨篇引用与个人路径，并检查编号章节与参考资料节；长度只在明显偏离参考区间时提示；
 `--force` 覆盖已存在的输出目录，`--open` 构建后直接打开入口页，`--no-check` 跳过质量检查（仅用于临时草稿）。
 
 默认输出到 `~/Downloads/learning-scout/<topic>-<date>/`。构建会：

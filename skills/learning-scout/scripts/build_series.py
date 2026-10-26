@@ -137,7 +137,7 @@ def validate_plan(plan: object, base_dir: Path) -> tuple[list[str], list[str]]:
                 errors.append(f"{vwhere} 缺少 title")
             if not _is_http(video.get("url")):
                 errors.append(f"{vwhere}.url 必须是 http(s) 链接")
-            if not _as_dict(note.get("videos")[video_index - 1]).get("verified_at"):
+            if not _as_dict(video).get("verified_at"):
                 warnings.append(f"{vwhere} 缺少 verified_at（核验日期）")
 
         for quiz_index, item in enumerate(_as_list(note.get("quiz")), start=1):

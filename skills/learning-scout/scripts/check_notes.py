@@ -34,6 +34,12 @@ CROSS_REFS = re.compile(
 )
 PERSONAL_PATHS = re.compile(r"(/Users/[^/\s]+|/home/[^/\s]+|[A-Z]:\\\\Users\\\\[^\\\\\s]+)")
 HEADING_RE = re.compile(r"^#{1,3}\s+(.*)$", re.M)
+# 本库 53/53 篇都以「## N. 参考资料」收尾，且二级标题 1..N 连续（见 references/house-style.md）。
+REFS_RE = re.compile(r"^##\s*(?:\d+\.\s*)?参考资料\s*$", re.M)
+NUMBERED_H2_RE = re.compile(r"^##\s+(\d+)\.\s+", re.M)
+# 开场禁语：读者要结论，不要目录。
+TITLE_BAN_RE = re.compile(r"^\s*(本文|本篇|这篇文章)\s*(将|会|主要|介绍|讨论|梳理)")
+FM_RE = re.compile(r"^---\n(.*?)\n---\n", re.S)
 FENCE_RE = re.compile(r"^```", re.M)
 
 
@@ -73,8 +79,31 @@ def check_note(path: Path, kind: str, strict: bool) -> tuple[list[str], list[str
         elif lines > high:
             warnings.append(f"{path.name}: {lines} 行，超过 {kind} 的参考上限 {high}，检查是否重复或该拆篇")
 
-    if not any("核验" in heading for heading in stats["headings"]):
-        errors.append(f"{path.name}: 缺少“核验”一节")
+    numbered = [int(n) for n in NUMBERED_H2_RE.findall(text)]
+    has_refs = bool(REFS_RE.search(text))
+    front = FM_RE.match(text)
+    has_reviewed_at = bool(front and re.search(r"^reviewed_at:", front.group(1), re.M))
+
+    # 核验落点三选一：单独一节、frontmatter 的 reviewed_at、或参考资料节。
+    # 实测库里 0 篇写「核验」节，37 篇在正文提核验 —— 硬要一节会把作者逼出没人用的节。
+    if not (any("核验" in heading for heading in stats["headings"])
+            or has_reviewed_at or has_refs):
+        errors.append(f"{path.name}: 没有核验落点（核验节 / frontmatter reviewed_at / 参考资料节）")
+
+    if not has_refs:
+        warnings.append(f"{path.name}: 缺少「## N. 参考资料」一节（本库 53/53 篇都有）")
+    if not numbered:
+        warnings.append(f"{path.name}: 二级标题没有按 1..N 编号")
+    elif numbered != list(range(1, len(numbered) + 1)):
+        warnings.append(f"{path.name}: 二级标题编号不连续（{numbered}）")
+
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("#", "|", ">", "-", "*", "`", "!", "1.")):
+            continue
+        if TITLE_BAN_RE.match(stripped):
+            warnings.append(f"{path.name}: 开头别写“本文介绍……”，直接给场景或判断")
+        break
 
     if kind in {"mechanism", "practice"} and not any("故障" in h or "失败" in h for h in stats["headings"]):
         warnings.append(f"{path.name}: 机制/实践篇建议有“故障矩阵”或“失败模式”一节")

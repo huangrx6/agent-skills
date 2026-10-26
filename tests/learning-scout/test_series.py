@@ -17,9 +17,9 @@ HERE = Path(__file__).resolve().parent
 SKILL = HERE.parents[1] / "skills" / "learning-scout"
 sys.path.insert(0, str(SKILL / "scripts"))
 
-import build_series  # noqa: E402
-import check_notes  # noqa: E402
-import render_md  # noqa: E402
+import build_series  # noqa: E402  # type: ignore[import-not-found]
+import check_notes  # noqa: E402  # type: ignore[import-not-found]
+import render_md  # noqa: E402  # type: ignore[import-not-found]
 
 
 def write_series(base: Path, *, with_image: bool = False) -> Path:
@@ -186,7 +186,7 @@ class CheckerTests(unittest.TestCase):
     def test_cross_reference_is_error(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            plan_path = write_series(base)
+            write_series(base)
             note = base / "notes" / "01-a.md"
             note.write_text(note.read_text() + "\n见第 2 篇。\n", encoding="utf-8")
             errors, _ = check_notes.check_note(note, "concept", strict=False)
@@ -195,7 +195,7 @@ class CheckerTests(unittest.TestCase):
     def test_other_note_references_are_errors(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            plan_path = write_series(base)
+            write_series(base)
             note = base / "notes" / "01-a.md"
             original = note.read_text()
             for phrase in ("见另一篇", "详见另一篇", "其他笔记"):
@@ -206,7 +206,7 @@ class CheckerTests(unittest.TestCase):
     def test_personal_path_is_error(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            plan_path = write_series(base)
+            write_series(base)
             note = base / "notes" / "01-a.md"
             note.write_text(note.read_text() + "\n/Users/someone/project\n", encoding="utf-8")
             errors, _ = check_notes.check_note(note, "concept", strict=False)
@@ -215,3 +215,58 @@ class CheckerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HouseStyleCheckTests(unittest.TestCase):
+    """成文风格里能机械查的部分：编号章节、参考资料节、开头禁语、核验落点。
+
+    这些约定来自本机 53 篇已成稿笔记的实测（见 references/house-style.md），
+    不是审美偏好；只有参考资料与核验落点会阻塞，其余先提示。
+    """
+
+    def note(self, tmp: str, body: str) -> Path:
+        path = Path(tmp) / "01-style.md"
+        path.write_text(body, encoding="utf-8")
+        return path
+
+    def style(self, body: str) -> tuple[list[str], list[str]]:
+        with tempfile.TemporaryDirectory() as tmp:
+            return check_notes.check_note(self.note(tmp, body), "concept", strict=False)
+
+    def test_numbered_sections_and_refs_produce_no_style_warnings(self):
+        body = ("# 标题\n\n一个具体场景。\n\n## 1. 问题\n\n正文。\n\n"
+                "## 2. 参考资料\n\n- [文档](https://example.com)\n")
+        errors, warnings = self.style(body)
+        self.assertEqual([], errors)
+        self.assertFalse([w for w in warnings if "参考资料" in w or "编号" in w], warnings)
+
+    def test_missing_references_section_is_warning(self):
+        _errors, warnings = self.style("# 标题\n\n场景。\n\n## 1. 问题\n\n正文。\n")
+        self.assertTrue(any("参考资料" in w for w in warnings), warnings)
+
+    def test_non_numbered_sections_are_warning(self):
+        body = "# 标题\n\n场景。\n\n## 问题\n\n正文。\n\n## 参考资料\n\n- [文档](https://x.y)\n"
+        _errors, warnings = self.style(body)
+        self.assertTrue(any("编号" in w for w in warnings), warnings)
+
+    def test_gapped_numbering_is_warning(self):
+        body = ("# 标题\n\n场景。\n\n## 1. 甲\n\n正文。\n\n## 3. 乙\n\n正文。\n\n"
+                "## 4. 参考资料\n\n- [文档](https://x.y)\n")
+        _errors, warnings = self.style(body)
+        self.assertTrue(any("不连续" in w for w in warnings), warnings)
+
+    def test_opening_with_intro_cliche_is_warning(self):
+        body = "# 标题\n\n本文将介绍上下文工程的基本概念。\n\n## 1. 问题\n\n正文。\n"
+        _errors, warnings = self.style(body)
+        self.assertTrue(any("本文介绍" in w for w in warnings), warnings)
+
+    def test_refs_section_counts_as_verification_anchor(self):
+        """53 篇里没有一篇写「核验」节：参考资料节本身就是核验落点。"""
+        body = ("# 标题\n\n场景。\n\n## 1. 问题\n\n正文。\n\n"
+                "## 2. 参考资料\n\n- [文档](https://example.com)\n")
+        errors, _warnings = self.style(body)
+        self.assertEqual([], errors)
+
+    def test_no_anchor_at_all_is_error(self):
+        errors, _warnings = self.style("# 标题\n\n场景。\n\n## 1. 问题\n\n正文。\n")
+        self.assertTrue(any("核验落点" in e for e in errors), errors)
