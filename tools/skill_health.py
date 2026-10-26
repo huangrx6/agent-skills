@@ -43,11 +43,6 @@ SCAN_SUFFIXES = (".md", ".json", ".py", ".js", ".sh", ".yml", ".yaml", ".toml")
 SKIP_DIRS = {".git", "__pycache__", ".venv", "node_modules", ".idea", ".pytest_cache"}
 MAX_SCAN_BYTES = 2 * 1024 * 1024
 
-# 参考文件超过这么多行就不该再让人（和 agent）从头滑到底：提示补一个目录。
-# 官方 best-practices 的建议线是 100 行；本仓库取 200 —— 100–200 行的文件
-# 一般一次读完，加目录反而多一次跳转。
-LONG_REF_LINES = 200
-
 # README 里的「## 目录结构」 → 第一个 ```text 块
 TREE_BLOCK_RE = re.compile(r"^## 目录结构\n.*?```text\n(.*?)```", re.DOTALL | re.MULTILINE)
 # 「没有 `scripts/` 与 `tests/`」这类否定句 —— 它比遗漏更糟：是句错话
@@ -209,13 +204,17 @@ def long_refs_without_toc(skill_dir: str) -> list[str]:
     refs = os.path.join(skill_dir, "references")
     if not os.path.isdir(refs):
         return []
+    # 超过 200 行就不该再让人（和 agent）从头滑到底：提示补一个目录。
+    # 官方 best-practices 的建议线是 100 行；本仓库取 200 —— 100–200 行的文件
+    # 一般一次读完，加目录反而多一次跳转。
+    threshold = 200
     out: list[str] = []
     for name in sorted(listdir(refs)):
         if not name.endswith(".md"):
             continue
         text = read_text(os.path.join(refs, name))
         lines = text.count("\n")
-        if lines <= LONG_REF_LINES:
+        if lines <= threshold:
             continue
         head = "\n".join(text.split("\n")[:40])
         if "## 目录" in head or "## Contents" in head:
