@@ -43,6 +43,11 @@ SCAN_SUFFIXES = (".md", ".json", ".py", ".js", ".sh", ".yml", ".yaml", ".toml")
 SKIP_DIRS = {".git", "__pycache__", ".venv", "node_modules", ".idea", ".pytest_cache"}
 MAX_SCAN_BYTES = 2 * 1024 * 1024
 
+# 参考文件超过这么多行就不该再让人（和 agent）从头滑到底：提示补一个目录。
+# 官方 best-practices 的建议线是 100 行；本仓库取 200 —— 100–200 行的文件
+# 一般一次读完，加目录反而多一次跳转。
+LONG_REF_LINES = 200
+
 # README 里的「## 目录结构」 → 第一个 ```text 块
 TREE_BLOCK_RE = re.compile(r"^## 目录结构\n.*?```text\n(.*?)```", re.DOTALL | re.MULTILINE)
 # 「没有 `scripts/` 与 `tests/`」这类否定句 —— 它比遗漏更糟：是句错话
@@ -195,6 +200,30 @@ def readme_tree_issues(skill_dir: str) -> list[str]:
     return issues
 
 
+def long_refs_without_toc(skill_dir: str) -> list[str]:
+    """references 里超过提示线却没有目录的文件。
+
+    官方 best-practices 建议给 100+ 行的参考文件加目录；本仓库取 200 行作提示线：
+    100–200 行的文件一般一次读完，加目录反而多一次跳转。
+    """
+    refs = os.path.join(skill_dir, "references")
+    if not os.path.isdir(refs):
+        return []
+    out: list[str] = []
+    for name in sorted(listdir(refs)):
+        if not name.endswith(".md"):
+            continue
+        text = read_text(os.path.join(refs, name))
+        lines = text.count("\n")
+        if lines <= LONG_REF_LINES:
+            continue
+        head = "\n".join(text.split("\n")[:40])
+        if "## 目录" in head or "## Contents" in head:
+            continue
+        out.append(f"{name}（{lines} 行）")
+    return out
+
+
 def scan_skill(root: str, name: str, validator) -> dict[str, Any]:
     skill_dir = os.path.join(root, "skills", name)
     skill_md = os.path.join(skill_dir, "SKILL.md")
@@ -216,6 +245,7 @@ def scan_skill(root: str, name: str, validator) -> dict[str, Any]:
         "has_evals": os.path.isfile(os.path.join(skill_dir, "evals", "evals.json")),
         "has_skill_md": os.path.isfile(skill_md),
         "references": len(listdir(refs_dir)) if os.path.isdir(refs_dir) else 0,
+        "long_refs": long_refs_without_toc(skill_dir),
         "script_lines": sum(count_lines(p) for p in walk_files(os.path.join(skill_dir, "scripts"))),
         # 测试住在仓库顶层 `tests/<skill>/`（**刻意不在 skill 目录里**：AI 调用 skill 时
         # 读的是 `skills/<skill>/` 那棵树）。这里也跟着看顶层，否则每行都显示 0。
@@ -256,6 +286,8 @@ def summarize(report: dict[str, Any]) -> dict[str, list[str]]:
         "缺 SKILL.md": [s["name"] for s in skills if not s["has_skill_md"]],
         "README 目录树过期": [f"{s['name']}（{'；'.join(s['tree_issues'])}）"
                               for s in skills if s["tree_issues"]],
+        "长参考缺目录": [f"{s['name']}：{'；'.join(s['long_refs'])}"
+                        for s in skills if s["long_refs"]],
         "死文件": dead,
     }
 

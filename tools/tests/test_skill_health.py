@@ -281,5 +281,42 @@ class ReportTest(RepoCase):
         self.assertIn("· 没有", text)
 
 
+
+class LongReferenceTest(RepoCase):
+    """超过 200 行的参考文件该有目录：官方建议 100 行，本仓库取 200 作提示线。
+
+    这条只提示、不判失败 —— 目录是给人（和 agent）找位置的，不是格式洁癖。
+    """
+
+    def write_ref(self, name: str, lines: int, toc: bool) -> None:
+        refs = os.path.join(self.root, "skills", "aaa", "references")
+        os.makedirs(refs, exist_ok=True)
+        head = ["# 参考", ""]
+        if toc:
+            head += ["## 目录", "", "- [一节](#一节)", ""]
+        head.append("## 一节")
+        body = ["正文"] * max(0, lines - len(head))
+        with open(os.path.join(refs, name), "w", encoding="utf-8") as fh:
+            fh.write("\n".join(head + body) + "\n")
+
+    def test_长文件没有目录会被提示(self):
+        self.make_skill("aaa")
+        self.write_ref("big.md", 220, toc=False)
+        groups = health.summarize(health.scan_repo(self.root))
+        self.assertTrue(any("big.md" in item for item in groups["长参考缺目录"]), groups)
+
+    def test_有目录就不再提示(self):
+        self.make_skill("aaa")
+        self.write_ref("big.md", 220, toc=True)
+        groups = health.summarize(health.scan_repo(self.root))
+        self.assertEqual([], groups["长参考缺目录"])
+
+    def test_短文件不要求目录(self):
+        self.make_skill("aaa")
+        self.write_ref("small.md", 150, toc=False)
+        groups = health.summarize(health.scan_repo(self.root))
+        self.assertEqual([], groups["长参考缺目录"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
