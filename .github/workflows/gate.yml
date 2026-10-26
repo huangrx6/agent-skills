@@ -28,17 +28,17 @@ jobs:
         with:
           python-version: "3.11"
       - name: 结构校验
-        run: python tools/skill-builder/scripts/validate_skill.py
+        run: python3 tools/skill-builder/scripts/validate_skill.py
       - name: 泄露扫描（未配置词表时脚本自行跳过）
-        run: python tools/skill-builder/scripts/check_leakage.py skills tools
+        run: python3 tools/skill-builder/scripts/check_leakage.py skills tools
       - name: 指针目标存在性
         run: |
           python tools/skill-builder/scripts/check_pointers.py \
             --root . skills tools
       - name: skills-lock 与仓库一致
-        run: python tools/skills_lock.py --check
+        run: python3 tools/skills_lock.py --check
       - name: 仓库体检（只提示，不阻塞）
-        run: python tools/skill_health.py
+        run: python3 tools/skill_health.py
 
   tests:
     name: 回归 py${{ matrix.python }} ${{ matrix.dir }}
@@ -73,7 +73,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: 运行 ${{ matrix.dir }}
-        run: python -m unittest discover -s "${{ matrix.dir }}" -v
+        run: python3 -m unittest discover -s "${{ matrix.dir }}" -v
 
   doc-tests:
     name: 文档示例（deck）
@@ -91,4 +91,4 @@ jobs:
       - name: deck 文档契约
         run: |
           cd tests/deck-authoring
-          python -m unittest discover -p "test_doc*.py" -v
+          python3 -m unittest discover -p "test_doc*.py" -v
