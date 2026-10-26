@@ -56,6 +56,11 @@
   `python3 tools/trigger_eval.py --template results.json` 生成模板，
   跑完用 `--score results.json` 算触发率；正例 ≥ 0.5 通过，反例 < 0.5 通过。
 - 评测不过先改 description 的触发词与排除项，不要改用例凑数；0.5 的边界值两边都算没过。
+- 跑的方式：一条请求一个**干净的 pi 会话**（`pi -p "<请求>" --tools read --session-dir <临时目录>`），
+  会话里的 `loaded-skill` / `inline-skill` 记录就是「触发了」。用 `--tools read` 是为了不产生
+  副作用：这一步只测「会不会选它」，不测能不能把活干完。
+- 数据源没指定的请求（只说「整理这周的周报」）会稳定落到 PingCode 那个 skill。这类要么在查询里
+  点明数据源，要么按实测把归属写进 `note`；**不要为了让被测 skill「该触发」而堆同义词**。
 
 ## 写最小可执行流程
 

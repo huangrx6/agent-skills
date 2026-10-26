@@ -56,7 +56,7 @@
       "id": 11,
       "query": "帮我整理一下这周的周报，把完成的需求列出来",
       "should_trigger": false,
-      "note": "→ obsidian-work：周报汇总要工作项状态，不是笔记维护"
+      "note": "→ 未指定数据源：实测 2/2 落到 pingcode-weekly（本地工作台才归 obsidian-work）。反例成立，但归属说明按实测写"
     },
     {
       "id": 12,
