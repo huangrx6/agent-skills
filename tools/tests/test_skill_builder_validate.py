@@ -444,3 +444,70 @@ class SpecConformanceTest(unittest.TestCase):
         path = self.make(f"name: spec-skill\ndescription: {GOOD_DESC}\nversion: \"1.0\"")
         self.assertEqual([], self.labels(path))
         self.assertTrue(any("规范外字段" in note for note in self.notes(path)))
+
+
+# ── 触发评测集的形状 ───────────────────────────────────────────────────────
+# 触发准确度没法用单元测试代替（要真跑模型），能机械查的只有标尺本身：
+# 标注是不是布尔值、正反例是否够数、反例有没有写清真正的归属。
+def _with_triggers(root: str, name: str, payload: dict) -> str:
+    path = _skill(root, name)
+    evals_dir = os.path.join(path, "evals")
+    os.makedirs(evals_dir, exist_ok=True)
+    with open(os.path.join(evals_dir, "triggers.json"), "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False)
+    return path
+
+
+def _trigger_set(positive: int = 8, negative: int = 8, *, note: bool = True) -> dict:
+    cases = [{"id": i, "query": f"正例 {i}", "should_trigger": True}
+             for i in range(1, positive + 1)]
+    for i in range(1, negative + 1):
+        case = {"id": positive + i, "query": f"近邻反例 {i}", "should_trigger": False}
+        if note:
+            case["note"] = "→ 别的 skill"
+        cases.append(case)
+    return {"skill_name": "with-triggers", "triggers": cases}
+
+
+class TriggerShapeTest(unittest.TestCase):
+    def setUp(self):
+        self.mod = _load_validate()
+        self.tmp = tempfile.mkdtemp(prefix="validate-triggers-")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def fails(self, payload: dict) -> bool:
+        return bool(self.mod.check_skill(_with_triggers(self.tmp, "with-triggers", payload))["errors"])
+
+    def test_合规的触发集通过(self):
+        self.assertFalse(self.fails(_trigger_set()))
+
+    def test_反例缺_note_时失败(self):
+        self.assertTrue(self.fails(_trigger_set(note=False)))
+
+    def test_正例不够数时失败(self):
+        self.assertTrue(self.fails(_trigger_set(positive=3)))
+
+    def test_反例不够数时失败(self):
+        self.assertTrue(self.fails(_trigger_set(negative=3)))
+
+    def test_should_trigger_不是布尔时失败(self):
+        payload = _trigger_set()
+        payload["triggers"][0]["should_trigger"] = "true"
+        self.assertTrue(self.fails(payload))
+
+    def test_id_重复时失败(self):
+        payload = _trigger_set()
+        payload["triggers"][1]["id"] = payload["triggers"][0]["id"]
+        self.assertTrue(self.fails(payload))
+
+    def test_query_重复时失败(self):
+        payload = _trigger_set()
+        payload["triggers"][1]["query"] = payload["triggers"][0]["query"]
+        self.assertTrue(self.fails(payload))
+
+    def test_skill_name_与目录不一致时失败(self):
+        payload = _trigger_set()
+        payload["skill_name"] = "someone-else"
+        self.assertTrue(self.fails(payload))

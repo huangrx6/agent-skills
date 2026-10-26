@@ -148,6 +148,9 @@ def load_yaml(text: str):
 
 # ── evals 的形状校验 ──────────────────────────────────────────────────────
 EVAL_REQUIRED = ("id", "prompt", "expected_output")
+# 触发评测集：正例、反例各至少这么多条。官方建议 8–10 + 8–10；
+# 少于此数算不出触发率，多也无意义（同一条话术堆再多也不提高分辨力）。
+TRIGGER_MIN_PER_SIDE = 8
 
 
 # AI 调用 skill 时读的材料：`SKILL.md` 与 `references/*.md`。
@@ -214,6 +217,10 @@ def check_evals(skill_dir: str, name: str, add) -> None:
             add(f"{label} 顶层是对象", False, type(payload).__name__)
             continue
 
+        if "triggers" in payload:
+            check_triggers(payload, name, label, add)
+            continue
+
         add(f"{label} skill_name 与目录一致", payload.get("skill_name") == name,
             f"skill_name={payload.get('skill_name')!r} 目录={name!r}")
 
@@ -254,6 +261,62 @@ def check_evals(skill_dir: str, name: str, add) -> None:
         add(f"{label} 每条都有 id/prompt/expected_output", not broken, "；".join(broken[:4]))
         add(f"{label} id 不重复", len(ids) == len(set(ids)), f"ids={ids}")
         add(f"{label} 引用的文件存在", not missing, "；".join(missing[:4]))
+
+
+def check_triggers(payload: dict, name: str, label: str, add) -> None:
+    """校验触发评测集：正例/反例各够数，反例必须写清该归谁。
+
+    为什么要有这条：触发准确度只能靠「同一条请求反复跑、看 skill 有没有被唤醒」
+    来测量，而这件事无法由单元测试代替 —— 能自动查的只有标尺本身：
+    标注是不是布尔值、正反例是不是够数、反例有没有写清真正的归属。
+    没有归属说明的反例，下次评审时会变成「这条到底该不该触发」的扯皮。
+    """
+    add(f"{label} skill_name 与目录一致", payload.get("skill_name") == name,
+        f"skill_name={payload.get('skill_name')!r} 目录={name!r}")
+    cases = payload.get("triggers")
+    if not isinstance(cases, list) or not cases:
+        add(f"{label} triggers 是非空列表", False, repr(cases)[:60])
+        return
+    add(f"{label} triggers 是非空列表", True)
+
+    ids: list = []
+    queries: list[str] = []
+    positive = negative = 0
+    broken: list[str] = []
+    for position, case in enumerate(cases, start=1):
+        where = f"第 {position} 条"
+        if not isinstance(case, dict):
+            broken.append(f"{where}不是对象")
+            continue
+        case_id = case.get("id")
+        if isinstance(case_id, (str, int)) and not isinstance(case_id, bool):
+            ids.append(case_id)
+        else:
+            broken.append(f"{where}的 id 必须是字符串或整数")
+        query = case.get("query")
+        if isinstance(query, str) and query.strip():
+            queries.append(query.strip())
+        else:
+            broken.append(f"{where}缺 query")
+        flag = case.get("should_trigger")
+        if not isinstance(flag, bool):
+            broken.append(f"{where}的 should_trigger 必须是布尔值")
+            continue
+        if flag:
+            positive += 1
+        else:
+            negative += 1
+            if not str(case.get("note", "")).strip():
+                broken.append(f"{where}是反例，必须用 note 写清它该归谁")
+
+    add(f"{label} 每条都有 id/query/should_trigger", not broken, "；".join(broken[:4]))
+    add(f"{label} id 不重复", len(ids) == len(set(ids)), f"ids={ids}")
+    add(f"{label} query 不重复", len(queries) == len(set(queries)),
+        f"重复 {len(queries) - len(set(queries))} 条")
+    add(f"{label} 正例 ≥ {TRIGGER_MIN_PER_SIDE}", positive >= TRIGGER_MIN_PER_SIDE,
+        f"{positive} 条")
+    add(f"{label} 反例 ≥ {TRIGGER_MIN_PER_SIDE}", negative >= TRIGGER_MIN_PER_SIDE,
+        f"{negative} 条")
 
 
 def check_skill(path: str) -> dict:
