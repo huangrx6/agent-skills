@@ -1,0 +1,116 @@
+{
+  "skill_name": "obsidian-wiki",
+  "note": "触发评测集。正例只有这个 skill 该接；反例是近邻误触发，note 写清它该归谁。评测方法见 tools/skill-builder/GUIDE.md。",
+  "triggers": [
+    {
+      "id": 1,
+      "query": "把这篇 RAG 的博客整理进我的知识库，看看要更新哪几篇笔记",
+      "should_trigger": true
+    },
+    {
+      "id": 2,
+      "query": "我之前是不是记过向量数据库的东西？找出来我看看",
+      "should_trigger": true
+    },
+    {
+      "id": 3,
+      "query": "这两篇笔记的结论好像冲突，帮我核对一下哪个还对",
+      "should_trigger": true
+    },
+    {
+      "id": 4,
+      "query": "考考我，用我库里的状态机笔记出三道题",
+      "should_trigger": true
+    },
+    {
+      "id": 5,
+      "query": "把这门课的笔记重组成能直接发公众号的长文",
+      "should_trigger": true
+    },
+    {
+      "id": 6,
+      "query": "帮我把散落的 MOC 链接整理一下，有些标题已经改了",
+      "should_trigger": true
+    },
+    {
+      "id": 7,
+      "query": "我上次写的那个源码机制解读，版本对不上代码了，检查一下",
+      "should_trigger": true
+    },
+    {
+      "id": 8,
+      "query": "给这篇讲缓存的笔记配一张知识图解，风格跟之前一致",
+      "should_trigger": true
+    },
+    {
+      "id": 9,
+      "query": "吸收一下这篇论文，标出哪些结论会推翻我现在的理解",
+      "should_trigger": true
+    },
+    {
+      "id": 10,
+      "query": "我库里有几篇笔记引用了已经不存在的文件，帮我查一下",
+      "should_trigger": true
+    },
+    {
+      "id": 11,
+      "query": "帮我整理一下这周的周报，把完成的需求列出来",
+      "should_trigger": false,
+      "note": "→ obsidian-work：周报汇总要工作项状态，不是笔记维护"
+    },
+    {
+      "id": 12,
+      "query": "把这个需求拆成三个任务，登记负责人是张三",
+      "should_trigger": false,
+      "note": "→ obsidian-work：需求/任务主档"
+    },
+    {
+      "id": 13,
+      "query": "PingCode 里我这个迭代还有哪些没关的缺陷",
+      "should_trigger": false,
+      "note": "→ pingcode：远端工作项查询"
+    },
+    {
+      "id": 14,
+      "query": "给这个系统画一张架构图，用 Excalidraw",
+      "should_trigger": false,
+      "note": "→ diagram-authoring：技术图"
+    },
+    {
+      "id": 15,
+      "query": "把这份材料做成 20 页的演示，下周要给客户讲",
+      "should_trigger": false,
+      "note": "→ deck-authoring：演示文稿"
+    },
+    {
+      "id": 16,
+      "query": "我想学 RAG，给我一条两周的学习路线，最后能自己搭一个",
+      "should_trigger": false,
+      "note": "→ learning-scout：从零学习路线，产出独立笔记系列"
+    },
+    {
+      "id": 17,
+      "query": "解释一下 Raft 的选举过程，说清楚 term 怎么变",
+      "should_trigger": false,
+      "note": "→ 普通问答：不涉及已有笔记，不需要读写知识库"
+    },
+    {
+      "id": 18,
+      "query": "帮我在这个仓库的 README 里补一段安装说明",
+      "should_trigger": false,
+      "note": "→ 普通编码任务"
+    },
+    {
+      "id": 19,
+      "query": "这几个提交帮我合并成一个，然后强推到远端分支",
+      "should_trigger": false,
+      "note": "→ git-dev-workflow：Git 操作"
+    },
+    {
+      "id": 20,
+      "query": "给我设计一个 Bases 视图，按状态分组显示未关闭缺陷",
+      "should_trigger": false,
+      "note": "→ obsidian-work：工作台视图"
+    }
+  ]
+}
