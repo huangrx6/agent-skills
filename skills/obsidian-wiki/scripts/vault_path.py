@@ -3,6 +3,10 @@
 
 AGENT_SKILLS_CONFIG_DIR 默认 $AGENT_SKILLS_HOME/config，文件名 obsidian-vault-path。
 用法：vault_path.py [PATH] [--explain]；退出码 0 目录存在，2 解析失败或目录不存在。
+
+本文件在 obsidian-wiki 与 obsidian-work 各存一份，两份必须逐字相同：两个 skill
+要能各自独立安装，不能互相 import。改完记得同步另一份 —— tools/tests/test_shared_files.py
+会对账，单边修改会直接变红。
 """
 
 from __future__ import annotations
