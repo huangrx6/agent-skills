@@ -150,6 +150,7 @@ article.note .hl[data-lang]::before{content:attr(data-lang);display:block;margin
 .quiz-option:hover{border-color:var(--accent)}
 .quiz-option.right{border-color:#4f8a5b;background:color-mix(in srgb,#4f8a5b 12%,transparent)}
 .quiz-option.wrong{border-color:#b4441f;background:color-mix(in srgb,#b4441f 10%,transparent)}
+.quiz-why{margin:6px 0 0;font-size:13px;color:#b4441f}
 .quiz-explain{display:none;margin:6px 0 0;font-size:13px;color:var(--muted)}
 .quiz-explain.show{display:block}
 
@@ -311,6 +312,7 @@ APP_JS = """
     var answer = Number(item.dataset.answer);
     var options = Array.from(item.querySelectorAll('.quiz-option'));
     var explain = item.querySelector('.quiz-explain');
+    var whyBox = item.querySelector('.quiz-why');
     function paint(chosen){
       options.forEach(function(other){ other.classList.remove('right','wrong'); });
       if (chosen === undefined || chosen === null) return;
@@ -319,6 +321,14 @@ APP_JS = """
       });
       if (chosen !== answer) options[answer].classList.add('right');
       if (explain) explain.classList.add('show');
+      if (whyBox) {
+        // 错选时就地说明这个选项错在哪；选项没写理由就保持隐藏。
+        var reasons = [];
+        try { reasons = JSON.parse(item.dataset.why || '[]'); } catch (err) { reasons = []; }
+        var reason = chosen !== answer ? (reasons[chosen] || '') : '';
+        whyBox.hidden = !reason;
+        whyBox.textContent = reason ? ('这个选项为什么不对：' + reason) : '';
+      }
     }
     var saved = quizStore[item.dataset.qid];
     if (saved !== undefined) paint(saved);

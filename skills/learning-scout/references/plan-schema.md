@@ -47,7 +47,15 @@ v2 把交付物从“一个 HTML 页面”改成“**一组可独立阅读的 Ma
       "minutes": 25,
       "file": "notes/01-what.md",
       "videos": [],
-      "quiz": []
+      "quiz": [
+        {
+          "q": "入队成功代表消息安全了吗？",
+          "options": ["是", "还要看是否落盘"],
+          "answer": 1,
+          "why": ["入队只在内存里，进程重启就没了", ""],
+          "explain": "入队只是进了内存队列。"
+        }
+      ]
     }
   ],
   "practice": {
@@ -90,7 +98,8 @@ v2 把交付物从“一个 HTML 页面”改成“**一组可独立阅读的 Ma
 | `kind` | 否 | `concept` / `mechanism` / `practice` / `source-review`。 |
 | `minutes` | 否 | 预计阅读分钟数。 |
 | `videos` | 否 | 0–2 个，字段见 [视频](video-sources.md)。 |
-| `quiz` | 否 | `[{q, options, answer, explain}]`，`answer` 是下标。 |
+| `quiz` | 否 | `[{q, options, answer, explain, why?}]`，`answer` 是下标；
+  `why` 可选，与 `options` 一一对应的字符串列表，写清每个选项错在哪。 |
 
 笔记正文的深度、长度参考、默认结构见 [笔记深度规范](depth-standard.md)；每篇必须独立成篇，
 不引用同系列其他篇；不需要为独立性补齐所有前置知识。

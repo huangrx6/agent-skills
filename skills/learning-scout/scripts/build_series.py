@@ -151,6 +151,12 @@ def validate_plan(plan: object, base_dir: Path) -> tuple[list[str], list[str]]:
             answer = item.get("answer")
             if not isinstance(answer, int) or not 0 <= answer < max(len(options), 1):
                 errors.append(f"{qwhere}.answer 必须是合法选项下标")
+            if "why" in item:
+                why = item.get("why")
+                if not isinstance(why, list) or not all(isinstance(part, str) for part in why):
+                    errors.append(f"{qwhere}.why 必须是字符串列表")
+                elif len(why) != len(options):
+                    errors.append(f"{qwhere}.why 要与 options 一一对应（{len(why)} 条理由 / {len(options)} 个选项）")
 
     for card_index, card in enumerate(_as_list(plan.get("review")), start=1):
         if not isinstance(card, dict):
@@ -499,9 +505,12 @@ def render_note_page(
                 f'<button type="button" class="quiz-option">{_text(option)}</button>'
                 for option in _as_list(item.get("options"))
             )
-            items.append(f"""<div class="quiz-item" data-qid="q{item_index}" data-answer="{int(item.get('answer', 0))}">
+            why = item.get("why") if isinstance(item.get("why"), list) else []
+            why_attr = _attr(json.dumps(why, ensure_ascii=False)) if why else ""
+            items.append(f"""<div class="quiz-item" data-qid="q{item_index}" data-answer="{int(item.get('answer', 0))}" data-why="{why_attr}">
   <p class="quiz-q">{item_index}. {_text(item.get('q'))}</p>
   {options}
+  <p class="quiz-why" hidden></p>
   <p class="quiz-explain">{_text(item.get('explain'))}</p>
 </div>""")
         quiz_html = f'<section class="quiz"><h2>自测</h2><p class="quiz-status" data-quiz-status></p>{"".join(items)}</section>'

@@ -323,3 +323,76 @@ class BodySignalTests(unittest.TestCase):
                 "## 2. 参考资料\n\n- [文档](https://example.com)\n")
         _errors, warnings = self.style(body, kind="mechanism")
         self.assertTrue(any("失败情况" in w for w in warnings), warnings)
+
+
+class QuizWhyTests(unittest.TestCase):
+    """自测的「选项级」理由：错选时告诉读者这个选项错在哪。
+
+    只有整题的 explain 时，读者知道自己错了但不知道错在想岔在哪一步；
+    逐选项理由来自评估设计里的干扰项分析，是主动回忆之外最便宜的一步。
+    """
+
+    def build(self, base: Path, quiz: list[dict]) -> str:
+        (base / "notes").mkdir(parents=True, exist_ok=True)
+        (base / "notes" / "01-a.md").write_text(
+            "# 一\n\n## 1. 甲\n\n正文。\n\n## 2. 参考资料\n\n- [文档](https://example.com)\n",
+            encoding="utf-8")
+        plan = {
+            "version": 2,
+            "topic": "测验",
+            "promise": "验证自测理由。",
+            "notes": [
+                {"id": "01", "title": "一", "goal": "目标", "kind": "concept",
+                 "file": "notes/01-a.md", "quiz": quiz},
+                {"id": "02", "title": "二", "goal": "目标二", "kind": "concept",
+                 "file": "notes/02-b.md"},
+            ],
+            "sources": {"verified_at": "2026-10-23"},
+        }
+        (base / "notes" / "02-b.md").write_text(
+            "# 二\n\n## 1. 乙\n\n正文。\n\n## 2. 参考资料\n\n- [文档](https://example.com)\n",
+            encoding="utf-8")
+        plan_path = base / "plan.json"
+        plan_path.write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
+        out = base / "dist"
+        build_series.build(plan_path, str(out), check=False)
+        # 产物名是 <id>-<标题 slug>.html，不沿用源 md 的文件名
+        pages = sorted((out / "notes").glob("01-*.html"))
+        return pages[0].read_text(encoding="utf-8")
+
+    def test_why_is_rendered_for_each_option(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            html = self.build(Path(tmp), [{
+                "q": "入队成功代表消息安全了吗？",
+                "options": ["是", "还要看是否落盘"],
+                "answer": 1,
+                "why": ["入队只在内存里，重启就没了", ""],
+                "explain": "入队只是进了内存队列。",
+            }])
+        self.assertIn("data-why=", html)
+        self.assertIn("quiz-why", html)
+        self.assertIn("入队只在内存里，重启就没了", html)
+
+    def test_why_length_must_match_options(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+                self.assertRaises(build_series.PlanError):
+            self.build(Path(tmp), [{
+                    "q": "?", "options": ["A", "B"], "answer": 0,
+                    "why": ["只有一条理由"], "explain": "x",
+                }])
+
+    def test_why_must_be_string_list(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+                self.assertRaises(build_series.PlanError):
+            self.build(Path(tmp), [{
+                    "q": "?", "options": ["A", "B"], "answer": 0,
+                    "why": [1, 2], "explain": "x",
+                }])
+
+    def test_quiz_without_why_still_builds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            html = self.build(Path(tmp), [{
+                "q": "?", "options": ["A", "B"], "answer": 0, "explain": "x",
+            }])
+        self.assertIn("quiz-option", html)
+        self.assertNotIn("入队只在内存里", html)
