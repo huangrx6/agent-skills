@@ -195,6 +195,12 @@ def readme_tree_issues(skill_dir: str) -> list[str]:
     return issues
 
 
+def _has_toc(text: str) -> bool:
+    """前 40 行里有目录就算加了：目录得在开头才有导航作用。"""
+    head = "\n".join(text.split("\n")[:40])
+    return "## 目录" in head or "## Contents" in head
+
+
 def long_refs_without_toc(skill_dir: str) -> list[str]:
     """references 里超过提示线却没有目录的文件。
 
@@ -216,8 +222,7 @@ def long_refs_without_toc(skill_dir: str) -> list[str]:
         lines = text.count("\n")
         if lines <= threshold:
             continue
-        head = "\n".join(text.split("\n")[:40])
-        if "## 目录" in head or "## Contents" in head:
+        if _has_toc(text):
             continue
         out.append(f"{name}（{lines} 行）")
     return out
