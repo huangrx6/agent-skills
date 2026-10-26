@@ -21,10 +21,10 @@ from pathlib import Path
 
 # 参考区间（低, 高）；低于低值的 60% 才提示“偏薄”，不直接判错。
 RANGES = {
-    "concept": (220, 400),
-    "mechanism": (320, 520),
-    "practice": (320, 520),
-    "source-review": (450, 650),
+    "concept": (180, 360),
+    "mechanism": (260, 460),
+    "practice": (220, 420),
+    "source-review": (400, 650),
 }
 
 # 跨篇引用：正文不得依赖同系列或库内其他文章。
@@ -39,6 +39,8 @@ REFS_RE = re.compile(r"^##\s*(?:\d+\.\s*)?参考资料\s*$", re.M)
 NUMBERED_H2_RE = re.compile(r"^##\s+(\d+)\.\s+", re.M)
 # 开场禁语：读者要结论，不要目录。
 TITLE_BAN_RE = re.compile(r"^\s*(本文|本篇|这篇文章)\s*(将|会|主要|介绍|讨论|梳理)")
+BOUNDARY_RE = re.compile(r"(边界|反例|不适用|什么时候不该|不成立的情况|例外情况)")
+FAILURE_RE = re.compile(r"(症状|故障|失败模式|失败链路|出错|排查|修法|回滚)")
 FM_RE = re.compile(r"^---\n(.*?)\n---\n", re.S)
 FENCE_RE = re.compile(r"^```", re.M)
 
@@ -66,7 +68,10 @@ def note_stats(text: str) -> dict:
 def check_note(path: Path, kind: str, strict: bool) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
-    text = path.read_text(encoding="utf-8")
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return [f"{path.name}: 读不了文件（{exc}）"], []
     stats = note_stats(text)
     lines = stats["lines"]
 
@@ -79,7 +84,7 @@ def check_note(path: Path, kind: str, strict: bool) -> tuple[list[str], list[str
         elif lines > high:
             warnings.append(f"{path.name}: {lines} 行，超过 {kind} 的参考上限 {high}，检查是否重复或该拆篇")
 
-    numbered = [int(n) for n in NUMBERED_H2_RE.findall(text)]
+    numbered = NUMBERED_H2_RE.findall(text)
     has_refs = bool(REFS_RE.search(text))
     front = FM_RE.match(text)
     has_reviewed_at = bool(front and re.search(r"^reviewed_at:", front.group(1), re.M))
@@ -94,7 +99,7 @@ def check_note(path: Path, kind: str, strict: bool) -> tuple[list[str], list[str
         warnings.append(f"{path.name}: 缺少「## N. 参考资料」一节，读者无法核验来源")
     if not numbered:
         warnings.append(f"{path.name}: 二级标题没有按 1..N 编号")
-    elif numbered != list(range(1, len(numbered) + 1)):
+    elif numbered != [str(i) for i in range(1, len(numbered) + 1)]:
         warnings.append(f"{path.name}: 二级标题编号不连续（{numbered}）")
 
     for line in text.splitlines():
@@ -105,11 +110,12 @@ def check_note(path: Path, kind: str, strict: bool) -> tuple[list[str], list[str
             warnings.append(f"{path.name}: 开头别写“本文介绍……”，直接给场景或判断")
         break
 
-    if kind in {"mechanism", "practice"} and not any("故障" in h or "失败" in h for h in stats["headings"]):
-        warnings.append(f"{path.name}: 机制/实践篇建议有“故障矩阵”或“失败模式”一节")
-
-    if not any("边界" in h or "反例" in h for h in stats["headings"]):
-        warnings.append(f"{path.name}: 缺少“边界”或“反例”一节")
+    # 这两件事看内容有没有讲到，而不是有没有专门开一节：
+    # 真实文章常把边界放在段落里，硬要标题会把作者逼出没人读的空节。
+    if kind in {"mechanism", "practice"} and not FAILURE_RE.search(text):
+        warnings.append(f"{path.name}: 机制/实践篇没提失败情况（症状、先查什么、怎么修）")
+    if not BOUNDARY_RE.search(text):
+        warnings.append(f"{path.name}: 没写边界或反例（什么情况下不适用）")
 
     if kind == "source-review":
         if stats["code_blocks"] < 8:

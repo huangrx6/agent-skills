@@ -6,6 +6,7 @@ Run from the repository root:
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 import sys
@@ -15,11 +16,25 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SKILL = HERE.parents[1] / "skills" / "learning-scout"
-sys.path.insert(0, str(SKILL / "scripts"))
+SCRIPTS = SKILL / "scripts"
+# build_series 内部 `import render_md`，所以这两条路径仍要留在 sys.path 上。
+sys.path.insert(0, str(SCRIPTS))
 
-import build_series  # noqa: E402  # type: ignore[import-not-found]
-import check_notes  # noqa: E402  # type: ignore[import-not-found]
-import render_md  # noqa: E402  # type: ignore[import-not-found]
+
+def _load(name: str, path: Path):
+    """按路径加载脚本；scripts/ 不是包，静态 import 解析不到。"""
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"加载不了 {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+render_md = _load("render_md_under_test", SCRIPTS / "render_md.py")
+build_series = _load("build_series_under_test", SCRIPTS / "build_series.py")
+check_notes = _load("check_notes_under_test", SCRIPTS / "check_notes.py")
 
 
 def write_series(base: Path, *, with_image: bool = False) -> Path:
@@ -270,3 +285,41 @@ class HouseStyleCheckTests(unittest.TestCase):
     def test_no_anchor_at_all_is_error(self):
         errors, _warnings = self.style("# 标题\n\n场景。\n\n## 1. 问题\n\n正文。\n")
         self.assertTrue(any("核验落点" in e for e in errors), errors)
+
+
+class BodySignalTests(unittest.TestCase):
+    """边界与失败模式看正文有没有讲到，不要求专门开一节。
+
+    真实文章常把边界放在段落里（「这个方案在 X 下不适用」），
+    按标题查会把人逼出没人读的空节。
+    """
+
+    def style(self, body: str, kind: str = "concept") -> tuple[list[str], list[str]]:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "01-body.md"
+            path.write_text(body, encoding="utf-8")
+            return check_notes.check_note(path, kind, strict=False)
+
+    def test_boundary_in_paragraph_is_enough(self):
+        body = ("# 标题\n\n场景。\n\n## 1. 机制\n\n这个方案在弱网下不适用，此时应先降级。\n\n"
+                "## 2. 参考资料\n\n- [文档](https://example.com)\n")
+        _errors, warnings = self.style(body)
+        self.assertFalse([w for w in warnings if "没写边界" in w], warnings)
+
+    def test_missing_boundary_everywhere_is_warning(self):
+        body = ("# 标题\n\n场景。\n\n## 1. 机制\n\n照着做即可。\n\n"
+                "## 2. 参考资料\n\n- [文档](https://example.com)\n")
+        _errors, warnings = self.style(body)
+        self.assertTrue(any("没写边界" in w for w in warnings), warnings)
+
+    def test_failure_mode_in_paragraph_counts_for_mechanism(self):
+        body = ("# 标题\n\n场景。\n\n## 1. 机制\n\n超时后先看症状：连接池耗尽，修法是加退避。\n"
+                "这里不适合流式场景。\n\n## 2. 参考资料\n\n- [文档](https://example.com)\n")
+        _errors, warnings = self.style(body, kind="mechanism")
+        self.assertFalse([w for w in warnings if "失败情况" in w], warnings)
+
+    def test_mechanism_without_failure_mode_is_warning(self):
+        body = ("# 标题\n\n场景。\n\n## 1. 机制\n\n请求按顺序转发，边界是单机部署。\n\n"
+                "## 2. 参考资料\n\n- [文档](https://example.com)\n")
+        _errors, warnings = self.style(body, kind="mechanism")
+        self.assertTrue(any("失败情况" in w for w in warnings), warnings)
