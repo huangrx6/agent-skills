@@ -1,0 +1,94 @@
+---
+name: gate
+
+# 本地 pre-commit 只保护「改的人」；这里保护仓库本身：PR、直接推送、换机器。
+# 重型套件（deck 的浏览器/PDF、diagram 的渲染）需要 Chrome 与 LibreOffice，
+# 故意不在 CI 跑；它们仍由发布前的人工闸门 AGENT_SKILLS_GATE=1 覆盖。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  structure:
+    name: 结构 / 泄露 / 指针 / 锁文件
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      # actions/setup-python v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.11"
+      - name: 结构校验
+        run: python tools/skill-builder/scripts/validate_skill.py
+      - name: 泄露扫描（未配置词表时脚本自行跳过）
+        run: python tools/skill-builder/scripts/check_leakage.py skills tools
+      - name: 指针目标存在性
+        run: |
+          python tools/skill-builder/scripts/check_pointers.py \
+            --root . skills tools
+      - name: skills-lock 与仓库一致
+        run: python tools/skills_lock.py --check
+      - name: 仓库体检（只提示，不阻塞）
+        run: python tools/skill_health.py
+
+  tests:
+    name: 回归 py${{ matrix.python }} ${{ matrix.dir }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 只跑声称支持 3.10 的套件：README 里的版本声明要能被验证，
+        # 否则「Python 3.10+」就是一句没人检查的话。
+        python: ["3.10", "3.11"]
+        dir:
+          - tests/cosmic-split
+          - tests/git-dev-workflow
+          - tests/obsidian-wiki
+          - tests/obsidian-work
+          - tests/pingcode
+          - tests/pingcode-weekly
+          - tests/learning-scout
+          - tools/tests
+        exclude:
+          - python: "3.10"
+            dir: tests/pingcode-weekly
+          - python: "3.10"
+            dir: tests/learning-scout
+    steps:
+      # actions/checkout v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      # actions/setup-python v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python }}
+      - name: 运行 ${{ matrix.dir }}
+        run: python -m unittest discover -s "${{ matrix.dir }}" -v
+
+  doc-tests:
+    name: 文档示例（deck）
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      # actions/setup-python v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.11"
+      # 只跑文档契约：不启动浏览器、不导出 PDF。
+      - name: deck 文档契约
+        run: |
+          cd tests/deck-authoring
+          python -m unittest discover -p "test_doc*.py" -v
