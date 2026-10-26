@@ -19,6 +19,18 @@ MAX_DESC = 800
 MAX_BODY_LINES = 240
 HEADROOM_MIN = 10
 
+# 官方 Agent Skills 规范对 name / description / compatibility 的硬约束
+# （https://agentskills.io/specification）。本地校验此前只查了「name == 目录名」，
+# 字符集与保留词都不管：写成 `Deck_Authoring` 能过本地检查，但上传或别的客户端会直接拒。
+# 规范里 description 上限是 1024，本仓库自己收到 800（更严，保留）。
+MAX_NAME = 64
+NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+RESERVED_NAME_WORDS = ("claude", "anthropic")
+MAX_COMPATIBILITY = 500
+# 规范定义的 frontmatter 键。多写的键别的客户端会忽略，所以只提示、不判失败。
+SPEC_KEYS = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
+XML_TAG_RE = re.compile(r"<[A-Za-z/][^>]*>")
+
 # 「绑定本机」声明 与 「从配置读」表述 同时出现 = 自相矛盾，直接判失败。
 #
 # 2026-09-12 实测（工作台）：同一段里上面写着
@@ -292,9 +304,27 @@ def check_skill(path: str) -> dict:
     body = content[m.end():]
 
     add("name == 目录名", fm_name == name, f"name={fm_name!r} dir={name!r}")
+    name_text = fm_name if isinstance(fm_name, str) else ""
+    add(f"name ≤ {MAX_NAME} 字符", 0 < len(name_text) <= MAX_NAME, f"name={fm_name!r}")
+    add("name 只含小写字母/数字/连字符", bool(NAME_RE.match(name_text)), f"name={fm_name!r}")
+    add("name 不含保留词", not any(w in name_text for w in RESERVED_NAME_WORDS),
+        f"name={fm_name!r}")
+    add("description 非空", bool(desc.strip()))
+    add("description 不含 XML 标签", not XML_TAG_RE.search(desc))
     add(f"description {len(desc)} 字符 < {MAX_DESC}", len(desc) < MAX_DESC)
     add("description 含触发表达", any(h in desc for h in TRIGGER_HINTS))
     add("description 含排除边界", bool(EXCLUSION_HINT_RE.search(desc)))
+    compat = data.get("compatibility")
+    if compat is not None:
+        add("compatibility 是字符串", isinstance(compat, str), type(compat).__name__)
+        if isinstance(compat, str):
+            add(f"compatibility 1-{MAX_COMPATIBILITY} 字符",
+                0 < len(compat.strip()) <= MAX_COMPATIBILITY, f"{len(compat)} 字符")
+    unknown_keys = sorted(set(data) - SPEC_KEYS)
+    if unknown_keys:
+        result.setdefault("notes", []).append(
+            f"frontmatter 含规范外字段 {', '.join(unknown_keys)}：客户端会忽略，确认是故意的"
+        )
     lines = body.count("\n")
     add(f"正文 {lines} 行 ≤ {MAX_BODY_LINES}", lines <= MAX_BODY_LINES)
     headroom = MAX_BODY_LINES - lines

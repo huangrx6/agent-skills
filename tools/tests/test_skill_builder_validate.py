@@ -361,3 +361,86 @@ class EvalShapeTest(unittest.TestCase):
     def test_empty_evals_list_is_flagged(self):
         self.assertTrue(self.fails(self.make(payload={"skill_name": "with-evals", "evals": []})))
 
+
+
+# ── 官方规范的硬约束 ───────────────────────────────────────────────────────
+# 这些规则不查也「看起来没问题」：本地跑得通、README 也自洽，但上传到别的客户端
+# 才会被拒。用 fixture 把边界钉住，免得下次改名或加字段时静默越界。
+class SpecConformanceTest(unittest.TestCase):
+    def setUp(self):
+        self.mod = _load_validate()
+        self.tmp = tempfile.mkdtemp(prefix="validate-spec-fixture-")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def make(self, frontmatter: str, name: str = "spec-skill") -> str:
+        path = os.path.join(self.tmp, name)
+        os.makedirs(path, exist_ok=True)
+        body = "| a | b |\n| --- | --- |\n"
+        with open(os.path.join(path, "SKILL.md"), "w", encoding="utf-8") as fh:
+            fh.write(f"---\n{frontmatter}\n---\n{body}")
+        return path
+
+    def labels(self, path: str) -> list[str]:
+        return self.mod.check_skill(path)["errors"]
+
+    def notes(self, path: str) -> list[str]:
+        return self.mod.check_skill(path).get("notes", [])
+
+    # ── name ──
+    def test_合规的_name_通过(self):
+        path = self.make(f"name: spec-skill\ndescription: {GOOD_DESC}")
+        self.assertEqual([], self.labels(path))
+
+    def test_大写字母的_name_被拒(self):
+        path = self.make(f"name: Spec-Skill\ndescription: {GOOD_DESC}")
+        self.assertTrue(any("只含小写" in label for label in self.labels(path)))
+
+    def test_下划线的_name_被拒(self):
+        path = self.make(f"name: spec_skill\ndescription: {GOOD_DESC}", name="spec_skill")
+        self.assertTrue(any("只含小写" in label for label in self.labels(path)))
+
+    def test_连续连字符的_name_被拒(self):
+        path = self.make(f"name: spec--skill\ndescription: {GOOD_DESC}", name="spec--skill")
+        self.assertTrue(any("只含小写" in label for label in self.labels(path)))
+
+    def test_保留词做_name_被拒(self):
+        path = self.make(f"name: claude-helper\ndescription: {GOOD_DESC}", name="claude-helper")
+        self.assertTrue(any("保留词" in label for label in self.labels(path)))
+
+    def test_超过_64_字符的_name_被拒(self):
+        long_name = "s" + "-x" * 32  # 65 字符
+        path = self.make(f"name: {long_name}\ndescription: {GOOD_DESC}", name=long_name)
+        self.assertTrue(any("≤ 64" in label for label in self.labels(path)))
+
+    # ── description ──
+    def test_description_只有空白时失败(self):
+        path = self.make('name: spec-skill\ndescription: "   "')
+        self.assertTrue(any("非空" in label for label in self.labels(path)))
+
+    def test_description_含_XML_标签时失败(self):
+        path = self.make("name: spec-skill\ndescription: Use this skill when <b>整理</b>. Do NOT use for 发版.")
+        self.assertTrue(any("XML" in label for label in self.labels(path)))
+
+    # ── compatibility ──
+    def test_compatibility_合法时通过(self):
+        path = self.make(f"name: spec-skill\ndescription: {GOOD_DESC}\n"
+                         f"compatibility: Requires Python 3.10+ and git.")
+        self.assertEqual([], self.labels(path))
+
+    def test_compatibility_为空时失败(self):
+        path = self.make(f'name: spec-skill\ndescription: {GOOD_DESC}\ncompatibility: "  "')
+        self.assertTrue(any("compatibility 1-500" in label for label in self.labels(path)))
+
+    def test_compatibility_超长时失败(self):
+        path = self.make(f"name: spec-skill\ndescription: {GOOD_DESC}\n"
+                         f"compatibility: {'x' * 501}")
+        self.assertTrue(any("compatibility 1-500" in label for label in self.labels(path)))
+
+    # ── 规范外的键 ──
+    def test_规范外字段只提示不失败(self):
+        """别的客户端会忽略多写的键，本仓库只提示，避免挡住合理的扩展。"""
+        path = self.make(f"name: spec-skill\ndescription: {GOOD_DESC}\nversion: \"1.0\"")
+        self.assertEqual([], self.labels(path))
+        self.assertTrue(any("规范外字段" in note for note in self.notes(path)))
