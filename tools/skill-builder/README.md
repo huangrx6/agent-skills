@@ -33,6 +33,10 @@ python3 tools/skill-builder/scripts/check_leakage.py skills tools
 | `check_pointers.py` | 文档中可识别的本地引用是否存在 | 内容是否接住条款仍需审阅 |
 | `preflight.py` | 上述三项检查、正文与测试文件快照、安装状态 | 不运行测试；未提及的脚本仅提示人工核对 |
 
+触发评测的数据在 `skills/<name>/evals/triggers.json`，形状由 `validate_skill.py` 校验；
+算分用仓库根的 `tools/trigger_eval.py`（`--list` / `--template` / `--score`），方法见
+[GUIDE.md](GUIDE.md#触发评测)。
+
 泄露词表按 `--blocklist`、`$SKILL_NAME_BLOCKLIST`、`$AGENT_SKILLS_HOME/config/skill-name-blocklist.txt` 解析。
 词表不要入库；`--show-blocklist` 会输出词条，不要把它的结果用于公开报告。
 
@@ -49,3 +53,5 @@ python3 tools/skill-builder/scripts/check_leakage.py skills tools
 - [reporting.md](references/reporting.md)：区分实测、跳过与未验证。
 - [skill-readme-template.md](references/skill-readme-template.md)：使用文档的参考结构。
 - `evals/evals.json`：人工或独立执行器可使用的行为样例，不会由 unittest 自动执行。
+- `evals/triggers.json`：触发评测集（正例 + 近邻反例）；同样不自动执行，
+  用 `tools/trigger_eval.py` 生成模板与算分。

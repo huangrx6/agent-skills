@@ -30,6 +30,33 @@
 - `name` 只用小写字母、数字与连字符，≤64 字符，与目录同名，不含 `claude` / `anthropic`；
   这些由 `validate_skill.py` 检查，不必靠人记。
 
+## 触发评测
+
+描述写得像不像样，读一遍看不出来：同一个 description 可能过宽（把邻近任务吸进来），
+也可能过窄（用户换种说法就不触发）。唯一可靠的判据是**真跑**。
+
+需要时可给 skill 提供 `evals/triggers.json`（目前 `obsidian-wiki`、`obsidian-work`、
+`pingcode-weekly` 已有）：
+
+```json
+{
+  "skill_name": "obsidian-wiki",
+  "triggers": [
+    {"id": 1, "query": "把这篇博客整理进我的知识库", "should_trigger": true},
+    {"id": 11, "query": "帮我整理这周的周报", "should_trigger": false,
+     "note": "→ obsidian-work：周报汇总要工作项状态"}
+  ]
+}
+```
+
+- 正例、反例各 8–10 条。反例要是**近邻误触发**（共享关键词但该归别的 skill），
+  并用 `note` 写清归属；没有归属说明的反例，下次评审就是扯皮。
+- 正例要拉开的维度：措辞（正式/口语）、明示程度（点名域 vs 只描述需求）、详略、复杂度。
+- 跑法：每条在**干净上下文**里跑 3 次，记 `triggered`（skill 被加载的次数）。
+  `python3 tools/trigger_eval.py --template results.json` 生成模板，
+  跑完用 `--score results.json` 算触发率；正例 ≥ 0.5 通过，反例 < 0.5 通过。
+- 评测不过先改 description 的触发词与排除项，不要改用例凑数；0.5 的边界值两边都算没过。
+
 ## 写最小可执行流程
 
 正文保留开始工作必须知道的信息：输入、配置发现、关键步骤、真实工具入口、检查方式和交付。
