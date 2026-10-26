@@ -150,6 +150,9 @@ compatibility: Requires Python 3.11+; optional renderer dependencies improve Mar
 }
 ```
 
+自测题的题型搭配、干扰项怎么写、`why` 与 `explain` 的分工见
+[自测设计](references/quiz-design.md)。
+
 ## 五、构建
 
 首次使用装一次渲染依赖（可选；不装会回退到内置渲染器，嵌套列表会被拍平）。

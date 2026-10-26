@@ -396,3 +396,73 @@ class QuizWhyTests(unittest.TestCase):
             }])
         self.assertIn("quiz-option", html)
         self.assertNotIn("入队只在内存里", html)
+
+
+class ShortAnswerQuizTests(unittest.TestCase):
+    """短答题：不给选项，先自己写，再对照参考答案。
+
+    识别题（选择题）只证明「见过」；回忆题才检验「能不能自己重建」。
+    两类混着出，比全是选择题更接近真实的理解检查。
+    """
+
+    def plan(self, base: Path, quiz: list[dict]) -> tuple[dict, Path]:
+        plan = {
+            "version": 2,
+            "topic": "短答",
+            "promise": "验证短答题。",
+            "notes": [
+                {"id": "01", "title": "一", "goal": "目标", "kind": "concept",
+                 "file": "notes/01-a.md", "quiz": quiz},
+                {"id": "02", "title": "二", "goal": "目标二", "kind": "concept",
+                 "file": "notes/02-b.md"},
+            ],
+            "sources": {"verified_at": "2026-10-23"},
+        }
+        (base / "notes").mkdir(parents=True, exist_ok=True)
+        body = "# 一\n\n## 1. 甲\n\n正文。\n\n## 2. 参考资料\n\n- [文档](https://example.com)\n"
+        (base / "notes" / "01-a.md").write_text(body, encoding="utf-8")
+        (base / "notes" / "02-b.md").write_text(body.replace("# 一", "# 二"), encoding="utf-8")
+        plan_path = base / "plan.json"
+        plan_path.write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
+        return plan, base
+
+    def test_short_requires_model_answer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            plan, base = self.plan(Path(tmp), [{"type": "short", "q": "为什么？"}])
+            errors, _ = build_series.validate_plan(plan, base)
+        self.assertTrue(any("model_answer" in e for e in errors), errors)
+
+    def test_short_must_not_carry_options(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            plan, base = self.plan(Path(tmp), [{
+                "type": "short", "q": "为什么？", "model_answer": "因为原子替换",
+                "options": ["A", "B"], "answer": 0}])
+            errors, _ = build_series.validate_plan(plan, base)
+        self.assertTrue(any("不要给 options" in e for e in errors), errors)
+
+    def test_short_renders_input_and_reference(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            plan, _ = self.plan(base, [{
+                "type": "short", "q": "为什么先写临时文件？",
+                "model_answer": "保证替换是原子的。", "explain": "对照 POSIX rename 语义。"}])
+            plan_path = base / "plan.json"
+            out = base / "dist"
+            build_series.build(plan_path, str(out), check=False)
+            html = sorted((out / "notes").glob("01-*.html"))[0].read_text(encoding="utf-8")
+        self.assertIn("quiz-input", html)
+        self.assertIn("quiz-reveal", html)
+        self.assertIn("保证替换是原子的", html)
+
+    def test_lazy_options_and_length_cue_are_warnings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base_path = Path(tmp)
+            plan, _base = self.plan(base_path, [
+                {"q": "?", "options": ["短", "以上都不对"], "answer": 0, "explain": "x"},
+                {"q": "?", "options": ["短", "这是一个明显比其他选项长出很多的正确表述文本内容"],
+                 "answer": 1, "explain": "x"},
+            ])
+            errors, warnings = build_series.validate_plan(plan, base_path)
+        self.assertEqual([], errors, errors)
+        self.assertTrue(any("排除法" in w for w in warnings), warnings)
+        self.assertTrue(any("长度" in w for w in warnings), warnings)

@@ -151,6 +151,10 @@ article.note .hl[data-lang]::before{content:attr(data-lang);display:block;margin
 .quiz-option.right{border-color:#4f8a5b;background:color-mix(in srgb,#4f8a5b 12%,transparent)}
 .quiz-option.wrong{border-color:#b4441f;background:color-mix(in srgb,#b4441f 10%,transparent)}
 .quiz-why{margin:6px 0 0;font-size:13px;color:#b4441f}
+.quiz-input{width:100%;margin:6px 0;padding:8px 10px;font:inherit;font-size:14px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);resize:vertical}
+.quiz-reveal{margin:4px 0;padding:6px 10px;font:inherit;font-size:13px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);cursor:pointer}
+.quiz-reveal:hover{border-color:var(--accent)}
+.quiz-model{margin:8px 0 0;padding:10px 12px;border-left:3px solid var(--accent);background:var(--panel);font-size:14px}
 .quiz-explain{display:none;margin:6px 0 0;font-size:13px;color:var(--muted)}
 .quiz-explain.show{display:block}
 
@@ -337,6 +341,17 @@ APP_JS = """
         quizStore[item.dataset.qid] = index;
         saveQuiz(); paint(index); quizSummary();
       });
+    });
+  });
+  document.querySelectorAll('.quiz-short').forEach(function(item){
+    var reveal = item.querySelector('.quiz-reveal');
+    var model = item.querySelector('.quiz-model');
+    var explain = item.querySelector('.quiz-explain');
+    if (!reveal || !model) return;
+    reveal.addEventListener('click', function(){
+      model.hidden = false;
+      reveal.hidden = true;
+      if (explain) explain.classList.add('show');
     });
   });
   quizSummary();

@@ -43,6 +43,11 @@ VIDEO_HOSTS = {
 }
 
 
+# 选择题里出现「以上都/都不对」这类选项时，测的是排除法而不是理解；
+# 正确项明显更长时，读者能靠长度猜。两条都只提示，不阻塞。
+QUIZ_LAZY_OPTION_RE = re.compile(r"(以上都|都不对|全部正确|都不正确|以上均)")
+
+
 class PlanError(ValueError):
     pass
 
@@ -145,6 +150,18 @@ def validate_plan(plan: object, base_dir: Path) -> tuple[list[str], list[str]]:
             if not isinstance(item, dict):
                 errors.append(f"{qwhere} 必须是对象")
                 continue
+            qtype = item.get("type") or "choice"
+            if qtype not in ("choice", "short"):
+                errors.append(f"{qwhere}.type 只能是 choice 或 short")
+                continue
+            if qtype == "short":
+                # 回忆题：不给选项，自己写，再对照参考答案。识别题只证明眼熟。
+                model = item.get("model_answer")
+                if not isinstance(model, str) or not model.strip():
+                    errors.append(f"{qwhere}.model_answer 必填：短答题没有参考答案就没法对照")
+                if "options" in item or "answer" in item:
+                    errors.append(f"{qwhere} 是 short 题，不要给 options/answer")
+                continue
             options = _as_list(item.get("options"))
             if len(options) < 2:
                 errors.append(f"{qwhere} 至少两个选项")
@@ -157,6 +174,16 @@ def validate_plan(plan: object, base_dir: Path) -> tuple[list[str], list[str]]:
                     errors.append(f"{qwhere}.why 必须是字符串列表")
                 elif len(why) != len(options):
                     errors.append(f"{qwhere}.why 要与 options 一一对应（{len(why)} 条理由 / {len(options)} 个选项）")
+            joined = " ".join(str(option) for option in options)
+            if QUIZ_LAZY_OPTION_RE.search(joined):
+                warnings.append(f"{qwhere} 用了「以上都/都不对」这类选项：它测的是排除法，不是理解")
+            if isinstance(answer, int) and 0 <= answer < len(options):
+                correct = str(options[answer])
+                others = [str(o) for i, o in enumerate(options) if i != answer]
+                if others and len(correct) >= 20:
+                    mean = sum(len(o) for o in others) / len(others)
+                    if mean and len(correct) > 1.5 * mean:
+                        warnings.append(f"{qwhere} 正确选项明显比其他选项长，读者能靠长度猜出来")
 
     for card_index, card in enumerate(_as_list(plan.get("review")), start=1):
         if not isinstance(card, dict):
@@ -501,6 +528,15 @@ def render_note_page(
     if quiz_items:
         items = []
         for item_index, item in enumerate(quiz_items, start=1):
+            if (item.get("type") or "choice") == "short":
+                items.append(f"""<div class="quiz-item quiz-short" data-qid="q{item_index}">
+  <p class="quiz-q">{item_index}. {_text(item.get('q'))}</p>
+  <textarea class="quiz-input" rows="3" placeholder="先自己写下来，再对照参考答案"></textarea>
+  <button type="button" class="quiz-reveal">对照参考答案</button>
+  <div class="quiz-model" hidden>{_text(item.get('model_answer'))}</div>
+  <p class="quiz-explain">{_text(item.get('explain'))}</p>
+</div>""")
+                continue
             options = "".join(
                 f'<button type="button" class="quiz-option">{_text(option)}</button>'
                 for option in _as_list(item.get("options"))
