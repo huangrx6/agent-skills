@@ -148,9 +148,11 @@ def load_yaml(text: str):
 
 # ── evals 的形状校验 ──────────────────────────────────────────────────────
 EVAL_REQUIRED = ("id", "prompt", "expected_output")
-# 触发评测集：正例、反例各至少这么多条。官方建议 8–10 + 8–10；
-# 少于此数算不出触发率，多也无意义（同一条话术堆再多也不提高分辨力）。
-TRIGGER_MIN_PER_SIDE = 8
+# 触发评测集：正例、反例各至少这么多条。
+# 成本决定上限：每条要 3 次干净会话，20 条的 skill 跑一轮就是 60 次，
+# 五个 skill 全量要半小时——那没人会天天跑。5+5 足够覆盖「不同说法」和「不同归属方」，
+# 再多只是同义重复。范围靠 tools/trigger_run.py 的 --skill/--ids 收窄，不靠删用例凑数。
+TRIGGER_MIN_PER_SIDE = 4
 
 
 # AI 调用 skill 时读的材料：`SKILL.md` 与 `references/*.md`。

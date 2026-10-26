@@ -1,6 +1,6 @@
 {
   "skill_name": "pingcode-weekly",
-  "note": "触发评测集。正例只有这个 skill 该接；反例是近邻误触发，note 写清它该归谁。评测方法见 tools/skill-builder/GUIDE.md。",
+  "note": "触发评测集：5 条正例覆盖不同说法，5 条反例各指向一个会抢走它的 skill。每条都要 3 次干净会话，所以只保留有判别力的问题；评测方法见 tools/skill-builder/GUIDE.md。",
   "triggers": [
     {
       "id": 1,
@@ -9,105 +9,50 @@
     },
     {
       "id": 2,
-      "query": "按人生成周报，每人一份文件",
-      "should_trigger": true
-    },
-    {
-      "id": 3,
       "query": "这周需求进展怎么样？出一份能给领导看的周报",
       "should_trigger": true
     },
     {
-      "id": 4,
-      "query": "10 月的月报做一下，需求和缺陷分开列",
-      "should_trigger": true
-    },
-    {
-      "id": 5,
+      "id": 3,
       "query": "先检查一下周报要的数据齐不齐，别生成出来是空的",
       "should_trigger": true
     },
     {
-      "id": 6,
+      "id": 4,
       "query": "下周计划那部分是空的，看看是不是下一迭代还没建",
       "should_trigger": true
     },
     {
-      "id": 7,
-      "query": "缺陷清单按严重程度排一下，写进这周的周报",
-      "should_trigger": true
-    },
-    {
-      "id": 8,
-      "query": "我们有两个项目，一起出一份上周的周报",
-      "should_trigger": true
-    },
-    {
-      "id": 9,
+      "id": 5,
       "query": "这周谁完成了哪些需求，按人汇总一下",
       "should_trigger": true
     },
     {
-      "id": 10,
-      "query": "周报里缺负责人的条目单独列出来，我要去补",
-      "should_trigger": true
-    },
-    {
-      "id": 11,
+      "id": 6,
       "query": "PingCode 里把 SCR-12 的状态改成已完成",
       "should_trigger": false,
       "note": "→ pingcode：写操作，周报 skill 只读"
     },
     {
-      "id": 12,
+      "id": 7,
       "query": "查一下我名下还有哪些没完成的缺陷",
       "should_trigger": false,
-      "note": "→ pingcode：单条工作项查询。实测 1/3 会连带唤醒本 skill（「缺陷」关键词），仍在阈值内，但属于要盯住的近邻"
+      "note": "→ pingcode：单条工作项查询（曾实测 1/3 连带唤醒本 skill，保留作回归）"
     },
     {
-      "id": 13,
-      "query": "把这个 bug 记到我的 Obsidian 工作台里",
-      "should_trigger": false,
-      "note": "→ obsidian-work：本地工作项主档"
-    },
-    {
-      "id": 14,
+      "id": 8,
       "query": "整理一下本周的会议纪要，把结论和待办分开",
       "should_trigger": false,
-      "note": "→ obsidian-wiki 的工作材料编辑：只改已有文字，不汇总工作项"
+      "note": "→ obsidian-wiki：库内已有笔记的编辑"
     },
     {
-      "id": 15,
-      "query": "把这个需求拆成任务，建到 PingCode 的项目里",
-      "should_trigger": false,
-      "note": "→ pingcode：创建工作项"
-    },
-    {
-      "id": 16,
+      "id": 9,
       "query": "生成一份季度总结 PPT，给管理层汇报",
       "should_trigger": false,
       "note": "→ deck-authoring：演示文稿"
     },
     {
-      "id": 17,
-      "query": "帮我学一下 PingCode 的 REST API 怎么分页",
-      "should_trigger": false,
-      "note": "→ learning-scout：学习内容，不是取数"
-    },
-    {
-      "id": 18,
-      "query": "画一张迭代流程的状态图",
-      "should_trigger": false,
-      "note": "→ diagram-authoring：技术图"
-    },
-    {
-      "id": 19,
-      "query": "把这几个提交合并成一个再推上去",
-      "should_trigger": false,
-      "note": "→ git-dev-workflow：Git 操作"
-    },
-    {
-      "id": 20,
+      "id": 10,
       "query": "把 GitHub 上的 issue 汇总成本周报告",
       "should_trigger": false,
       "note": "→ 非 PingCode 数据源，本 skill 明确排除"

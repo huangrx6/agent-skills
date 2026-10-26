@@ -1,6 +1,6 @@
 {
   "skill_name": "deck-authoring",
-  "note": "触发评测集。正例只有这个 skill 该接；反例是近邻误触发，note 写清它该归谁。评测方法见 tools/skill-builder/GUIDE.md。",
+  "note": "触发评测集：5 条正例覆盖不同说法，5 条反例各指向一个会抢走它的 skill。每条都要 3 次干净会话，所以只保留有判别力的问题；评测方法见 tools/skill-builder/GUIDE.md。",
   "triggers": [
     {
       "id": 1,
@@ -14,103 +14,48 @@
     },
     {
       "id": 3,
-      "query": "做一套技术方案的汇报幻灯片，要有整体视觉风格",
-      "should_trigger": true
-    },
-    {
-      "id": 4,
-      "query": "这些截图和文档做成 slides，明天讲三十分钟",
-      "should_trigger": true
-    },
-    {
-      "id": 5,
       "query": "帮我把这篇长文压缩成十五页的演示，每页一个观点",
       "should_trigger": true
     },
     {
-      "id": 6,
-      "query": "做一个产品发布会用的幻灯片，最后要导出 PDF",
-      "should_trigger": true
-    },
-    {
-      "id": 7,
-      "query": "这份周报我想放到大屏上讲，做成能翻页的 deck",
-      "should_trigger": true
-    },
-    {
-      "id": 8,
-      "query": "我有一堆零散笔记，想做成一套培训用的演示",
-      "should_trigger": true
-    },
-    {
-      "id": 9,
+      "id": 4,
       "query": "帮我定一下演示的视觉风格：配色、字号、版式怎么排",
       "should_trigger": true
     },
     {
-      "id": 10,
+      "id": 5,
       "query": "把这份 markdown 转成可播放的网页幻灯片，最好能导出视频",
       "should_trigger": true
     },
     {
-      "id": 11,
+      "id": 6,
       "query": "把这段文字画成一张架构图",
       "should_trigger": false,
       "note": "→ diagram-authoring：结构图不是演示"
     },
     {
-      "id": 12,
-      "query": "画一个订单状态流转图，标出异常分支",
-      "should_trigger": false,
-      "note": "→ diagram-authoring：状态机图"
-    },
-    {
-      "id": 13,
-      "query": "把这份思维导图整理成大纲，再画成图",
-      "should_trigger": false,
-      "note": "→ diagram-authoring：mind map 也是它的范围"
-    },
-    {
-      "id": 14,
+      "id": 7,
       "query": "帮我改一下这个 pptx 文件第 5 页的标题",
       "should_trigger": false,
-      "note": "→ 编辑已有 PowerPoint，skill 明确不做（description 的 Do NOT 第一条）"
+      "note": "→ 编辑已有 pptx，明确不做。实测 0/3、3/3、2/3：把范围句前置到描述第一句后仍会翻，属共享名词「PPT」带来的边界摩擦"
     },
     {
-      "id": 15,
+      "id": 8,
       "query": "给这篇文章配一张封面插画",
       "should_trigger": false,
-      "note": "→ 单张配图/生图，不是演示。边界用例：三轮实测 0/3、1/3、2/3，正好在阈值上翻；description 已写「出单张图不接」，保留作观察项"
+      "note": "→ 单张配图，明确不做。「配图」是 deck 的能力词（页内配图），实测 0/3、3/3 反复；要压住只能删能力词，代价是正例掉，不划算——接受并记录"
     },
     {
-      "id": 16,
-      "query": "做一张今年的营收对比柱状图",
-      "should_trigger": false,
-      "note": "→ 单张图表，没有演示结构"
-    },
-    {
-      "id": 17,
-      "query": "把这篇长文整理成可以直接发布的图文稿，配好小标题和插图",
-      "should_trigger": false,
-      "note": "→ learning-scout / 长文写作：同样要「图文并茂」，但产出是文章不是演示。（前两版反例——「beamer 讲稿」「.tex 编译成 PDF」——实测都 3/3 唤醒 deck-authoring：前者「讲稿」是核心名词，后者全库只有它会产 PDF；两条都测不出边界，已替换）"
-    },
-    {
-      "id": 18,
-      "query": "帮我把会议纪要整理成结构化笔记",
-      "should_trigger": false,
-      "note": "→ obsidian-wiki / 笔记整理，不是演示"
-    },
-    {
-      "id": 19,
+      "id": 9,
       "query": "剪一个三分钟的产品宣传视频，要有多镜头和配乐",
       "should_trigger": false,
-      "note": "→ 多镜头影视剪辑，skill 明确不做。三轮实测 1/3、3/3、2/3：「视频」这个词在 description 里指的是幻灯片录制，写成「不是剪辑」仍压不住，保留作观察项"
+      "note": "→ 影视剪辑，明确不做。「视频」是 deck 的能力词（逐页录视频），实测 1/3、3/3 反复；同上，不为此删能力词"
     },
     {
-      "id": 20,
-      "query": "把这个需求拆成三个任务，登记负责人",
+      "id": 10,
+      "query": "把这篇长文整理成可以直接发布的图文稿",
       "should_trigger": false,
-      "note": "→ obsidian-work 或 pingcode：工作项管理"
+      "note": "→ learning-scout / 长文写作：产出是文章"
     }
   ]
 }

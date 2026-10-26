@@ -1,6 +1,6 @@
 {
   "skill_name": "obsidian-work",
-  "note": "触发评测集。正例只有这个 skill 该接；反例是近邻误触发，note 写清它该归谁。评测方法见 tools/skill-builder/GUIDE.md。",
+  "note": "触发评测集：5 条正例覆盖不同说法，5 条反例各指向一个会抢走它的 skill。每条都要 3 次干净会话，所以只保留有判别力的问题；评测方法见 tools/skill-builder/GUIDE.md。",
   "triggers": [
     {
       "id": 1,
@@ -14,103 +14,48 @@
     },
     {
       "id": 3,
-      "query": "这个需求登记给张三，下周三前要提测",
-      "should_trigger": true
-    },
-    {
-      "id": 4,
-      "query": "更新一下项目主页的进度，把已完成的需求挪过去",
-      "should_trigger": true
-    },
-    {
-      "id": 5,
       "query": "设计一个 Bases 视图，按负责人分组显示未关闭的缺陷",
       "should_trigger": true
     },
     {
-      "id": 6,
-      "query": "补一下本周的工作记录，今天解决了两个线上问题",
-      "should_trigger": true
-    },
-    {
-      "id": 7,
+      "id": 4,
       "query": "这周工作台里记的事情，帮我汇总成周报发给领导",
       "should_trigger": true
     },
     {
-      "id": 8,
-      "query": "写一条发布记录，说明 2.3.1 回滚的原因和影响面",
-      "should_trigger": true
-    },
-    {
-      "id": 9,
-      "query": "把工作台里这个任务拆成三个子任务，分别给前端和后端",
-      "should_trigger": true
-    },
-    {
-      "id": 10,
+      "id": 5,
       "query": "回归测试结果记一下：12 条通过，2 条失败",
       "should_trigger": true
     },
     {
-      "id": 11,
+      "id": 6,
       "query": "把这篇文章整理进我的知识库，顺便更新相关笔记",
       "should_trigger": false,
       "note": "→ obsidian-wiki：学习 Wiki 的吸收与更新"
     },
     {
-      "id": 12,
-      "query": "PingCode 里查一下 SCR-12 的详情和流转历史",
-      "should_trigger": false,
-      "note": "→ pingcode：远端工作项读取"
-    },
-    {
-      "id": 13,
+      "id": 7,
       "query": "从 PingCode 的需求和缺陷生成本月月报",
       "should_trigger": false,
       "note": "→ pingcode-weekly：PingCode 是唯一数据源"
     },
     {
-      "id": 14,
-      "query": "帮我把这篇笔记改写成可以直接发布的公众号文章",
-      "should_trigger": false,
-      "note": "→ obsidian-wiki：知识文章写作与发布标准"
-    },
-    {
-      "id": 15,
-      "query": "我想学事件溯源，给我一条从入门到能落地的路线",
-      "should_trigger": false,
-      "note": "→ learning-scout：学习路线与笔记系列"
-    },
-    {
-      "id": 16,
+      "id": 8,
       "query": "画一张发布流程的状态图，标出回滚路径",
       "should_trigger": false,
       "note": "→ diagram-authoring：技术图"
     },
     {
-      "id": 17,
+      "id": 9,
       "query": "把这份季度总结做成 PPT，给管理层汇报",
       "should_trigger": false,
       "note": "→ deck-authoring：演示文稿"
     },
     {
-      "id": 18,
-      "query": "把这段改动提交了，然后推到远端",
-      "should_trigger": false,
-      "note": "→ git-dev-workflow：Git 操作"
-    },
-    {
-      "id": 19,
+      "id": 10,
       "query": "解释一下 SLO 和 SLA 的区别",
       "should_trigger": false,
       "note": "→ 普通问答：没有工作笔记上下文"
-    },
-    {
-      "id": 20,
-      "query": "梳理一下这个模块有哪几个调用方，依赖是不是有环",
-      "should_trigger": false,
-      "note": "→ 代码分析（diagram-authoring 的依赖图只负责画，不负责查代码）"
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "skill_name": "diagram-authoring",
-  "note": "触发评测集。正例只有这个 skill 该接；反例是近邻误触发，note 写清它该归谁。评测方法见 tools/skill-builder/GUIDE.md。",
+  "note": "触发评测集：5 条正例覆盖不同说法，5 条反例各指向一个会抢走它的 skill。每条都要 3 次干净会话，所以只保留有判别力的问题；评测方法见 tools/skill-builder/GUIDE.md。",
   "triggers": [
     {
       "id": 1,
@@ -14,103 +14,48 @@
     },
     {
       "id": 3,
-      "query": "把这几个模块的依赖关系画成图",
-      "should_trigger": true
-    },
-    {
-      "id": 4,
       "query": "画一张数据从采集到入库的流程图，标出失败分支",
       "should_trigger": true
     },
     {
-      "id": 5,
-      "query": "画个网络拓扑：两台核心交换机接三台服务器",
-      "should_trigger": true
-    },
-    {
-      "id": 6,
-      "query": "把这份部署说明画成一张图，我要放进设计文档",
-      "should_trigger": true
-    },
-    {
-      "id": 7,
+      "id": 4,
       "query": "画一张思维导图，整理这篇文章的要点",
       "should_trigger": true
     },
     {
-      "id": 8,
+      "id": 5,
       "query": "draw an architecture diagram from this docker-compose.yml",
       "should_trigger": true
     },
     {
-      "id": 9,
-      "query": "把这段代码的调用关系画成依赖图，输出 mermaid",
-      "should_trigger": true
-    },
-    {
-      "id": 10,
-      "query": "帮我出一张可编辑的流程图，我后面自己调布局",
-      "should_trigger": true
-    },
-    {
-      "id": 11,
+      "id": 6,
       "query": "把这份季度总结做成一份演示文稿，二十页左右",
       "should_trigger": false,
       "note": "→ deck-authoring：演示文稿不是结构图"
     },
     {
-      "id": 12,
-      "query": "做一张发布会用的幻灯片，最后导出 PDF",
-      "should_trigger": false,
-      "note": "→ deck-authoring：幻灯片（PDF 导出是它的能力，不是画图）"
-    },
-    {
-      "id": 13,
-      "query": "给这份白皮书配一张封面插画",
-      "should_trigger": false,
-      "note": "→ 装饰插画/生图，description 明确不做。实测五轮 0/3、0/3、3/3、0/3、3/3：曾在正面句里写「不要 decorative art」，反而把插画请求吸过来（点名抬高相似度），删掉后回落。近阈值，保留作观察项"
-    },
-    {
-      "id": 14,
+      "id": 7,
       "query": "设计一个登录页的线框图，标出输入框和按钮",
       "should_trigger": false,
-      "note": "→ UI wireframe，description 明确不做"
+      "note": "→ UI wireframe，明确不做"
     },
     {
-      "id": 15,
+      "id": 8,
       "query": "给这个迭代做一个甘特图排期，标出关键路径",
       "should_trigger": false,
-      "note": "→ 甘特图排期不在图型清单（架构/依赖/流程/状态/拓扑/思维导图）。只写英文 gantt charts 时实测 3/3 误触发；补上「甘特图排期」后 1/3、2/3，近阈值，保留作观察项"
+      "note": "→ 甘特图排期不在图型清单。近阈值：补中文说法后 1/3、2/3"
     },
     {
-      "id": 16,
-      "query": "把今年的营收做成一张柱状图对比一下",
+      "id": 9,
+      "query": "给这份白皮书配一张封面插画",
       "should_trigger": false,
-      "note": "→ 数据图表：要的是数值可视化，不是结构关系"
+      "note": "→ 装饰插画，明确不做。近阈值：实测 0/3、3/3 反复"
     },
     {
-      "id": 17,
-      "query": "把这个需求拆成三个任务，登记负责人",
-      "should_trigger": false,
-      "note": "→ obsidian-work / pingcode：工作项管理"
-    },
-    {
-      "id": 18,
+      "id": 10,
       "query": "PingCode 里我这个迭代还有哪些没关的缺陷",
       "should_trigger": false,
       "note": "→ pingcode：远端工作项查询"
-    },
-    {
-      "id": 19,
-      "query": "把这篇博客整理进我的知识库，看看要更新哪几篇",
-      "should_trigger": false,
-      "note": "→ obsidian-wiki：知识库维护"
-    },
-    {
-      "id": 20,
-      "query": "把这篇长文整理成可以直接发布的图文稿",
-      "should_trigger": false,
-      "note": "→ learning-scout / 长文写作：产出是文章"
     }
   ]
 }

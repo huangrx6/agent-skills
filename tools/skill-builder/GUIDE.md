@@ -36,7 +36,7 @@
 也可能过窄（用户换种说法就不触发）。唯一可靠的判据是**真跑**。
 
 需要时可给 skill 提供 `evals/triggers.json`（目前 `obsidian-wiki`、`obsidian-work`、
-`pingcode-weekly` 已有）：
+`pingcode-weekly`、`deck-authoring`、`diagram-authoring` 已有，每个 5+5 条）：
 
 ```json
 {
@@ -49,15 +49,30 @@
 }
 ```
 
-- 正例、反例各 8–10 条。反例要是**近邻误触发**（共享关键词但该归别的 skill），
-  并用 `note` 写清归属；没有归属说明的反例，下次评审就是扯皮。
+- 正例、反例**各 5 条**（4–6 都可）。反例要是**近邻误触发**（共享关键词但该归别的 skill），
+  每条指向**不同的**归属方，并用 `note` 写清归属；没有归属说明的反例，下次评审就是扯皮。
+  上限是成本定的：每条要 3 次干净会话，20 条一个 skill 就是 60 次，
+  五个 skill 全量半小时——那样没人会天天跑。同义句堆再多也不提高分辨力。
 - 正例要拉开的维度：措辞（正式/口语）、明示程度（点名域 vs 只描述需求）、详略、复杂度。
-- 跑法：每条在**干净上下文**里跑 3 次，记 `triggered`（skill 被加载的次数）。
-  `python3 tools/trigger_eval.py --template results.json` 生成模板，
-  跑完用 `--score results.json` 算触发率；正例 ≥ 0.5 通过，反例 < 0.5 通过。
+- 跑法（**按改动范围分层**，别每次都全量）：
+
+  ```bash
+  # 改哪个 skill 就跑哪个：10 条 × 3 次 = 30 次会话，几分钟出结论
+  python3 tools/trigger_run.py --skill deck-authoring
+  # 只想验刚动过的两条边界
+  python3 tools/trigger_run.py --skill deck-authoring --ids 8,9 --reps 1
+  # 发布前全量（5 个 skill，150 次会话）
+  python3 tools/trigger_run.py --out /tmp/all.json && python3 tools/trigger_eval.py --score /tmp/all.json
+  ```
+
+  `trigger_run.py` 负责跑（起干净会话、解析 `loaded-skill`、算触发率），
+  `trigger_eval.py` 负责算分与汇总。判定：正例 > 0.5 通过，反例 < 0.5 通过。
 - 评测不过先改 description 的触发词与排除项，不要改用例凑数；0.5 的边界值两边都算没过。
 - 排除项要用**用户会说的那种话**：只写英文类别（gantt charts）对中文请求不起作用，
   实测仍是 3/3；补上「甘特图排期」才降到 1/3。中文 skill 的 Do NOT 该写中英两版关键词。
+- 反例里如果撞的是 skill 的**能力名词**（配图、视频、PPT），描述层面压不住：
+  把这些词删掉能压住误触发，但正例也会跟着掉。这种情况记下实测数字、留着观察，
+  别为一条反例拆掉自己的能力词——load 了之后拒绝，比该用时没 load 便宜。
 - 同一个类别只在 Do NOT 出现一次：把它也写进正面句（「不是装饰插画」）反而把插画请求吸过来，
   实测从 0/3 变 3/3——点名本身就抬高了相似度，否定词压不住。
 - 单轮有噪音：真实触发率落在 0.4–0.6 的用例，3 次跑会来回翻（同一反例曾在三轮里出现
@@ -67,9 +82,9 @@
   反例请求往往应该唤醒**别的** skill（画图那条会唤醒 diagram），把它算成命中等于把评测做废。
 - 会话目录每轮必须新建（或先清空）：`--session-dir` 下会累积历史 jsonl，
   检测时一并读进来，等于把上一轮的结果算进这一轮。实测同一反例因此连续三轮都是「命中」。
-- 跑的方式：一条请求一个**干净的 pi 会话**（`pi -p "<请求>" --tools read --session-dir <临时目录>`），
-  会话里的 `loaded-skill` / `inline-skill` 记录就是「触发了」。用 `--tools read` 是为了不产生
-  副作用：这一步只测「会不会选它」，不测能不能把活干完。
+- 每条请求一个**干净 pi 会话**（`pi -p "<请求>" --tools read --session-dir <临时目录>`），
+  `loaded-skill` / `inline-skill` 记录才算「触发了」。只给 read 是为了不产生副作用：
+  这一步只测「会不会选它」，不测能不能把活干完。
 - 数据源没指定的请求（只说「整理这周的周报」）会稳定落到 PingCode 那个 skill。这类要么在查询里
   点明数据源，要么按实测把归属写进 `note`；**不要为了让被测 skill「该触发」而堆同义词**。
 
