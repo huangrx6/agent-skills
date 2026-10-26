@@ -4,6 +4,15 @@
 `styles/<name>/style.json` 与 `skin.css`；组织身份放在可选 brand。
 本篇给出当前实现的接口，不是成品风格模板。图表、素材、品牌分别按对应参考文档补充。
 
+## 目录
+
+- [风格查找](#风格查找)
+- [style.json](#stylejson)
+- [skin.css](#skincss)
+- [字号与观看场景](#字号与观看场景)
+- [deck.spec.json](#deckspecjson)
+- [验证与可复现](#验证与可复现)
+
 ## 风格查找
 
 `deck.style` 必填，可用名字或包含两份风格文件的目录路径。按顺序查找：
