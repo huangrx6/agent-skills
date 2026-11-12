@@ -8,10 +8,11 @@ import os
 import re
 from datetime import date
 from email import policy
+from email.header import Header
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.utils import formatdate
+from email.utils import formataddr, formatdate, getaddresses
 from . import ASSETS, blocks
 from .htmltools import Tags
 from .spec import filename_base, type_label
@@ -192,6 +193,17 @@ def embed_images(html_body: str, base_dir: str) -> tuple[str, list[dict], list[s
     return html_body, attachments, notes
 
 
+def _encode_addresses(value: str) -> str:
+    """只编码非 ASCII 显示名，保留地址本身，避免 3.10 的头部编码差异。"""
+    parts = []
+    for name, addr in getaddresses([value]):
+        if not addr:
+            continue
+        display = Header(name, "utf-8").encode() if name else ""
+        parts.append(formataddr((display, addr)) if display else addr)
+    return ", ".join(parts)
+
+
 def build_eml(
     subject: str,
     html_body: str,
@@ -210,11 +222,11 @@ def build_eml(
         root.attach(alternative)
     else:
         root = alternative
-    root["Subject"] = subject
+    root["Subject"] = Header(subject, "utf-8").encode()
     if to:
-        root["To"] = to
+        root["To"] = _encode_addresses(to)
     if cc:
-        root["Cc"] = ", ".join(cc)
+        root["Cc"] = _encode_addresses(", ".join(cc))
     root["Date"] = formatdate(localtime=True)
     for item in attachments:
         mime, _ = mimetypes.guess_type(item["path"])
