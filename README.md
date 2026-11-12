@@ -28,7 +28,8 @@ python3 tools/build_site.py --out docs --check
 ```
 
 依赖与部署说明见 [`tools/site/README.md`](tools/site/README.md)；发布由
-[`.github/workflows/pages.yml`](.github/workflows/pages.yml) 完成，不要手改 `docs/` 下的 HTML。
+[`.github/workflows/pages.yml`](.github/workflows/pages.yml) 完成。首次发布需在仓库
+Settings → Pages 把 Source 设为 GitHub Actions；不要手改 `docs/` 下的 HTML。
 
 ## Skills
 
