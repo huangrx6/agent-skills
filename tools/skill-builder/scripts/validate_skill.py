@@ -119,6 +119,14 @@ TRIGGER_HINTS = ("Use this skill", "Use when", "用于", "触发")
 EXCLUSION_HINT_RE = re.compile(r"[Dd]o NOT use|不适用于|不用于")
 
 
+def _unquote_scalar(value: str) -> str:
+    """去掉整段标量外层成对的引号；空白值也要还原成空串。"""
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        return value[1:-1]
+    return value
+
+
 def _minimal_parse(text: str) -> dict:
     """只认顶层 `key: value` 的极简 frontmatter 解析器（PyYAML 不可用时的退路）。"""
     data: dict = {}
@@ -127,7 +135,7 @@ def _minimal_parse(text: str) -> dict:
         if re.match(r"^\S", line) and ":" in line:
             key, _, val = line.partition(":")
             key = key.strip()
-            data[key] = val.strip()
+            data[key] = _unquote_scalar(val)
         elif key and line.startswith((" ", "\t")):
             data[key] = (str(data.get(key, "")) + " " + line.strip()).strip()
     return data

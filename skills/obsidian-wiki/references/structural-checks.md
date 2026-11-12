@@ -3,6 +3,17 @@
 脚本路径相对于本 skill 目录。所有命令只读；脚本默认按 `vault_path.py` 解析 vault，
 也可用 `--vault PATH` 指定测试目录或本次目标。
 
+## 统一健康检查
+
+```sh
+python3 scripts/health_check.py
+python3 scripts/health_check.py --strict --json
+```
+
+默认检查失效 wikilink/嵌入和 `.obsidian` 配置中的失效文件路径，适用于已有自定义结构的库。
+`--strict` 额外要求初始化模板的 PARA 目录、`AGENTS.md`、`VAULT.md`、README、各区域入口和 `.gitignore`，
+用于新库验收或分享前检查。普通 Markdown 链接、标题/块锚点、知识真伪仍需人工检查。
+
 ## 链接检查
 
 ```sh

@@ -1,3 +1,6 @@
+# email-composer 生成的草稿（本地产物，不入库）
+email-out/
+
 # OS
 .DS_Store
 *.swp

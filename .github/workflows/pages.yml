@@ -1,0 +1,42 @@
+---
+name: Pages
+
+# 发布本仓库 docs/ 到项目 Pages：https://huangrx6.github.io/agent-skills/
+# 根域名站点不在本仓库，不受影响。
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      # actions/configure-pages v5
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
+      # actions/upload-pages-artifact v3
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa
+        with:
+          path: docs
+      # actions/deploy-pages v4
+      - id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e

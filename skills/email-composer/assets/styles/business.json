@@ -1,0 +1,26 @@
+{
+  "name": "business",
+  "description": "申请、确认、邀请：白底，深蓝强调色，标题左侧色条",
+  "width": 640,
+  "font": {
+    "family": "'Microsoft YaHei', '微软雅黑', 'PingFang SC', Arial, sans-serif",
+    "size": 14,
+    "line_height": 1.7
+  },
+  "color": {
+    "accent": "#1F4E79",
+    "text": "#1F2328",
+    "muted": "#5B6770",
+    "background": "#FFFFFF",
+    "page": "#F3F5F7",
+    "surface": "#F1F6FA",
+    "border": "#D9E2EA"
+  },
+  "spacing": { "page": 24, "content": 28, "block": 12 },
+  "frame": { "border": true },
+  "heading": { "bar": true, "size": 20, "section_size": 16 },
+  "summary": { "card": true },
+  "callout": { "card": true },
+  "table": { "zebra": false, "header_background": "#EAF1F8" },
+  "band": { "enabled": false, "color": "#B42318", "text": "#FFFFFF" }
+}

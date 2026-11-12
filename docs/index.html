@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Skills — 可执行、可验证的 Agent skill</title>
+<meta name="description" content="10 个可独立安装的 Agent skill：演示文稿、技术图、COSMIC、Obsidian、Git、PingCode、学习路线与邮件。每个 skill 都带入口说明、可执行脚本和回归测试。">
+<link rel="canonical" href="https://huangrx6.github.io/agent-skills/">
+<meta name="theme-color" content="#0f1012">
+<meta property="og:title" content="Agent Skills — 可执行、可验证的 Agent skill">
+<meta property="og:description" content="10 个可独立安装的 Agent skill：演示文稿、技术图、COSMIC、Obsidian、Git、PingCode、学习路线与邮件。每个 skill 都带入口说明、可执行脚本和回归测试。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://huangrx6.github.io/agent-skills/">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<script>
+  (() => {
+    const root = document.documentElement;
+    let theme = 'dark';
+    try {
+      const stored = localStorage.getItem('agent-skills-theme');
+      if (stored === 'light' || stored === 'dark') theme = stored;
+    } catch (error) {}
+    root.dataset.theme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#0f1012' : '#f5f3ee';
+  })();
+</script>
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body class="home">
+<a class="skip-link" href="#main">跳到正文</a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="index.html">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="2" y="14" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="14" width="8" height="8" rx="2" fill="currentColor" opacity=".45"/>
+      </svg>
+      <span>Agent Skills</span>
+    </a>
+    <div class="header-tools">
+      <nav class="site-nav" id="site-nav" aria-label="主导航">
+        <a href="docs/index.html">文档</a><a href="docs/skills/index.html">Skills</a><a href="docs/guide.html">编写 Skill</a>
+        <a class="nav-github" href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </nav>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换白天/夜间模式" title="切换白天/夜间"><span class="when-light"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>夜间</span><span class="when-dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>白天</span></button>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="打开导航">
+        <span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+<main id="main">
+  <section class="hero wrap">
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Agent Skills</p>
+      <h1>把重复的工作方法，<br>写成 <em>Agent 能执行</em>、<br>也能验证的 skill。</h1>
+      <p class="hero-lede">10 个可独立安装的能力，覆盖内容表达、知识工作与开发流程。每个 skill 都带入口说明、可执行脚本和回归测试。</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="docs/getting-started.html">开始使用</a>
+        <a class="btn btn-ghost" href="docs/skills/index.html">浏览 Skills <span aria-hidden="true">→</span></a>
+      </div>
+    </div>
+    <aside class="terminal" aria-label="快速安装">
+      <div class="terminal-bar">
+        <span class="terminal-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="terminal-title">quick start</span>
+        <button class="copy-btn terminal-copy" type="button" data-copy-target="install-command">复制</button>
+      </div>
+      <pre id="install-command"><code>git clone https://github.com/huangrx6/agent-skills.git
+cd agent-skills
+python3 tools/install_skills.py</code></pre>
+      <p class="terminal-note">默认安装到 <code>~/.agents/skills/</code></p>
+    </aside>
+  </section>
+
+  <div class="wrap hero-meta" aria-label="项目概况">
+    <span><strong>10</strong> skills</span>
+    <span><strong>3</strong> 类场景</span>
+    <span><strong>Python 3.10+</strong></span>
+    <span><strong>MIT</strong></span>
+  </div>
+
+  <section class="wrap section" id="skills">
+    <div class="section-head">
+      <h2>Skills</h2>
+      <p>每个 skill 独立安装，也可以组合使用。</p>
+    </div>
+    <div class="skill-group"><div class="group-head"><h3>内容与表达</h3><span>4</span></div><div class="skill-grid"><a class="skill-card" href="docs/skills/deck-authoring.html">
+  <div class="skill-card-head">
+    <span class="skill-id">deck-authoring</span>
+    <span class="skill-arrow" aria-hidden="true">→</span>
+  </div>
+  <h4>演示文稿制作</h4>
+  <p>从材料组织内容、设计版面与配图，用真实页面迭代</p>
+  <span class="skill-output">HTML 演示 · PDF · PNG · PPTX · 视频</span>
+</a><a class="skill-card" href="docs/skills/diagram-authoring.html">
+  <div class="skill-card-head">
+    <span class="skill-id"></span>
+    <span class="skill-arrow" aria-hidden="true">→</span>
+  </div>
+  <h4>diagram-authoring</h4>
+  <p>把结构描述变成可编辑的技术图，并检查布局与可读性</p>
+  <span class="skill-output">Excalidraw · draw.io · Mermaid · PNG</span>
+</a><a class="skill-card" href="docs/skills/cosmic-split.html">
+  <div class="skill-card-head">
+    <span class="skill-id"></span>
+    <span class="skill-arrow" aria-hidden="true">→</span>
+  </div>
+  <h4>cosmic-split</h4>
+  <p>按需求、接口、页面或代码识别 COSMIC 数据移动</p>
+  <span class="skill-output">拆分表 · 自检报告 · 覆盖清单</span>
+</a><a class="skill-card" href="docs/skills/email-composer.html">
+  <div class="skill-card-head">
+    <span class="skill-id"></span>
+    <span class="skill-arrow" aria-hidden="true">→</span>
+  </div>
+  <h4>email-composer</h4>
+  <p>起草与制作工作邮件，复用 Spec / HTML 模板</p>
+  <span class="skill-output">邮件草稿 · .eml · 模板库</span>
+</a></div></div>
+<div class="skill-group"><div class="group-head"><h3>知识与工作</h3><span>4</span></div><div class="skill-grid"><a class="skill-card" href="docs/skills/obsidian-wiki.html">
+  <div class="skill-card-head">
+    <span class="skill-id"></span>
+    <span class="skill-arrow" aria-hidden="true">→</span>
+  </div>
+  <h4>obsidian-wiki</h4>
+  <p>吸收资料、关联证据、按笔记问答与复习</p>
+  <span class="skill-output">可持续维护的学习 Wiki</span>
+</a><a class="skill-card" href="docs/skills/obsidian-work.html">
+  <div class="skill-card-head">
+    <span class="skill-id"></span>
+    <span class="skill-arrow" aria-hidden="true">→</span>
+  </div>
+  <h4>obsidian-work</h4>
+  <p>管理需求、缺陷、任务、周报与发布记录</p>
+  <span class="skill-output">工作项主档 · Bases 工作台</span>
+</a><a class="skill-card" href="docs/skills/pingcode.html">
+  <div class="skill-card-head">
+    <span class="skill-id"></span>
+    <span class="skill-arrow" aria-hidden="true">→</span>
+  </div>
+  <h4>pingcode</h4>
+  <p>查询和维护 PingCode 项目、工作项与迭代</p>
+  <span class="skill-output">CLI 输出 · 结构化工作项</span>
+</a><a class="skill-card" href="docs/skills/pingcode-weekly.html">
+  <div class="skill-card-head">
+    <span class="skill-id"></span>
+    <span class="skill-arrow" aria-hidden="true">→</span>
+  </div>
+  <h4>pingcode-weekly</h4>
+  <p>从需求与缺陷生成项目周报，只读 PingCode</p>
+  <span class="skill-output">Markdown 周报 · 证据 JSON</span>
+</a></div></div>
+<div class="skill-group"><div class="group-head"><h3>开发与学习</h3><span>2</span></div><div class="skill-grid"><a class="skill-card" href="docs/skills/git-dev-workflow.html">
+  <div class="skill-card-head">
+    <span class="skill-id"></span>
+    <span class="skill-arrow" aria-hidden="true">→</span>
+  </div>
+  <h4>git-dev-workflow</h4>
+  <p>本地 Git 状态、破坏性操作预检、提交与 worktree</p>
+  <span class="skill-output">状态快照 · 风险结论 · 操作建议</span>
+</a><a class="skill-card" href="docs/skills/learning-scout.html">
+  <div class="skill-card-head">
+    <span class="skill-id"></span>
+    <span class="skill-arrow" aria-hidden="true">→</span>
+  </div>
+  <h4>learning-scout</h4>
+  <p>把学习需求研究成一组独立笔记与离线入口页</p>
+  <span class="skill-output">笔记 · HTML 入口 · 打印版 · PDF</span>
+</a></div></div>
+  </section>
+
+  <section class="wrap section how" id="how">
+    <div class="section-head">
+      <h2>怎么运作</h2>
+      <p>入口、执行、验证三件事固定下来，能力才可复用。</p>
+    </div>
+    <div class="how-grid">
+      <article class="how-item">
+        <span class="how-num">01</span>
+        <h3>入口</h3>
+        <p><code>SKILL.md</code> 说明什么时候触发、按什么步骤执行；不靠临场发挥。</p>
+      </article>
+      <article class="how-item">
+        <span class="how-num">02</span>
+        <h3>执行</h3>
+        <p><code>scripts/</code> 把确定性步骤写成可运行代码，产物落到文件。</p>
+      </article>
+      <article class="how-item">
+        <span class="how-num">03</span>
+        <h3>验证</h3>
+        <p>回归测试与结构检查守住行为边界；产物质量单独验收。</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="wrap section install" id="install">
+    <div class="section-head">
+      <h2>安装</h2>
+      <p>本机开发用软链，其他 Agent 用官方 CLI。</p>
+    </div>
+    <div class="install-grid">
+      <article class="install-card">
+        <div class="install-head"><h3>本机开发</h3><span>推荐</span></div>
+        <pre><code>git clone https://github.com/huangrx6/agent-skills.git
+cd agent-skills
+python3 tools/install_skills.py</code></pre>
+        <p>默认软链到 <code>~/.agents/skills/</code>，改仓库立即生效。</p>
+      </article>
+      <article class="install-card">
+        <div class="install-head"><h3>其他 Agent</h3><span>CLI</span></div>
+        <pre><code>npx skills add https://github.com/huangrx6/agent-skills \
+  -a claude-code -a codex -g</code></pre>
+        <p>由官方安装器维护路径与更新；也可以装到项目的 <code>.agents/skills</code>。</p>
+      </article>
+    </div>
+    <div class="section-foot">
+      <a class="text-link" href="docs/getting-started.html">查看完整安装与配置 <span aria-hidden="true">→</span></a>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <p>Agent Skills · 10 个可独立安装的 skill</p>
+    <nav aria-label="页脚">
+      <a href="docs/index.html">文档</a>
+      <a href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="../">huangrx6.github.io</a>
+    </nav>
+  </div>
+</footer>
+<script src="assets/site.js" defer></script>
+</body>
+</html>

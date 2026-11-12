@@ -2,15 +2,33 @@
 
 <p align="center">
   <strong>把重复的工作方法，写成 Agent 能执行、能验证的 skill。</strong><br>
-  <sub>演示文稿 · 技术图 · COSMIC · Obsidian · Git · PingCode · 学习路线</sub>
+  <sub>演示文稿 · 技术图 · COSMIC · Obsidian · Git · PingCode · 学习路线 · 邮件</sub>
 </p>
 
 <p align="center">
-  <code>9 skills</code> &nbsp;·&nbsp; <code>Python 3.10+（learning-scout、pingcode-weekly 需 3.11+）</code> &nbsp;·&nbsp; <code>MIT</code>
+  <code>10 skills</code> &nbsp;·&nbsp; <code>Python 3.10+（learning-scout、pingcode-weekly 需 3.11+）</code> &nbsp;·&nbsp; <code>MIT</code>
+</p>
+
+<p align="center">
+  <a href="https://huangrx6.github.io/agent-skills/">项目主页</a>
 </p>
 
 每个 skill 都是一个独立目录：`SKILL.md` 说明什么时候触发、怎么执行，`README.md` 交代依赖、用法和边界。
 能力之间可以组合，但安装和配置互不依赖。
+
+## 项目主页
+
+项目主页与文档：<https://huangrx6.github.io/agent-skills/>。
+
+站点由本仓库的 README、skill README、GUIDE 与 ROADMAP 生成，默认黑夜主题，
+右上角可切换白天/黑夜。生成结果在 `docs/`，改完文档后重新生成并提交：
+
+```sh
+python3 tools/build_site.py --out docs --check
+```
+
+依赖与部署说明见 [`tools/site/README.md`](tools/site/README.md)；发布由
+[`.github/workflows/pages.yml`](.github/workflows/pages.yml) 完成，不要手改 `docs/` 下的 HTML。
 
 ## Skills
 
@@ -21,6 +39,7 @@
 | [**deck-authoring**](skills/deck-authoring/README.md) | 从材料组织内容、设计版面与配图，用真实页面迭代 | HTML 演示 · PDF · PNG · PPTX · 视频 |
 | [**diagram-authoring**](skills/diagram-authoring/README.md) | 把结构描述变成可编辑的技术图，并检查布局与可读性 | Excalidraw · draw.io · Mermaid · PNG |
 | [**cosmic-split**](skills/cosmic-split/README.md) | 按需求、接口、页面或代码识别 COSMIC 数据移动 | 拆分表 · 自检报告 · 覆盖清单 |
+| [**email-composer**](skills/email-composer/README.md) | 起草与制作工作邮件，复用 Spec / HTML 模板 | 邮件草稿 · .eml · 模板库 |
 
 ### 知识与工作
 
@@ -55,6 +74,7 @@ Obsidian 两项能力各自独立，通过笔记数据关联。
 | `migrate_skill_home.py` | 把旧配置 / 缓存迁到 `~/.agent-skills` |
 | `skill_health.py` | 仓库体检与维护建议 |
 | `skill_trigger_log.py` | 分析本机会话日志，不做触发效果承诺 |
+| [`build_site.py`](tools/build_site.py) | 从 README 与 skill 文档生成项目站点（首页 + docs） |
 
 ## 安装
 
@@ -95,7 +115,7 @@ npx skills add https://github.com/huangrx6/agent-skills -a claude-code -g \
   --skill learning-scout --skill pingcode --skill pingcode-weekly
 ```
 
-官方安装器维护各 Agent 的路径与更新；本仓库的 `tools/install_skills.py` 仍然一次安装全部 9 个。
+官方安装器维护各 Agent 的路径与更新；本仓库的 `tools/install_skills.py` 仍然一次安装全部 10 个。
 本地 `--copy` 只复制 Git 跟踪的内容，不会带上 `.venv` 或 IDE 配置。仓库可能移动、需要固定副本时：
 
 ```sh
@@ -142,9 +162,11 @@ python3 tools/migrate_skill_home.py --apply
 
 ```text
 agent-skills/
-├── skills/        # 9 个可独立安装的 skill
+├── skills/        # 10 个可独立安装的 skill
 ├── tools/         # 安装、锁文件、迁移、体检、skill 编写
 ├── tests/         # 回归测试，按 skill 分目录
+├── docs/          # 生成的项目站点（GitHub Pages 发布）
+├── .github/       # CI 与 Pages 发布
 ├── .githooks/     # 提交检查
 └── skills-lock.json
 ```

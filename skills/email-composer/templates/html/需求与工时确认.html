@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>需求范围、工时与交付计划确认｜{{project_name}}</title>
+</head>
+<body style="margin:0;padding:24px 14px;background-color:#FFFFFF;color:#1F2937;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',Arial,sans-serif;">
+<table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;margin:0 auto;border-collapse:collapse;">
+<tr>
+<td style="padding:0 0 20px;border-bottom:2px solid #1D4ED8;">
+<h1 style="margin:0;font-size:20px;line-height:1.5;color:#1F2937;font-weight:700;">需求范围、工时与交付计划确认</h1>
+</td>
+</tr>
+<tr>
+<td style="padding:22px 24px 0;font-size:14px;line-height:1.85;color:#1F2937;">
+
+<p style="margin:0 0 14px;">各位领导，您好：</p>
+<p style="margin:0 0 14px;">针对「<strong>{{project_name}}</strong>」，我们已完成需求分析和初步工时评估。现将工作范围、预估工时与交付安排同步如下；如涉及上线发布，另附当晚支撑安排，烦请确认。</p>
+
+<h2 style="margin:27px 0 11px;font-size:15px;line-height:1.5;color:#1F2937;font-weight:700;">需求范围</h2>
+<ul style="margin:0 0 10px;padding-left:22px;font-size:14px;line-height:1.9;color:#1F2937;">
+<li style="padding:0 0 2px;">{{scope_1}}</li>
+<li style="padding:0 0 2px;">{{scope_2}}</li>
+<li style="padding:0 0 2px;">{{scope_3}}</li>
+</ul>
+<p style="margin:0 0 14px;font-size:13px;line-height:1.7;color:#64748B;">以上为本次确认的范围；未列出的内容视为新增，按变更流程另行评估。</p>
+
+<h2 style="margin:27px 0 11px;font-size:15px;line-height:1.5;color:#1F2937;font-weight:700;">方案与效果</h2>
+<p style="margin:0 0 14px;">以下为关键页面与流程示意，实际效果以验收版本为准。</p>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;margin:15px 0 0;">
+<tr><td align="center" style="padding:0;border:1px solid #E2E8F0;background-color:#F8FAFC;">
+<img src="{{image_1_src}}" alt="{{image_1_alt}}" width="592" style="display:block;width:100%;max-width:592px;height:auto;border:0;outline:none;text-decoration:none;">
+</td></tr>
+</table>
+<p style="margin:7px 0 14px;font-size:12px;line-height:1.6;color:#64748B;">图 1｜{{image_1_caption}}</p>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;margin:15px 0 0;">
+<tr><td align="center" style="padding:0;border:1px solid #E2E8F0;background-color:#F8FAFC;">
+<img src="{{image_2_src}}" alt="{{image_2_alt}}" width="592" style="display:block;width:100%;max-width:592px;height:auto;border:0;outline:none;text-decoration:none;">
+</td></tr>
+</table>
+<p style="margin:7px 0 14px;font-size:12px;line-height:1.6;color:#64748B;">图 2｜{{image_2_caption}}</p>
+
+<h2 style="margin:27px 0 11px;font-size:15px;line-height:1.5;color:#1F2937;font-weight:700;">预估工时</h2>
+<table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;border:1px solid #E2E8F0;margin:0 0 10px;">
+<tr>
+<td style="width:72%;padding:12px 14px;border-bottom:1px solid #E2E8F0;font-size:14px;line-height:1.6;color:#1F2937;background-color:#FFFFFF;">功能开发与适配</td>
+<td align="right" style="width:28%;padding:12px 14px;border-bottom:1px solid #E2E8F0;font-size:14px;line-height:1.6;color:#1F2937;background-color:#FFFFFF;white-space:nowrap;">{{hours_dev}} 人天</td>
+</tr>
+<tr>
+<td style="width:72%;padding:12px 14px;border-bottom:1px solid #E2E8F0;font-size:14px;line-height:1.6;color:#1F2937;background-color:#FFFFFF;">接口对接与联调</td>
+<td align="right" style="width:28%;padding:12px 14px;border-bottom:1px solid #E2E8F0;font-size:14px;line-height:1.6;color:#1F2937;background-color:#FFFFFF;white-space:nowrap;">{{hours_api}} 人天</td>
+</tr>
+<tr>
+<td style="width:72%;padding:12px 14px;border-bottom:1px solid #E2E8F0;font-size:14px;line-height:1.6;color:#1F2937;background-color:#FFFFFF;">测试与部署</td>
+<td align="right" style="width:28%;padding:12px 14px;border-bottom:1px solid #E2E8F0;font-size:14px;line-height:1.6;color:#1F2937;background-color:#FFFFFF;white-space:nowrap;">{{hours_test}} 人天</td>
+</tr>
+<tr>
+<td style="width:72%;padding:12px 14px;border-bottom:1px solid #E2E8F0;font-size:14px;line-height:1.6;color:#1F2937;background-color:#F8FAFC;font-weight:700;">合计</td>
+<td align="right" style="width:28%;padding:12px 14px;border-bottom:1px solid #E2E8F0;font-size:14px;line-height:1.6;color:#1F2937;background-color:#F8FAFC;font-weight:700;white-space:nowrap;">{{hours_total}} 人天</td>
+</tr>
+</table>
+<p style="margin:0 0 14px;font-size:13px;line-height:1.7;color:#64748B;">工时口径：1 人天按 8 小时计；合计为各行之和，范围调整时同步更新。</p>
+
+<h2 style="margin:27px 0 11px;font-size:15px;line-height:1.5;color:#1F2937;font-weight:700;">交付计划</h2>
+<table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;border:1px solid #E2E8F0;margin:0 0 14px;">
+<tr>
+<td style="width:38%;padding:12px 14px;border-bottom:1px solid #E2E8F0;font-size:14px;line-height:1.65;color:#1F2937;vertical-align:top;">预计交付时间</td>
+<td style="width:62%;padding:12px 14px;border-bottom:1px solid #E2E8F0;font-size:14px;line-height:1.65;color:#1F2937;vertical-align:top;">{{delivery_date}}</td>
+</tr>
+<tr>
+<td style="width:38%;padding:12px 14px;border-bottom:1px solid #E2E8F0;font-size:14px;line-height:1.65;color:#1F2937;vertical-align:top;">交付内容</td>
+<td style="width:62%;padding:12px 14px;border-bottom:1px solid #E2E8F0;font-size:14px;line-height:1.65;color:#1F2937;vertical-align:top;">{{delivery_scope}}</td>
+</tr>
+<tr>
+<td style="width:38%;padding:12px 14px;border-bottom:1px solid #E2E8F0;font-size:14px;line-height:1.65;color:#1F2937;vertical-align:top;">验收方式</td>
+<td style="width:62%;padding:12px 14px;border-bottom:1px solid #E2E8F0;font-size:14px;line-height:1.65;color:#1F2937;vertical-align:top;">{{acceptance_method}}</td>
+</tr>
+<tr>
+<td style="width:38%;padding:12px 14px;border-bottom:1px solid #E2E8F0;font-size:14px;line-height:1.65;color:#1F2937;vertical-align:top;">前置条件</td>
+<td style="width:62%;padding:12px 14px;border-bottom:1px solid #E2E8F0;font-size:14px;line-height:1.65;color:#1F2937;vertical-align:top;">{{prerequisites}}</td>
+</tr>
+</table>
+
+<h2 style="margin:27px 0 11px;font-size:15px;line-height:1.5;color:#1F2937;font-weight:700;">上线当晚支撑安排</h2>
+<p style="margin:0 0 10px;">以下为发布窗口内的值守安排，如有调整请提前告知。本次需求不涉及上线发布时，可删除本节。</p>
+<table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;border:1px solid #E2E8F0;margin:0 0 14px;">
+<tr>
+<th align="left" style="width:26%;padding:10px 12px;border-bottom:1px solid #E2E8F0;background-color:#F8FAFC;font-size:13px;line-height:1.6;color:#1F2937;font-weight:700;">时段</th>
+<th align="left" style="width:20%;padding:10px 12px;border-bottom:1px solid #E2E8F0;background-color:#F8FAFC;font-size:13px;line-height:1.6;color:#1F2937;font-weight:700;">支撑人员</th>
+<th align="left" style="width:30%;padding:10px 12px;border-bottom:1px solid #E2E8F0;background-color:#F8FAFC;font-size:13px;line-height:1.6;color:#1F2937;font-weight:700;">职责</th>
+<th align="left" style="width:24%;padding:10px 12px;border-bottom:1px solid #E2E8F0;background-color:#F8FAFC;font-size:13px;line-height:1.6;color:#1F2937;font-weight:700;">联系方式</th>
+</tr>
+<tr>
+<td style="padding:10px 12px;border-bottom:1px solid #E2E8F0;font-size:13px;line-height:1.6;color:#1F2937;">{{support_period_1}}</td>
+<td style="padding:10px 12px;border-bottom:1px solid #E2E8F0;font-size:13px;line-height:1.6;color:#1F2937;">{{support_person_1}}</td>
+<td style="padding:10px 12px;border-bottom:1px solid #E2E8F0;font-size:13px;line-height:1.6;color:#1F2937;">{{support_role_1}}</td>
+<td style="padding:10px 12px;border-bottom:1px solid #E2E8F0;font-size:13px;line-height:1.6;color:#1F2937;">{{support_contact_1}}</td>
+</tr>
+<tr>
+<td style="padding:10px 12px;border-bottom:1px solid #E2E8F0;font-size:13px;line-height:1.6;color:#1F2937;">{{support_period_2}}</td>
+<td style="padding:10px 12px;border-bottom:1px solid #E2E8F0;font-size:13px;line-height:1.6;color:#1F2937;">{{support_person_2}}</td>
+<td style="padding:10px 12px;border-bottom:1px solid #E2E8F0;font-size:13px;line-height:1.6;color:#1F2937;">{{support_role_2}}</td>
+<td style="padding:10px 12px;border-bottom:1px solid #E2E8F0;font-size:13px;line-height:1.6;color:#1F2937;">{{support_contact_2}}</td>
+</tr>
+<tr>
+<td style="padding:10px 12px;border-bottom:1px solid #E2E8F0;font-size:13px;line-height:1.6;color:#1F2937;">{{support_period_3}}</td>
+<td style="padding:10px 12px;border-bottom:1px solid #E2E8F0;font-size:13px;line-height:1.6;color:#1F2937;">{{support_person_3}}</td>
+<td style="padding:10px 12px;border-bottom:1px solid #E2E8F0;font-size:13px;line-height:1.6;color:#1F2937;">{{support_role_3}}</td>
+<td style="padding:10px 12px;border-bottom:1px solid #E2E8F0;font-size:13px;line-height:1.6;color:#1F2937;">{{support_contact_3}}</td>
+</tr>
+</table>
+
+<p style="margin:0 0 14px;">以上评估基于当前已明确的需求范围。如后续有新增内容或范围调整，我们会及时同步变化及相应工时，经双方确认后继续推进。</p>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:20px 0;border-collapse:collapse;border-left:3px solid #1D4ED8;background-color:#F8FAFC;">
+<tr><td style="padding:12px 16px;font-size:14px;line-height:1.8;color:#1F2937;">烦请于 <strong>{{confirm_deadline}}</strong> 前确认需求范围、预估工时及交付计划；如涉及上线发布，请一并确认当晚支撑安排。收到确认后，我们将据此安排实施；如有调整建议，请直接回复。</td></tr>
+</table>
+<p style="margin:0 0 6px;">感谢支持与配合。</p>
+
+</td>
+</tr>
+</table>
+</body>
+</html>

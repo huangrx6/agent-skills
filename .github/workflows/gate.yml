@@ -40,6 +40,27 @@ jobs:
       - name: 仓库体检（只提示，不阻塞）
         run: python3 tools/skill_health.py
 
+  site:
+    name: 站点构建
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      # actions/setup-python v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.11"
+      - name: 安装站点依赖
+        run: python3 -m pip install -r tools/site/requirements.txt
+      - name: 构建并检查链接
+        run: python3 tools/build_site.py --out /tmp/site --check
+      - name: 提交的 docs/ 与生成结果一致
+        run: diff -ru /tmp/site docs
+      - name: 站点回归
+        run: python3 -m unittest discover -s tools/site/tests -v
+
   tests:
     name: 回归 py${{ matrix.python }} ${{ matrix.dir }}
     runs-on: ubuntu-latest
@@ -51,6 +72,7 @@ jobs:
         python: ["3.10", "3.11"]
         dir:
           - tests/cosmic-split
+          - tests/email-composer
           - tests/git-dev-workflow
           - tests/obsidian-wiki
           - tests/obsidian-work

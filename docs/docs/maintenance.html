@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>维护与验证 · Agent Skills</title>
+<meta name="description" content="结构检查、回归测试、锁文件与站点构建，各自证明不同的事情。">
+<link rel="canonical" href="https://huangrx6.github.io/agent-skills/docs/maintenance.html">
+<meta name="theme-color" content="#0f1012">
+<meta property="og:title" content="维护与验证 · Agent Skills">
+<meta property="og:description" content="结构检查、回归测试、锁文件与站点构建，各自证明不同的事情。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://huangrx6.github.io/agent-skills/docs/maintenance.html">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<script>
+  (() => {
+    const root = document.documentElement;
+    let theme = 'dark';
+    try {
+      const stored = localStorage.getItem('agent-skills-theme');
+      if (stored === 'light' || stored === 'dark') theme = stored;
+    } catch (error) {}
+    root.dataset.theme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#0f1012' : '#f5f3ee';
+  })();
+</script>
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body class="docs">
+<a class="skip-link" href="#main">跳到正文</a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="../index.html">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="2" y="14" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="14" width="8" height="8" rx="2" fill="currentColor" opacity=".45"/>
+      </svg>
+      <span>Agent Skills</span>
+    </a>
+    <div class="header-tools">
+      <nav class="site-nav" id="site-nav" aria-label="主导航">
+        <a href="index.html" aria-current="page">文档</a><a href="skills/index.html">Skills</a><a href="guide.html">编写 Skill</a>
+        <a class="nav-github" href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </nav>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换白天/夜间模式" title="切换白天/夜间"><span class="when-light"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>夜间</span><span class="when-dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>白天</span></button>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="打开导航">
+        <span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="docs-shell has-toc">
+  <aside class="docs-sidebar" id="docs-sidebar">
+<nav aria-label="文档导航">
+<p class="side-label">文档</p>
+<a href="index.html">文档首页</a>
+<a href="getting-started.html">开始使用</a>
+<a href="skills/index.html">Skill 目录</a>
+<a href="guide.html">编写 Skill</a>
+<a href="maintenance.html" class="is-active" aria-current="page">维护与验证</a>
+<a href="roadmap.html">路线图</a>
+<p class="side-label">Skills</p>
+<p class="side-cat">内容与表达</p>
+<a href="skills/deck-authoring.html">deck-authoring</a>
+<a href="skills/diagram-authoring.html">diagram-authoring</a>
+<a href="skills/cosmic-split.html">cosmic-split</a>
+<a href="skills/email-composer.html">email-composer</a>
+<p class="side-cat">知识与工作</p>
+<a href="skills/obsidian-wiki.html">obsidian-wiki</a>
+<a href="skills/obsidian-work.html">obsidian-work</a>
+<a href="skills/pingcode.html">pingcode</a>
+<a href="skills/pingcode-weekly.html">pingcode-weekly</a>
+<p class="side-cat">开发与学习</p>
+<a href="skills/git-dev-workflow.html">git-dev-workflow</a>
+<a href="skills/learning-scout.html">learning-scout</a>
+</nav>
+</aside>
+  <div class="sidebar-backdrop" data-sidebar-close hidden></div>
+  <main id="main" class="docs-main">
+    <button class="sidebar-toggle" type="button" aria-expanded="false" aria-controls="docs-sidebar">
+      <span>文档导航</span><span class="sidebar-toggle-mark" aria-hidden="true">+</span>
+    </button>
+    <nav class="crumbs" aria-label="面包屑"><a href="../index.html">Agent Skills</a><span aria-hidden="true">/</span><a href="index.html">文档</a><span aria-hidden="true">/</span><span aria-current="page">维护与验证</span></nav>
+    <header class="page-head">
+      <p class="eyebrow">文档</p>
+      <h1>维护与验证</h1>
+      <p class="page-lede">结构检查、回归测试、锁文件与站点构建，各自证明不同的事情。</p>
+      <div class="page-meta"><a href="https://github.com/huangrx6/agent-skills/blob/main/README.md" target="_blank" rel="noreferrer">README.md</a></div>
+    </header>
+    <article class="prose">
+      <div class="callout">结构检查、回归测试与产物质量是三件事。检查通过只说明对应范围，不代表视觉、导出或外部服务已经验收。</div><h2 id="维护工具">维护工具</h2>
+<p>技能之外的仓库工具放在 <code>tools/</code>，不会被安装到 agent：</p>
+<div class="table-wrap"><table><thead>
+<tr>
+<th>工具</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/huangrx6/agent-skills/blob/main/tools/skill-builder/README.md"><strong>skill-builder</strong></a></td>
+<td>编写 / 评审 skill 的指南，以及结构、引用、名称泄露检查器</td>
+</tr>
+<tr>
+<td><code>install_skills.py</code></td>
+<td>把 <code>skills/</code> 软链或复制到 agent 发现目录</td>
+</tr>
+<tr>
+<td><code>skills_lock.py</code></td>
+<td>记录并校验各个 <code>SKILL.md</code> 的哈希</td>
+</tr>
+<tr>
+<td><code>migrate_skill_home.py</code></td>
+<td>把旧配置 / 缓存迁到 <code>~/.agent-skills</code></td>
+</tr>
+<tr>
+<td><code>skill_health.py</code></td>
+<td>仓库体检与维护建议</td>
+</tr>
+<tr>
+<td><code>skill_trigger_log.py</code></td>
+<td>分析本机会话日志，不做触发效果承诺</td>
+</tr>
+<tr>
+<td><a href="https://github.com/huangrx6/agent-skills/blob/main/tools/build_site.py"><code>build_site.py</code></a></td>
+<td>从 README 与 skill 文档生成项目站点（首页 + docs）</td>
+</tr>
+</tbody>
+</table></div><h2 id="开发与验证">开发与验证</h2>
+<pre><code class="language-sh">python3 tools/skill-builder/scripts/preflight.py
+python3 -m unittest discover -s tools/tests -v
+python3 tools/skills_lock.py --check
+</code></pre>
+<p>修改其他 skill 时，把测试目录换成对应名称。<code>preflight.py</code> 只做结构、泄露、指针与文件快照，
+不执行回归，也不证明产物质量；Deck 的浏览器与 PDF 测试需要其运行依赖。
+<code>tools/skill_health.py</code> 提供维护建议，<code>tools/skill_trigger_log.py</code> 分析本机会话日志。
+<code>skill-builder</code> 的写作方法在 <a href="https://github.com/huangrx6/agent-skills/blob/main/tools/skill-builder/GUIDE.md">GUIDE.md</a>，检查器命令见其 README。</p>
+<p>CI 在 <a href="https://github.com/huangrx6/agent-skills/blob/main/.github/workflows/gate.yml"><code>.github/workflows/gate.yml</code></a>：推送与 PR 时跑结构、泄露、
+指针、锁文件校验，并按 <code>Python 3.10 / 3.11</code> 跑各 skill 与 <code>tools/</code> 的回归——版本声明要能被验证。Deck 与 diagram 的重型套件需要 Chrome / LibreOffice，不在 CI 里跑，仍由发布前的人工闸门覆盖：</p>
+<p>改动 description 或触发边界后，用 <code>tools/trigger_eval.py</code> 算触发率：数据在
+<code>skills/&lt;name&gt;/evals/triggers.json</code>（正例 + 近邻反例），<code>--template</code> 生成待记录结果，
+<code>--score</code> 算分。方法与判据见 <a href="https://github.com/huangrx6/agent-skills/blob/main/tools/skill-builder/GUIDE.md#%E8%A7%A6%E5%8F%91%E8%AF%84%E6%B5%8B">GUIDE</a>。</p>
+<pre><code class="language-sh">AGENT_SKILLS_GATE=1 git commit --allow-empty -m &quot;release gate&quot;
+</code></pre>
+<p>提交涉及 <code>skills/</code>、<code>tests/</code>、<code>tools/</code> 或 <code>.githooks/</code> 时，可启用仓库 hook：</p>
+<pre><code class="language-sh">git config core.hooksPath .githooks
+</code></pre>
+<div class="table-wrap"><table><thead>
+<tr>
+<th>检查</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>结构、敏感名称、引用目标、文档测试数字</td>
+<td>发现错误时阻塞；词表未配置则跳过该扫描</td>
+</tr>
+<tr>
+<td>各 skill 与仓库工具回归</td>
+<td>默认只提示；<code>AGENT_SKILLS_GATE=1</code> 时阻塞</td>
+</tr>
+<tr>
+<td>仓库体检</td>
+<td>维护建议，不阻塞</td>
+</tr>
+<tr>
+<td>锁文件同步</td>
+<td>按暂存区的 SKILL.md 更新锁文件</td>
+</tr>
+</tbody>
+</table></div><p>后续方向见 <a href="roadmap.html">ROADMAP.md</a>。</p>
+<hr />
+<p align="center">
+  <sub>原创代码与文档采用 <a href="https://github.com/huangrx6/agent-skills/blob/main/LICENSE">MIT License</a>；第三方依赖、字体与品牌素材按各自许可使用。</sub>
+</p>
+<h2 id="仓库结构">仓库结构</h2>
+<pre><code class="language-text">agent-skills/
+├── skills/        # 10 个可独立安装的 skill
+├── tools/         # 安装、锁文件、迁移、体检、skill 编写
+├── tests/         # 回归测试，按 skill 分目录
+├── docs/          # 生成的项目站点（GitHub Pages 发布）
+├── .github/       # CI 与 Pages 发布
+├── .githooks/     # 提交检查
+└── skills-lock.json
+</code></pre>
+
+    </article>
+    <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="guide.html"><span>上一篇</span><strong>编写 Skill</strong></a><a class="page-nav-link next" href="roadmap.html"><span>下一篇</span><strong>路线图</strong></a></nav>
+  </main>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#维护工具">维护工具</a></li><li class="toc-2"><a href="#开发与验证">开发与验证</a></li><li class="toc-2"><a href="#仓库结构">仓库结构</a></li></ul></aside>
+</div>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <p>Agent Skills · 10 个可独立安装的 skill</p>
+    <nav aria-label="页脚">
+      <a href="index.html">文档</a>
+      <a href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="../../">huangrx6.github.io</a>
+    </nav>
+  </div>
+</footer>
+<script src="../assets/site.js" defer></script>
+</body>
+</html>

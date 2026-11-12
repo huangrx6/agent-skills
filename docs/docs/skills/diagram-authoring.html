@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>diagram-authoring · Agent Skills</title>
+<meta name="description" content="从结构规格生成可编辑的技术图：架构、依赖、流程、状态、思维导图和网络拓扑。">
+<link rel="canonical" href="https://huangrx6.github.io/agent-skills/docs/skills/diagram-authoring.html">
+<meta name="theme-color" content="#0f1012">
+<meta property="og:title" content="diagram-authoring · Agent Skills">
+<meta property="og:description" content="从结构规格生成可编辑的技术图：架构、依赖、流程、状态、思维导图和网络拓扑。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://huangrx6.github.io/agent-skills/docs/skills/diagram-authoring.html">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<script>
+  (() => {
+    const root = document.documentElement;
+    let theme = 'dark';
+    try {
+      const stored = localStorage.getItem('agent-skills-theme');
+      if (stored === 'light' || stored === 'dark') theme = stored;
+    } catch (error) {}
+    root.dataset.theme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#0f1012' : '#f5f3ee';
+  })();
+</script>
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body class="docs">
+<a class="skip-link" href="#main">跳到正文</a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="../../index.html">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="2" y="14" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="14" width="8" height="8" rx="2" fill="currentColor" opacity=".45"/>
+      </svg>
+      <span>Agent Skills</span>
+    </a>
+    <div class="header-tools">
+      <nav class="site-nav" id="site-nav" aria-label="主导航">
+        <a href="../index.html">文档</a><a href="../skills/index.html" aria-current="page">Skills</a><a href="../guide.html">编写 Skill</a>
+        <a class="nav-github" href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </nav>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换白天/夜间模式" title="切换白天/夜间"><span class="when-light"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>夜间</span><span class="when-dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>白天</span></button>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="打开导航">
+        <span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="docs-shell has-toc">
+  <aside class="docs-sidebar" id="docs-sidebar">
+<nav aria-label="文档导航">
+<p class="side-label">文档</p>
+<a href="../index.html">文档首页</a>
+<a href="../getting-started.html">开始使用</a>
+<a href="../skills/index.html">Skill 目录</a>
+<a href="../guide.html">编写 Skill</a>
+<a href="../maintenance.html">维护与验证</a>
+<a href="../roadmap.html">路线图</a>
+<p class="side-label">Skills</p>
+<p class="side-cat">内容与表达</p>
+<a href="../skills/deck-authoring.html">deck-authoring</a>
+<a href="../skills/diagram-authoring.html" class="is-active" aria-current="page">diagram-authoring</a>
+<a href="../skills/cosmic-split.html">cosmic-split</a>
+<a href="../skills/email-composer.html">email-composer</a>
+<p class="side-cat">知识与工作</p>
+<a href="../skills/obsidian-wiki.html">obsidian-wiki</a>
+<a href="../skills/obsidian-work.html">obsidian-work</a>
+<a href="../skills/pingcode.html">pingcode</a>
+<a href="../skills/pingcode-weekly.html">pingcode-weekly</a>
+<p class="side-cat">开发与学习</p>
+<a href="../skills/git-dev-workflow.html">git-dev-workflow</a>
+<a href="../skills/learning-scout.html">learning-scout</a>
+</nav>
+</aside>
+  <div class="sidebar-backdrop" data-sidebar-close hidden></div>
+  <main id="main" class="docs-main">
+    <button class="sidebar-toggle" type="button" aria-expanded="false" aria-controls="docs-sidebar">
+      <span>文档导航</span><span class="sidebar-toggle-mark" aria-hidden="true">+</span>
+    </button>
+    <nav class="crumbs" aria-label="面包屑"><a href="../../index.html">Agent Skills</a><span aria-hidden="true">/</span><a href="../index.html">文档</a><span aria-hidden="true">/</span><a href="../skills/index.html">Skill 目录</a><span aria-hidden="true">/</span><span aria-current="page">diagram-authoring</span></nav>
+    <header class="page-head">
+      <p class="eyebrow">内容与表达</p>
+      <h1>diagram-authoring</h1>
+      <p class="page-lede">从结构规格生成可编辑的技术图：架构、依赖、流程、状态、思维导图和网络拓扑。</p>
+      <div class="page-meta"><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/SKILL.md" target="_blank" rel="noreferrer">SKILL.md</a><span aria-hidden="true">·</span><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/README.md" target="_blank" rel="noreferrer">README.md</a></div>
+    </header>
+    <article class="prose">
+      <div class="table-wrap"><table><thead>
+<tr>
+<th>适合</th>
+<th>产物</th>
+<th>依赖</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>系统 / 流程 / 状态 / 拓扑 → 可编辑技术图</td>
+<td><code>.excalidraw</code> · <code>.drawio</code> · <code>.mmd</code> · PNG / SVG</td>
+<td>Python 3.10+；官方导出另需浏览器或 draw.io</td>
+</tr>
+</tbody>
+</table></div><p>模型理解节点与关系；Python 负责布局、路由、检查和序列化。</p>
+<h2 id="成品示例">成品示例</h2>
+<p>同一份虚构的订单系统规格（<a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/examples/architecture/source.diagram.json">source.diagram.json</a>），
+三个后端各自计算布局。节点、连接、分组都来自规格，不是手工摆放的坐标。</p>
+<p><img src="https://raw.githubusercontent.com/huangrx6/agent-skills/main/skills/diagram-authoring/examples/architecture/excalidraw.png" alt="Excalidraw 后端渲染的订单架构图" /></p>
+<p><strong>Excalidraw（默认）</strong>：editorial 视觉，轻边框与手写感字体；产物是可继续编辑的 <code>.excalidraw</code>。</p>
+<p><img src="https://raw.githubusercontent.com/huangrx6/agent-skills/main/skills/diagram-authoring/examples/architecture/drawio.png" alt="draw.io 后端渲染的订单架构图" /></p>
+<p><strong>draw.io</strong>：同一份规格换成 classic 表现；需要 draw.io 协作或图标库时使用，产物是 <code>.drawio</code>。</p>
+<p><img src="https://raw.githubusercontent.com/huangrx6/agent-skills/main/skills/diagram-authoring/examples/architecture/mermaid.png" alt="Mermaid 官方渲染器输出的订单架构图" /></p>
+<p><strong>Mermaid</strong>：规格先生成 <code>.mmd</code>，再交给官方解析器/渲染器；适合嵌进 Markdown 与文档流水线。</p>
+<p>三张图来自 <code>examples/</code> 的虚构案例，不含客户数据；后端不同，布局与字体不要求像素一致。</p>
+<h2 id="安装与依赖">安装与依赖</h2>
+<p>从仓库根目录安装：</p>
+<pre><code class="language-sh">python3 tools/install_skills.py
+</code></pre>
+<p>核心生成链只用 Python 标准库。可选工具各有依赖：</p>
+<div class="table-wrap"><table><thead>
+<tr>
+<th>功能</th>
+<th>依赖</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>自研布局预览 <code>dev-tools/preview.py</code></td>
+<td>Pillow</td>
+</tr>
+<tr>
+<td>Excalidraw 官方 PNG/SVG 导出</td>
+<td>Chrome/Chromium 等受支持浏览器；加载官方 JS 包需要网络</td>
+</tr>
+<tr>
+<td>Mermaid 官方语法检查与 PNG/SVG 导出</td>
+<td>Chrome/Chromium；固定版本 Mermaid ESM 加载需网络</td>
+</tr>
+<tr>
+<td>draw.io PNG/SVG/PDF/JPG 导出</td>
+<td>draw.io 桌面版，支持 <code>DRAWIO_BIN</code> / <code>--binary</code> 指定路径</td>
+</tr>
+<tr>
+<td>官方图标库搜索/下载</td>
+<td>网络；缓存默认在 <code>~/.agent-skills/data/diagram-authoring/libraries/</code></td>
+</tr>
+</tbody>
+</table></div><h2 id="作图前逐步确认">作图前逐步确认</h2>
+<p>默认按内容 → 配色 → Excalidraw 图标逐项提交具体方案，每个节点等用户回复后再继续，最后生成。
+draw.io/Mermaid 确认内容与配色，图标按当前能力标记为不适用；用户要求图标时先核对后端。
+已确认且未变化的选择沿用，明确免确认的授权按其范围执行。参见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/references/decision-gates.md">逐步确认</a>。
+这是代理对话流程；底层 CLI 保持非交互，不伪称脚本能验证人类确认。</p>
+<h2 id="表达与观看">表达与观看</h2>
+<p>先明确读者问题，按 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/references/semantic-patterns.md">表达模式</a> 与 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/references/type-guides.md">图型规则</a>
+组织内容。<code>guide.py</code> 支持 <code>--pattern</code>、<code>--audience</code>、<code>--preset</code>；已有规格无需迁移。
+Excalidraw/draw.io 生成器 <code>--preset</code> 支持文档、投影与打印字号/间距；默认 fit 保持旧输出。
+语义检查提示遗漏，观看检查估算字号，官方 SVG 检查测量真实渲染；三者均不改事实。
+一张图承载多个阅读问题时，先写视图计划再用 <code>split_views.py</code> 提取，保留全部原始节点与边并生成覆盖回执，
+见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/references/reading-views.md">阅读视图</a>。需要同一画布内横竖混排时，用 <code>compose_panels.py</code> 做面板式组合，
+每个面板独立布局，跨面板连线不自动生成；见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/references/mixed-direction.md">混合方向</a>。
+<a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/examples/README.md">标准样例</a> 提供六类输入、可编辑产物与实际导出。</p>
+<h2 id="自由配色">自由配色</h2>
+<p>三后端支持 <code>--colors 项目.colors.json</code>，可使用任意 HEX、自由增添命名色，按节点角色或 ID 分配，
+并调整填充强度。颜色可来自网站、参考图、品牌材料或 <code>color_design.py --seed</code> 的任意主色候选。
+旧方向和方案保持兼容，不限制新设计。见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/references/color-design.md">配色方法与文件格式</a>、
+<a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/examples/colors/README.md">三种来源的同图实测</a>。</p>
+<h2 id="快速开始">快速开始</h2>
+<p>适用节点确认后在 skill 目录运行；规格示例和字段见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/references/diagram-spec.md">diagram-spec.md</a>：</p>
+<pre><code class="language-sh">python3 scripts/validate_spec.py /project/docs/diagrams/system/.source/system.diagram.json
+python3 scripts/check_semantics.py /project/docs/diagrams/system/.source/system.diagram.json --json
+python3 scripts/emit_excalidraw.py /project/docs/diagrams/system/.source/system.diagram.json --quality showcase
+python3 dev-tools/sync_exports.py /project/docs/diagrams/system/system.excalidraw
+# 需要 draw.io 时替换上一条，不默认同时交付两种可编辑格式：
+python3 scripts/emit_drawio.py /project/docs/diagrams/system/.source/system.diagram.json --quality showcase
+python3 dev-tools/sync_exports.py /project/docs/diagrams/system/system.drawio
+python3 scripts/check_presentation.py /project/docs/diagrams/system/system.excalidraw --preset doc-inline --json
+</code></pre>
+<p>新图默认一图一目录：外层只放可编辑文件，规格与配色放 <code>.source/</code>；不主动生成 PNG/SVG，
+只提示用户需要时可导出。更新后通过 <code>sync_exports.py</code> 刷新已有格式，无已有图片则不调用导出器。
+报告和试稿放临时目录，不例行附送 README 或展示页。详见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/references/delivery-files.md">文件组织</a>。
+直接位于 <code>.source/</code> 的 <code>system.diagram.json</code> 默认生成上级 <code>system.excalidraw</code> / <code>system.drawio</code>；
+其他输入保留旧规则（同目录只换最后后缀），<code>-o</code> 可指定任意输出路径。保留 spec，修改结构后重新生成。
+同一输入、同一版本与素材生成确定性文件；手工编辑源成品的变化不会自动读回 spec。</p>
+<div class="table-wrap"><table><thead>
+<tr>
+<th>工具</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>scripts/guide.py</code></td>
+<td>按表达模式、图型信号、受众与观看场景推荐起手方案</td>
+</tr>
+<tr>
+<td><code>scripts/check_semantics.py</code></td>
+<td>分支、状态、树关系与重点的审稿提示</td>
+</tr>
+<tr>
+<td><code>scripts/check_presentation.py</code></td>
+<td>成品名义字号的观看尺寸估算；不替代渲染</td>
+</tr>
+<tr>
+<td><code>scripts/check_layout.py --json</code></td>
+<td>布局诊断、自动调参回执</td>
+</tr>
+<tr>
+<td><code>scripts/check_drawio.py</code></td>
+<td>draw.io XML 结构检查（含压缩页）</td>
+</tr>
+<tr>
+<td><code>scripts/readable_routing.py</code></td>
+<td>Excalidraw 密集图的近距离平行线、实际交叉与标签间隔检查（原生几何）</td>
+</tr>
+<tr>
+<td><code>scripts/layout.py --explain</code></td>
+<td>开发时查看布局推导</td>
+</tr>
+<tr>
+<td><code>scripts/emit_mermaid.py</code> / <code>check_mermaid.py</code></td>
+<td>结构规格 → <code>.mmd</code>，并用官方解析器校验语法</td>
+</tr>
+<tr>
+<td><code>scripts/direction_preview.py</code> / <code>scheme_preview.py</code></td>
+<td>按需比较视觉方向或 draw.io 配色</td>
+</tr>
+<tr>
+<td><code>scripts/compose_panels.py</code></td>
+<td>把多张已生成的 Excalidraw 按 row/column 拼到同一画布，隔离 ID 与引用</td>
+</tr>
+<tr>
+<td><code>scripts/sigils.py</code> / <code>icons.py</code> / <code>icons_fetch.py</code></td>
+<td>内置图标、本地素材和官方库查询</td>
+</tr>
+<tr>
+<td><code>dev-tools/export_excalidraw.py</code> / <code>export_drawio.py</code> / <code>export_mermaid.py</code></td>
+<td>调用真实渲染器导出</td>
+</tr>
+<tr>
+<td><code>dev-tools/sync_exports.py</code></td>
+<td>只刷新已有格式；显式 <code>--format</code> 才新增格式，保存导出参数</td>
+</tr>
+<tr>
+<td><code>dev-tools/check_render.py</code></td>
+<td>在真实浏览器核对单页官方 SVG；能力与限制见观看场景</td>
+</tr>
+</tbody>
+</table></div><p>默认 Excalidraw；draw.io 支持多份 spec 合成多页文件。两者共有七种基本形状，
+但 draw.io 当前拒绝图标、不支持完整云/UML/BPMN图元库。不要把“应用本身支持”当成“本生成器支持”。</p>
+<h2 id="质量边界">质量边界</h2>
+<p><code>standard</code> 允许部分连线警告；<code>showcase</code> 将结构类警告升级为阻塞。
+阻塞时 emit 不写成品，已有文件不会被半成品覆盖。默认仅交付原生图时不强制导出做检查，
+未做真实渲染审查须如实说明；Excalidraw 可能重新折行，字体与应用版本也可能改变结果。</p>
+<p>默认在当前项目交付文件，不自动写 Obsidian。用户指定 vault 后才解析环境变量
+<code>OBSIDIAN_VAULT_PATH</code> 或 <code>~/.agent-skills/config/obsidian-vault-path</code>。</p>
+<p>详见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/SKILL.md">使用入口</a>、<a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/references/validation.md">校验</a> 与两份后端说明。
+<code>evals/evals.json</code> 覆盖代理行为；<code>benchmarks/first-pass/</code> 保留首轮可用性的协议、验证器与历史证据，
+历史截图不代表当前版本已通过视觉验收。</p>
+<h2 id="开发验证">开发验证</h2>
+<p>从仓库根目录执行（测试包含核心不变量与外部导出的 mock 合同）：</p>
+<pre><code class="language-sh">python3 -m unittest discover -s tests/diagram-authoring -v
+</code></pre>
+<p>浏览器/应用实际导出需单独运行并检查产物；单元测试通过不能替代它。</p>
+<h2 id="mermaid-与-draw-io-的补齐">Mermaid 与 draw.io 的补齐</h2>
+<p><code>emit_mermaid.py</code> 从结构规格生成 <code>.mmd</code>，<code>check_mermaid.py</code> 用官方解析器校验；
+PNG/SVG 由 <code>dev-tools/export_mermaid.py</code> 按需导出，已有格式通过 <code>sync_exports.py</code> 刷新：</p>
+<pre><code class="language-sh">python3 scripts/emit_mermaid.py system.diagram.json -o system.mmd
+python3 scripts/check_mermaid.py system.mmd
+python3 dev-tools/export_mermaid.py system.mmd -o system.png --format png
+</code></pre>
+<p>详见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/references/mermaid-backend.md">Mermaid 后端</a>。
+draw.io 支持压缩文件回读、默认名义留白 80，多页图片需显式页码，PDF 默认全部页。</p>
+
+    </article>
+    <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="../skills/deck-authoring.html"><span>上一篇</span><strong>演示文稿制作</strong></a><a class="page-nav-link next" href="../skills/cosmic-split.html"><span>下一篇</span><strong>cosmic-split</strong></a></nav>
+  </main>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#成品示例">成品示例</a></li><li class="toc-2"><a href="#安装与依赖">安装与依赖</a></li><li class="toc-2"><a href="#作图前逐步确认">作图前逐步确认</a></li><li class="toc-2"><a href="#表达与观看">表达与观看</a></li><li class="toc-2"><a href="#自由配色">自由配色</a></li><li class="toc-2"><a href="#快速开始">快速开始</a></li><li class="toc-2"><a href="#质量边界">质量边界</a></li><li class="toc-2"><a href="#开发验证">开发验证</a></li><li class="toc-2"><a href="#mermaid-与-draw-io-的补齐">Mermaid 与 draw.io 的补齐</a></li></ul></aside>
+</div>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <p>Agent Skills · 10 个可独立安装的 skill</p>
+    <nav aria-label="页脚">
+      <a href="../index.html">文档</a>
+      <a href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="../../../">huangrx6.github.io</a>
+    </nav>
+  </div>
+</footer>
+<script src="../../assets/site.js" defer></script>
+</body>
+</html>

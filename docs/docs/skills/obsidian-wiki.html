@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Obsidian 学习 Wiki · Agent Skills</title>
+<meta name="description" content="以学习为主的知识 Wiki：把资料融入已有知识，按笔记提问、复习，并随新证据更新结论。">
+<link rel="canonical" href="https://huangrx6.github.io/agent-skills/docs/skills/obsidian-wiki.html">
+<meta name="theme-color" content="#0f1012">
+<meta property="og:title" content="Obsidian 学习 Wiki · Agent Skills">
+<meta property="og:description" content="以学习为主的知识 Wiki：把资料融入已有知识，按笔记提问、复习，并随新证据更新结论。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://huangrx6.github.io/agent-skills/docs/skills/obsidian-wiki.html">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<script>
+  (() => {
+    const root = document.documentElement;
+    let theme = 'dark';
+    try {
+      const stored = localStorage.getItem('agent-skills-theme');
+      if (stored === 'light' || stored === 'dark') theme = stored;
+    } catch (error) {}
+    root.dataset.theme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#0f1012' : '#f5f3ee';
+  })();
+</script>
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body class="docs">
+<a class="skip-link" href="#main">跳到正文</a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="../../index.html">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="2" y="14" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="14" width="8" height="8" rx="2" fill="currentColor" opacity=".45"/>
+      </svg>
+      <span>Agent Skills</span>
+    </a>
+    <div class="header-tools">
+      <nav class="site-nav" id="site-nav" aria-label="主导航">
+        <a href="../index.html">文档</a><a href="../skills/index.html" aria-current="page">Skills</a><a href="../guide.html">编写 Skill</a>
+        <a class="nav-github" href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </nav>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换白天/夜间模式" title="切换白天/夜间"><span class="when-light"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>夜间</span><span class="when-dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>白天</span></button>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="打开导航">
+        <span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="docs-shell has-toc">
+  <aside class="docs-sidebar" id="docs-sidebar">
+<nav aria-label="文档导航">
+<p class="side-label">文档</p>
+<a href="../index.html">文档首页</a>
+<a href="../getting-started.html">开始使用</a>
+<a href="../skills/index.html">Skill 目录</a>
+<a href="../guide.html">编写 Skill</a>
+<a href="../maintenance.html">维护与验证</a>
+<a href="../roadmap.html">路线图</a>
+<p class="side-label">Skills</p>
+<p class="side-cat">内容与表达</p>
+<a href="../skills/deck-authoring.html">deck-authoring</a>
+<a href="../skills/diagram-authoring.html">diagram-authoring</a>
+<a href="../skills/cosmic-split.html">cosmic-split</a>
+<a href="../skills/email-composer.html">email-composer</a>
+<p class="side-cat">知识与工作</p>
+<a href="../skills/obsidian-wiki.html" class="is-active" aria-current="page">obsidian-wiki</a>
+<a href="../skills/obsidian-work.html">obsidian-work</a>
+<a href="../skills/pingcode.html">pingcode</a>
+<a href="../skills/pingcode-weekly.html">pingcode-weekly</a>
+<p class="side-cat">开发与学习</p>
+<a href="../skills/git-dev-workflow.html">git-dev-workflow</a>
+<a href="../skills/learning-scout.html">learning-scout</a>
+</nav>
+</aside>
+  <div class="sidebar-backdrop" data-sidebar-close hidden></div>
+  <main id="main" class="docs-main">
+    <button class="sidebar-toggle" type="button" aria-expanded="false" aria-controls="docs-sidebar">
+      <span>文档导航</span><span class="sidebar-toggle-mark" aria-hidden="true">+</span>
+    </button>
+    <nav class="crumbs" aria-label="面包屑"><a href="../../index.html">Agent Skills</a><span aria-hidden="true">/</span><a href="../index.html">文档</a><span aria-hidden="true">/</span><a href="../skills/index.html">Skill 目录</a><span aria-hidden="true">/</span><span aria-current="page">obsidian-wiki</span></nav>
+    <header class="page-head">
+      <p class="eyebrow">知识与工作</p>
+      <h1>Obsidian 学习 Wiki</h1>
+      <p class="page-lede">以学习为主的知识 Wiki：把资料融入已有知识，按笔记提问、复习，并随新证据更新结论。</p>
+      <div class="page-meta"><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/obsidian-wiki/SKILL.md" target="_blank" rel="noreferrer">SKILL.md</a><span aria-hidden="true">·</span><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/obsidian-wiki/README.md" target="_blank" rel="noreferrer">README.md</a></div>
+    </header>
+    <article class="prose">
+      <div class="table-wrap"><table><thead>
+<tr>
+<th>适合</th>
+<th>产物</th>
+<th>依赖</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>新建 Wiki · 吸收文章 / 课程 · 主题更新 · 按笔记问答与复习</td>
+<td>可分享的库结构 · 知识笔记 · MOC · 证据链接</td>
+<td>Obsidian · Python 3.10+（标准库）</td>
+</tr>
+</tbody>
+</table></div><p>保留原有 PARA 目录，同时区分来源、知识和学习入口；不要求另建 raw/wiki 顶层目录。</p>
+<p>这个 skill 可以单独安装运行，不依赖工作记录 skill、PingCode、数据库或插件。
+工作笔记可作为学习来源；知识文章按可直接发布到公众号/博客的标准写，正文不依赖其他库内文章，笔记间导航只放 MOC，保留外部证据来源。
+不会触发任务同步或自动生成工作记录。</p>
+<h2 id="使用场景">使用场景</h2>
+<ul>
+<li>“把这篇文章融入我的缓存专题，保留原来的个人理解，指出它改变了什么。”</li>
+<li>“根据已有笔记解释缓存一致性，标出还有哪些地方没证据。”</li>
+<li>“基于这个主题考我两个应用问题，先别给答案。”</li>
+<li>“这份新版本说明推翻了旧笔记的一部分，核对并更新。”</li>
+<li>“检查这些笔记的矛盾和过期结论，先告诉我问题。”</li>
+<li>“把这篇笔记改名并更新受影响的链接。”</li>
+<li>“我本地还没有知识库，帮我在这个目录初始化一个可以分享给别人的学习 Wiki。”</li>
+<li>“这篇像模板拼起来的，围绕真正的问题重组，保留细节和我的解释。”</li>
+<li>“只更新这份 v2 材料影响的部分；v1 项目仍在使用的操作保留。”</li>
+<li>“给这篇笔记做知识图解，用我的小研究员 IP；不能生图就把参考图和提示词留在待生成块里。”</li>
+</ul>
+<p>资料接收、查询和检查的具体行为见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/obsidian-wiki/SKILL.md">SKILL.md</a>。查询和复习默认不写入，
+“保存”“融入”“更新”才在要求范围内修改。需求、缺陷、任务分工不属于本 skill 的业务职责。
+整理项目说明、会议材料或润色已有周报时，按 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/obsidian-wiki/references/work-note-editing.md">工作材料编辑</a> 处理：
+可以保留材料中已有的分工与进展，区分事实、建议和决定；仅编辑文档不会自动变更工作项主档。</p>
+<h2 id="配置">配置</h2>
+<p>安装方式见仓库 <a href="https://github.com/huangrx6/agent-skills/blob/main/README.md">README</a>。脚本只依赖 Python 标准库。
+下面命令从仓库根运行；安装后可换成对应 skill 的完整脚本路径。</p>
+<pre><code class="language-sh">export OBSIDIAN_VAULT_PATH=&quot;/path/to/your/vault&quot;
+python3 skills/obsidian-wiki/scripts/vault_path.py --explain
+</code></pre>
+<p>也可把路径写为 <code>~/.agent-skills/config/obsidian-vault-path</code> 的一行文本；
+<code>AGENT_SKILLS_CONFIG_DIR</code> 可覆盖配置目录，旧文件 <code>~/.config/obsidian-vault-path</code> 仅兼容回退。
+显式路径优先于环境变量，环境变量优先于配置文件；可以单独指定本次库，不要求与其他能力共用库。</p>
+<p>如果本机还没有 vault，可以先创建一个可分享的起点：</p>
+<pre><code class="language-sh">python3 skills/obsidian-wiki/scripts/init_vault.py &quot;/path/to/your/vault&quot; --git --configure
+</code></pre>
+<p>它会创建最小 PARA 目录、入口页、<code>AGENTS.md</code>、<code>VAULT.md</code> 和 <code>.gitignore</code>，只写缺失文件。
+<code>AGENTS.md</code> 约束所有 Agent，<code>VAULT.md</code> 保存库内目录和知识生命周期；已有同名文件不会被覆盖。
+<code>--git</code> 初始化 vault 自己的 Git 仓库，<code>--configure</code> 写入当前用户的 vault 路径配置。
+skill 代码仓库和 vault 数据仓库分开分享，本机配置不要提交到任一仓库。接收者流程见
+<a href="https://github.com/huangrx6/agent-skills/blob/main/skills/obsidian-wiki/references/vault-bootstrap.md">初始化与分享知识库</a>。</p>
+<h2 id="从旧方式迁移">从旧方式迁移</h2>
+<p><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/obsidian-wiki/references/adoption.md">渐进采用</a>说明如何从一个真实主题开始，不搬空现有目录。
+<a href="https://github.com/huangrx6/agent-skills/blob/main/skills/obsidian-wiki/references/knowledge-model.md">知识模型</a>定义来源、结论、个人理解与可选属性。
+已知归属直接更新主笔记；资料先与已有认识比较，再决定是否需要新页面。</p>
+<p>文章没有统一章节骨架。<a href="https://github.com/huangrx6/agent-skills/blob/main/skills/obsidian-wiki/references/resource-notes.md">学习笔记</a>指导如何从问题选择讲述顺序，
+<a href="https://github.com/huangrx6/agent-skills/blob/main/skills/obsidian-wiki/references/writing-conventions.md">写作规范</a>指导段落、表格、代码、提示块和图的搭配。
+沿用的是文件、属性和链接约定，不是旧模板里所有章节。深入解释与简短笔记都可以成立。
+每篇以“不需要回看其他库内文章”为标准；本文真正依赖的名词、流程和代码讲清，用不到的前置知识不必补。
+详略按理解难点分配：简单处省略，名词、繁琐流程与关键代码讲透。
+源码与机制长文按 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/obsidian-wiki/references/source-review.md">机制与源码解读</a> 组织：先给可检验的心智模型，再落到源码证据。</p>
+<p><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/obsidian-wiki/references/knowledge-updates.md">知识更新</a>处理“新资料怎样改变旧笔记”：对应到具体结论，
+区分补充、修正、版本并存与未决分歧，修订相关示例和图，并说明实际核验范围。
+收到新资料、准备应用或用户要求复核时维护；不会自动持续联网、定时改库或要求新建版本数据库。</p>
+<h2 id="个人-ip-配图">个人 IP 配图</h2>
+<p>内置 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/obsidian-wiki/assets/personal-ip/researcher-v1-reference.png">小研究员角色原图</a>，
+配图默认使用与它协调的清爽手绘风格。人物可以讲解、提出问题或参与情境，出现与否由图的解释目的决定。
+角色身份以图片为准；构图、知识结构、动作及知识区域的配色随内容变化。</p>
+<p>支持参考图输入的生图工具会实际带图生成；没有生图工具、不能输入参考或你要自己生成时，
+在笔记对应位置留下展开的 <strong>「配图待生成」</strong> Callout，包含参考附件、完整提示词和成图保存路径。
+在外部工具中需要<strong>同时上传参考图片</strong>，只复制提示词或图片路径不能保证同一人物。
+补回图片后检查身份和知识准确性，再替换待生成块；提示词作为制作附件保留，便于后续更新。</p>
+<p>详见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/obsidian-wiki/references/personal-ip.md">个人 IP 与生图交接</a>。当前只有角色参考板，还没有确认的独立贴纸包；
+要达到人物像素级一致，应复用以后确认的透明素材，不能把参考图生成等同于绝对一致。
+此能力不强制安装其他 skill 或插件，也不会自动给旧笔记批量加人物。
+可直接查看一份完整的 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/obsidian-wiki/examples/personal-ip-handoff.md">待生成块示例</a>。</p>
+<h2 id="验证与限制">验证与限制</h2>
+<pre><code class="language-sh">python3 skills/obsidian-wiki/scripts/health_check.py --strict
+python3 -m unittest discover -s tests/obsidian-wiki -v
+</code></pre>
+<p><code>health_check.py</code> 默认检查失效双链和 <code>.obsidian</code> 配置文件路径；<code>--strict</code> 再检查共享前的核心目录与入口，
+适合刚初始化的库。单独诊断时再运行 <code>check_links.py</code> 或 <code>check_paths.py</code>。所有检查只读，
+支持 <code>--vault PATH</code>、<code>--json</code> 和 <code>--quiet</code>。
+退出码为 <code>0</code> 无范围内失败、<code>1</code> 发现问题、<code>2</code> 输入不可用。
+链接检查只验证双链/嵌入的文件目标，不覆盖普通 Markdown 链接、标题/块锚点或同名语义歧义。
+配置检查只提取常见 POSIX 绝对路径，并启发式区分文件和目录，边界见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/obsidian-wiki/references/structural-checks.md">结构检查</a>。
+这些脚本不证明结论正确；证据、冲突和学习效果需按实际材料审阅。
+<code>evals/evals.json</code> 是行为场景，不代表已自动执行全部场景或完成触发基准测试。</p>
+
+    </article>
+    <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="../skills/email-composer.html"><span>上一篇</span><strong>email-composer</strong></a><a class="page-nav-link next" href="../skills/obsidian-work.html"><span>下一篇</span><strong>obsidian-work</strong></a></nav>
+  </main>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#使用场景">使用场景</a></li><li class="toc-2"><a href="#配置">配置</a></li><li class="toc-2"><a href="#从旧方式迁移">从旧方式迁移</a></li><li class="toc-2"><a href="#个人-ip-配图">个人 IP 配图</a></li><li class="toc-2"><a href="#验证与限制">验证与限制</a></li></ul></aside>
+</div>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <p>Agent Skills · 10 个可独立安装的 skill</p>
+    <nav aria-label="页脚">
+      <a href="../index.html">文档</a>
+      <a href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="../../../">huangrx6.github.io</a>
+    </nav>
+  </div>
+</footer>
+<script src="../../assets/site.js" defer></script>
+</body>
+</html>

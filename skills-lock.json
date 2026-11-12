@@ -18,6 +18,12 @@
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
+    "email-composer": {
+      "computedHash": "fe305bba2252b2efc01cd1507e1ed2f6ab348d9c4586e38a74e01803dea6ae38",
+      "skillPath": "skills/email-composer/SKILL.md",
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github"
+    },
     "git-dev-workflow": {
       "computedHash": "ac70b39b0a49c08e2629919c315822ae0911bc9e351ae653a71b2db9ffb53144",
       "skillPath": "skills/git-dev-workflow/SKILL.md",
@@ -31,7 +37,7 @@
       "sourceType": "github"
     },
     "obsidian-wiki": {
-      "computedHash": "21c930dd06609d066d845a0b2a3e78a0997c3887e5c655592f46a44e22ce08b6",
+      "computedHash": "6e62d12bca2afca2cf1a820f3e0abb4600dcc6d2abb2d8e7a212e75e982e2ae0",
       "skillPath": "skills/obsidian-wiki/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"

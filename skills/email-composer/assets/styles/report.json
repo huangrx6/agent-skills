@@ -1,0 +1,26 @@
+{
+  "name": "report",
+  "description": "汇报、交付、周报：顶部摘要卡，表格带浅灰斑马纹",
+  "width": 640,
+  "font": {
+    "family": "'Microsoft YaHei', '微软雅黑', 'PingFang SC', Arial, sans-serif",
+    "size": 14,
+    "line_height": 1.7
+  },
+  "color": {
+    "accent": "#255E75",
+    "text": "#1F2328",
+    "muted": "#5B6770",
+    "background": "#FFFFFF",
+    "page": "#F5F6F8",
+    "surface": "#F4F7F9",
+    "border": "#DDE3E8"
+  },
+  "spacing": { "page": 24, "content": 28, "block": 12 },
+  "frame": { "border": true },
+  "heading": { "bar": false, "size": 20, "section_size": 16 },
+  "summary": { "card": true },
+  "callout": { "card": true },
+  "table": { "zebra": true, "header_background": "#EDF2F5" },
+  "band": { "enabled": false, "color": "#B42318", "text": "#FFFFFF" }
+}

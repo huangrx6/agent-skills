@@ -1,0 +1,84 @@
+type: approval
+secondary: [handover, confirm]
+audience: 上级（内部）
+tone: 正式、简洁
+to: 王总 <wang@example.com>
+subject: 【申请】Orbit 工作台上线申请（2026-11-20 20:00）
+greeting: 王总，您好
+summary: >-
+  申请于 2026-11-20 20:00 发布 Orbit 工作台，请审批。发布窗口预计 2 小时，
+  回滚演练已经完成。
+blocks:
+  - kind: paragraph
+    text: 本次申请包含发布审批、交付说明与工时确认三部分，具体如下。
+  - kind: heading
+    text: 发布范围
+  - kind: bullets
+    items:
+      - 首页改版与导航调整
+      - 审批流的并行会签
+      - 移动端适配
+  - kind: images
+    items:
+      - src: https://example.com/orbit/home.png
+        alt: 改版后的首页
+        caption: 首页改版效果
+      - src: https://example.com/orbit/flow.png
+        alt: 并行会签的审批流
+        caption: 审批流配置
+      - src: https://example.com/orbit/mobile.png
+        alt: 移动端适配效果
+        caption: 移动端首页
+  - kind: heading
+    text: 工时确认
+  - kind: table
+    columns: [项目, 工时（人天）, 说明]
+    rows:
+      - [发布执行, "3.5", 含窗口值守]
+      - [功能验证, "1.5", 覆盖三条主流程]
+      - [次日值守, "0.5", 处理线上反馈]
+  - kind: heading
+    text: 发布步骤
+  - kind: steps
+    items:
+      - title: 冻结变更
+        time: "20:00"
+        text: 停止合入，确认当前版本与发布单一致。
+      - title: 灰度发布
+        time: "20:30"
+        text: 先放量一成，观察错误率与耗时。
+      - title: 全量发布
+        time: "22:00"
+        text: 确认无异常后全量，完成回归验证。
+  - kind: callout
+    tone: warn
+    title: 回滚条件
+    text: 发布后 30 分钟内错误率超过 1%，或核心接口耗时翻倍，立即回滚。
+  - kind: todo
+    items:
+      - text: 确认发布窗口与值守人
+        owner: 李工
+        due: 2026-11-18 18:00
+      - text: 通知值班同事
+        owner: 王工
+        due: 2026-11-19 12:00
+  - kind: signature
+    name: 张明
+    title: 平台组
+    contact:
+      - 内线 8001
+facts:
+  - 2026-11-20 20:00
+  - 2026-11-18 18:00
+  - 2026-11-19 12:00
+  - "2 小时"
+  - "30 分钟"
+  - "1%"
+  - "20:00"
+  - "20:30"
+  - "22:00"
+  - "3.5 人天"
+  - "1.5 人天"
+  - "0.5 人天"
+  - "8001"
+placeholders: []

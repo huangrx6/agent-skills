@@ -1,0 +1,26 @@
+{
+  "name": "plain",
+  "description": "日常、对外、短通知：无色块，靠留白和标题层级区分",
+  "width": 600,
+  "font": {
+    "family": "'Microsoft YaHei', '微软雅黑', 'PingFang SC', Arial, sans-serif",
+    "size": 14,
+    "line_height": 1.7
+  },
+  "color": {
+    "accent": "#2B2B2B",
+    "text": "#1F1F1F",
+    "muted": "#666666",
+    "background": "#FFFFFF",
+    "page": "#FFFFFF",
+    "surface": "#FFFFFF",
+    "border": "#E0E0E0"
+  },
+  "spacing": { "page": 16, "content": 20, "block": 12 },
+  "frame": { "border": false },
+  "heading": { "bar": false, "size": 20, "section_size": 16 },
+  "summary": { "card": false },
+  "callout": { "card": false },
+  "table": { "zebra": false, "header_background": "#FFFFFF" },
+  "band": { "enabled": false, "color": "#B42318", "text": "#FFFFFF" }
+}

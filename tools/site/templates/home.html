@@ -1,0 +1,88 @@
+<main id="main">
+  <section class="hero wrap">
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Agent Skills</p>
+      <h1>把重复的工作方法，<br>写成 <em>Agent 能执行</em>、<br>也能验证的 skill。</h1>
+      <p class="hero-lede">@@SKILL_COUNT@@ 个可独立安装的能力，覆盖内容表达、知识工作与开发流程。每个 skill 都带入口说明、可执行脚本和回归测试。</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="docs/getting-started.html">开始使用</a>
+        <a class="btn btn-ghost" href="docs/skills/index.html">浏览 Skills <span aria-hidden="true">→</span></a>
+      </div>
+    </div>
+    <aside class="terminal" aria-label="快速安装">
+      <div class="terminal-bar">
+        <span class="terminal-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="terminal-title">quick start</span>
+        <button class="copy-btn terminal-copy" type="button" data-copy-target="install-command">复制</button>
+      </div>
+      <pre id="install-command"><code>git clone https://github.com/huangrx6/agent-skills.git
+cd agent-skills
+python3 tools/install_skills.py</code></pre>
+      <p class="terminal-note">默认安装到 <code>~/.agents/skills/</code></p>
+    </aside>
+  </section>
+
+  <div class="wrap hero-meta" aria-label="项目概况">
+    <span><strong>@@SKILL_COUNT@@</strong> skills</span>
+    <span><strong>3</strong> 类场景</span>
+    <span><strong>Python 3.10+</strong></span>
+    <span><strong>MIT</strong></span>
+  </div>
+
+  <section class="wrap section" id="skills">
+    <div class="section-head">
+      <h2>Skills</h2>
+      <p>每个 skill 独立安装，也可以组合使用。</p>
+    </div>
+    @@SKILL_GROUPS@@
+  </section>
+
+  <section class="wrap section how" id="how">
+    <div class="section-head">
+      <h2>怎么运作</h2>
+      <p>入口、执行、验证三件事固定下来，能力才可复用。</p>
+    </div>
+    <div class="how-grid">
+      <article class="how-item">
+        <span class="how-num">01</span>
+        <h3>入口</h3>
+        <p><code>SKILL.md</code> 说明什么时候触发、按什么步骤执行；不靠临场发挥。</p>
+      </article>
+      <article class="how-item">
+        <span class="how-num">02</span>
+        <h3>执行</h3>
+        <p><code>scripts/</code> 把确定性步骤写成可运行代码，产物落到文件。</p>
+      </article>
+      <article class="how-item">
+        <span class="how-num">03</span>
+        <h3>验证</h3>
+        <p>回归测试与结构检查守住行为边界；产物质量单独验收。</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="wrap section install" id="install">
+    <div class="section-head">
+      <h2>安装</h2>
+      <p>本机开发用软链，其他 Agent 用官方 CLI。</p>
+    </div>
+    <div class="install-grid">
+      <article class="install-card">
+        <div class="install-head"><h3>本机开发</h3><span>推荐</span></div>
+        <pre><code>git clone https://github.com/huangrx6/agent-skills.git
+cd agent-skills
+python3 tools/install_skills.py</code></pre>
+        <p>默认软链到 <code>~/.agents/skills/</code>，改仓库立即生效。</p>
+      </article>
+      <article class="install-card">
+        <div class="install-head"><h3>其他 Agent</h3><span>CLI</span></div>
+        <pre><code>npx skills add https://github.com/huangrx6/agent-skills \
+  -a claude-code -a codex -g</code></pre>
+        <p>由官方安装器维护路径与更新；也可以装到项目的 <code>.agents/skills</code>。</p>
+      </article>
+    </div>
+    <div class="section-foot">
+      <a class="text-link" href="docs/getting-started.html">查看完整安装与配置 <span aria-hidden="true">→</span></a>
+    </div>
+  </section>
+</main>

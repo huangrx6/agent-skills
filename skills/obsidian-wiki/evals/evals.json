@@ -204,6 +204,12 @@
       "prompt": "这段架构解释只说“Agent 不持有提示词和工具，它们以系统消息写进 transcript，由 AgentSession 每次请求前算好”，还把它叫“纯函数”和“唯一反向通道”。帮我讲透并修正。",
       "expected_output": "区分 source of truth、派生视图、持久化增量与请求投影；补 SystemMessage 的 sections/toolsAdded 重放、AgentSession 的 run 开始/轮次间两个注入点、agent-loop 的工具声明对齐；指出“纯函数”和“唯一反向通道”不成立；给出代码位置、对象所有权和时序，不把多层机制压成一句。",
       "files": []
+    },
+    {
+      "id": 35,
+      "prompt": "我本地还没有 Obsidian 知识库，帮我在 /tmp/study-wiki 初始化一个能分享给别人的库，然后检查是否可以交给别人。",
+      "expected_output": "使用明确给出的目标路径运行 init_vault.py，只创建缺失结构；保留已有文件，不覆盖 .obsidian。说明生成的 AGENTS.md、VAULT.md、本机配置与 vault 数据分别是什么，运行 health_check.py --strict；不自动上传、提交、推送或安装插件。",
+      "files": []
     }
   ]
 }

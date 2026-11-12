@@ -1,6 +1,6 @@
 {
   "skill_name": "obsidian-wiki",
-  "note": "触发评测集：5 条正例覆盖不同说法，5 条反例各指向一个会抢走它的 skill。每条都要 3 次干净会话，所以只保留有判别力的问题；评测方法见 tools/skill-builder/GUIDE.md。",
+  "note": "触发评测集：6 条正例覆盖不同说法，5 条反例各指向一个会抢走它的 skill。每条都要 3 次干净会话，所以只保留有判别力的问题；评测方法见 tools/skill-builder/GUIDE.md。",
   "triggers": [
     {
       "id": 1,
@@ -56,6 +56,11 @@
       "query": "解释一下 Raft 的选举过程，说清楚 term 怎么变",
       "should_trigger": false,
       "note": "→ 普通问答：不涉及已有笔记"
+    },
+    {
+      "id": 11,
+      "query": "我本地还没有 Obsidian 知识库，帮我在指定目录初始化一个可以分享的 Wiki",
+      "should_trigger": true
     }
   ]
 }

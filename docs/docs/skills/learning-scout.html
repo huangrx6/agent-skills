@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>learning-scout · Agent Skills</title>
+<meta name="description" content="把一个学习需求变成一组能读进去的独立笔记，以及一个可离线打开的入口页。">
+<link rel="canonical" href="https://huangrx6.github.io/agent-skills/docs/skills/learning-scout.html">
+<meta name="theme-color" content="#0f1012">
+<meta property="og:title" content="learning-scout · Agent Skills">
+<meta property="og:description" content="把一个学习需求变成一组能读进去的独立笔记，以及一个可离线打开的入口页。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://huangrx6.github.io/agent-skills/docs/skills/learning-scout.html">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<script>
+  (() => {
+    const root = document.documentElement;
+    let theme = 'dark';
+    try {
+      const stored = localStorage.getItem('agent-skills-theme');
+      if (stored === 'light' || stored === 'dark') theme = stored;
+    } catch (error) {}
+    root.dataset.theme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#0f1012' : '#f5f3ee';
+  })();
+</script>
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body class="docs">
+<a class="skip-link" href="#main">跳到正文</a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="../../index.html">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="2" y="14" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="14" width="8" height="8" rx="2" fill="currentColor" opacity=".45"/>
+      </svg>
+      <span>Agent Skills</span>
+    </a>
+    <div class="header-tools">
+      <nav class="site-nav" id="site-nav" aria-label="主导航">
+        <a href="../index.html">文档</a><a href="../skills/index.html" aria-current="page">Skills</a><a href="../guide.html">编写 Skill</a>
+        <a class="nav-github" href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </nav>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换白天/夜间模式" title="切换白天/夜间"><span class="when-light"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>夜间</span><span class="when-dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>白天</span></button>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="打开导航">
+        <span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="docs-shell has-toc">
+  <aside class="docs-sidebar" id="docs-sidebar">
+<nav aria-label="文档导航">
+<p class="side-label">文档</p>
+<a href="../index.html">文档首页</a>
+<a href="../getting-started.html">开始使用</a>
+<a href="../skills/index.html">Skill 目录</a>
+<a href="../guide.html">编写 Skill</a>
+<a href="../maintenance.html">维护与验证</a>
+<a href="../roadmap.html">路线图</a>
+<p class="side-label">Skills</p>
+<p class="side-cat">内容与表达</p>
+<a href="../skills/deck-authoring.html">deck-authoring</a>
+<a href="../skills/diagram-authoring.html">diagram-authoring</a>
+<a href="../skills/cosmic-split.html">cosmic-split</a>
+<a href="../skills/email-composer.html">email-composer</a>
+<p class="side-cat">知识与工作</p>
+<a href="../skills/obsidian-wiki.html">obsidian-wiki</a>
+<a href="../skills/obsidian-work.html">obsidian-work</a>
+<a href="../skills/pingcode.html">pingcode</a>
+<a href="../skills/pingcode-weekly.html">pingcode-weekly</a>
+<p class="side-cat">开发与学习</p>
+<a href="../skills/git-dev-workflow.html">git-dev-workflow</a>
+<a href="../skills/learning-scout.html" class="is-active" aria-current="page">learning-scout</a>
+</nav>
+</aside>
+  <div class="sidebar-backdrop" data-sidebar-close hidden></div>
+  <main id="main" class="docs-main">
+    <button class="sidebar-toggle" type="button" aria-expanded="false" aria-controls="docs-sidebar">
+      <span>文档导航</span><span class="sidebar-toggle-mark" aria-hidden="true">+</span>
+    </button>
+    <nav class="crumbs" aria-label="面包屑"><a href="../../index.html">Agent Skills</a><span aria-hidden="true">/</span><a href="../index.html">文档</a><span aria-hidden="true">/</span><a href="../skills/index.html">Skill 目录</a><span aria-hidden="true">/</span><span aria-current="page">learning-scout</span></nav>
+    <header class="page-head">
+      <p class="eyebrow">开发与学习</p>
+      <h1>learning-scout</h1>
+      <p class="page-lede">把一个学习需求变成一组能读进去的独立笔记，以及一个可离线打开的入口页。</p>
+      <div class="page-meta"><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/learning-scout/SKILL.md" target="_blank" rel="noreferrer">SKILL.md</a><span aria-hidden="true">·</span><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/learning-scout/README.md" target="_blank" rel="noreferrer">README.md</a></div>
+    </header>
+    <article class="prose">
+      <div class="table-wrap"><table><thead>
+<tr>
+<th>适合</th>
+<th>产物</th>
+<th>依赖</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>主题学习 · 系列笔记 · 可复习的离线课程</td>
+<td>笔记 <code>.md</code> · HTML 入口 · 打印版 / PDF</td>
+<td>Python 3.11+；渲染增强可选</td>
+</tr>
+</tbody>
+</table></div><h2 id="快速开始">快速开始</h2>
+<pre><code class="language-sh">sh scripts/setup.sh                                 # 可选：装 Markdown 渲染与代码高亮
+python3 scripts/check_notes.py --plan plan.json     # 质量闸门
+python3 scripts/build_series.py build --input plan.json
+python3 scripts/build_series.py build --input plan.json --out ./dist --force --open
+</code></pre>
+<p>默认输出到 <code>~/Downloads/learning-scout/&lt;topic&gt;-&lt;date&gt;/</code>。<code>--no-check</code> 跳过质量检查，
+仅用于临时草稿。</p>
+<h2 id="输出结构">输出结构</h2>
+<pre><code class="language-text">&lt;workspace&gt;/
+├── index.html      # 篇目、进度、视频墙、动手任务、复习卡、术语表
+├── print.html      # 全部篇目合并，可直接打印或导出 PDF
+├── plan.json       # 计划源文件
+├── README.md       # 篇目与路径清单
+└── notes/
+    ├── 01-xxx.md   # 独立成篇的深度笔记，可导入知识库或直接发布到博客/公众号
+    └── 01-xxx.html # 渲染页：目录、视频、自测、上一篇/下一篇
+</code></pre>
+<h2 id="依赖">依赖</h2>
+<ul>
+<li>
+<p>Python 3.11+。</p>
+</li>
+<li>
+<p><strong>可选</strong>：<code>markdown-it-py</code>、<code>mdit-py-plugins</code>、<code>pygments</code>，提供嵌套列表、表格对齐与代码高亮。
+它们装在项目家目录，不放进 skill：</p>
+<pre><code class="language-sh">sh scripts/setup.sh
+# → ${AGENT_SKILLS_HOME:-~/.agent-skills}/data/learning-scout/venv
+</code></pre>
+<p>可用 <code>LEARNING_SCOUT_VENV</code> 指定别处。未安装时自动回退到内置渲染器：
+基本 Markdown 可用，嵌套列表会被拍平、代码不高亮。</p>
+</li>
+</ul>
+<h2 id="页面能力">页面能力</h2>
+<ul>
+<li>亮 / 暗自动切换，无远程字体与脚本。</li>
+<li>篇目搜索、已读勾选、继续上次、复习卡 1/3/7 天调度、测验答案持久化。</li>
+<li>视频点击后才加载播放器；断网时正文、目录、测验、复习卡仍可读。</li>
+<li>打印时隐藏导航、视频与测验；<code>print.html</code> 合并全部篇目。</li>
+</ul>
+<h2 id="目录与参考">目录与参考</h2>
+<details>
+<summary><strong>展开文件说明</strong></summary>
+<div class="table-wrap"><table><thead>
+<tr>
+<th>文件</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SKILL.md</code></td>
+<td>工作流程、来源规则、验收标准</td>
+</tr>
+<tr>
+<td><code>scripts/build_series.py</code></td>
+<td>构建入口：校验、质检、渲染、复制原文与图片、生成 index 与 print</td>
+</tr>
+<tr>
+<td><code>scripts/render_md.py</code></td>
+<td>Markdown 引擎（markdown-it + Pygments；无依赖时回退）</td>
+</tr>
+<tr>
+<td><code>scripts/series_theme.py</code></td>
+<td>简洁样式（亮/暗）与前端脚本（进度、测验、复习、搜索）</td>
+</tr>
+<tr>
+<td><code>scripts/check_notes.py</code></td>
+<td>结构与独立性检查（默认节、代码量、跨篇引用、个人路径；长度仅提示）</td>
+</tr>
+<tr>
+<td><code>scripts/setup.sh</code></td>
+<td>可选的 venv 安装</td>
+</tr>
+<tr>
+<td><code>tests/learning-scout/</code>（仓库根目录）</td>
+<td>渲染、视频地址、校验、构建、图片复制、检查器</td>
+</tr>
+<tr>
+<td><code>references/depth-standard.md</code></td>
+<td>每篇写多深、多少行、默认有哪些节</td>
+</tr>
+<tr>
+<td><code>references/note-templates.md</code></td>
+<td>四类笔记的起步骨架</td>
+</tr>
+<tr>
+<td><code>references/learning-design.md</code></td>
+<td>承诺、篇目节奏、独立性与练习</td>
+</tr>
+<tr>
+<td><code>references/plan-schema.md</code></td>
+<td>v2 系列合同；v1 单页字段在文末</td>
+</tr>
+<tr>
+<td><code>references/video-sources.md</code></td>
+<td>视频来源、核验字段、内嵌平台</td>
+</tr>
+<tr>
+<td><code>references/content-quality.md</code></td>
+<td>内容合同与清晰度检查</td>
+</tr>
+<tr>
+<td><code>references/source-quality.md</code></td>
+<td>博客 / 视频 / 社区来源的分层与核验</td>
+</tr>
+<tr>
+<td><code>examples/series.plan.json</code></td>
+<td>v2 系列示例（配 <code>examples/series-notes/</code>）</td>
+</tr>
+<tr>
+<td><code>examples/rag.plan.json</code></td>
+<td>v1 单页路线示例（legacy）</td>
+</tr>
+<tr>
+<td><code>examples/langchain-notes.plan.json</code></td>
+<td>v1 paged 示例（legacy）</td>
+</tr>
+<tr>
+<td><code>scripts/learning_scout.py</code></td>
+<td>v1 单页渲染器（legacy，保留兼容）</td>
+</tr>
+<tr>
+<td><code>assets/</code>、<code>templates/</code></td>
+<td>v1 版式的样式与模板（legacy）</td>
+</tr>
+</tbody>
+</table></div></details>
+<h2 id="验证">验证</h2>
+<pre><code class="language-sh">python3 -m unittest discover -s tests/learning-scout -v   # 55 条：全绿（未装可选依赖时跳过渲染用例）
+</code></pre>
+<h2 id="限制">限制</h2>
+<ul>
+<li>未装可选依赖时，嵌套列表会拍平、代码无高亮；<code>check_notes.py</code> 仍可用。</li>
+<li>视频内嵌需要联网；离线只保留标题与链接。</li>
+<li>进度、答题与复习记录保存在浏览器 <code>localStorage</code>，换设备或清缓存会丢失。</li>
+<li>1 / 3 / 7 天是轻量间隔复习，不是完整 FSRS。</li>
+</ul>
+
+    </article>
+    <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="../skills/git-dev-workflow.html"><span>上一篇</span><strong>git-dev-workflow</strong></a><a class="page-nav-link next" href="../guide.html"><span>下一篇</span><strong>编写 Skill</strong></a></nav>
+  </main>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#快速开始">快速开始</a></li><li class="toc-2"><a href="#输出结构">输出结构</a></li><li class="toc-2"><a href="#依赖">依赖</a></li><li class="toc-2"><a href="#页面能力">页面能力</a></li><li class="toc-2"><a href="#目录与参考">目录与参考</a></li><li class="toc-2"><a href="#验证">验证</a></li><li class="toc-2"><a href="#限制">限制</a></li></ul></aside>
+</div>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <p>Agent Skills · 10 个可独立安装的 skill</p>
+    <nav aria-label="页脚">
+      <a href="../index.html">文档</a>
+      <a href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="../../../">huangrx6.github.io</a>
+    </nav>
+  </div>
+</footer>
+<script src="../../assets/site.js" defer></script>
+</body>
+</html>

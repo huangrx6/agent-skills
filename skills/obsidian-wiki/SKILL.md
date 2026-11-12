@@ -3,10 +3,10 @@ name: obsidian-wiki
 description: >-
   用于在 Obsidian 中学习和维护个人 Wiki：吸收文章或课程、整理概念与实践、综合多个来源、
   根据已有笔记回答问题、复习自测、把散篇重组成可直接发布的长文、核对笔记与代码的版本、
-  笔记配图与个人 IP 生图交接，以及笔记归位和链接维护。
-  触发示例：把这份资料融入知识库、我之前学过什么、更新这个主题、检查知识冲突。
+  笔记配图与个人 IP 生图交接、笔记归位和链接维护，以及没有现成库时初始化可分享的 Wiki。
+  触发示例：初始化知识库、把这份资料融入知识库、我之前学过什么、更新这个主题、检查知识冲突。
   Do NOT use for: 不涉及知识库的普通问答、需求缺陷与任务分工的业务管理、周报与工作项汇总、外部平台操作、不涉及知识库的纯文字改写。
-compatibility: Requires Python 3.10+ (standard library only) and an Obsidian vault path.
+compatibility: Requires Python 3.10+ (standard library only). Existing vaults can be used directly; a new vault can be initialized with the bundled bootstrap script.
 ---
 
 # Obsidian 学习 Wiki
@@ -23,16 +23,22 @@ compatibility: Requires Python 3.10+ (standard library only) and an Obsidian vau
 ```sh
 python3 scripts/vault_path.py --explain
 python3 scripts/vault_path.py "/本次指定的知识库" --explain
+python3 scripts/init_vault.py "/新知识库路径" --git --configure
 ```
 
 路径来源依次为本次显式路径、`OBSIDIAN_VAULT_PATH`、
 `$AGENT_SKILLS_CONFIG_DIR/obsidian-vault-path`（配置目录默认 `~/.agent-skills/config`），
 再兼容旧配置 `~/.config/obsidian-vault-path`。未配置时仍可处理用户给出的材料，不能猜库写入。
+用户明确要求初始化时，先使用用户给出的目标路径运行 `init_vault.py`；脚本只创建缺失结构，
+不会覆盖已有笔记或 `.obsidian/`。新库会生成统一 Agent 协议 `AGENTS.md`、库内地图 `VAULT.md`，
+以及可选的 Git 仓库和本机路径配置。Git、分享边界见
+[初始化与分享知识库](references/vault-bootstrap.md)。
 
 ## 先选本次动作
 
 | 用户要做什么 | 工作方式 | 按需读取 |
 | --- | --- | --- |
+| 没有现成 vault，想初始化一个可分享的学习库 | 使用目标路径创建最小 PARA 结构，可选初始化 Git 和本机路径配置 | [初始化与分享知识库](references/vault-bootstrap.md)、[归位规则](references/vault-map.md) |
 | 保存、吸收文章/课程/自己的理解 | 查重、定位相关知识、整合有价值的增量 | [知识模型](references/knowledge-model.md)、[资料与查询流程](references/wiki-operations.md) |
 | 根据知识库提问或复习自测 | 找到相关笔记和证据，在对话中回答；默认只读 | [资料与查询流程](references/wiki-operations.md)、[学习笔记](references/resource-notes.md) |
 | 写学习笔记、重组文章、改善排版 | 找到理解主线，简单处省略，名词/流程/代码讲透；按可直接发布标准组织叙述与 Markdown | [学习笔记](references/resource-notes.md)、[写作规范](references/writing-conventions.md)、[研究与综合](references/research-and-synthesis.md) |
@@ -78,12 +84,12 @@ MOC 以所在目录及其子目录的引用列表为主，保持简洁，不默�
 ## 检查与交付
 
 ```sh
-python3 scripts/check_links.py --vault "/知识库路径" --ignore-template
-python3 scripts/check_paths.py --vault "/知识库路径"
+python3 scripts/health_check.py --vault "/知识库路径"
+python3 scripts/health_check.py --vault "/知识库路径" --strict
 ```
 
-链接/位置改变时按需要运行链接检查；配置路径检查只用于相关插件配置修改或迁移。
-两者只读：退出码 `0` 无范围内失败、`1` 有问题、`2` 输入不可用。
+默认检查用于已有库；`--strict` 用于刚初始化的库或分享前检查核心结构。只查断链或插件路径时，
+再单独运行 `check_links.py`、`check_paths.py`。检查器只读：退出码 `0` 无失败、`1` 有问题、`2` 输入不可用。
 脚本不判断知识真伪、来源支持程度或 Markdown 链接/标题锚点；边界见 [结构检查](references/structural-checks.md)。
 原有断链与本次新增问题分开，不能为通过检查编造笔记或删除有意预留的链接。
 

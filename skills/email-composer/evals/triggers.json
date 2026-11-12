@@ -1,0 +1,61 @@
+{
+  "skill_name": "email-composer",
+  "note": "触发评测集：5 条正例覆盖不同说法，5 条反例各指向一个会抢走它的 skill 或明确不做的能力。每条跑 3 次干净会话；方法见 tools/skill-builder/GUIDE.md。",
+  "triggers": [
+    {
+      "id": 1,
+      "query": "帮我写封邮件给王总，申请周五晚上上线",
+      "should_trigger": true
+    },
+    {
+      "id": 2,
+      "query": "把这周的进展整理成一封汇报邮件发给老板",
+      "should_trigger": true
+    },
+    {
+      "id": 3,
+      "query": "做一个上线通知的邮件模板，以后每周复用",
+      "should_trigger": true
+    },
+    {
+      "id": 4,
+      "query": "写一封对外报价邮件，附价格表和付款方式",
+      "should_trigger": true
+    },
+    {
+      "id": 5,
+      "query": "帮我把这封邮件改正式一点，再出一版 HTML",
+      "should_trigger": true
+    },
+    {
+      "id": 6,
+      "query": "帮我整理一下这周的周报",
+      "should_trigger": false,
+      "note": "→ pingcode-weekly / obsidian-work：周报要汇总工作项状态，不是起草一封邮件"
+    },
+    {
+      "id": 7,
+      "query": "把这段会议录音整理成纪要",
+      "should_trigger": false,
+      "note": "→ 会议纪要，明确不做；录音转写与纪要整理不属于邮件起草"
+    },
+    {
+      "id": 8,
+      "query": "帮我把这句微信回复改得客气点",
+      "should_trigger": false,
+      "note": "→ 单句聊天回复，明确不做；本 skill 只处理完整邮件"
+    },
+    {
+      "id": 9,
+      "query": "做一份产品介绍的 PPT",
+      "should_trigger": false,
+      "note": "→ deck-authoring：演示文稿不是邮件"
+    },
+    {
+      "id": 10,
+      "query": "帮我把这封邮件直接发出去",
+      "should_trigger": false,
+      "note": "→ 发送能力，明确不做；v1 只输出草稿文件，不接邮箱"
+    }
+  ]
+}

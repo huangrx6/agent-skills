@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "name": "需求与工时确认",
+  "type": "confirm",
+  "scene": "requirements",
+  "description": "确认需求范围、预估工时、交付计划与上线当晚支撑安排；效果图与支撑表可按需保留。",
+  "vars": {
+    "project_name": {
+      "required": true,
+      "description": "需求或项目名称，同时用于邮件主题",
+      "example": "客户门户改版"
+    },
+    "scope_1": {
+      "required": true,
+      "description": "需求范围第 1 条",
+      "example": "首页信息架构调整与视觉改版"
+    },
+    "scope_2": {
+      "required": true,
+      "description": "需求范围第 2 条",
+      "example": "审批流并行会签与消息通知"
+    },
+    "scope_3": {
+      "required": true,
+      "description": "需求范围第 3 条",
+      "example": "移动端适配与兼容性修复"
+    },
+    "image_1_src": {
+      "required": true,
+      "description": "效果图 1 的图片地址",
+      "example": "https://placehold.co/1200x675/EDF2F7/64748B.png?text=Screen+1"
+    },
+    "image_1_alt": {
+      "required": true,
+      "description": "效果图 1 的替代文本",
+      "example": "改版后的首页效果"
+    },
+    "image_1_caption": {
+      "required": true,
+      "description": "效果图 1 的图注",
+      "example": "首页改版效果"
+    },
+    "image_2_src": {
+      "required": false,
+      "description": "效果图 2 的图片地址；不需要时删除整段图片块",
+      "example": "https://placehold.co/1200x675/EDF2F7/64748B.png?text=Screen+2",
+      "default": "https://placehold.co/1200x675/EDF2F7/64748B.png?text=Screen+2"
+    },
+    "image_2_alt": {
+      "required": false,
+      "description": "效果图 2 的替代文本",
+      "example": "审批流配置页面",
+      "default": "审批流配置页面"
+    },
+    "image_2_caption": {
+      "required": false,
+      "description": "效果图 2 的图注",
+      "example": "审批流配置",
+      "default": "审批流配置"
+    },
+    "hours_dev": {
+      "required": true,
+      "description": "功能开发与适配工时（人天）",
+      "example": "12"
+    },
+    "hours_api": {
+      "required": true,
+      "description": "接口对接与联调工时（人天）",
+      "example": "5"
+    },
+    "hours_test": {
+      "required": true,
+      "description": "测试与部署工时（人天）",
+      "example": "3"
+    },
+    "hours_total": {
+      "required": true,
+      "description": "合计工时（人天），应为各行之和",
+      "example": "20"
+    },
+    "delivery_date": {
+      "required": true,
+      "description": "预计交付时间",
+      "example": "2026-12-05"
+    },
+    "delivery_scope": {
+      "required": true,
+      "description": "交付内容或验收范围",
+      "example": "测试环境部署包、发布说明与回滚预案"
+    },
+    "acceptance_method": {
+      "required": true,
+      "description": "验收方式",
+      "example": "按需求范围逐项验收，三条主流程回归通过"
+    },
+    "prerequisites": {
+      "required": false,
+      "description": "前置条件（接口、环境、权限、资料等）",
+      "example": "测试环境、接口权限与历史数据样例",
+      "default": "无"
+    },
+    "support_period_1": {
+      "required": true,
+      "description": "值守第 1 行：时段",
+      "example": "20:00–22:00"
+    },
+    "support_person_1": {
+      "required": true,
+      "description": "值守第 1 行：支撑人员",
+      "example": "张工"
+    },
+    "support_role_1": {
+      "required": true,
+      "description": "值守第 1 行：职责",
+      "example": "发布执行与回滚"
+    },
+    "support_contact_1": {
+      "required": true,
+      "description": "值守第 1 行：联系方式",
+      "example": "内线 8001"
+    },
+    "support_period_2": {
+      "required": true,
+      "description": "值守第 2 行：时段",
+      "example": "22:00–次日 00:00"
+    },
+    "support_person_2": {
+      "required": true,
+      "description": "值守第 2 行：支撑人员",
+      "example": "李工"
+    },
+    "support_role_2": {
+      "required": true,
+      "description": "值守第 2 行：职责",
+      "example": "业务验证与问题定位"
+    },
+    "support_contact_2": {
+      "required": true,
+      "description": "值守第 2 行：联系方式",
+      "example": "内线 8002"
+    },
+    "support_period_3": {
+      "required": true,
+      "description": "值守第 3 行：时段",
+      "example": "次日 09:00–10:00"
+    },
+    "support_person_3": {
+      "required": true,
+      "description": "值守第 3 行：支撑人员",
+      "example": "王工"
+    },
+    "support_role_3": {
+      "required": true,
+      "description": "值守第 3 行：职责",
+      "example": "早间巡检与反馈收集"
+    },
+    "support_contact_3": {
+      "required": true,
+      "description": "值守第 3 行：联系方式",
+      "example": "内线 8003"
+    },
+    "confirm_deadline": {
+      "required": true,
+      "description": "确认截止时间",
+      "example": "2026-11-25 18:00"
+    }
+  }
+}

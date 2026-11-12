@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>@@TITLE@@</title>
+<meta name="description" content="@@DESCRIPTION@@">
+<link rel="canonical" href="@@CANONICAL@@">
+<meta name="theme-color" content="#0f1012">
+<meta property="og:title" content="@@TITLE@@">
+<meta property="og:description" content="@@DESCRIPTION@@">
+<meta property="og:type" content="website">
+<meta property="og:url" content="@@CANONICAL@@">
+<link rel="icon" href="@@BASE@@favicon.svg" type="image/svg+xml">
+<script>
+  (() => {
+    const root = document.documentElement;
+    let theme = 'dark';
+    try {
+      const stored = localStorage.getItem('agent-skills-theme');
+      if (stored === 'light' || stored === 'dark') theme = stored;
+    } catch (error) {}
+    root.dataset.theme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#0f1012' : '#f5f3ee';
+  })();
+</script>
+<link rel="stylesheet" href="@@BASE@@site.css">
+</head>
+<body class="@@BODY_CLASS@@">
+<a class="skip-link" href="#main">跳到正文</a>
+@@HEADER@@
+@@BODY@@
+@@FOOTER@@
+<script src="@@BASE@@site.js" defer></script>
+</body>
+</html>

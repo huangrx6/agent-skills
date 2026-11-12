@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>git-dev-workflow · Agent Skills</title>
+<meta name="description" content="本地 Git 写操作的状态探查、破坏性动作预检、提交检查与 worktree 管理。">
+<link rel="canonical" href="https://huangrx6.github.io/agent-skills/docs/skills/git-dev-workflow.html">
+<meta name="theme-color" content="#0f1012">
+<meta property="og:title" content="git-dev-workflow · Agent Skills">
+<meta property="og:description" content="本地 Git 写操作的状态探查、破坏性动作预检、提交检查与 worktree 管理。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://huangrx6.github.io/agent-skills/docs/skills/git-dev-workflow.html">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<script>
+  (() => {
+    const root = document.documentElement;
+    let theme = 'dark';
+    try {
+      const stored = localStorage.getItem('agent-skills-theme');
+      if (stored === 'light' || stored === 'dark') theme = stored;
+    } catch (error) {}
+    root.dataset.theme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#0f1012' : '#f5f3ee';
+  })();
+</script>
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body class="docs">
+<a class="skip-link" href="#main">跳到正文</a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="../../index.html">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="2" y="14" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="14" width="8" height="8" rx="2" fill="currentColor" opacity=".45"/>
+      </svg>
+      <span>Agent Skills</span>
+    </a>
+    <div class="header-tools">
+      <nav class="site-nav" id="site-nav" aria-label="主导航">
+        <a href="../index.html">文档</a><a href="../skills/index.html" aria-current="page">Skills</a><a href="../guide.html">编写 Skill</a>
+        <a class="nav-github" href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </nav>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换白天/夜间模式" title="切换白天/夜间"><span class="when-light"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>夜间</span><span class="when-dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>白天</span></button>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="打开导航">
+        <span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="docs-shell has-toc">
+  <aside class="docs-sidebar" id="docs-sidebar">
+<nav aria-label="文档导航">
+<p class="side-label">文档</p>
+<a href="../index.html">文档首页</a>
+<a href="../getting-started.html">开始使用</a>
+<a href="../skills/index.html">Skill 目录</a>
+<a href="../guide.html">编写 Skill</a>
+<a href="../maintenance.html">维护与验证</a>
+<a href="../roadmap.html">路线图</a>
+<p class="side-label">Skills</p>
+<p class="side-cat">内容与表达</p>
+<a href="../skills/deck-authoring.html">deck-authoring</a>
+<a href="../skills/diagram-authoring.html">diagram-authoring</a>
+<a href="../skills/cosmic-split.html">cosmic-split</a>
+<a href="../skills/email-composer.html">email-composer</a>
+<p class="side-cat">知识与工作</p>
+<a href="../skills/obsidian-wiki.html">obsidian-wiki</a>
+<a href="../skills/obsidian-work.html">obsidian-work</a>
+<a href="../skills/pingcode.html">pingcode</a>
+<a href="../skills/pingcode-weekly.html">pingcode-weekly</a>
+<p class="side-cat">开发与学习</p>
+<a href="../skills/git-dev-workflow.html" class="is-active" aria-current="page">git-dev-workflow</a>
+<a href="../skills/learning-scout.html">learning-scout</a>
+</nav>
+</aside>
+  <div class="sidebar-backdrop" data-sidebar-close hidden></div>
+  <main id="main" class="docs-main">
+    <button class="sidebar-toggle" type="button" aria-expanded="false" aria-controls="docs-sidebar">
+      <span>文档导航</span><span class="sidebar-toggle-mark" aria-hidden="true">+</span>
+    </button>
+    <nav class="crumbs" aria-label="面包屑"><a href="../../index.html">Agent Skills</a><span aria-hidden="true">/</span><a href="../index.html">文档</a><span aria-hidden="true">/</span><a href="../skills/index.html">Skill 目录</a><span aria-hidden="true">/</span><span aria-current="page">git-dev-workflow</span></nav>
+    <header class="page-head">
+      <p class="eyebrow">开发与学习</p>
+      <h1>git-dev-workflow</h1>
+      <p class="page-lede">本地 Git 写操作的状态探查、破坏性动作预检、提交检查与 worktree 管理。</p>
+      <div class="page-meta"><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/git-dev-workflow/SKILL.md" target="_blank" rel="noreferrer">SKILL.md</a><span aria-hidden="true">·</span><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/git-dev-workflow/README.md" target="_blank" rel="noreferrer">README.md</a></div>
+    </header>
+    <article class="prose">
+      <div class="table-wrap"><table><thead>
+<tr>
+<th>适合</th>
+<th>产物</th>
+<th>依赖</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>提交、建分支、清理、worktree、误操作恢复</td>
+<td>状态快照 · 风险结论 · 可执行建议</td>
+<td>Python 3.10+ · Git</td>
+</tr>
+</tbody>
+</table></div><p>Agent 的选择规则见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/git-dev-workflow/SKILL.md">SKILL.md</a>，详细操作按其中的参考链接读取。</p>
+<h2 id="快速开始">快速开始</h2>
+<p>命令从本仓库根目录运行；检查别的仓库时加 <code>--repo</code>。</p>
+<pre><code class="language-sh">python3 skills/git-dev-workflow/scripts/git_state.py --repo /path/to/repo
+python3 skills/git-dev-workflow/scripts/git_guard.py --list
+python3 skills/git-dev-workflow/scripts/git_guard.py delete-branch feature --repo /path/to/repo
+python3 skills/git-dev-workflow/scripts/commit_style.py --check 'fix(api): 修正分页'
+python3 skills/git-dev-workflow/scripts/worktree.py list --repo /path/to/repo
+</code></pre>
+<h2 id="边界">边界</h2>
+<p><code>git_guard.py</code> 只输出证据和建议命令，不执行。SAFE/WARN/BLOCK 的退出码为 0/3/4。
+<code>worktree.py remove</code> 只自动执行 SAFE；WARN 时会给出预检结果及可供授权后使用的命令。
+仓库不需要安装钩子才能使用本 skill；若已有钩子，<code>bypass-hooks</code> 会报告它们。</p>
+<p>可选审计：动手前 <code>git_report.py --capture</code>，完成后 <code>git_report.py</code>。
+默认快照放在 Git 公共元数据目录，多个 worktree 共用；并行审计请各自指定 <code>--file</code>。
+没有事前快照时，可以报告当前状态和已知提交，但不能倒造“操作前”的证据。</p>
+<h2 id="验证">验证</h2>
+<p>从本仓库根目录运行：</p>
+<pre><code class="language-sh">python3 -m unittest discover -s tests/git-dev-workflow -v
+</code></pre>
+<p>测试使用临时 Git 仓库，不修改当前工作区。覆盖状态、guard、worktree、报告、分组和提交语法。
+文件分类仍是命名启发式，远端信息仍取决于本地跟踪引用；bare、shallow 及旧版 Git 未作全面兼容验证。</p>
+
+    </article>
+    <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="../skills/pingcode-weekly.html"><span>上一篇</span><strong>pingcode-weekly</strong></a><a class="page-nav-link next" href="../skills/learning-scout.html"><span>下一篇</span><strong>learning-scout</strong></a></nav>
+  </main>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#快速开始">快速开始</a></li><li class="toc-2"><a href="#边界">边界</a></li><li class="toc-2"><a href="#验证">验证</a></li></ul></aside>
+</div>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <p>Agent Skills · 10 个可独立安装的 skill</p>
+    <nav aria-label="页脚">
+      <a href="../index.html">文档</a>
+      <a href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="../../../">huangrx6.github.io</a>
+    </nav>
+  </div>
+</footer>
+<script src="../../assets/site.js" defer></script>
+</body>
+</html>

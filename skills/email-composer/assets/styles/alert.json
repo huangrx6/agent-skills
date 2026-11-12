@@ -1,0 +1,26 @@
+{
+  "name": "alert",
+  "description": "故障、协调、紧急通知：顶部警示色带，红色强调",
+  "width": 640,
+  "font": {
+    "family": "'Microsoft YaHei', '微软雅黑', 'PingFang SC', Arial, sans-serif",
+    "size": 14,
+    "line_height": 1.7
+  },
+  "color": {
+    "accent": "#B42318",
+    "text": "#1F2328",
+    "muted": "#5B6770",
+    "background": "#FFFFFF",
+    "page": "#F7F4F3",
+    "surface": "#FDF3F2",
+    "border": "#EFD9D6"
+  },
+  "spacing": { "page": 24, "content": 28, "block": 12 },
+  "frame": { "border": true },
+  "heading": { "bar": true, "size": 20, "section_size": 16 },
+  "summary": { "card": true },
+  "callout": { "card": true },
+  "table": { "zebra": false, "header_background": "#FBEAE8" },
+  "band": { "enabled": true, "color": "#B42318", "text": "#FFFFFF" }
+}

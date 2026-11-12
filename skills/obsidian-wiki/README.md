@@ -4,7 +4,7 @@
 
 | 适合 | 产物 | 依赖 |
 | --- | --- | --- |
-| 吸收文章 / 课程 · 主题更新 · 按笔记问答与复习 | 知识笔记 · MOC · 证据链接 · 配图交接 | Obsidian · Python 3.10+（标准库） |
+| 新建 Wiki · 吸收文章 / 课程 · 主题更新 · 按笔记问答与复习 | 可分享的库结构 · 知识笔记 · MOC · 证据链接 | Obsidian · Python 3.10+（标准库） |
 
 保留原有 PARA 目录，同时区分来源、知识和学习入口；不要求另建 raw/wiki 顶层目录。
 
@@ -20,6 +20,7 @@
 - “这份新版本说明推翻了旧笔记的一部分，核对并更新。”
 - “检查这些笔记的矛盾和过期结论，先告诉我问题。”
 - “把这篇笔记改名并更新受影响的链接。”
+- “我本地还没有知识库，帮我在这个目录初始化一个可以分享给别人的学习 Wiki。”
 - “这篇像模板拼起来的，围绕真正的问题重组，保留细节和我的解释。”
 - “只更新这份 v2 材料影响的部分；v1 项目仍在使用的操作保留。”
 - “给这篇笔记做知识图解，用我的小研究员 IP；不能生图就把参考图和提示词留在待生成块里。”
@@ -42,6 +43,18 @@ python3 skills/obsidian-wiki/scripts/vault_path.py --explain
 也可把路径写为 `~/.agent-skills/config/obsidian-vault-path` 的一行文本；
 `AGENT_SKILLS_CONFIG_DIR` 可覆盖配置目录，旧文件 `~/.config/obsidian-vault-path` 仅兼容回退。
 显式路径优先于环境变量，环境变量优先于配置文件；可以单独指定本次库，不要求与其他能力共用库。
+
+如果本机还没有 vault，可以先创建一个可分享的起点：
+
+```sh
+python3 skills/obsidian-wiki/scripts/init_vault.py "/path/to/your/vault" --git --configure
+```
+
+它会创建最小 PARA 目录、入口页、`AGENTS.md`、`VAULT.md` 和 `.gitignore`，只写缺失文件。
+`AGENTS.md` 约束所有 Agent，`VAULT.md` 保存库内目录和知识生命周期；已有同名文件不会被覆盖。
+`--git` 初始化 vault 自己的 Git 仓库，`--configure` 写入当前用户的 vault 路径配置。
+skill 代码仓库和 vault 数据仓库分开分享，本机配置不要提交到任一仓库。接收者流程见
+[初始化与分享知识库](references/vault-bootstrap.md)。
 
 ## 从旧方式迁移
 
@@ -79,12 +92,13 @@ python3 skills/obsidian-wiki/scripts/vault_path.py --explain
 ## 验证与限制
 
 ```sh
-python3 skills/obsidian-wiki/scripts/check_links.py --ignore-template
-python3 skills/obsidian-wiki/scripts/check_paths.py
+python3 skills/obsidian-wiki/scripts/health_check.py --strict
 python3 -m unittest discover -s tests/obsidian-wiki -v
 ```
 
-两个检查器支持 `--vault PATH`、`--json`、`--quiet`，不修改文件。
+`health_check.py` 默认检查失效双链和 `.obsidian` 配置文件路径；`--strict` 再检查共享前的核心目录与入口，
+适合刚初始化的库。单独诊断时再运行 `check_links.py` 或 `check_paths.py`。所有检查只读，
+支持 `--vault PATH`、`--json` 和 `--quiet`。
 退出码为 `0` 无范围内失败、`1` 发现问题、`2` 输入不可用。
 链接检查只验证双链/嵌入的文件目标，不覆盖普通 Markdown 链接、标题/块锚点或同名语义歧义。
 配置检查只提取常见 POSIX 绝对路径，并启发式区分文件和目录，边界见 [结构检查](references/structural-checks.md)。

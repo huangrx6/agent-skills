@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>编写 Skill · Agent Skills</title>
+<meta name="description" content="把可复用的工作方法写成容易触发、能执行、能核验的 skill。用于创建新 skill、评审触发描述或范围；普通正文或脚本修改直接进行，不需要重新论证。用户已明确要求创建或调整时，在授权范围内直接推进。">
+<link rel="canonical" href="https://huangrx6.github.io/agent-skills/docs/guide.html">
+<meta name="theme-color" content="#0f1012">
+<meta property="og:title" content="编写 Skill · Agent Skills">
+<meta property="og:description" content="把可复用的工作方法写成容易触发、能执行、能核验的 skill。用于创建新 skill、评审触发描述或范围；普通正文或脚本修改直接进行，不需要重新论证。用户已明确要求创建或调整时，在授权范围内直接推进。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://huangrx6.github.io/agent-skills/docs/guide.html">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<script>
+  (() => {
+    const root = document.documentElement;
+    let theme = 'dark';
+    try {
+      const stored = localStorage.getItem('agent-skills-theme');
+      if (stored === 'light' || stored === 'dark') theme = stored;
+    } catch (error) {}
+    root.dataset.theme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#0f1012' : '#f5f3ee';
+  })();
+</script>
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body class="docs">
+<a class="skip-link" href="#main">跳到正文</a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="../index.html">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="2" y="14" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="14" width="8" height="8" rx="2" fill="currentColor" opacity=".45"/>
+      </svg>
+      <span>Agent Skills</span>
+    </a>
+    <div class="header-tools">
+      <nav class="site-nav" id="site-nav" aria-label="主导航">
+        <a href="index.html">文档</a><a href="skills/index.html">Skills</a><a href="guide.html" aria-current="page">编写 Skill</a>
+        <a class="nav-github" href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </nav>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换白天/夜间模式" title="切换白天/夜间"><span class="when-light"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>夜间</span><span class="when-dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>白天</span></button>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="打开导航">
+        <span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="docs-shell has-toc">
+  <aside class="docs-sidebar" id="docs-sidebar">
+<nav aria-label="文档导航">
+<p class="side-label">文档</p>
+<a href="index.html">文档首页</a>
+<a href="getting-started.html">开始使用</a>
+<a href="skills/index.html">Skill 目录</a>
+<a href="guide.html" class="is-active" aria-current="page">编写 Skill</a>
+<a href="maintenance.html">维护与验证</a>
+<a href="roadmap.html">路线图</a>
+<p class="side-label">Skills</p>
+<p class="side-cat">内容与表达</p>
+<a href="skills/deck-authoring.html">deck-authoring</a>
+<a href="skills/diagram-authoring.html">diagram-authoring</a>
+<a href="skills/cosmic-split.html">cosmic-split</a>
+<a href="skills/email-composer.html">email-composer</a>
+<p class="side-cat">知识与工作</p>
+<a href="skills/obsidian-wiki.html">obsidian-wiki</a>
+<a href="skills/obsidian-work.html">obsidian-work</a>
+<a href="skills/pingcode.html">pingcode</a>
+<a href="skills/pingcode-weekly.html">pingcode-weekly</a>
+<p class="side-cat">开发与学习</p>
+<a href="skills/git-dev-workflow.html">git-dev-workflow</a>
+<a href="skills/learning-scout.html">learning-scout</a>
+</nav>
+</aside>
+  <div class="sidebar-backdrop" data-sidebar-close hidden></div>
+  <main id="main" class="docs-main">
+    <button class="sidebar-toggle" type="button" aria-expanded="false" aria-controls="docs-sidebar">
+      <span>文档导航</span><span class="sidebar-toggle-mark" aria-hidden="true">+</span>
+    </button>
+    <nav class="crumbs" aria-label="面包屑"><a href="../index.html">Agent Skills</a><span aria-hidden="true">/</span><a href="index.html">文档</a><span aria-hidden="true">/</span><span aria-current="page">编写 Skill</span></nav>
+    <header class="page-head">
+      <p class="eyebrow">文档</p>
+      <h1>编写 Skill</h1>
+      <p class="page-lede">把可复用的工作方法写成容易触发、能执行、能核验的 skill。用于创建新 skill、评审触发描述或范围；普通正文或脚本修改直接进行，不需要重新论证。用户已明确要求创建或调整时，在授权范围内直接推进。</p>
+      <div class="page-meta"><a href="https://github.com/huangrx6/agent-skills/blob/main/tools/skill-builder/GUIDE.md" target="_blank" rel="noreferrer">GUIDE.md</a></div>
+    </header>
+    <article class="prose">
+      <h2 id="先确定范围">先确定范围</h2>
+<p>从当前请求和已有材料回答这些问题，不必逐条向用户提问：</p>
+<ol>
+<li><strong>解决什么重复问题？</strong> 用户经常给什么输入，想拿到什么产物，哪些步骤需要固定下来？
+尚无使用记录时，用具体预期场景建立初版，说明待验证处；一次性任务通常直接完成即可。</li>
+<li><strong>什么时候触发？</strong> 写出用户会实际说的话，包含常用语言和产物名称。</li>
+<li><strong>与相邻 skill 怎么分工？</strong> 阅读可能重叠的 description，按输入、动作、产物区分。
+能由现有 skill 完整覆盖时优先复用；有独立流程时再拆分。允许同一任务合理组合多个 skill。</li>
+<li><strong>本次做到哪里？</strong> 定义一个可完成的主流程、必要依赖、验证方式和能力边界。
+不为了凑齐目录而新增脚本、素材或参考文件。</li>
+</ol>
+<p>只有影响结果、无法从上下文判断的信息才问用户。不要用“过去 30 天用够几次”、固定写作时长
+或必须先修改另一个 skill 的描述作为开工门槛。</p>
+<h2 id="写-description">写 description</h2>
+<ul>
+<li>先写用途和具体触发条件，再写最容易混淆的排除项；本仓库以 <code>Do NOT use for:</code> 标识边界。</li>
+<li>使用用户的常用表达；中文工作流应有中文触发语，但不堆砌同义词。</li>
+<li>description 是发现入口，正文是操作流程；不要把完整命令、安装步骤或历史故事塞进入口。</li>
+<li>对照相邻 skill，确保一般请求不会误触发，也不会把真正属于自己的任务排除出去。</li>
+<li>不承诺尚未实现或未验证的功能。触发准确度需要独立测试，不能由措辞好看推断。</li>
+<li>环境要求写进 frontmatter 的 <code>compatibility</code>（≤500 字符，官方规范的字段）：运行时、浏览器、
+外部账号与网络。它和 README 的依赖表是两个入口，说法必须一致。</li>
+<li><code>name</code> 只用小写字母、数字与连字符，≤64 字符，与目录同名，不含 <code>claude</code> / <code>anthropic</code>；
+这些由 <code>validate_skill.py</code> 检查，不必靠人记。</li>
+</ul>
+<h2 id="触发评测">触发评测</h2>
+<p>描述写得像不像样，读一遍看不出来：同一个 description 可能过宽（把邻近任务吸进来），
+也可能过窄（用户换种说法就不触发）。唯一可靠的判据是<strong>真跑</strong>。</p>
+<p>需要时可给 skill 提供 <code>evals/triggers.json</code>（目前 <code>obsidian-wiki</code>、<code>obsidian-work</code>、
+<code>pingcode-weekly</code>、<code>deck-authoring</code>、<code>diagram-authoring</code> 已有，每个 5+5 条）：</p>
+<pre><code class="language-json">{
+  &quot;skill_name&quot;: &quot;obsidian-wiki&quot;,
+  &quot;triggers&quot;: [
+    {&quot;id&quot;: 1, &quot;query&quot;: &quot;把这篇博客整理进我的知识库&quot;, &quot;should_trigger&quot;: true},
+    {&quot;id&quot;: 11, &quot;query&quot;: &quot;帮我整理这周的周报&quot;, &quot;should_trigger&quot;: false,
+     &quot;note&quot;: &quot;→ obsidian-work：周报汇总要工作项状态&quot;}
+  ]
+}
+</code></pre>
+<ul>
+<li>
+<p>正例、反例<strong>各 5 条</strong>（4–6 都可）。反例要是<strong>近邻误触发</strong>（共享关键词但该归别的 skill），
+每条指向<strong>不同的</strong>归属方，并用 <code>note</code> 写清归属；没有归属说明的反例，下次评审就是扯皮。
+上限是成本定的：每条要 3 次干净会话，20 条一个 skill 就是 60 次，
+五个 skill 全量半小时——那样没人会天天跑。同义句堆再多也不提高分辨力。</p>
+</li>
+<li>
+<p>正例要拉开的维度：措辞（正式/口语）、明示程度（点名域 vs 只描述需求）、详略、复杂度。</p>
+</li>
+<li>
+<p>跑法（<strong>按改动范围分层</strong>，别每次都全量）：</p>
+<pre><code class="language-bash"># 改哪个 skill 就跑哪个：10 条 × 3 次 = 30 次会话，几分钟出结论
+python3 tools/trigger_run.py --skill deck-authoring
+# 只想验刚动过的两条边界
+python3 tools/trigger_run.py --skill deck-authoring --ids 8,9 --reps 1
+# 发布前全量（5 个 skill，150 次会话）
+python3 tools/trigger_run.py --out /tmp/all.json &amp;&amp; python3 tools/trigger_eval.py --score /tmp/all.json
+</code></pre>
+<p><code>trigger_run.py</code> 负责跑（起干净会话、解析 <code>loaded-skill</code>、算触发率），
+<code>trigger_eval.py</code> 负责算分与汇总。判定：正例 &gt; 0.5 通过，反例 &lt; 0.5 通过。</p>
+</li>
+<li>
+<p>评测不过先改 description 的触发词与排除项，不要改用例凑数；0.5 的边界值两边都算没过。</p>
+</li>
+<li>
+<p>排除项要用<strong>用户会说的那种话</strong>：只写英文类别（gantt charts）对中文请求不起作用，
+实测仍是 3/3；补上「甘特图排期」才降到 1/3。中文 skill 的 Do NOT 该写中英两版关键词。</p>
+</li>
+<li>
+<p>反例里如果撞的是 skill 的<strong>能力名词</strong>（配图、视频、PPT），描述层面压不住：
+把这些词删掉能压住误触发，但正例也会跟着掉。这种情况记下实测数字、留着观察，
+别为一条反例拆掉自己的能力词——load 了之后拒绝，比该用时没 load 便宜。</p>
+</li>
+<li>
+<p>同一个类别只在 Do NOT 出现一次：把它也写进正面句（「不是装饰插画」）反而把插画请求吸过来，
+实测从 0/3 变 3/3——点名本身就抬高了相似度，否定词压不住。</p>
+</li>
+<li>
+<p>单轮有噪音：真实触发率落在 0.4–0.6 的用例，3 次跑会来回翻（同一反例曾在三轮里出现
+0/3、1/3、2/3）。判断一次改动有没有用，看<strong>多轮同一批用例的趋势</strong>，别拿单轮通过数当结论；
+改完 description 至少再跑一轮全量。</p>
+</li>
+<li>
+<p>记 <code>triggered</code> 时数的是<strong>这个 skill 自己被加载</strong>的次数，不是「有没有加载任何 skill」：
+反例请求往往应该唤醒<strong>别的</strong> skill（画图那条会唤醒 diagram），把它算成命中等于把评测做废。</p>
+</li>
+<li>
+<p>会话目录每轮必须新建（或先清空）：<code>--session-dir</code> 下会累积历史 jsonl，
+检测时一并读进来，等于把上一轮的结果算进这一轮。实测同一反例因此连续三轮都是「命中」。</p>
+</li>
+<li>
+<p>每条请求一个<strong>干净 pi 会话</strong>（<code>pi -p &quot;&lt;请求&gt;&quot; --tools read --session-dir &lt;临时目录&gt;</code>），
+<code>loaded-skill</code> / <code>inline-skill</code> 记录才算「触发了」。只给 read 是为了不产生副作用：
+这一步只测「会不会选它」，不测能不能把活干完。</p>
+</li>
+<li>
+<p>数据源没指定的请求（只说「整理这周的周报」）会稳定落到 PingCode 那个 skill。这类要么在查询里
+点明数据源，要么按实测把归属写进 <code>note</code>；<strong>不要为了让被测 skill「该触发」而堆同义词</strong>。</p>
+</li>
+</ul>
+<h2 id="写最小可执行流程">写最小可执行流程</h2>
+<p>正文保留开始工作必须知道的信息：输入、配置发现、关键步骤、真实工具入口、检查方式和交付。
+把按条件才需要的详细格式、后端差异、示例放进 references，并在正文说明何时读取。</p>
+<ul>
+<li>优先记录本项目特有的知识、可靠脚本和难以猜出的约束，不重复通用助手礼仪。</li>
+<li>skill 是给别人装的：<strong>不写自己库的规模、路径、快照日期</strong>（「本机 53 篇实测」「<code>03 Resources</code> 下」这类）。
+数字要么是通用经验区间，要么说清是可复现的检查结果；个人约定写进配置，不写进正文。
+换个人用同一份 skill，看到别人的库统计只会困惑。</li>
+<li>文档里给出可执行脚本时用解释器起手（<code>python3 scripts/x.py</code>）：部分 agent 打包会丢掉可执行位，裸路径在那些环境直接失败。</li>
+<li>配置、路径、账号和秘密从环境或配置读取；示例使用占位符。</li>
+<li>脚本是行为的依据，文档说明接口与限制；不要复制一份容易漂移的实现细节。</li>
+<li>仅在风险和用户授权范围要求时确认。用户已授权的可逆工作不重复设审批门。</li>
+<li>删除过时流程、无依据的比例/次数、重复叙述；保留影响决策的理由即可。</li>
+<li>可调用的独立 skill 不应依赖仓库外不可用的文件；必需共享资源要说明安装关系或包含后备方案。</li>
+</ul>
+<p>目录与边界见 <code>references/anatomy-and-scope.md</code>；精简现有内容时读 <code>references/slimming.md</code>。
+仓库内为使用者补一份 README，用法见 <code>references/skill-readme-template.md</code>。</p>
+<h2 id="验证与交付">验证与交付</h2>
+<ol>
+<li>对照脚本 CLI、实际文件和已实现行为，检查每个命令、链接和限制。
+官方 Agent Skills 规范还要求引用只能一层（所有 reference 都从 SKILL.md 直链），
+嵌套引用会让 agent 用 <code>head -100</code> 半读；<code>validate_skill.py</code> 不查这一条，靠人看。</li>
+<li>运行 <code>scripts/validate_skill.py &lt;skill目录&gt;</code>：结构约束以脚本定义为准。
+正文上限是仓库的维护约定，不是模型能力边界；不要为压行数写成电报体。</li>
+<li>运行 <code>scripts/check_pointers.py</code> 检查目标存在；逐项确认引用内容确实支持正文的说法。</li>
+<li>涉及对外文档时运行 <code>scripts/check_leakage.py</code>；未配置词表表示扫描未执行，不能称“已排除泄露”。</li>
+<li>脚本行为改变时跑对应回归；触发或流程改变时，用真实正例、近似反例和授权边界场景评估。
+独立评估只向执行者提供用户输入和 skill，不提供预期答案；结果再与判据比较。</li>
+<li>仓库维护可运行 <code>scripts/preflight.py</code> 汇总结构、泄露、指针检查与文件快照。
+它不运行回归测试，不证明产物质量，也不自动证明脚本有无用处。</li>
+<li>新增或移除 skill 时更新根索引；改变 SKILL.md 后，用仓库的锁文件工具生成哈希。
+仅当后续方向改变时更新 ROADMAP，不记每次维护流水账。</li>
+</ol>
+<p>报告实际改动、检查结果和仍有的限制。失败、跳过、未执行分别说明，不能拿静态检查代替
+浏览器渲染、外部 API 或视觉验收。简洁证据写法见 <code>references/reporting.md</code>。</p>
+
+    </article>
+    <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="skills/index.html"><span>上一篇</span><strong>Skill 目录</strong></a><a class="page-nav-link next" href="maintenance.html"><span>下一篇</span><strong>维护与验证</strong></a></nav>
+  </main>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#先确定范围">先确定范围</a></li><li class="toc-2"><a href="#写-description">写 description</a></li><li class="toc-2"><a href="#触发评测">触发评测</a></li><li class="toc-2"><a href="#写最小可执行流程">写最小可执行流程</a></li><li class="toc-2"><a href="#验证与交付">验证与交付</a></li></ul></aside>
+</div>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <p>Agent Skills · 10 个可独立安装的 skill</p>
+    <nav aria-label="页脚">
+      <a href="index.html">文档</a>
+      <a href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="../../">huangrx6.github.io</a>
+    </nav>
+  </div>
+</footer>
+<script src="../assets/site.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pingcode-weekly · Agent Skills</title>
+<meta name="description" content="从 PingCode 的需求和缺陷生成项目周报。PingCode 是唯一事实源；只读，不写回任何系统。">
+<link rel="canonical" href="https://huangrx6.github.io/agent-skills/docs/skills/pingcode-weekly.html">
+<meta name="theme-color" content="#0f1012">
+<meta property="og:title" content="pingcode-weekly · Agent Skills">
+<meta property="og:description" content="从 PingCode 的需求和缺陷生成项目周报。PingCode 是唯一事实源；只读，不写回任何系统。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://huangrx6.github.io/agent-skills/docs/skills/pingcode-weekly.html">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<script>
+  (() => {
+    const root = document.documentElement;
+    let theme = 'dark';
+    try {
+      const stored = localStorage.getItem('agent-skills-theme');
+      if (stored === 'light' || stored === 'dark') theme = stored;
+    } catch (error) {}
+    root.dataset.theme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#0f1012' : '#f5f3ee';
+  })();
+</script>
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body class="docs">
+<a class="skip-link" href="#main">跳到正文</a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="../../index.html">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="2" y="14" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="14" width="8" height="8" rx="2" fill="currentColor" opacity=".45"/>
+      </svg>
+      <span>Agent Skills</span>
+    </a>
+    <div class="header-tools">
+      <nav class="site-nav" id="site-nav" aria-label="主导航">
+        <a href="../index.html">文档</a><a href="../skills/index.html" aria-current="page">Skills</a><a href="../guide.html">编写 Skill</a>
+        <a class="nav-github" href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </nav>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换白天/夜间模式" title="切换白天/夜间"><span class="when-light"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>夜间</span><span class="when-dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>白天</span></button>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="打开导航">
+        <span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="docs-shell has-toc">
+  <aside class="docs-sidebar" id="docs-sidebar">
+<nav aria-label="文档导航">
+<p class="side-label">文档</p>
+<a href="../index.html">文档首页</a>
+<a href="../getting-started.html">开始使用</a>
+<a href="../skills/index.html">Skill 目录</a>
+<a href="../guide.html">编写 Skill</a>
+<a href="../maintenance.html">维护与验证</a>
+<a href="../roadmap.html">路线图</a>
+<p class="side-label">Skills</p>
+<p class="side-cat">内容与表达</p>
+<a href="../skills/deck-authoring.html">deck-authoring</a>
+<a href="../skills/diagram-authoring.html">diagram-authoring</a>
+<a href="../skills/cosmic-split.html">cosmic-split</a>
+<a href="../skills/email-composer.html">email-composer</a>
+<p class="side-cat">知识与工作</p>
+<a href="../skills/obsidian-wiki.html">obsidian-wiki</a>
+<a href="../skills/obsidian-work.html">obsidian-work</a>
+<a href="../skills/pingcode.html">pingcode</a>
+<a href="../skills/pingcode-weekly.html" class="is-active" aria-current="page">pingcode-weekly</a>
+<p class="side-cat">开发与学习</p>
+<a href="../skills/git-dev-workflow.html">git-dev-workflow</a>
+<a href="../skills/learning-scout.html">learning-scout</a>
+</nav>
+</aside>
+  <div class="sidebar-backdrop" data-sidebar-close hidden></div>
+  <main id="main" class="docs-main">
+    <button class="sidebar-toggle" type="button" aria-expanded="false" aria-controls="docs-sidebar">
+      <span>文档导航</span><span class="sidebar-toggle-mark" aria-hidden="true">+</span>
+    </button>
+    <nav class="crumbs" aria-label="面包屑"><a href="../../index.html">Agent Skills</a><span aria-hidden="true">/</span><a href="../index.html">文档</a><span aria-hidden="true">/</span><a href="../skills/index.html">Skill 目录</a><span aria-hidden="true">/</span><span aria-current="page">pingcode-weekly</span></nav>
+    <header class="page-head">
+      <p class="eyebrow">知识与工作</p>
+      <h1>pingcode-weekly</h1>
+      <p class="page-lede">从 PingCode 的需求和缺陷生成项目周报。PingCode 是唯一事实源；只读，不写回任何系统。</p>
+      <div class="page-meta"><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/pingcode-weekly/SKILL.md" target="_blank" rel="noreferrer">SKILL.md</a><span aria-hidden="true">·</span><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/pingcode-weekly/README.md" target="_blank" rel="noreferrer">README.md</a></div>
+    </header>
+    <article class="prose">
+      <div class="table-wrap"><table><thead>
+<tr>
+<th>适合</th>
+<th>产物</th>
+<th>依赖</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>周报 / 月报 · 按项目或按人汇总 · 数据缺口检查</td>
+<td>Markdown 周报 · 证据 JSON</td>
+<td>Python 3.11+（标准库）· PingCode 令牌</td>
+</tr>
+</tbody>
+</table></div><h2 id="依赖">依赖</h2>
+<ul>
+<li>Python 3.11+，只用标准库（<code>tomllib</code>、<code>urllib</code>）。</li>
+<li>一个可访问的 PingCode 租户，以及能读取项目、工作项、类型、状态、迭代的令牌。</li>
+<li>本 skill 内置只读客户端。</li>
+</ul>
+<h2 id="目录">目录</h2>
+<div class="table-wrap"><table><thead>
+<tr>
+<th>文件</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>scripts/pingcode_weekly.py</code></td>
+<td>CLI：<code>auth</code>、<code>check</code>、<code>collect</code>、<code>weekly</code>、<code>render</code>、<code>projects</code></td>
+</tr>
+<tr>
+<td><code>scripts/collect.py</code></td>
+<td>窗口、需求/缺陷采集、数据合同和缺口</td>
+</tr>
+<tr>
+<td><code>scripts/pingcode_read.py</code></td>
+<td>项目/类型/状态/迭代/工作项/history 只读接口</td>
+</tr>
+<tr>
+<td><code>scripts/weekly.py</code></td>
+<td>模板加载与 Markdown 渲染</td>
+</tr>
+<tr>
+<td><code>scripts/output_paths.py</code></td>
+<td>跨平台下载目录、文件名清洗和原子写入</td>
+</tr>
+<tr>
+<td><code>scripts/_pingcode/</code></td>
+<td>内置只读认证与 HTTP 客户端；来源与上游差异见 <code>_pingcode/VENDOR.md</code></td>
+</tr>
+<tr>
+<td><code>templates/default.toml</code></td>
+<td>默认周报模板</td>
+</tr>
+<tr>
+<td><code>references/</code></td>
+<td>数据合同、模板和证据 JSON</td>
+</tr>
+</tbody>
+</table></div><h2 id="认证">认证</h2>
+<p>第一次使用：</p>
+<pre><code class="language-sh">python3 scripts/pingcode_weekly.py auth login
+python3 scripts/pingcode_weekly.py auth status
+</code></pre>
+<ul>
+<li>用户 OAuth：<code>auth login</code> 打印授权地址；回调地址打不开时，把地址栏的 <code>code</code> 带回：
+<code>auth login --code &lt;code&gt;</code>。</li>
+<li>企业令牌：<code>auth login --mode enterprise</code>。</li>
+<li>也可以直接提供令牌：<code>PINGCODE_ACCESS_TOKEN</code>、<code>PINGCODE_HOST</code>。</li>
+<li>配置目录默认是 <code>~/.agent-skills/config/pingcode/</code>，可用 <code>PINGCODE_CONFIG_DIR</code> 改。</li>
+<li>凭据格式和所需 scope 见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/pingcode-weekly/references/data-contract.md">references/data-contract.md</a>。</li>
+</ul>
+<p>认证代码是内置的只读副本；配置目录只用于保存凭据和令牌。</p>
+<h2 id="快速开始">快速开始</h2>
+<pre><code class="language-sh"># 先检查数据是否足够
+python3 scripts/pingcode_weekly.py check --project PROJ --week 2026-W43
+
+# 生成周报：默认写到下载目录
+python3 scripts/pingcode_weekly.py weekly --project PROJ --week 2026-W43
+
+# 只看不落盘
+python3 scripts/pingcode_weekly.py weekly --project PROJ --week 2026-W43 --stdout
+
+# 保存证据 JSON：默认写到同一个目录
+python3 scripts/pingcode_weekly.py collect --project PROJ --week 2026-W43
+
+# 从已有证据重渲染
+python3 scripts/pingcode_weekly.py render --input &lt;collect 的输出路径&gt; --template custom.toml
+</code></pre>
+<p><code>--week</code> 使用 ISO 周（周一到周日）；也可用 <code>--month 2026-10</code> 或 <code>--since/--until</code>。
+<code>weekly</code> 在没有 PingCode 记录时默认退出 2；确实要空周报时加 <code>--allow-empty</code>。</p>
+<h2 id="输出位置">输出位置</h2>
+<p><code>weekly</code>、<code>collect</code>、<code>render</code> 的默认输出都在同一个下载目录：</p>
+<ul>
+<li>macOS/Linux：<code>~/Downloads/pingcode-weekly/</code></li>
+<li>Windows：<code>%USERPROFILE%\Downloads\pingcode-weekly\</code></li>
+</ul>
+<p>文件名：</p>
+<ul>
+<li>周报：<code>&lt;项目或工作区&gt;-&lt;窗口&gt;-weekly.md</code></li>
+<li>证据：<code>&lt;项目或工作区&gt;-&lt;窗口&gt;-evidence.json</code></li>
+<li>重渲染：<code>&lt;证据文件名&gt;-rendered-weekly.md</code></li>
+</ul>
+<p><code>check</code>、<code>auth</code>、<code>projects</code> 只打印，不写文件。可用 <code>--stdout</code> 不落盘，
+<code>--out</code> 指定完整路径，或用 <code>--output-dir</code>、<code>PINGCODE_WEEKLY_OUTPUT_DIR</code>、
+<code>[workspace] output_dir</code> 换目录。写入是临时文件加原子替换，失败不会覆盖旧文件。</p>
+<h2 id="按人总结">按人总结</h2>
+<p>默认所有人合并。需要按人看时：</p>
+<pre><code class="language-sh"># 只看自己
+python3 scripts/pingcode_weekly.py weekly --project PROJ --week 2026-W43 --mine
+
+# 指定一个或多个人
+python3 scripts/pingcode_weekly.py weekly --project PROJ --week 2026-W43 \
+  --assignee 张三 --assignee 李四
+
+# 每人一份文件
+python3 scripts/pingcode_weekly.py weekly --project PROJ --week 2026-W43 --per-assignee
+
+# 月底所有人合并
+python3 scripts/pingcode_weekly.py weekly --project PROJ --month 2026-10
+</code></pre>
+<p><code>--mine</code> / <code>--assignee</code> 对 <code>check</code>、<code>collect</code>、<code>weekly</code> 都生效；<code>--per-assignee</code>
+只用于 <code>weekly</code>。<code>--per-assignee</code> 生成 <code>&lt;项目&gt;-&lt;窗口&gt;-&lt;姓名&gt;-weekly.md</code>，不能和 <code>--stdout</code> / <code>--out</code>
+一起用。<code>--month</code> 是自然月，不能与 <code>--week</code> / <code>--since</code> / <code>--until</code> 同时使用。
+<code>--mine</code> 需要用户令牌；企业令牌下改用人名。</p>
+<p>注意：<strong>未分配负责人的工作项不匹配任何人</strong>，不会出现在按人结果里；
+窗口内有这类条目时，<code>weekly</code> 会在 stderr 和“数据缺口”里列出被排除的 ID，
+<code>check</code> 显示“未分配被排除 N 条”。按人生成前先跑 <code>check</code>，先补负责人。</p>
+<h2 id="多项目">多项目</h2>
+<pre><code class="language-toml">[workspace]
+# 省略 template 就用内置模板；要自定义，把 templates/default.toml 复制到本文件同目录再打开这行
+# template = &quot;templates/default.toml&quot;
+# output_dir = &quot;~/Downloads/pingcode-weekly&quot;
+
+[[projects]]
+name = &quot;示例项目 A&quot;
+pingcode_project = &quot;PROJ&quot;
+requirement_types = [&quot;需求&quot;, &quot;用户故事&quot;]
+defect_types = [&quot;缺陷&quot;]
+summary_field = &quot;周报摘要&quot;
+summary_max_chars = 300
+# 如果“已关闭”也算完成：
+# done_state_types = [&quot;completed&quot;, &quot;closed&quot;]
+
+[[projects]]
+name = &quot;示例项目 B&quot;
+pingcode_project = &quot;DEMO&quot;
+requirement_types = [&quot;用户故事&quot;]
+defect_types = [&quot;缺陷&quot;]
+</code></pre>
+<pre><code class="language-sh">python3 scripts/pingcode_weekly.py weekly --workspace weekly.toml --week 2026-W43
+</code></pre>
+<p>所有项目都通过 PingCode 解析。</p>
+<h2 id="模板">模板</h2>
+<p>默认模板是 <code>templates/default.toml</code>。用 <code>[layout] body</code> 控制章节顺序，
+用 <code>[format]</code> 控制项目标题和条目写法：</p>
+<pre><code class="language-toml">[layout]
+body = &quot;&quot;&quot;
+# {week_start} ~ {week_end} 周报
+
+## 本周任务
+{this_week}
+
+## 本周新增/待开始
+{new_items}
+
+## 本周新增缺陷
+{new_bugs}
+
+## 缺陷清单
+{bugs}
+
+## 下周计划
+{next_week}
+
+{gaps}
+&quot;&quot;&quot;
+</code></pre>
+<p>完整块和字段见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/pingcode-weekly/references/template.md">references/template.md</a>。</p>
+<h2 id="输出内容">输出内容</h2>
+<p><code>collect</code> 输出 <code>version: 1</code> 的证据 JSON；<code>weekly</code> 输出 Markdown，含本周任务、本周新增缺陷、缺陷清单和下周计划。
+每个需求/缺陷都保留 PingCode 编号、状态、负责人、摘要和链接。
+缺负责人、缺完成时间、缺陷缺严重程度、没有下一迭代会进入“数据缺口”，不会用默认值补造。</p>
+<h2 id="验证">验证</h2>
+<pre><code class="language-sh">python3 -m unittest discover -s tests/pingcode-weekly -v
+</code></pre>
+<p>测试使用 fake PingCode API，不访问真实租户。真实租户只读验证可以用一个测试项目跑
+<code>check</code>，不要把真实输出提交为固定夹具。</p>
+<h2 id="当前限制">当前限制</h2>
+<ul>
+<li>只支持需求/缺陷；任务、史诗、特性不进入默认周报。</li>
+<li><code>closed</code> 默认不算完成；如果项目的“已关闭”确实代表完成，需要在采集口径里调整。</li>
+<li>缺陷严重程度依赖工作项属性或 <code>severity</code> 字段；没有就显示“未分级”。</li>
+<li>只做 PingCode 周报，不执行写入。</li>
+<li>工作项达到 <code>--limit</code> 时标记截断，不能声称覆盖全部历史。</li>
+</ul>
+
+    </article>
+    <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="../skills/pingcode.html"><span>上一篇</span><strong>pingcode</strong></a><a class="page-nav-link next" href="../skills/git-dev-workflow.html"><span>下一篇</span><strong>git-dev-workflow</strong></a></nav>
+  </main>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#依赖">依赖</a></li><li class="toc-2"><a href="#目录">目录</a></li><li class="toc-2"><a href="#认证">认证</a></li><li class="toc-2"><a href="#快速开始">快速开始</a></li><li class="toc-2"><a href="#输出位置">输出位置</a></li><li class="toc-2"><a href="#按人总结">按人总结</a></li><li class="toc-2"><a href="#多项目">多项目</a></li><li class="toc-2"><a href="#模板">模板</a></li><li class="toc-2"><a href="#输出内容">输出内容</a></li><li class="toc-2"><a href="#验证">验证</a></li><li class="toc-2"><a href="#当前限制">当前限制</a></li></ul></aside>
+</div>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <p>Agent Skills · 10 个可独立安装的 skill</p>
+    <nav aria-label="页脚">
+      <a href="../index.html">文档</a>
+      <a href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="../../../">huangrx6.github.io</a>
+    </nav>
+  </div>
+</footer>
+<script src="../../assets/site.js" defer></script>
+</body>
+</html>
