@@ -78,6 +78,7 @@ jobs:
           - tests/obsidian-work
           - tests/pingcode
           - tests/pingcode-weekly
+          - tests/repo-baseline
           - tests/learning-scout
           - tools/tests
         exclude:

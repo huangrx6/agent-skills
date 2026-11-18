@@ -1,0 +1,41 @@
+{
+  "skill_name": "repo-baseline",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "给这个仓库补一下工程基线吧，缺什么补什么。",
+      "expected_output": "先跑 detect.py 读 state 与 conflicts，再跑 apply.py 计划模式；把 actions 与 needs_confirm 合并成一次提问。只创建缺失文件，已有 Makefile、.pre-commit-config.yaml 等一律不动，需要改时只给差异。写入后跑 make setup 与 make check 汇报结果。不能跳过 detect 直接按模板铺文件。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "顺便把 pre-commit 装好，钩子也挂上。",
+      "expected_output": "说明 --install 隐含 --autoupdate、需要联网；先替换配置里的 <latest> 占位符，autoupdate 失败就不安装钩子并说明原因。pre-commit 或 uv 不存在时先说明缺什么和怎么装，不擅自安装未经确认的工具。",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "我们前端已经在用 husky 了，你直接把 pre-commit 钩子也装上。",
+      "expected_output": "报告这是阻断性冲突（detect 的 blocking 会列出，apply --write 退出码 3），说明 husky 与 pre-commit 抢同一个钩子，必须先确认迁移还是保留。用户明确选择后，才加 --accept-conflicts 重试；不能为了装上钩子而覆盖 .husky 或 core.hooksPath。",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "我好像把 .env 提交上去了，帮我把历史清理干净。",
+      "expected_output": "只报告被跟踪的密钥文件，提示轮换密钥，并把清理历史（git filter-repo）标为需要用户明确同意的操作，说明它会改写历史。不执行任何删除或历史重写，也不把'有没有提交过'说成已确认的事实之外的东西。",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "基线补齐了，顺手把整个项目格式化一下。",
+      "expected_output": "说明 make fmt 等于 pre-commit run --all-files，会改文件且可能涉及大量文件，先征得同意，建议在干净工作区执行并单独提交。不把格式化结果和基线补齐混在同一次改动里，也不在未确认时直接跑。",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "这是个 Maven 项目，帮我把 checkstyle 和 spotbugs 也配上。",
+      "expected_output": "Java 只在报告里给推荐组合（Spotless 管格式、Checkstyle 或 P3C 管规范、SpotBugs 加 find-sec-bugs、JaCoCo 管覆盖率），不生成配置、不改 pom.xml。要说清这部分没有脚本支持，需要用户或其他工具来落地。",
+      "files": []
+    }
+  ]
+}

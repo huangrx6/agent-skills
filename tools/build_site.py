@@ -43,8 +43,8 @@ BLOB = f"{REPO}/blob/main"
 SITE_URL = "https://huangrx6.github.io/agent-skills/"
 SITE_NAME = "Agent Skills"
 SITE_DESC = (
-    "10 个可独立安装的 Agent skill：演示文稿、技术图、COSMIC、Obsidian、Git、"
-    "PingCode、学习路线与邮件。每个 skill 都带入口说明、可执行脚本和回归测试。"
+    "11 个可独立安装的 Agent skill：演示文稿、技术图、COSMIC、Obsidian、Git、PingCode、"
+    "学习路线、邮件与工程基线。每个 skill 都带入口说明、可执行脚本和回归测试。"
 )
 
 SKILL_ROW_RE = re.compile(
@@ -608,7 +608,7 @@ def build_landing(categories: list[dict], count: int) -> str:
 def build_docs_index(categories: list[dict], count: int) -> str:
     cards = [
         ("01", "开始使用", "getting-started.html", "安装到 agent 的发现目录，确认配置，然后从一条真实需求开始。"),
-        ("02", "Skill 目录", "skills/index.html", "按场景浏览 10 个 skill，查看各自的输入、产物与边界。"),
+        ("02", "Skill 目录", "skills/index.html", "按场景浏览 11 个 skill，查看各自的输入、产物与边界。"),
         ("03", "编写 Skill", "guide.html", "从触发描述、最小流程到验证与交付，写一个能执行的 skill。"),
         ("04", "维护与验证", "maintenance.html", "结构检查、回归测试、锁文件与站点构建各自证明什么。"),
         ("05", "路线图", "roadmap.html", "当前优先解决的问题与后续扩展方向。"),

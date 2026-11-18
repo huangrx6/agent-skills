@@ -32,7 +32,7 @@ class TestContentParsing(unittest.TestCase):
             [category["name"] for category in categories],
         )
         names = [item["name"] for category in categories for item in category["skills"]]
-        self.assertEqual(10, len(names))
+        self.assertEqual(11, len(names))
         self.assertEqual(len(names), len(set(names)))
         self.assertIn("email-composer", names)
         deck = next(
@@ -109,7 +109,7 @@ class TestBuild(unittest.TestCase):
         cls.tmp.cleanup()
 
     def test_builds_expected_pages(self):
-        self.assertEqual(18, self.pages)
+        self.assertEqual(19, self.pages)
         for relative in (
             "index.html",
             "404.html",

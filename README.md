@@ -2,11 +2,11 @@
 
 <p align="center">
   <strong>把重复的工作方法，写成 Agent 能执行、能验证的 skill。</strong><br>
-  <sub>演示文稿 · 技术图 · COSMIC · Obsidian · Git · PingCode · 学习路线 · 邮件</sub>
+  <sub>演示文稿 · 技术图 · COSMIC · Obsidian · Git · PingCode · 学习路线 · 邮件 · 工程基线</sub>
 </p>
 
 <p align="center">
-  <code>10 skills</code> &nbsp;·&nbsp; <code>Python 3.10+（learning-scout、pingcode-weekly 需 3.11+）</code> &nbsp;·&nbsp; <code>MIT</code>
+  <code>11 skills</code> &nbsp;·&nbsp; <code>Python 3.10+（learning-scout、pingcode-weekly 需 3.11+）</code> &nbsp;·&nbsp; <code>MIT</code>
 </p>
 
 <p align="center">
@@ -56,6 +56,7 @@ Settings → Pages 把 Source 设为 GitHub Actions；不要手改 `docs/` 下�
 | Skill | 做什么 | 产出 |
 | --- | --- | --- |
 | [**git-dev-workflow**](skills/git-dev-workflow/README.md) | 本地 Git 状态、破坏性操作预检、提交与 worktree | 状态快照 · 风险结论 · 操作建议 |
+| [**repo-baseline**](skills/repo-baseline/README.md) | 检测并补齐仓库工程基线，只补缺失项 | 基线文件 · 检测报告 · 巡检结论 |
 | [**learning-scout**](skills/learning-scout/README.md) | 把学习需求研究成一组独立笔记与离线入口页 | 笔记 · HTML 入口 · 打印版 · PDF |
 
 Obsidian 两项能力各自独立，通过笔记数据关联。
@@ -116,7 +117,7 @@ npx skills add https://github.com/huangrx6/agent-skills -a claude-code -g \
   --skill learning-scout --skill pingcode --skill pingcode-weekly
 ```
 
-官方安装器维护各 Agent 的路径与更新；本仓库的 `tools/install_skills.py` 仍然一次安装全部 10 个。
+官方安装器维护各 Agent 的路径与更新；本仓库的 `tools/install_skills.py` 仍然一次安装全部 11 个。
 本地 `--copy` 只复制 Git 跟踪的内容，不会带上 `.venv` 或 IDE 配置。仓库可能移动、需要固定副本时：
 
 ```sh
@@ -163,7 +164,7 @@ python3 tools/migrate_skill_home.py --apply
 
 ```text
 agent-skills/
-├── skills/        # 10 个可独立安装的 skill
+├── skills/        # 11 个可独立安装的 skill
 ├── tools/         # 安装、锁文件、迁移、体检、skill 编写
 ├── tests/         # 回归测试，按 skill 分目录
 ├── docs/          # 生成的项目站点（GitHub Pages 发布）

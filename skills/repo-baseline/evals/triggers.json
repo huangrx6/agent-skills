@@ -1,0 +1,20 @@
+{
+  "skill_name": "repo-baseline",
+  "triggers": [
+    {"id": 1, "query": "给这个仓库补上 pre-commit 和 Makefile", "should_trigger": true},
+    {"id": 2, "query": "看看我们项目的工程基线还缺什么", "should_trigger": true},
+    {"id": 3, "query": "前后端各写了一套格式化配置，帮我统一成一份", "should_trigger": true},
+    {"id": 4, "query": "仓库里没有 CI，加一个每次推送都跑 make check 的", "should_trigger": true},
+    {"id": 5, "query": "每次进这个项目都提醒我一下基线不完整", "should_trigger": true},
+    {"id": 6, "query": "帮我把这些改动提交了，顺便建个分支", "should_trigger": false,
+     "note": "→ git-dev-workflow：提交、分支与状态预检归它"},
+    {"id": 7, "query": "在这个仓库里加一个导出 PDF 的函数", "should_trigger": false,
+     "note": "普通业务代码实现，不需要 skill"},
+    {"id": 8, "query": "把这个 bug 记下来，指派给张三", "should_trigger": false,
+     "note": "→ obsidian-work：工作项登记与分工"},
+    {"id": 9, "query": "查一下这个迭代还有哪些缺陷没修", "should_trigger": false,
+     "note": "→ pingcode：迭代与缺陷查询"},
+    {"id": 10, "query": "帮我做一份工程基线整改的汇报演示", "should_trigger": false,
+     "note": "→ deck-authoring：演示文稿制作"}
+  ]
+}
