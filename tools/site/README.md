@@ -25,7 +25,7 @@ python3 -m unittest discover -s tools/site/tests -v
 
 `--check` 会检查：
 
-- 18 个页面、样式、脚本、图标与 `.nojekyll` 是否齐全；
+- 全部必需页面、样式、脚本、图标与 `.nojekyll` 是否齐全；
 - HTML 内链目标是否存在（跳过外链与站点根目录之外的链接）；
 - 是否有 `@@TOKEN@@` 残留；
 - 每个页面是否有 `<title>`。

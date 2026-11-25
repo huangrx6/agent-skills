@@ -571,8 +571,8 @@ def skill_groups(
     <span class="skill-arrow" aria-hidden="true">→</span>
   </div>
   <h4>{esc(item["subtitle"] or item["name"])}</h4>
-  <p>{esc(item["what"])}</p>
-  <span class="skill-output">{esc(item["output"])}</span>
+  <p>{esc(strip_inline_md(item["what"]))}</p>
+  <span class="skill-output">{esc(strip_inline_md(item["output"]))}</span>
 </a>"""
             for item in category["skills"]
         )

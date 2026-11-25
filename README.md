@@ -38,7 +38,7 @@ Settings → Pages 把 Source 设为 GitHub Actions；不要手改 `docs/` 下�
 | Skill | 做什么 | 产出 |
 | --- | --- | --- |
 | [**deck-authoring**](skills/deck-authoring/README.md) | 从材料组织内容、设计版面与配图，用真实页面迭代 | HTML 演示 · PDF · PNG · PPTX · 视频 |
-| [**diagram-authoring**](skills/diagram-authoring/README.md) | 把结构描述变成可编辑的技术图，支持圆角/曲线/直连、无框图标与跨后端 `.excalidrawlib` 素材 | Excalidraw · draw.io · Mermaid · PNG |
+| [**diagram-authoring**](skills/diagram-authoring/README.md) | 把结构描述变成可编辑的技术图，支持圆角/曲线/直连、无框图标与跨后端 .excalidrawlib 素材 | Excalidraw · draw.io · Mermaid · PNG |
 | [**cosmic-split**](skills/cosmic-split/README.md) | 按需求、接口、页面或代码识别 COSMIC 数据移动 | 拆分表 · 自检报告 · 覆盖清单 |
 | [**email-composer**](skills/email-composer/README.md) | 起草与制作工作邮件，复用 Spec / HTML 模板 | 邮件草稿 · .eml · 模板库 |
 
