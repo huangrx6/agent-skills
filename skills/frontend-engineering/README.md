@@ -36,6 +36,15 @@ Agent 的执行闸门、工程铁律与场景路由见 [SKILL.md](SKILL.md)，9 
 - 纯视觉审美方向与设计评审归 `ui-design-craft`，后端/Electron 主进程/数据库架构归 `arch-backend-craft`，独立 TDD 流程归 `tdd-testing`，黑盒浏览器交互验收归 `ui-qa-acceptance`，仓库工程基线配置归 `repo-baseline`；
 - 不在未完成复现与计算样式/状态采证前盲目修改样式或堆叠补丁。
 
+## 来源与整合说明
+
+- **主要引用来源**：性能优化与架构组合主要借鉴自 [`vercel-labs/agent-skills`](https://github.com/vercel-labs/agent-skills)（MIT License）的 `react-best-practices` 与 `composition-patterns`，前端疑难排错方法借鉴自 [`obra/superpowers`](https://github.com/obra/superpowers)（MIT License）的 `systematic-debugging`。
+- **整合与调整要点**：
+  1. **按场景与影响面重组参考体系**：将两个上游 skill 原本平铺的多条碎规则整合为按核心瓶颈与模块职责划分的 9 份专题文档（异步瀑布流、包体积、服务端与客户端数据、重渲染、渲染与 JS 微性能、组合与状态、高级 React 模式、CSS 与交互工艺、前端系统排错）。
+  2. **解除 Next.js / Vercel 单栈预设**：保留 RSC 与服务端边界建议的同时，显式适配 Vite + React SPA、桌面渲染进程（如 Electron renderer）与纯前端路由状态场景。
+  3. **补全交互稳健性与现代 React 实践**：新增 `references/css-and-interaction-craft.md`（不用 `!important` 的作用域隔离、粘滞滚动、焦点返回、异步竞态清理），并在状态与并发章节补充 React 19（如 `use()`、`useActionState`）的现代做法。
+  4. **内建前端四阶段排错闭环**：新增 `references/frontend-debugging.md`，把浏览器 Evidence 收集、状态/水合定位与「连续三次尝试失败即停手回溯」原则融合进前端开发流。
+
 ## 验证
 
 本 skill 无可执行脚本，结构与引用校验在仓库根目录运行：

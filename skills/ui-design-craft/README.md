@@ -36,6 +36,14 @@ Agent 的核心路由、工艺底线与参考索引见 [SKILL.md](SKILL.md)。
 - **负责**：界面视觉与交互设计、反模板审视、排版布局色彩、文案与空态引导、动效编排、既有页面精修、前端界面加固、技术审计与 UX Critique。
 - **不负责**：React 状态/Hook 架构重构与渲染性能调优（归 `frontend-engineering`）、产品范围与编号 AC 收敛（归 `product-spec`）、黑盒点击验收报告（归 `ui-qa-acceptance`）、幻灯片与技术图制作（归 `deck-authoring` / `diagram-authoring`）。
 
+## 来源与整合说明
+
+- **主要引用来源**：主要借鉴自 [`pbakaus/impeccable`](https://github.com/pbakaus/impeccable)（Apache License 2.0）的 `impeccable` 体系及其参考集合（访客模式、工艺底线、排版、布局、色彩、精简、引导、增强/收敛、动效、打磨、组件审查、极值加固与审阅评分准则），并融入 [`anthropics/skills`](https://github.com/anthropics/skills)（按其各技能目录 `LICENSE.txt` 条款）中 `frontend-design` 的明确美学立意与反模板化方向。
+- **整合与调整要点**：
+  1. **多指令聚拢为单技能双轴路由**：将上游分散的二十余个指令与参考文档重组为单一可独立安装的 skill，以「3 类访客模式（操作型 / 阅读型 / 说服型）× 5 种工艺模式（构思 / 增强 / 精炼 / 动效 / 审查加固）」路由至 10 份结构化参考手册。
+  2. **补强中文排版与桌面端表面工艺**：在 `references/typography-system.md` 与 `references/polish-and-component-review.md` 中补入中英混排字重/行高补偿与等宽数字对齐，以及 Electron / 多表面桌面界面（标题栏、侧栏、弹层、菜单栏一致性）的打磨要点。
+  3. **统一可落地的缺陷定级与风格去偏见**：在 `references/critique-and-audit-rubric.md` 中落地 `P0–P3` 问题分级与复核清单；删除原参考中容易误伤简洁工具台或社论排版的泛化视觉禁用词表，同时剥离原仓库的多宿主命令脚手架。
+
 ## 维护校验
 
 本 skill 无可执行脚本，结构、规则与引用校验在仓库根目录运行：

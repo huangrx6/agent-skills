@@ -153,6 +153,17 @@ python3 skills/ui-qa-acceptance/scripts/with_server.py \
 <li>本 skill 专注<strong>真实渲染态黑盒交互验收与证据交付</strong>，不替代单元测试与 TDD（归 <code>tdd-testing</code>）、纯静态视觉审美评审（归 <code>ui-design-craft</code>）、前端业务源码修改（归 <code>frontend-engineering</code>）或产品 AC 起草（归 <code>product-spec</code>）。</li>
 <li>无法启动浏览器、缺少账号/外部令牌或目标平台无 CDP 暴露时，必须将对应项如实标为「未验证（原因）」，绝不凭读代码猜测结论。</li>
 </ul>
+<h2 id="来源与整合说明">来源与整合说明</h2>
+<ul>
+<li><strong>主要引用来源</strong>：多服务协调与「静默侦察页面状态先于自动化操作」的工作流主要借鉴自 <a href="https://github.com/anthropics/skills"><code>anthropics/skills</code></a>（按其各技能目录 <code>LICENSE.txt</code> 条款）的 <code>webapp-testing</code>，审阅与极端情况压测视角借鉴自 <a href="https://github.com/pbakaus/impeccable"><code>pbakaus/impeccable</code></a>（Apache License 2.0）的极值加固与检查思路，交付实证标准对齐 <a href="https://github.com/obra/superpowers"><code>obra/superpowers</code></a>（MIT License）的完成前验证规范。</li>
+<li><strong>整合与调整要点</strong>：
+<ol>
+<li><strong>自研 Python 3.10+ 进程组服务托管器</strong>：用纯标准库实现的 <code>scripts/with_server.py</code> 替代示例脚本，支持多前端/后端命令编排、可选 <code>--path</code> HTTP 就绪探测（把 <code>2xx/3xx/4xx</code> 视为可服务响应）、跨平台进程组退出清理与对应单元测试（<code>tests/ui-qa-acceptance/</code>）。</li>
+<li><strong>七维高压测试矩阵与几何级检查</strong>：新增 <code>references/qa-stress-matrix.md</code> 与 <code>references/dom-and-geometry-checks.md</code>，系统化覆盖超长/多语言文本、并发与弱网、键盘导航、空白与边界态，以及 Playwright/DevTools 的水平溢出与元素遮挡检查代码片段。</li>
+<li><strong>桌面应用与 SPA 水合验收补齐</strong>：新增 <code>references/electron-and-spa-qa.md</code> 与 <code>references/evidence-and-bug-reporting.md</code>，补充 Electron/WebView 隔离 <code>USER_DATA</code> 目录与 CDP 调试、SPA Hydration 前事件丢失排查，以及可复现的 <code>Blocker / High / Medium / Low</code> 缺陷报告模板。</li>
+</ol>
+</li>
+</ul>
 <h2 id="维护与验证">维护与验证</h2>
 <p>从本仓库根目录运行以下三条校验命令（须全部退出码 0、0 失败、0 警告）：</p>
 <pre><code class="language-sh">python3 tools/skill-builder/scripts/validate_skill.py skills/ui-qa-acceptance
@@ -163,7 +174,7 @@ python3 -m unittest discover -s tests/ui-qa-acceptance -v
     </article>
     <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="../skills/tdd-testing.html"><span>上一篇</span><strong>TDD 与高质量自动化测试</strong></a><a class="page-nav-link next" href="../guide.html"><span>下一篇</span><strong>编写 Skill</strong></a></nav>
   </main>
-<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#快速使用">快速使用</a></li><li class="toc-2"><a href="#目录结构">目录结构</a></li><li class="toc-2"><a href="#能力边界">能力边界</a></li><li class="toc-2"><a href="#维护与验证">维护与验证</a></li></ul></aside>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#快速使用">快速使用</a></li><li class="toc-2"><a href="#目录结构">目录结构</a></li><li class="toc-2"><a href="#能力边界">能力边界</a></li><li class="toc-2"><a href="#来源与整合说明">来源与整合说明</a></li><li class="toc-2"><a href="#维护与验证">维护与验证</a></li></ul></aside>
 </div>
 
 <footer class="site-footer">

@@ -36,6 +36,14 @@ Agent 的核心铁律、任务分流表与交付门禁见 [SKILL.md](SKILL.md)�
 - 覆盖 Python、Java、Node.js/TypeScript 等通用后端架构、持久化、安全与评审；前端 React 组件与 CSS 归 `frontend-engineering` / `ui-design-craft`，产品需求澄清归 `product-spec`，独立测试套件编写归 `tdd-testing`，Git 分支提交归 `git-dev-workflow`。
 - 评审模式默认 100% 只读，不改动工作树、暂存区或分支指针。
 
+## 来源与整合说明
+
+- **主要引用来源**：排错方法论、审阅协作与完成门控主要借鉴自 [`obra/superpowers`](https://github.com/obra/superpowers)（MIT License）的 `systematic-debugging`（含反向溯源与纵深防御思路）、`requesting-code-review`、`receiving-code-review` 及 `verification-before-completion`。
+- **整合与调整要点**：
+  1. **从单一工程约束扩展为跨语言通用后端规范**：在通用架构契约之外，补充 `references/python-backend-craft.md`（FastAPI / Django / SQLAlchemy / Alembic 与异步/连接池）与 `references/java-backend-craft.md`（Spring Boot / JPA / MyBatis / Flyway / HikariCP 与并发治理），同时兼顾 Node.js / TypeScript 等服务端技术栈，按目标仓库语言路由加载。
+  2. **深化模块化边界与安全契约**：新增 `references/architecture-and-boundaries.md` 与 `references/contracts-and-security.md`，落定单一事实来源（SSOT）、唯一公共入口、五级配置优先级、`realpath`/Zip-Slip 路径防逃逸、凭据加密存储，以及诚实标注静态检查与真实 OS 沙箱边界。
+  3. **补充零停机迁移与回滚准则**：新增 `references/persistence-and-migrations.md`，建立 Expand-Contract 两阶段数据库迁移、版本化历史数据迁移与原子目录切换回滚流程，使架构设计与线上演进衔接完整。
+
 ## 验证
 
 本 skill 无可执行脚本，结构与引用校验在仓库根目录运行：

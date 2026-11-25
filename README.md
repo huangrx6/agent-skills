@@ -184,6 +184,32 @@ agent-skills/
 └── skills-lock.json
 ```
 
+## 开源借鉴与整合说明
+
+本仓库的原创文档、工作流编排与自研脚本采用 [MIT License](LICENSE)。其中 `产品、设计与研发` 分组的 6 个工程流 skill 并非凭空撰写，而是在参考多个优秀开源 Agent Skill 项目的核心方法论后，进行了**交叉整合、去冗余合并、跨技术栈泛化与工具脚本重写**。各上游项目均按其原始开源许可在此及对应 skill 文档中公开致谢，且不将上游规则条目、内部指标或原始文件直接等同于本仓库状态。
+
+> 注：[`deck-authoring`](skills/deck-authoring/README.md#维护与借鉴) 的自由排版路线与开源生态取舍已在 [`skills/deck-authoring/references/layout-technology.md`](skills/deck-authoring/references/layout-technology.md) 单独记录；[`diagram-authoring`](skills/diagram-authoring/README.md) 使用标准 `.excalidrawlib` 素材格式并支持按需选用外部图标库，其来源约束与使用说明详见该 skill 文档。
+
+### 上游参考项目与许可
+
+| 上游仓库 | 主要参考组件 / Skill | 引用与借鉴的核心方法 | 开源许可 |
+| --- | --- | --- | --- |
+| [`obra/superpowers`](https://github.com/obra/superpowers) | `brainstorming`、`writing-plans`、`systematic-debugging`、`test-driven-development`、`requesting-code-review`、`receiving-code-review`、`verification-before-completion` | 探索式单问收敛、独立构建视角审查、零占位符任务拆分、四阶段根因溯源与纵深防御、条件等待与轮询隔离、RED → GREEN → REFACTOR 纪律及完成前实证要求 | MIT License |
+| [`pbakaus/impeccable`](https://github.com/pbakaus/impeccable) | `impeccable` 主体系与 `reference` 方法集（访客模式、质量底线、排版、色彩、交互、打磨、极值加固与审查打分） | 三类访客模式识别、界面质量底线、字体与色彩节制、信息精简与引导优化、极端内容加固以及多维度设计审查尺度 | Apache License 2.0 |
+| [`vercel-labs/agent-skills`](https://github.com/vercel-labs/agent-skills) | `react-best-practices`、`composition-patterns`（并结合 `web-design-guidelines` 检查视角） | 按性能收益排名的前端关键路径优化（异步瀑布流、包体积、服务端/RSC、客户端去重、重渲染与渲染微优化、高级 Hooks）与复合组件/显式变体组合架构 | MIT License |
+| [`anthropics/skills`](https://github.com/anthropics/skills) | `frontend-design`、`webapp-testing` | 明确美学方向与反模板化前端设计立意；本地多服务托管及「静默页面探测先于自动化点击」的浏览器测试思路 | 按其各技能目录 `LICENSE.txt` 条款 |
+
+### 各整合 Skill 的引用与调整对照
+
+| 本仓库 Skill | 主要引用来源 | 整合调整与自研增强 |
+| --- | --- | --- |
+| [`product-spec`](skills/product-spec/README.md) | `obra/superpowers`（`brainstorming`、`writing-plans`） | 收口为 7 步连续门控与「未定稿不写代码」硬闸门；新增短/全规格双深度路由、18 类模糊词改写为 Given/When/Then 可测 AC、9 场景边界异常矩阵及实施计划桥接；剥离原仓库宿主会话 Hook 与固定目录假设 |
+| [`ui-design-craft`](skills/ui-design-craft/README.md) | `pbakaus/impeccable`（`impeccable` 全参考体系）、`anthropics/skills`（`frontend-design`） | 将二十余份分散规范与斜杠指令整合为「3 类访客模式 × 5 种工艺模式」统一路由与 10 份专题参考；新增中文与中英混排补偿、桌面多表面打磨及 `P0–P3` 缺陷分级；去除与简洁工作台/社论风格冲突的一刀切禁用表 |
+| [`frontend-engineering`](skills/frontend-engineering/README.md) | `vercel-labs/agent-skills`（`react-best-practices`、`composition-patterns`）、`obra/superpowers`（`systematic-debugging`） | 将零散规则按前端性能、组合架构与状态影响面重构为 9 份按场景加载的手册；融合四阶段排错与连续失败熔断；补充无 `!important` 样式隔离、粘滞滚动、`focus-return`、竞态取消与 React 19 状态 Action；解除纯 Next.js/Vercel 框架绑定，兼容 Vite/SPA |
+| [`arch-backend-craft`](skills/arch-backend-craft/README.md) | `obra/superpowers`（`systematic-debugging`、`requesting-code-review`、`receiving-code-review`、`verification-before-completion`） | 保留根因溯源、纵深防御与实证审阅主干，**泛化为跨语言后端指南**：新增 Python（FastAPI / Django / SQLAlchemy / Alembic）与 Java（Spring Boot / JPA / MyBatis / Flyway / HikariCP）专门指引；补充 SSOT、唯一公共入口、五级配置优先级、`realpath`/Zip-Slip 校验、凭据保护与 Expand-Contract 零停机迁移 |
+| [`tdd-testing`](skills/tdd-testing/README.md) | `obra/superpowers`（`test-driven-development`、`systematic-debugging`、`verification-before-completion`） | 统一红绿重构与反镜像断言铁律；用自研跨平台 Python 3.10+ 标准库脚本 `scripts/find_polluter.py`（支持 `--json`、预检与早停，附单元测试）取代 shell 版污染扫描思路；新增 `L1–L4` 分层测试策略表、LIFO 清理栈治理与变异校验 |
+| [`ui-qa-acceptance`](skills/ui-qa-acceptance/README.md) | `anthropics/skills`（`webapp-testing`）、`pbakaus/impeccable`（审查与极值思路）、`obra/superpowers`（`verification-before-completion`） | 用自研 Python 3.10+ 标准库 `scripts/with_server.py`（进程组销毁、多服务编排与 HTTP 就绪探测，附单元测试）替代示例脚本；新增七维高压测试矩阵、DOM 几何溢出检测脚本、Electron/WebView 隔离 `USER_DATA` 与 SPA Hydration 验收及 `Blocker–Low` 报告模板 |
+
 ## 开发与验证
 
 ```sh
@@ -226,5 +252,5 @@ git config core.hooksPath .githooks
 ---
 
 <p align="center">
-  <sub>原创代码与文档采用 <a href="LICENSE">MIT License</a>；第三方依赖、字体与品牌素材按各自许可使用。</sub>
+  <sub>原创代码与文档采用 <a href="LICENSE">MIT License</a>；借鉴整合的开源方法论、第三方依赖、字体与外部素材按各自原始许可标注并使用。</sub>
 </p>

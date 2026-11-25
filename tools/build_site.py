@@ -736,7 +736,9 @@ def build_guide(categories: list[dict], count: int) -> str:
 
 def build_maintenance(root_readme: str, categories: list[dict], count: int) -> str:
     markdown = (
-        extract_section(root_readme, "维护工具")
+        extract_section(root_readme, "开源借鉴与整合说明")
+        + "\n"
+        + extract_section(root_readme, "维护工具")
         + "\n"
         + extract_section(root_readme, "开发与验证")
         + "\n"
@@ -745,13 +747,14 @@ def build_maintenance(root_readme: str, categories: list[dict], count: int) -> s
     content, toc = render_markdown(markdown, "", "root")
     callout = (
         '<div class="callout">结构检查、回归测试与产物质量是三件事。'
-        "检查通过只说明对应范围，不代表视觉、导出或外部服务已经验收。</div>"
+        "检查通过只说明对应范围，不代表视觉、导出或外部服务已经验收；"
+        "整合自开源社区的 skill 亦在本页说明引用来源与改造边界。</div>"
     )
     prev_page = {"href": "guide.html", "label": "编写 Skill"}
     next_page = {"href": "roadmap.html", "label": "路线图"}
     return docs_page(
         title="维护与验证",
-        lead="结构检查、回归测试、锁文件与站点构建，各自证明不同的事情。",
+        lead="结构检查、回归测试、锁文件、站点构建与开源借鉴说明。",
         content_html=callout + content,
         toc=toc,
         canonical=SITE_URL + "docs/maintenance.html",

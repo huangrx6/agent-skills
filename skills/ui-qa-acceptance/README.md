@@ -50,6 +50,14 @@ python3 skills/ui-qa-acceptance/scripts/with_server.py \
 - 本 skill 专注**真实渲染态黑盒交互验收与证据交付**，不替代单元测试与 TDD（归 `tdd-testing`）、纯静态视觉审美评审（归 `ui-design-craft`）、前端业务源码修改（归 `frontend-engineering`）或产品 AC 起草（归 `product-spec`）。
 - 无法启动浏览器、缺少账号/外部令牌或目标平台无 CDP 暴露时，必须将对应项如实标为「未验证（原因）」，绝不凭读代码猜测结论。
 
+## 来源与整合说明
+
+- **主要引用来源**：多服务协调与「静默侦察页面状态先于自动化操作」的工作流主要借鉴自 [`anthropics/skills`](https://github.com/anthropics/skills)（按其各技能目录 `LICENSE.txt` 条款）的 `webapp-testing`，审阅与极端情况压测视角借鉴自 [`pbakaus/impeccable`](https://github.com/pbakaus/impeccable)（Apache License 2.0）的极值加固与检查思路，交付实证标准对齐 [`obra/superpowers`](https://github.com/obra/superpowers)（MIT License）的完成前验证规范。
+- **整合与调整要点**：
+  1. **自研 Python 3.10+ 进程组服务托管器**：用纯标准库实现的 `scripts/with_server.py` 替代示例脚本，支持多前端/后端命令编排、可选 `--path` HTTP 就绪探测（把 `2xx/3xx/4xx` 视为可服务响应）、跨平台进程组退出清理与对应单元测试（`tests/ui-qa-acceptance/`）。
+  2. **七维高压测试矩阵与几何级检查**：新增 `references/qa-stress-matrix.md` 与 `references/dom-and-geometry-checks.md`，系统化覆盖超长/多语言文本、并发与弱网、键盘导航、空白与边界态，以及 Playwright/DevTools 的水平溢出与元素遮挡检查代码片段。
+  3. **桌面应用与 SPA 水合验收补齐**：新增 `references/electron-and-spa-qa.md` 与 `references/evidence-and-bug-reporting.md`，补充 Electron/WebView 隔离 `USER_DATA` 目录与 CDP 调试、SPA Hydration 前事件丢失排查，以及可复现的 `Blocker / High / Medium / Low` 缺陷报告模板。
+
 ## 维护与验证
 
 从本仓库根目录运行以下三条校验命令（须全部退出码 0、0 失败、0 警告）：

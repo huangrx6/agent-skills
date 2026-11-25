@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>维护与验证 · Agent Skills</title>
-<meta name="description" content="结构检查、回归测试、锁文件与站点构建，各自证明不同的事情。">
+<meta name="description" content="结构检查、回归测试、锁文件、站点构建与开源借鉴说明。">
 <link rel="canonical" href="https://huangrx6.github.io/agent-skills/docs/maintenance.html">
 <meta name="theme-color" content="#0f1012">
 <meta property="og:title" content="维护与验证 · Agent Skills">
-<meta property="og:description" content="结构检查、回归测试、锁文件与站点构建，各自证明不同的事情。">
+<meta property="og:description" content="结构检查、回归测试、锁文件、站点构建与开源借鉴说明。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://huangrx6.github.io/agent-skills/docs/maintenance.html">
 <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
@@ -95,11 +95,91 @@
     <header class="page-head">
       <p class="eyebrow">文档</p>
       <h1>维护与验证</h1>
-      <p class="page-lede">结构检查、回归测试、锁文件与站点构建，各自证明不同的事情。</p>
+      <p class="page-lede">结构检查、回归测试、锁文件、站点构建与开源借鉴说明。</p>
       <div class="page-meta"><a href="https://github.com/huangrx6/agent-skills/blob/main/README.md" target="_blank" rel="noreferrer">README.md</a></div>
     </header>
     <article class="prose">
-      <div class="callout">结构检查、回归测试与产物质量是三件事。检查通过只说明对应范围，不代表视觉、导出或外部服务已经验收。</div><h2 id="维护工具">维护工具</h2>
+      <div class="callout">结构检查、回归测试与产物质量是三件事。检查通过只说明对应范围，不代表视觉、导出或外部服务已经验收；整合自开源社区的 skill 亦在本页说明引用来源与改造边界。</div><h2 id="开源借鉴与整合说明">开源借鉴与整合说明</h2>
+<p>本仓库的原创文档、工作流编排与自研脚本采用 <a href="https://github.com/huangrx6/agent-skills/blob/main/LICENSE">MIT License</a>。其中 <code>产品、设计与研发</code> 分组的 6 个工程流 skill 并非凭空撰写，而是在参考多个优秀开源 Agent Skill 项目的核心方法论后，进行了<strong>交叉整合、去冗余合并、跨技术栈泛化与工具脚本重写</strong>。各上游项目均按其原始开源许可在此及对应 skill 文档中公开致谢，且不将上游规则条目、内部指标或原始文件直接等同于本仓库状态。</p>
+<blockquote>
+<p>注：<a href="skills/deck-authoring.html#%E7%BB%B4%E6%8A%A4%E4%B8%8E%E5%80%9F%E9%89%B4"><code>deck-authoring</code></a> 的自由排版路线与开源生态取舍已在 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/deck-authoring/references/layout-technology.md"><code>skills/deck-authoring/references/layout-technology.md</code></a> 单独记录；<a href="skills/diagram-authoring.html"><code>diagram-authoring</code></a> 使用标准 <code>.excalidrawlib</code> 素材格式并支持按需选用外部图标库，其来源约束与使用说明详见该 skill 文档。</p>
+</blockquote>
+<h3 id="上游参考项目与许可">上游参考项目与许可</h3>
+<div class="table-wrap"><table><thead>
+<tr>
+<th>上游仓库</th>
+<th>主要参考组件 / Skill</th>
+<th>引用与借鉴的核心方法</th>
+<th>开源许可</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/obra/superpowers"><code>obra/superpowers</code></a></td>
+<td><code>brainstorming</code>、<code>writing-plans</code>、<code>systematic-debugging</code>、<code>test-driven-development</code>、<code>requesting-code-review</code>、<code>receiving-code-review</code>、<code>verification-before-completion</code></td>
+<td>探索式单问收敛、独立构建视角审查、零占位符任务拆分、四阶段根因溯源与纵深防御、条件等待与轮询隔离、RED → GREEN → REFACTOR 纪律及完成前实证要求</td>
+<td>MIT License</td>
+</tr>
+<tr>
+<td><a href="https://github.com/pbakaus/impeccable"><code>pbakaus/impeccable</code></a></td>
+<td><code>impeccable</code> 主体系与 <code>reference</code> 方法集（访客模式、质量底线、排版、色彩、交互、打磨、极值加固与审查打分）</td>
+<td>三类访客模式识别、界面质量底线、字体与色彩节制、信息精简与引导优化、极端内容加固以及多维度设计审查尺度</td>
+<td>Apache License 2.0</td>
+</tr>
+<tr>
+<td><a href="https://github.com/vercel-labs/agent-skills"><code>vercel-labs/agent-skills</code></a></td>
+<td><code>react-best-practices</code>、<code>composition-patterns</code>（并结合 <code>web-design-guidelines</code> 检查视角）</td>
+<td>按性能收益排名的前端关键路径优化（异步瀑布流、包体积、服务端/RSC、客户端去重、重渲染与渲染微优化、高级 Hooks）与复合组件/显式变体组合架构</td>
+<td>MIT License</td>
+</tr>
+<tr>
+<td><a href="https://github.com/anthropics/skills"><code>anthropics/skills</code></a></td>
+<td><code>frontend-design</code>、<code>webapp-testing</code></td>
+<td>明确美学方向与反模板化前端设计立意；本地多服务托管及「静默页面探测先于自动化点击」的浏览器测试思路</td>
+<td>按其各技能目录 <code>LICENSE.txt</code> 条款</td>
+</tr>
+</tbody>
+</table></div><h3 id="各整合-skill-的引用与调整对照">各整合 Skill 的引用与调整对照</h3>
+<div class="table-wrap"><table><thead>
+<tr>
+<th>本仓库 Skill</th>
+<th>主要引用来源</th>
+<th>整合调整与自研增强</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="skills/product-spec.html"><code>product-spec</code></a></td>
+<td><code>obra/superpowers</code>（<code>brainstorming</code>、<code>writing-plans</code>）</td>
+<td>收口为 7 步连续门控与「未定稿不写代码」硬闸门；新增短/全规格双深度路由、18 类模糊词改写为 Given/When/Then 可测 AC、9 场景边界异常矩阵及实施计划桥接；剥离原仓库宿主会话 Hook 与固定目录假设</td>
+</tr>
+<tr>
+<td><a href="skills/ui-design-craft.html"><code>ui-design-craft</code></a></td>
+<td><code>pbakaus/impeccable</code>（<code>impeccable</code> 全参考体系）、<code>anthropics/skills</code>（<code>frontend-design</code>）</td>
+<td>将二十余份分散规范与斜杠指令整合为「3 类访客模式 × 5 种工艺模式」统一路由与 10 份专题参考；新增中文与中英混排补偿、桌面多表面打磨及 <code>P0–P3</code> 缺陷分级；去除与简洁工作台/社论风格冲突的一刀切禁用表</td>
+</tr>
+<tr>
+<td><a href="skills/frontend-engineering.html"><code>frontend-engineering</code></a></td>
+<td><code>vercel-labs/agent-skills</code>（<code>react-best-practices</code>、<code>composition-patterns</code>）、<code>obra/superpowers</code>（<code>systematic-debugging</code>）</td>
+<td>将零散规则按前端性能、组合架构与状态影响面重构为 9 份按场景加载的手册；融合四阶段排错与连续失败熔断；补充无 <code>!important</code> 样式隔离、粘滞滚动、<code>focus-return</code>、竞态取消与 React 19 状态 Action；解除纯 Next.js/Vercel 框架绑定，兼容 Vite/SPA</td>
+</tr>
+<tr>
+<td><a href="skills/arch-backend-craft.html"><code>arch-backend-craft</code></a></td>
+<td><code>obra/superpowers</code>（<code>systematic-debugging</code>、<code>requesting-code-review</code>、<code>receiving-code-review</code>、<code>verification-before-completion</code>）</td>
+<td>保留根因溯源、纵深防御与实证审阅主干，<strong>泛化为跨语言后端指南</strong>：新增 Python（FastAPI / Django / SQLAlchemy / Alembic）与 Java（Spring Boot / JPA / MyBatis / Flyway / HikariCP）专门指引；补充 SSOT、唯一公共入口、五级配置优先级、<code>realpath</code>/Zip-Slip 校验、凭据保护与 Expand-Contract 零停机迁移</td>
+</tr>
+<tr>
+<td><a href="skills/tdd-testing.html"><code>tdd-testing</code></a></td>
+<td><code>obra/superpowers</code>（<code>test-driven-development</code>、<code>systematic-debugging</code>、<code>verification-before-completion</code>）</td>
+<td>统一红绿重构与反镜像断言铁律；用自研跨平台 Python 3.10+ 标准库脚本 <code>scripts/find_polluter.py</code>（支持 <code>--json</code>、预检与早停，附单元测试）取代 shell 版污染扫描思路；新增 <code>L1–L4</code> 分层测试策略表、LIFO 清理栈治理与变异校验</td>
+</tr>
+<tr>
+<td><a href="skills/ui-qa-acceptance.html"><code>ui-qa-acceptance</code></a></td>
+<td><code>anthropics/skills</code>（<code>webapp-testing</code>）、<code>pbakaus/impeccable</code>（审查与极值思路）、<code>obra/superpowers</code>（<code>verification-before-completion</code>）</td>
+<td>用自研 Python 3.10+ 标准库 <code>scripts/with_server.py</code>（进程组销毁、多服务编排与 HTTP 就绪探测，附单元测试）替代示例脚本；新增七维高压测试矩阵、DOM 几何溢出检测脚本、Electron/WebView 隔离 <code>USER_DATA</code> 与 SPA Hydration 验收及 <code>Blocker–Low</code> 报告模板</td>
+</tr>
+</tbody>
+</table></div><h2 id="维护工具">维护工具</h2>
 <p>技能之外的仓库工具放在 <code>tools/</code>，不会被安装到 agent：</p>
 <div class="table-wrap"><table><thead>
 <tr>
@@ -183,7 +263,7 @@ python3 tools/skills_lock.py --check
 </table></div><p>后续方向见 <a href="roadmap.html">ROADMAP.md</a>。</p>
 <hr />
 <p align="center">
-  <sub>原创代码与文档采用 <a href="https://github.com/huangrx6/agent-skills/blob/main/LICENSE">MIT License</a>；第三方依赖、字体与品牌素材按各自许可使用。</sub>
+  <sub>原创代码与文档采用 <a href="https://github.com/huangrx6/agent-skills/blob/main/LICENSE">MIT License</a>；借鉴整合的开源方法论、第三方依赖、字体与外部素材按各自原始许可标注并使用。</sub>
 </p>
 <h2 id="仓库结构">仓库结构</h2>
 <pre><code class="language-text">agent-skills/
@@ -199,7 +279,7 @@ python3 tools/skills_lock.py --check
     </article>
     <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="guide.html"><span>上一篇</span><strong>编写 Skill</strong></a><a class="page-nav-link next" href="roadmap.html"><span>下一篇</span><strong>路线图</strong></a></nav>
   </main>
-<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#维护工具">维护工具</a></li><li class="toc-2"><a href="#开发与验证">开发与验证</a></li><li class="toc-2"><a href="#仓库结构">仓库结构</a></li></ul></aside>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#开源借鉴与整合说明">开源借鉴与整合说明</a></li><li class="toc-3"><a href="#上游参考项目与许可">上游参考项目与许可</a></li><li class="toc-3"><a href="#各整合-skill-的引用与调整对照">各整合 Skill 的引用与调整对照</a></li><li class="toc-2"><a href="#维护工具">维护工具</a></li><li class="toc-2"><a href="#开发与验证">开发与验证</a></li><li class="toc-2"><a href="#仓库结构">仓库结构</a></li></ul></aside>
 </div>
 
 <footer class="site-footer">

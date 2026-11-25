@@ -146,6 +146,17 @@
 <li>负责自动化测试设计与工程验证门控；真实页面黑盒交互验收归 <code>ui-qa-acceptance</code>，系统架构与纯代码评审归 <code>arch-backend-craft</code>，仓库 CI 与 lint 基线初始化归 <code>repo-baseline</code>。</li>
 <li><code>scripts/find_polluter.py</code> 按传入顺序逐个执行并在找到首个污染源后立刻早停，要求目标污染产物在开始前不存在（否则以退出码 <code>2</code> 拒绝执行）；若仅在多文件组合或并发执行时才出现污染，结合 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/tdd-testing/references/isolation-and-polluters.md">测试隔离、资源清理与污染排查</a> 的二分分组排查法定位。</li>
 </ul>
+<h2 id="来源与整合说明">来源与整合说明</h2>
+<ul>
+<li><strong>主要引用来源</strong>：核心纪律借鉴自 <a href="https://github.com/obra/superpowers"><code>obra/superpowers</code></a>（MIT License）的 <code>test-driven-development</code>（RED → GREEN → REFACTOR 循环与良好测试编写规范）、<code>systematic-debugging</code> 中的条件等待及轮询定位污染文件思路，以及 <code>verification-before-completion</code> 的实证要求。</li>
+<li><strong>整合与调整要点</strong>：
+<ol>
+<li><strong>用跨平台 Python 脚本重写污染源定位器</strong>：原仓库的 <code>find-polluter.sh</code> 依赖 bash 环境且扩展性有限；本 skill 使用仅依赖 Python 3.10+ 标准库自研实现了 <code>scripts/find_polluter.py</code>，增加基线清理检查、目录存在性预检、<code>--json</code> 输出、早停控制并附带完整单元测试（<code>tests/tdd-testing/</code>）。</li>
+<li><strong>建立分层测试路由矩阵</strong>：新增 <code>references/test-strategy-by-layer.md</code>，区分 <code>L1–L4</code>（纯函数 / 状态边界 / 持久化与集成 / 端到端与视觉）选型原则，提供 TypeScript 与 Python 用例模板，减少过度 mock 或全链路滥用。</li>
+<li><strong>补全 LIFO 清理与变异检验要求</strong>：在 <code>references/isolation-and-polluters.md</code> 与 <code>references/writing-good-tests.md</code> 中加入 LIFO 资源清理栈、多文件组合污染二分排查及「破坏实现验证测试必红」的反镜像断言要求。</li>
+</ol>
+</li>
+</ul>
 <h2 id="维护与验证">维护与验证</h2>
 <p>从本仓库根目录运行全部三项校验（须全部退出码 <code>0</code>、0 失败、0 警告）：</p>
 <pre><code class="language-sh">python3 tools/skill-builder/scripts/validate_skill.py skills/tdd-testing
@@ -156,7 +167,7 @@ python3 -m unittest discover -s tests/tdd-testing -v
     </article>
     <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="../skills/arch-backend-craft.html"><span>上一篇</span><strong>架构设计、后端工程与代码评审</strong></a><a class="page-nav-link next" href="../skills/ui-qa-acceptance.html"><span>下一篇</span><strong>黑盒交互验收与 UI 质检</strong></a></nav>
   </main>
-<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#快速使用">快速使用</a></li><li class="toc-2"><a href="#目录结构">目录结构</a></li><li class="toc-2"><a href="#边界">边界</a></li><li class="toc-2"><a href="#维护与验证">维护与验证</a></li></ul></aside>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#快速使用">快速使用</a></li><li class="toc-2"><a href="#目录结构">目录结构</a></li><li class="toc-2"><a href="#边界">边界</a></li><li class="toc-2"><a href="#来源与整合说明">来源与整合说明</a></li><li class="toc-2"><a href="#维护与验证">维护与验证</a></li></ul></aside>
 </div>
 
 <footer class="site-footer">

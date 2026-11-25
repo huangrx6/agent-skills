@@ -142,6 +142,18 @@
 <li>纯视觉审美方向与设计评审归 <code>ui-design-craft</code>，后端/Electron 主进程/数据库架构归 <code>arch-backend-craft</code>，独立 TDD 流程归 <code>tdd-testing</code>，黑盒浏览器交互验收归 <code>ui-qa-acceptance</code>，仓库工程基线配置归 <code>repo-baseline</code>；</li>
 <li>不在未完成复现与计算样式/状态采证前盲目修改样式或堆叠补丁。</li>
 </ul>
+<h2 id="来源与整合说明">来源与整合说明</h2>
+<ul>
+<li><strong>主要引用来源</strong>：性能优化与架构组合主要借鉴自 <a href="https://github.com/vercel-labs/agent-skills"><code>vercel-labs/agent-skills</code></a>（MIT License）的 <code>react-best-practices</code> 与 <code>composition-patterns</code>，前端疑难排错方法借鉴自 <a href="https://github.com/obra/superpowers"><code>obra/superpowers</code></a>（MIT License）的 <code>systematic-debugging</code>。</li>
+<li><strong>整合与调整要点</strong>：
+<ol>
+<li><strong>按场景与影响面重组参考体系</strong>：将两个上游 skill 原本平铺的多条碎规则整合为按核心瓶颈与模块职责划分的 9 份专题文档（异步瀑布流、包体积、服务端与客户端数据、重渲染、渲染与 JS 微性能、组合与状态、高级 React 模式、CSS 与交互工艺、前端系统排错）。</li>
+<li><strong>解除 Next.js / Vercel 单栈预设</strong>：保留 RSC 与服务端边界建议的同时，显式适配 Vite + React SPA、桌面渲染进程（如 Electron renderer）与纯前端路由状态场景。</li>
+<li><strong>补全交互稳健性与现代 React 实践</strong>：新增 <code>references/css-and-interaction-craft.md</code>（不用 <code>!important</code> 的作用域隔离、粘滞滚动、焦点返回、异步竞态清理），并在状态与并发章节补充 React 19（如 <code>use()</code>、<code>useActionState</code>）的现代做法。</li>
+<li><strong>内建前端四阶段排错闭环</strong>：新增 <code>references/frontend-debugging.md</code>，把浏览器 Evidence 收集、状态/水合定位与「连续三次尝试失败即停手回溯」原则融合进前端开发流。</li>
+</ol>
+</li>
+</ul>
 <h2 id="验证">验证</h2>
 <p>本 skill 无可执行脚本，结构与引用校验在仓库根目录运行：</p>
 <pre><code class="language-sh">python3 tools/skill-builder/scripts/validate_skill.py skills/frontend-engineering
@@ -151,7 +163,7 @@ python3 tools/skill-builder/scripts/check_pointers.py --root . skills/frontend-e
     </article>
     <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="../skills/ui-design-craft.html"><span>上一篇</span><strong>界面设计工艺与可用性规范</strong></a><a class="page-nav-link next" href="../skills/arch-backend-craft.html"><span>下一篇</span><strong>架构设计、后端工程与代码评审</strong></a></nav>
   </main>
-<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#快速使用">快速使用</a></li><li class="toc-2"><a href="#目录结构">目录结构</a></li><li class="toc-2"><a href="#边界">边界</a></li><li class="toc-2"><a href="#验证">验证</a></li></ul></aside>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#快速使用">快速使用</a></li><li class="toc-2"><a href="#目录结构">目录结构</a></li><li class="toc-2"><a href="#边界">边界</a></li><li class="toc-2"><a href="#来源与整合说明">来源与整合说明</a></li><li class="toc-2"><a href="#验证">验证</a></li></ul></aside>
 </div>
 
 <footer class="site-footer">

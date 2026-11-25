@@ -142,6 +142,17 @@
 <li><strong>负责</strong>：界面视觉与交互设计、反模板审视、排版布局色彩、文案与空态引导、动效编排、既有页面精修、前端界面加固、技术审计与 UX Critique。</li>
 <li><strong>不负责</strong>：React 状态/Hook 架构重构与渲染性能调优（归 <code>frontend-engineering</code>）、产品范围与编号 AC 收敛（归 <code>product-spec</code>）、黑盒点击验收报告（归 <code>ui-qa-acceptance</code>）、幻灯片与技术图制作（归 <code>deck-authoring</code> / <code>diagram-authoring</code>）。</li>
 </ul>
+<h2 id="来源与整合说明">来源与整合说明</h2>
+<ul>
+<li><strong>主要引用来源</strong>：主要借鉴自 <a href="https://github.com/pbakaus/impeccable"><code>pbakaus/impeccable</code></a>（Apache License 2.0）的 <code>impeccable</code> 体系及其参考集合（访客模式、工艺底线、排版、布局、色彩、精简、引导、增强/收敛、动效、打磨、组件审查、极值加固与审阅评分准则），并融入 <a href="https://github.com/anthropics/skills"><code>anthropics/skills</code></a>（按其各技能目录 <code>LICENSE.txt</code> 条款）中 <code>frontend-design</code> 的明确美学立意与反模板化方向。</li>
+<li><strong>整合与调整要点</strong>：
+<ol>
+<li><strong>多指令聚拢为单技能双轴路由</strong>：将上游分散的二十余个指令与参考文档重组为单一可独立安装的 skill，以「3 类访客模式（操作型 / 阅读型 / 说服型）× 5 种工艺模式（构思 / 增强 / 精炼 / 动效 / 审查加固）」路由至 10 份结构化参考手册。</li>
+<li><strong>补强中文排版与桌面端表面工艺</strong>：在 <code>references/typography-system.md</code> 与 <code>references/polish-and-component-review.md</code> 中补入中英混排字重/行高补偿与等宽数字对齐，以及 Electron / 多表面桌面界面（标题栏、侧栏、弹层、菜单栏一致性）的打磨要点。</li>
+<li><strong>统一可落地的缺陷定级与风格去偏见</strong>：在 <code>references/critique-and-audit-rubric.md</code> 中落地 <code>P0–P3</code> 问题分级与复核清单；删除原参考中容易误伤简洁工具台或社论排版的泛化视觉禁用词表，同时剥离原仓库的多宿主命令脚手架。</li>
+</ol>
+</li>
+</ul>
 <h2 id="维护校验">维护校验</h2>
 <p>本 skill 无可执行脚本，结构、规则与引用校验在仓库根目录运行：</p>
 <pre><code class="language-sh">python3 tools/skill-builder/scripts/validate_skill.py skills/ui-design-craft
@@ -151,7 +162,7 @@ python3 tools/skill-builder/scripts/check_pointers.py --root . skills/ui-design-
     </article>
     <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="../skills/product-spec.html"><span>上一篇</span><strong>产品需求澄清与规格收敛</strong></a><a class="page-nav-link next" href="../skills/frontend-engineering.html"><span>下一篇</span><strong>前端工程实现、性能优化与根因调试</strong></a></nav>
   </main>
-<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#典型用法">典型用法</a></li><li class="toc-2"><a href="#目录结构">目录结构</a></li><li class="toc-2"><a href="#职责边界">职责边界</a></li><li class="toc-2"><a href="#维护校验">维护校验</a></li></ul></aside>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#典型用法">典型用法</a></li><li class="toc-2"><a href="#目录结构">目录结构</a></li><li class="toc-2"><a href="#职责边界">职责边界</a></li><li class="toc-2"><a href="#来源与整合说明">来源与整合说明</a></li><li class="toc-2"><a href="#维护校验">维护校验</a></li></ul></aside>
 </div>
 
 <footer class="site-footer">

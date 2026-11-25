@@ -142,6 +142,17 @@
 <li>覆盖 Python、Java、Node.js/TypeScript 等通用后端架构、持久化、安全与评审；前端 React 组件与 CSS 归 <code>frontend-engineering</code> / <code>ui-design-craft</code>，产品需求澄清归 <code>product-spec</code>，独立测试套件编写归 <code>tdd-testing</code>，Git 分支提交归 <code>git-dev-workflow</code>。</li>
 <li>评审模式默认 100% 只读，不改动工作树、暂存区或分支指针。</li>
 </ul>
+<h2 id="来源与整合说明">来源与整合说明</h2>
+<ul>
+<li><strong>主要引用来源</strong>：排错方法论、审阅协作与完成门控主要借鉴自 <a href="https://github.com/obra/superpowers"><code>obra/superpowers</code></a>（MIT License）的 <code>systematic-debugging</code>（含反向溯源与纵深防御思路）、<code>requesting-code-review</code>、<code>receiving-code-review</code> 及 <code>verification-before-completion</code>。</li>
+<li><strong>整合与调整要点</strong>：
+<ol>
+<li><strong>从单一工程约束扩展为跨语言通用后端规范</strong>：在通用架构契约之外，补充 <code>references/python-backend-craft.md</code>（FastAPI / Django / SQLAlchemy / Alembic 与异步/连接池）与 <code>references/java-backend-craft.md</code>（Spring Boot / JPA / MyBatis / Flyway / HikariCP 与并发治理），同时兼顾 Node.js / TypeScript 等服务端技术栈，按目标仓库语言路由加载。</li>
+<li><strong>深化模块化边界与安全契约</strong>：新增 <code>references/architecture-and-boundaries.md</code> 与 <code>references/contracts-and-security.md</code>，落定单一事实来源（SSOT）、唯一公共入口、五级配置优先级、<code>realpath</code>/Zip-Slip 路径防逃逸、凭据加密存储，以及诚实标注静态检查与真实 OS 沙箱边界。</li>
+<li><strong>补充零停机迁移与回滚准则</strong>：新增 <code>references/persistence-and-migrations.md</code>，建立 Expand-Contract 两阶段数据库迁移、版本化历史数据迁移与原子目录切换回滚流程，使架构设计与线上演进衔接完整。</li>
+</ol>
+</li>
+</ul>
 <h2 id="验证">验证</h2>
 <p>本 skill 无可执行脚本，结构与引用校验在仓库根目录运行：</p>
 <pre><code class="language-sh">python3 tools/skill-builder/scripts/validate_skill.py skills/arch-backend-craft
@@ -151,7 +162,7 @@ python3 tools/skill-builder/scripts/check_pointers.py --root . skills/arch-backe
     </article>
     <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="../skills/frontend-engineering.html"><span>上一篇</span><strong>前端工程实现、性能优化与根因调试</strong></a><a class="page-nav-link next" href="../skills/tdd-testing.html"><span>下一篇</span><strong>TDD 与高质量自动化测试</strong></a></nav>
   </main>
-<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#快速使用">快速使用</a></li><li class="toc-2"><a href="#目录结构">目录结构</a></li><li class="toc-2"><a href="#边界">边界</a></li><li class="toc-2"><a href="#验证">验证</a></li></ul></aside>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#快速使用">快速使用</a></li><li class="toc-2"><a href="#目录结构">目录结构</a></li><li class="toc-2"><a href="#边界">边界</a></li><li class="toc-2"><a href="#来源与整合说明">来源与整合说明</a></li><li class="toc-2"><a href="#验证">验证</a></li></ul></aside>
 </div>
 
 <footer class="site-footer">
