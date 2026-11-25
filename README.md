@@ -2,11 +2,11 @@
 
 <p align="center">
   <strong>把重复的工作方法，写成 Agent 能执行、能验证的 skill。</strong><br>
-  <sub>演示文稿 · 技术图 · COSMIC · Obsidian · Git · PingCode · 学习路线 · 邮件 · 工程基线</sub>
+  <sub>演示文稿 · 技术图 · COSMIC · Obsidian · Git · PingCode · 学习路线 · 邮件 · 工程基线 · 需求规格 · 界面工艺 · 前后端研发 · 测试与验收</sub>
 </p>
 
 <p align="center">
-  <code>11 skills</code> &nbsp;·&nbsp; <code>Python 3.10+（learning-scout、pingcode-weekly 需 3.11+）</code> &nbsp;·&nbsp; <code>MIT</code>
+  <code>17 skills</code> &nbsp;·&nbsp; <code>Python 3.10+（learning-scout、pingcode-weekly 需 3.11+）</code> &nbsp;·&nbsp; <code>MIT</code>
 </p>
 
 <p align="center">
@@ -38,7 +38,7 @@ Settings → Pages 把 Source 设为 GitHub Actions；不要手改 `docs/` 下�
 | Skill | 做什么 | 产出 |
 | --- | --- | --- |
 | [**deck-authoring**](skills/deck-authoring/README.md) | 从材料组织内容、设计版面与配图，用真实页面迭代 | HTML 演示 · PDF · PNG · PPTX · 视频 |
-| [**diagram-authoring**](skills/diagram-authoring/README.md) | 把结构描述变成可编辑的技术图，并检查布局与可读性 | Excalidraw · draw.io · Mermaid · PNG |
+| [**diagram-authoring**](skills/diagram-authoring/README.md) | 把结构描述变成可编辑的技术图，支持圆角/曲线/直连、无框图标与跨后端 `.excalidrawlib` 素材 | Excalidraw · draw.io · Mermaid · PNG |
 | [**cosmic-split**](skills/cosmic-split/README.md) | 按需求、接口、页面或代码识别 COSMIC 数据移动 | 拆分表 · 自检报告 · 覆盖清单 |
 | [**email-composer**](skills/email-composer/README.md) | 起草与制作工作邮件，复用 Spec / HTML 模板 | 邮件草稿 · .eml · 模板库 |
 
@@ -59,9 +59,20 @@ Settings → Pages 把 Source 设为 GitHub Actions；不要手改 `docs/` 下�
 | [**repo-baseline**](skills/repo-baseline/README.md) | 检测并补齐仓库工程基线，只补缺失项 | 基线文件 · 检测报告 · 巡检结论 |
 | [**learning-scout**](skills/learning-scout/README.md) | 把学习需求研究成一组独立笔记与离线入口页 | 笔记 · HTML 入口 · 打印版 · PDF |
 
+### 产品、设计与研发
+
+| Skill | 做什么 | 产出 |
+| --- | --- | --- |
+| [**product-spec**](skills/product-spec/README.md) | 澄清模糊需求、收敛范围边界、对比方案并写可复测 AC | 产品规格书 · 编号 AC · 异常矩阵 |
+| [**ui-design-craft**](skills/ui-design-craft/README.md) | 界面视觉与交互工艺、反模板审视、动效打磨与极端加固 | 设计调整方案 · 动效规范 · 5 维审计报告 |
+| [**frontend-engineering**](skills/frontend-engineering/README.md) | React/TS 组合架构、异步与重渲染优化、作用域 CSS 与根因调试 | 组合组件与纯模型 · 性能与样式修复 |
+| [**arch-backend-craft**](skills/arch-backend-craft/README.md) | 跨语言（Node / Python / Java）系统架构、单源事实、后端安全契约、迁移回滚与分级评审 | 架构决策 · 迁移实现 · 分级评审报告 |
+| [**tdd-testing**](skills/tdd-testing/README.md) | 红绿重构 TDD、真实行为测试、测试隔离与污染定位、完成前验证门控 | 自动化测试 · 污染定位 · 验证报告 |
+| [**ui-qa-acceptance**](skills/ui-qa-acceptance/README.md) | 真实页面黑盒交互验收、7 维高压质检与本地多服务启停 | 验收结论 · AC 核对表 · 分级缺陷单 |
+
 Obsidian 两项能力各自独立，通过笔记数据关联。
 
-例如：“使用 `$deck-authoring` 把材料做成演示文稿”，或“使用 `$learning-scout` 给我一条两周的 RAG 学习路线”。
+例如：“使用 `$deck-authoring` 把材料做成演示文稿”、“使用 `$diagram-authoring` 画出带无框图标和圆角连线的网络拓扑图”，或“使用 `$product-spec` 把这条模糊需求整理成可验收规格书”。
 是否自动发现、如何显式调用，取决于使用的 Agent。
 
 ## 维护工具
@@ -117,7 +128,7 @@ npx skills add https://github.com/huangrx6/agent-skills -a claude-code -g \
   --skill learning-scout --skill pingcode --skill pingcode-weekly
 ```
 
-官方安装器维护各 Agent 的路径与更新；本仓库的 `tools/install_skills.py` 仍然一次安装全部 11 个。
+官方安装器维护各 Agent 的路径与更新；本仓库的 `tools/install_skills.py` 仍然一次安装全部 17 个。
 本地 `--copy` 只复制 Git 跟踪的内容，不会带上 `.venv` 或 IDE 配置。仓库可能移动、需要固定副本时：
 
 ```sh
@@ -164,7 +175,7 @@ python3 tools/migrate_skill_home.py --apply
 
 ```text
 agent-skills/
-├── skills/        # 11 个可独立安装的 skill
+├── skills/        # 17 个可独立安装的 skill
 ├── tools/         # 安装、锁文件、迁移、体检、skill 编写
 ├── tests/         # 回归测试，按 skill 分目录
 ├── docs/          # 生成的项目站点（GitHub Pages 发布）

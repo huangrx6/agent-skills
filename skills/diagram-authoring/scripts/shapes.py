@@ -50,6 +50,8 @@ SHAPES: dict[str, dict] = {
                  "roundness": {"type": 3}, "text_fit": "cylinder"},
     "note": {"zh": "便签（注释 / 说明）", "excalidraw": "rectangle",
              "roundness": None, "text_fit": (1.0, 1.0), "stroke_style": "dashed"},
+    "icon": {"zh": "无框图标（拓扑 / 设备）", "excalidraw": "rectangle",
+             "roundness": None, "text_fit": (1.0, 1.0)},
 }
 
 # kind → 默认形状。显式写了 shape 就以显式为准。

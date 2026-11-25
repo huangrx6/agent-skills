@@ -1,0 +1,20 @@
+{
+  "skill_name": "ui-design-craft",
+  "triggers": [
+    {"id": 1, "query": "这个设置弹窗看起来太凌乱，而且和旁边页面风格不统一，帮我出一下视觉和交互优化方案", "should_trigger": true},
+    {"id": 2, "query": "帮我梳理全站的展开收起和加载动效，优化得更克制丝滑，顺便考虑减少动态效果", "should_trigger": true},
+    {"id": 3, "query": "这个页面感觉有很重的 AI 模板味，帮我从排版、配色和卡片层级上做一次深度设计评审", "should_trigger": true},
+    {"id": 4, "query": "列表装到 50 项并且在窄窗口下容易被裁切，帮我按生产标准做界面加固评审", "should_trigger": true},
+    {"id": 5, "query": "帮我对这套桌面端设置界面做一次无障碍、明暗主题和响应式的技术审计并打分", "should_trigger": true},
+    {"id": 6, "query": "这个 React 组件每次输入都全树重渲染，帮我用 useDeferredValue 和组合模式重构一下", "should_trigger": false,
+     "note": "→ frontend-engineering：React 状态架构与渲染性能优化"},
+    {"id": 7, "query": "帮我把用户反馈整理成本期需求范围和编号验收条件 AC", "should_trigger": false,
+     "note": "→ product-spec：产品需求收敛与 AC 编写"},
+    {"id": 8, "query": "打开本地页面帮我黑盒点一遍，检查切页状态复位和控制台有没有报错", "should_trigger": false,
+     "note": "→ ui-qa-acceptance：黑盒交互验收与缺陷复测"},
+    {"id": 9, "query": "帮我画一张系统架构图导出成 Excalidraw 和 PNG", "should_trigger": false,
+     "note": "→ diagram-authoring：技术图绘制与导出"},
+    {"id": 10, "query": "把这份产品介绍材料做成 12 页的 HTML 演示文稿", "should_trigger": false,
+     "note": "→ deck-authoring：演示文稿制作"}
+  ]
+}

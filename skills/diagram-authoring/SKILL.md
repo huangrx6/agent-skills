@@ -42,10 +42,11 @@ compatibility: Requires Python 3.10+; PNG/SVG/PDF exports need a browser or draw
 4. 根据用途选后端、风格和 `--preset` 场景；预设会重新测量字号、盒子与间距。沿用用户已确认的选择；未确认的视觉方向先作为提案。
    配色先看用户参考/品牌和当前图的作用，读 [自由配色](references/color-design.md)，用项目 `*.colors.json` 落实；
    不把旧方向当固定色板；默认中性节点与少量重点色，仅在有助理解时增加分类色。没有偏好时给出具体推荐。说明颜色如何分配到画布、节点、重点和分区，等待用户确认，再落实配色。仅需要比较时做小范围示意，不默认生成图片。
-   分层/分区难辨时，可用 `by_group` 指定不同浅底色，独立于节点重点色；大面积纹理可能干扰连线，按实际效果选择实心底色。
+   分层/分区难辨时，可用 `by_group` 指定不同浅底色，独立于节点重点色；大面积纹理可能干扰连线，按实际效果选择实心底色（`style.fill: "solid"`）。
+   连线默认使用柔和圆角正交（`style.edges: "rounded"`）；流程/概念/汇报图需要更灵动时可选 `curved`（顺滑曲线）或 `straight`（无遮挡直连），严格蓝图/工程图可选 `sharp`（90° 直角）。
    用户要求整块区域底色时，逐一核对涉及的分组都有填充，不能只给入口和基础设施上色；中间层的 neutral 名称不应使明确指定的区域配色失效。
-   配色确认后，Excalidraw 提交图标方案：是否使用、具体素材/风格、节点覆盖数量与比例、大小/位置、颜色处理；
-   等待用户确认后才设置 icon。draw.io/Mermaid 不支持图标，此节点说明为不适用；有图标诉求先解决后端选择。
+   配色确认后，按需提交图标方案（Excalidraw 与 draw.io 均支持同一套 `.excalidrawlib` 素材库）：是否使用、实际素材来源/库名、节点覆盖清单与是否用无框 `shape: "icon"`（拓扑/设备图优先）、颜色处理；
+   等待用户确认后才设置 icon。Mermaid 不支持图标，此节点说明为不适用；有图标诉求先解决后端选择。
 5. 适用节点均确认后，校验规格并运行 `python3 scripts/check_semantics.py`，对照来源处理语义提示；不自动删改事实。
    Mermaid 路径先读 [Mermaid 后端](references/mermaid-backend.md)：使用 `emit_mermaid.py`，再用 `check_mermaid.py` 做官方语法检查；不运行下面的几何/观看检查，完成后进入第 8 步。
    Excalidraw/draw.io 的 emit 会校验规格、计算布局、有限调参，再原子写入；有阻塞项时不写成品。
@@ -95,7 +96,7 @@ python3 dev-tools/sync_exports.py /path/to/diagrams/system/system.drawio
 | 后端 | 适用 | 当前边界 |
 | --- | --- | --- |
 | Excalidraw（默认） | 手绘感、图标、可编辑 JSON；可选 PNG/SVG | 编辑器可能重新折行；官方导出需要浏览器 |
-| draw.io | 工程图、原生基本形状、多页 `.drawio`；可选 PNG/SVG/PDF | 七种基本形状；无图标/完整专用图库；多页图片需指定页码，PDF 默认全页 |
+| draw.io | 工程图、原生形状、内联 `.excalidrawlib` 图标、多页 `.drawio`；可选 PNG/SVG/PDF | 八种形状（含无框 `icon`）；图标自动转内联 SVG；多页图片需指定页码，PDF 默认全页 |
 | Mermaid | 文本 `.mmd`；架构、依赖、流程、普通状态图；可选 PNG/SVG | 自有布局；不支持 icon/rank/pin；状态图转换限制见后端说明 |
 
 三后端都支持 `--colors 项目.colors.json`：任意颜色、节点角色/ID 分配、自由填充比例，
@@ -123,7 +124,7 @@ python3 scripts/scheme_preview.py -o /tmp/schemes.drawio
 - 分组表达真实边界，不能为了排得整齐把无关节点归在一起。复杂图可拆视图并保留跨图对应关系。
   上下分层要看分组外框之间的净空；节点间距还会被标题带和内边距占用。标题较长且通道密集时可保留全文换行。
   多条长线难以追踪时，先调整节点次序、引出端口和层间空间；仍拥挤时按读者问题拆图，使用 [视图覆盖核对](references/reading-views.md) 防止漏边。
-- 图标方案先查实际素材，再提交确认；常见语义可推荐内置 sigil，需要品牌图标再查素材库。draw.io/Mermaid 生成器不支持图标，不能悄悄删除。
+- 图标方案优先从已缓存或官方 `.excalidrawlib` 素材库按实名选取（`icons_fetch.py --find` / `--cached`），Excalidraw 与 draw.io 共用同一套素材；网络/设备拓扑可用无框 `shape: "icon"` 让图标作视觉主角。Mermaid 生成器不支持图标，不能悄悄删除。
 - 实测布局与真实渲染分开报告：自研 preview 只能看布局模型；官方导出后仍需目视核对文字、连线和重点。
 - 只在用户要求放入 Obsidian 时解析 `$OBSIDIAN_VAULT_PATH`，其次读取
   `~/.agent-skills/config/obsidian-vault-path`；不能因默认后端是 Excalidraw 就写入外部 vault。

@@ -1,0 +1,20 @@
+{
+  "skill_name": "frontend-engineering",
+  "triggers": [
+    {"id": 1, "query": "这个 React 组件布尔 props 太多太乱了，帮我用复合组件和纯函数模型重构", "should_trigger": true},
+    {"id": 2, "query": "列表搜索时输入掉帧而且旧请求会覆盖新结果，帮我优化重渲染和竞态问题", "should_trigger": true},
+    {"id": 3, "query": "弹窗里的图标尺寸被另一个对话框的 CSS 覆盖了，帮我定位根因并彻底解决样式冲突", "should_trigger": true},
+    {"id": 4, "query": "把前端数据加载里的串行 await 瀑布改成并行，顺便懒加载重型图表组件", "should_trigger": true},
+    {"id": 5, "query": "切页回来后设置页还停留在上次的子视图里，帮我排查状态复位逻辑并修复", "should_trigger": true},
+    {"id": 6, "query": "帮我从排版、配色和反 AI 模板的角度评审这个工作台界面并给设计方案", "should_trigger": false,
+     "note": "→ ui-design-craft：视觉审美、排版与设计审计"},
+    {"id": 7, "query": "帮我设计 Electron 主进程和 SQLite 的数据迁移方案与 IPC 安全边界", "should_trigger": false,
+     "note": "→ arch-backend-craft：后端/主进程架构与数据库迁移"},
+    {"id": 8, "query": "帮我用 TDD 红绿重构方式给这个纯计算模块补一套自动化测试", "should_trigger": false,
+     "note": "→ tdd-testing：TDD 与自动化测试设计"},
+    {"id": 9, "query": "启动本地应用把设置页和弹窗黑盒点一遍，输出带证据的验收报告", "should_trigger": false,
+     "note": "→ ui-qa-acceptance：黑盒交互验收"},
+    {"id": 10, "query": "帮我把这次前端改动的提交拆成几个规范的 commit 并检查分支状态", "should_trigger": false,
+     "note": "→ git-dev-workflow：Git 提交与分支工作流"}
+  ]
+}

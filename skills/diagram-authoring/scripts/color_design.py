@@ -16,7 +16,8 @@ import re
 
 HEX = re.compile(r"#[0-9a-fA-F]{6}\Z")
 FIELDS = {"version", "name", "source", "rationale", "canvas", "ink", "accent",
-          "critical", "swatches", "by_kind", "by_node", "by_group", "strength"}
+          "critical", "swatches", "by_kind", "by_node", "by_group",
+          "by_edge_kind", "by_edge", "strength"}
 DEFAULT_STRENGTH = {"normal": .12, "primary": .30, "critical": .18, "surface": .035}
 
 
@@ -147,9 +148,41 @@ def resolve(value, p):
     edge = boundary(p._mix(canvas, ink, .60), canvas, "edge")
     for background in surrounds:
         check("edge", edge, background, 3)
+
+    # 按内容需要为不同流向/通道的边分配语义色（默认不填，保持克制中性边线）
+    edge_swatches = {**swatches, "ink": ink}
+    edge_by_kind: dict[str, str] = {}
+    raw_edge_kind = raw.get("by_edge_kind", {})
+    if not isinstance(raw_edge_kind, dict):
+        raise ValueError("by_edge_kind 必须是对象")
+    for kind_key, swatch_name in raw_edge_kind.items():
+        if kind_key not in p.EDGE_STYLES:
+            raise ValueError(f"by_edge_kind 含未知边类型：{kind_key!r}（可用 {sorted(p.EDGE_STYLES)}）")
+        if not isinstance(swatch_name, str) or swatch_name not in edge_swatches:
+            raise ValueError(f"by_edge_kind.{kind_key} 引用了不存在的色名：{swatch_name!r}")
+        resolved_edge = boundary(edge_swatches[swatch_name], canvas, f"edge-kind:{kind_key}")
+        for background in surrounds:
+            check(f"edge-kind:{kind_key}", resolved_edge, background, 3)
+        edge_by_kind[kind_key] = resolved_edge
+
+    edge_by_id: dict[str, str] = {}
+    raw_edge_id = raw.get("by_edge", {})
+    if not isinstance(raw_edge_id, dict):
+        raise ValueError("by_edge 必须是对象")
+    for edge_key, swatch_name in raw_edge_id.items():
+        if not isinstance(edge_key, str) or not edge_key:
+            raise ValueError("by_edge 的键必须是非空字符串（边 id 或 from->to）")
+        if not isinstance(swatch_name, str) or swatch_name not in edge_swatches:
+            raise ValueError(f"by_edge.{edge_key} 引用了不存在的色名：{swatch_name!r}")
+        resolved_edge = boundary(edge_swatches[swatch_name], canvas, f"edge:{edge_key}")
+        for background in surrounds:
+            check(f"edge:{edge_key}", resolved_edge, background, 3)
+        edge_by_id[edge_key] = resolved_edge
+
     check("canvas:text", ink, canvas, 4.5)
     return dict(raw=raw, canvas=canvas, ink=ink, levels=levels, colors=colors,
-                primary=primary, edge=edge, groups=groups, **assignments,
+                primary=primary, edge=edge, edge_by_kind=edge_by_kind,
+                edge_by_id=edge_by_id, groups=groups, **assignments,
                 report=dict(status="pass", basis="resolved-solid-color-pairs",
                             checks=checks, adjustments=adjustments,
                             limits=["不检查透明度、图标像素、纹理或色觉缺陷；不代表审美或完整无障碍验收"]))

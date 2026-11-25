@@ -1,0 +1,41 @@
+{
+  "skill_name": "arch-backend-craft",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "我们要加一个跨进程插件安装接口，前端传入压缩包路径，主进程解压安装并返回结果。帮我设计架构、安全边界和契约。",
+      "expected_output": "明确单源事实与模块公开入口；设计纯净可序列化 JSON 契约（不透传原始内部句柄/凭据/未脱敏路径）；覆盖路径与压缩包防逃逸（..、符号链接、解压体积限制）、目录原子替换（暂存校验→备份→重命名→落库→清理）及失败回滚。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "线上报了一个深层错误：git init 跑到了源码根目录。我觉得在 gitInit 函数里加一行 if (!dir) return 就能修好，对吗？",
+      "expected_output": "拒绝只在症状点加空值吞错；按五步逆向溯源法向上追查空 dir 的最初产生源头并从源头修复，同时设计四层纵深防御（入口校验、业务校验、环境守卫、诊断日志）。",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "帮我对刚才的数据库迁移 PR 做一次代码评审。",
+      "expected_output": "保持只读并基于实际阅读代码输出结构化评审报告：先列 Strengths，再按 Critical/Important/Minor 列出带文件行号、影响和修复建议的问题，检查存量数据保护与事务原子性，单列 Declined to judge 项，并给出明确合并结论。",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "代码评审员给了两条意见：1) 给一个从未被调用的内部函数补齐分页导出和缓存；2) 删除一个兼容旧版配置的迁移代码。你直接按他的意见全改了吧。",
+      "expected_output": "不盲目服从也不表演式赞同；先核验源码：对第 1 条执行 YAGNI 检查确认无调用方后提出质疑或移除建议；对第 2 条核实存量数据兼容风险后用技术事实理性反驳并征求决策。",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "我们在 Spring Boot 里一个 Controller 直接返回了 JPA Entity，并且 Service 里在 @Transactional 方法里调用了外部支付 HTTP 接口还用 this.innerSave() 自调用事务，帮我指出全部隐患并给改法。",
+      "expected_output": "精准指出全部问题：关闭 OSIV 并改为不可变 record DTO 投影防字段泄露与 N+1、同类 this 自调用导致 @Transactional 代理失效、默认不回滚 Checked Exception、事务内发外部 HTTP 会拖爆 HikariCP 连接池（应把外部调用移出事务并用 TransactionTemplate 精准包裹 DB 写入）。",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "我们在 FastAPI 的 async def 接口里直接用 requests.get 调第三方、在 asyncio.gather 里共用了同一个 AsyncSession、且用 zipfile.extractall 解压用户上传的压缩包，帮我评审并给标准修复方案。",
+      "expected_output": "精准指出全部风险：async def 里调阻塞 requests 卡死事件循环（改 httpx.AsyncClient + 超时）、AsyncSession 严禁跨协程共享、extractall 存在 Zip Slip/符号链接/Zip Bomb 风险（改逐条校验路径与符号链接并流式限字节解压），并补充 Pydantic extra=forbid 校验与统一脱敏错误信封。",
+      "files": []
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "skill_name": "arch-backend-craft",
+  "triggers": [
+    {"id": 1, "query": "帮我设计一下这个跨模块功能的系统架构、数据归属和 DTO 安全契约", "should_trigger": true},
+    {"id": 2, "query": "Spring Boot 里 @Transactional 没回滚而且事务内调外部接口把 HikariCP 打满了，帮我重构", "should_trigger": true},
+    {"id": 3, "query": "FastAPI 异步接口混用了阻塞请求而且 AsyncSession 跨协程报错，帮我排查并规范事务与 Alembic 迁移", "should_trigger": true},
+    {"id": 4, "query": "帮我对这组后端和主进程改动做一次代码评审，按 Critical/Important/Minor 分级给结论", "should_trigger": true},
+    {"id": 5, "query": "外部评审提了 6 条修改意见，其中两条好像会破坏旧数据兼容，帮我逐条核验并处理", "should_trigger": true},
+    {"id": 6, "query": "这个 React 弹窗的状态管理和列表重渲染很卡，帮我做前端组件重构", "should_trigger": false,
+     "note": "→ frontend-engineering：前端 React 组合与渲染性能优化"},
+    {"id": 7, "query": "帮我把用户反馈整理成一份包含范围边界和编号 AC 的产品规格", "should_trigger": false,
+     "note": "→ product-spec：产品需求收敛与验收条件编写"},
+    {"id": 8, "query": "帮我用 TDD 红绿重构方式给解析函数写一套不依赖 Mock 的单元测试", "should_trigger": false,
+     "note": "→ tdd-testing：TDD 与高质量自动化测试"},
+    {"id": 9, "query": "给这个仓库补齐 Makefile、pre-commit 和 GitHub Actions 基线", "should_trigger": false,
+     "note": "→ repo-baseline：仓库工程基线初始化"},
+    {"id": 10, "query": "把当前分支的改动整理提交，并清理掉已经合并的旧 worktree", "should_trigger": false,
+     "note": "→ git-dev-workflow：Git 提交与 worktree 工作流"}
+  ]
+}

@@ -199,6 +199,9 @@ def _valid_path(path, edge, placed, L):
 def refine(spec, original, boxes, L, presentation):
     if original.direction not in ('TB','LR') or original.reversed_edges:
         return original
+    raw_style = spec.get('style') if isinstance(spec, dict) else None
+    if isinstance(raw_style, dict) and raw_style.get('edges') in ('curved', 'straight'):
+        return original  # preserve intentional curved/straight edge routing
     axis = 1 if original.direction == 'TB' else 0
     main = lambda p: p.y if axis == 1 else p.x
     if any(main(original.placed[e['to']]) <= main(original.placed[e['from']]) for e in original.edges):

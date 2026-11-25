@@ -77,6 +77,13 @@
 <a href="skills/git-dev-workflow.html">git-dev-workflow</a>
 <a href="skills/repo-baseline.html">repo-baseline</a>
 <a href="skills/learning-scout.html">learning-scout</a>
+<p class="side-cat">产品、设计与研发</p>
+<a href="skills/product-spec.html">product-spec</a>
+<a href="skills/ui-design-craft.html">ui-design-craft</a>
+<a href="skills/frontend-engineering.html">frontend-engineering</a>
+<a href="skills/arch-backend-craft.html">arch-backend-craft</a>
+<a href="skills/tdd-testing.html">tdd-testing</a>
+<a href="skills/ui-qa-acceptance.html">ui-qa-acceptance</a>
 </nav>
 </aside>
   <div class="sidebar-backdrop" data-sidebar-close hidden></div>
@@ -120,7 +127,7 @@ npx skills add https://github.com/huangrx6/agent-skills -a cursor --skill learni
 npx skills add https://github.com/huangrx6/agent-skills -a claude-code -g \
   --skill learning-scout --skill pingcode --skill pingcode-weekly
 </code></pre>
-<p>官方安装器维护各 Agent 的路径与更新；本仓库的 <code>tools/install_skills.py</code> 仍然一次安装全部 11 个。
+<p>官方安装器维护各 Agent 的路径与更新；本仓库的 <code>tools/install_skills.py</code> 仍然一次安装全部 17 个。
 本地 <code>--copy</code> 只复制 Git 跟踪的内容，不会带上 <code>.venv</code> 或 IDE 配置。仓库可能移动、需要固定副本时：</p>
 <pre><code class="language-sh">python3 tools/install_skills.py --copy
 </code></pre>
@@ -168,7 +175,8 @@ npx skills add https://github.com/huangrx6/agent-skills -a claude-code -g \
 <p>在 agent 里直接描述任务，或显式点名 skill：</p>
 <blockquote>
 <p>使用 <code>$deck-authoring</code> 把这份材料做成演示文稿。</p>
-<p>使用 <code>$email-composer</code> 写一封上线申请邮件。</p>
+<p>使用 <code>$diagram-authoring</code> 画出带无框图标和圆角连线的网络拓扑图。</p>
+<p>使用 <code>$product-spec</code> 把这条需求整理成可验收规格书。</p>
 </blockquote>
 <p>是否自动发现、如何显式调用，取决于使用的 Agent。</p>
 
@@ -180,7 +188,7 @@ npx skills add https://github.com/huangrx6/agent-skills -a claude-code -g \
 
 <footer class="site-footer">
   <div class="wrap footer-inner">
-    <p>Agent Skills · 11 个可独立安装的 skill</p>
+    <p>Agent Skills · 17 个可独立安装的 skill</p>
     <nav aria-label="页脚">
       <a href="index.html">文档</a>
       <a href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub</a>

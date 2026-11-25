@@ -31,7 +31,7 @@ python3 dev-tools/sync_exports.py /project/diagrams/orders/orders.mmd
 - flowchart 的椭圆映射为 stadium，便签映射为虚线矩形；这两项是外观近似，其他基础形状对应原生 Mermaid 形状。
 - state 模式拒绝分组、卡片、特殊形状、非同步边。普通区域不等于复合状态，不能无依据转换。
 - `icon`、`rank`、`pin` 明确拒绝，不丢弃约束后假装等价。图标或精细布线需求使用 Excalidraw/draw.io。
-- `detail` 沿用既有信息量规则；线条虚实来自边 kind。手绘粗糙度、纹理和角样式不映射，采用 Mermaid 原生样式。
+- `detail` 沿用既有信息量规则；线条虚实来自边 kind。`style.edges` 映射为 flowchart 曲线配置：`rounded`（默认）按方向用 `monotoneX`/`monotoneY`，`curved` 用 `basis`，`sharp`/`straight` 用 `linear`。手绘粗糙度、纹理和节点角样式采用 Mermaid 原生样式。
 - Mermaid 自己计算坐标和路由，不复用本 skill 的几何布局、避让、预设字号验收，也不承诺无交叉。
   默认增大层间距和节点间距；真实效果仍需编辑器预览或用户需要的导出图核对。
   子图与外部节点相连时，其内部方向可能服从整体方向，不能把分组声明当作精确布局锁定。

@@ -71,6 +71,12 @@ LINE_STYLES = ("straight", "sketch", "rough")
 ROUGHNESS_OF = {"straight": 0, "sketch": 1, "rough": 2}
 
 ICON_COLOUR_MODES = ("auto", "ink", "native")
+# 连线路由与拐角风格：
+#   rounded  = 正交走线 + 柔和圆角（默认；现代技术图既整齐又不生硬）
+#   curved   = 顺滑曲线（无遮挡时走自然弧线，避障时柔和绕过）
+#   sharp    = 经典 90° 硬折角（严格工程蓝图风）
+#   straight = 无遮挡时直连，有障碍时最小折点绕开
+EDGE_ROUTING_STYLES = ("rounded", "curved", "sharp", "straight")
 
 STYLE_AXES: dict[str, tuple[str, ...]] = {
     "fill": FILL_STYLES,
@@ -80,9 +86,10 @@ STYLE_AXES: dict[str, tuple[str, ...]] = {
     # 图标颜色：auto = 多色素材保留原色（压到可读）、单色素材用墨色；
     # ink = 一律单色（严格蓝图风）；native = 原样保留（不管对比度）
     "icons": ICON_COLOUR_MODES,
+    "edges": EDGE_ROUTING_STYLES,
 }
 STYLE_DEFAULT = {"fill": "hachure", "stroke": "shape", "corners": "shape",
-                 "line": "sketch", "icons": "auto"}
+                 "line": "sketch", "icons": "auto", "edges": "rounded"}
 
 
 def resolve_style(raw: dict | None) -> dict:
@@ -161,6 +168,14 @@ def stroke_style_of(style: dict, shape_default: str) -> str:
 
 def roughness_of(style: dict) -> int:
     return ROUGHNESS_OF[style.get("line", STYLE_DEFAULT["line"])]
+
+
+def edge_style_of(style: dict | None) -> str:
+    """解析连线路由/拐角风格（rounded / curved / sharp / straight）。"""
+    if not isinstance(style, dict):
+        return STYLE_DEFAULT["edges"]
+    value = style.get("edges", STYLE_DEFAULT["edges"])
+    return value if value in EDGE_ROUTING_STYLES else STYLE_DEFAULT["edges"]
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -887,6 +902,14 @@ def use_colors(value, *, spec: dict | None = None) -> dict:
         unknown_groups = set(resolved["groups"]) - {g["id"] for g in spec.get("groups", [])}
         if unknown_groups:
             raise ValueError(f"配色 by_group 引用了不存在的分组：{sorted(unknown_groups)}")
+        edge_keys = set()
+        for e in spec.get("edges", []):
+            if e.get("id"):
+                edge_keys.add(str(e["id"]))
+            edge_keys.add(f"{e['from']}->{e['to']}")
+        unknown_edges = set(resolved.get("edge_by_id", {})) - edge_keys
+        if unknown_edges:
+            raise ValueError(f"配色 by_edge 引用了不存在的边：{sorted(unknown_edges)}")
     _rebind()
     _custom_colors = resolved
     LEVELS = {name: dict(pair) for name, pair in resolved["levels"].items()}
@@ -898,7 +921,8 @@ def use_colors(value, *, spec: dict | None = None) -> dict:
                     "accent-soft": LEVELS["accent"]["fill"],
                     "critical-soft": LEVELS["critical"]["fill"],
                     "edge": resolved["edge"], "edge-muted": resolved["edge"]})
-    EDGE_KINDS = {kind: {**entry, "stroke": resolved["edge"]}
+    edge_by_kind = resolved.get("edge_by_kind", {})
+    EDGE_KINDS = {kind: {**entry, "stroke": edge_by_kind.get(kind, resolved["edge"])}
                   for kind, entry in EDGE_KINDS.items()}
     return resolved["report"]
 
@@ -990,6 +1014,20 @@ def edge_style_for(kind: str) -> str:
         raise KeyError(
             f"未知边 kind: {kind!r}；允许的取值：{sorted(EDGE_KINDS)}"
         ) from None
+
+
+def edge_stroke_for(edge: dict) -> str:
+    """单条边的描边色：优先 `colors.json` 的 `by_edge`（id 或 from->to），其次 `by_edge_kind` / 默认边色。"""
+    if _custom_colors:
+        by_id = _custom_colors.get("edge_by_id") or {}
+        eid = edge.get("id")
+        if eid and str(eid) in by_id:
+            return by_id[str(eid)]
+        pair = f"{edge.get('from', '')}->{edge.get('to', '')}"
+        if pair in by_id:
+            return by_id[pair]
+    kind = edge.get("kind") or DEFAULT_EDGE_KIND
+    return EDGE_KINDS.get(kind, EDGE_KINDS[DEFAULT_EDGE_KIND])["stroke"]
 
 
 _rebind()

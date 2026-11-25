@@ -162,7 +162,8 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
     # 带说明的节点同样解绑 —— **一个容器只能有一个绑定文字**，Excalidraw 只画第一个：
     # 标题绑了容器，说明就永远不出现（JSON 里明明有那个元素，渲染器就是不画）。
     # 实测见 references/validation.md（2026-09-16：解绑后说明立刻出现）。
-    free_text = bool(icon_src) or has_detail
+    is_icon_shape = box.shape == "icon"
+    free_text = bool(icon_src) or has_detail or is_icon_shape
     if free_text:
         bound = [{"type": "arrow", "id": a} for a in arrows_out + arrows_in]
 
@@ -173,65 +174,45 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
     stroke = palette.stroke_for(kind, emphasis, node["id"])
     fill = palette.fill_for(kind, emphasis, node["id"])
     stroke_width = palette.emphasis_stroke_width(emphasis)
-    elements = shape_elements(shape_id, box.shape, placed, stroke, fill,
-                              stroke_width=stroke_width, style=style)
+    if is_icon_shape:
+        # 无框图标节点：透明无边包围盒仅用于箭头绑定与几何避让，画布上只呈现图标本体 + 下方文字
+        anchor = _base(shape_id, "rectangle", placed.x, placed.y,
+                       placed.width, placed.height,
+                       "transparent", "transparent", stroke_style="solid",
+                       roundness=None, stroke_width=0, fill_style="solid",
+                       roughness=0, extra={"opacity": 0})
+        elements = [anchor]
+    else:
+        elements = shape_elements(shape_id, box.shape, placed, stroke, fill,
+                                  stroke_width=stroke_width, style=style)
     # 文字与箭头都绑到**主体**那个元素上；圆柱的顶盖只是一个装饰性叠加
     elements[0]["boundElements"] = bound
 
-    # 文字在**形状里能放字的那块区域**居中（不是在整个包围盒里居中）——
-    # 圆柱要下沉一个盖高，否则标题会压在椭圆盖上。
     inner_y, inner_h = text_band(box.shape, placed)
     title_h = len(text.lines) * text.font_size * tm.LINE_HEIGHT
     detail_h = len(text.detail_lines) * text.detail_font_size * tm.LINE_HEIGHT
     top = inner_y + (inner_h - (title_h + detail_h)) / 2.0
     content_w = text.break_units * text.font_size
 
-    # 图标（可选）与文字的摆放，要按**真实 Excalidraw 的规矩**来算。
-    #
-    # 关键事实（官方渲染实测，复核工具见 dev-tools/export_excalidraw.py）：
-    # `containerId` 非空的文字，官方会**自己重算位置、水平垂直居中于容器**，
-    # 我们写进去的 x/y 只影响预览。所以"图标 + 文字"整组居中，在**绑定**的前提下
-    # 数学上做不到：文字被钉在容器中心，只把图标贴到可见文字左边，整组重心就
-    # 必然偏左 (图标宽 + 间隔) / 2。实测 19px —— 这就是用户那句"图标和文本，
-    # 不应该居中吗"。
-    #
-    # 解法：**带图标的节点，标签不绑容器**（`containerId: None`）。官方就按我们给的
-    # 坐标落笔（已实测：写 145.6，渲染出来就是 145.6），整组于是能精确居中。
-    # 带说明的节点同样解绑（原因不同：一个容器只认一个绑定文字，见上面 `free_text`）。
-    # 代价与补偿：解绑后改标签不会自动重排，且拖动形状时文字不会跟着走 ——
-    # 所以形状 / 图标 / 标签**同挂一个 groupId**，在编辑器里它们仍是一体。
-    # （本项目的"有 groupId 的就不是节点"那条判据随之改成**按 id 前缀认节点**。）
-    # 没有图标也没有说明的节点不牵涉这件事，保持绑定。
     icon_w = 0.0
-    height = icon_height if icon_height else icons.ICON_HEIGHT
+    height = icon_height if icon_height else (L.ICON_NODE_HEIGHT if is_icon_shape else icons.ICON_HEIGHT)
     if icon_src:
         scale = icons.fit_scale(icon_src, height)
         icon_w = icons.intrinsic_size(icon_src)[0] * scale
 
-    gap = (layout_gap() if icon_w else 0.0)
-    # 可见文字宽度：**每桶按自己的字号算**（标题 16px、说明 12px）。
-    # 拿标题字号去乘说明行会高估 33% —— 说明变宽之后这个高估直接超出框宽，
-    # 图标就被推到左边框外面去了（用户截图里的溢出就是这么来的，2026-09-16 修）。
+    gap = (layout_gap() if (icon_w and not is_icon_shape) else 0.0)
     label_visible = (max([tm.weighted_units(line) for line in text.lines] or [0.0])
                      * text.font_size)
     detail_visible = (max([tm.weighted_units(line) for line in text.detail_lines] or [0.0])
                       * text.detail_font_size)
     visible_w = max(label_visible, detail_visible)
     center = placed.x + placed.width / 2.0
-    # 有图标时：文字中心右移半个"图标位"，让 (图标 + 间隔 + 可见文字) 整组居中；
-    # 没有图标时就是盒子中心。
-    text_center = center + (icon_w + gap) / 2.0 if icon_src else center
+    text_center = center + (icon_w + gap) / 2.0 if (icon_src and not is_icon_shape) else center
     tx = text_center - content_w / 2.0
-    # 自由文字还是绑定文字：
-    #  - 有图标 → 必须自由，否则整组居中做不到（见下面那段）；
-    #  - 有说明 → 必须自由，否则 Excalidraw 只画容器里的第一个绑定文字（标题），
-    #    说明永不出现；而且两个绑定文字会互相压在一起（标题被拉回容器中心）。
-    # 其余（只有标题）保持绑定 —— 那个在编辑器里更顺手（改完自动重排）。
     label_container = None if free_text else shape_id
 
     node_group = [_eid("group", nid)] if free_text else []
     if node_group:
-        # 形状、圆柱顶盖、图标、标签同组：解绑之后它们必须靠分组才能"一起动"
         for el in elements:
             if el["groupIds"]:
                 if node_group[0] not in el["groupIds"]:
@@ -240,18 +221,17 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
                 el["groupIds"] = list(node_group)
 
     if icon_src:
-        # 图标紧贴可见文字的左边（间隔 = 设计值），竖向与文字块中心对齐。
-        # 位置由"整组居中"推出来；**框在布局阶段已经适配过内容宽度**
-        # （layout.boxes_from_spec：宽 ≥ 内边距×2 + 图标 + 间隔 + 可见文字），
-        # 所以这里算出来必定在框内，不需要（也不应该）钳位 —— 钳位只会把图标
-        # 推到文字底下，看起来像"图标没了"（用户 2026-09-16 的反馈）。
-        icon_left = text_center - visible_w / 2.0 - gap - icon_w
-        icon_els = icons.place(icon_src, icon_left,
-                               top + (title_h + detail_h) / 2.0 - height / 2.0,
+        if is_icon_shape:
+            # 图标居中置顶，标签紧贴其下方居中
+            total_stack = height + L.ICON_NODE_GAP + title_h + detail_h
+            icon_top = placed.y + max(L.ICON_NODE_PAD_Y, (placed.height - total_stack) / 2.0)
+            icon_left = center - icon_w / 2.0
+            top = icon_top + height + L.ICON_NODE_GAP
+        else:
+            icon_left = text_center - visible_w / 2.0 - gap - icon_w
+            icon_top = top + (title_h + detail_h) / 2.0 - height / 2.0
+        icon_els = icons.place(icon_src, icon_left, icon_top,
                                key=_eid("icon", nid), target_height=height,
-                               # 单色素材用**所属节点自己的描边色**（图标与框同色）；
-                               # 多色素材（品牌 logo）保留配色，按画布对比度压到可读。
-                               # 策略由样式轴 `style.icons` 决定（auto / ink / native）
                                stroke=stroke,
                                canvas=palette.CANVAS.get("background"),
                                colours=palette.resolve_style(style).get("icons", "auto"))
@@ -268,8 +248,10 @@ def node_elements(node: dict, placed, box, arrows_out: list[str],
         for el in labels:
             el["groupIds"] = list(node_group)
     if palette.has_custom_colors():
+        label_color = (palette.CANVAS["text"] if is_icon_shape
+                       else palette.text_for(kind, emphasis, node["id"]))
         for label in labels:
-            label["strokeColor"] = palette.text_for(kind, emphasis, node["id"])
+            label["strokeColor"] = label_color
     elements += labels
     return elements
 
@@ -555,6 +537,24 @@ def visible_edge(edge: dict, placed: dict, boxes: dict) -> dict:
     return {**edge, "points": pts}
 
 
+ROUNDED_LEG_MIN = 40.0   # rounded 模式下每段长度至少这么长才倒圆角，避免短腿出现钩子
+
+
+def _arrow_roundness(pts: list, edge_routing: str) -> dict | None:
+    """按 style.edges 决定 Excalidraw 箭头的 roundness。
+
+    - curved：始终启用 type 2，让 3 点弧线与绕障路径顺滑成曲线。
+    - rounded（默认）：有拐角且每段 >= ROUNDED_LEG_MIN 时启用 type 2，柔和倒角又不糊成钩子。
+    - sharp / straight：直角 / 折线（None）。
+    """
+    if edge_routing == "curved":
+        return {"type": 2}
+    if edge_routing == "rounded" and len(pts) >= 3:
+        if all(math.dist(a, b) >= ROUNDED_LEG_MIN for a, b in zip(pts, pts[1:])):
+            return {"type": 2}
+    return None
+
+
 def arrow_element(edge: dict, index: int,
                   style: dict | None = None) -> dict:
     pts = edge["points"]
@@ -564,16 +564,14 @@ def arrow_element(edge: dict, index: int,
     ys = [p[1] for p in rel]
     kind = edge.get("kind") or palette.DEFAULT_EDGE_KIND
     edge_style = palette.EDGE_KINDS.get(kind, palette.EDGE_KINDS[palette.DEFAULT_EDGE_KIND])
+    resolved = palette.resolve_style(style)
+    edge_routing = palette.edge_style_of(resolved)
 
     el_id = _eid("edge", f"{edge['from']}-{edge['to']}", index)
-    # 拐角**不圆**。用户的原话是「就是那种 90 度拐弯的线不行吗」，而 Excalidraw 的
-    # `roundness` type 2 会把每个拐角都倒成弧 —— 多段折线的短拐角被糊得几乎看不出角度，
-    # 实测图里那几处「钩子」有一半是它造成的。手绘感由 `roughness` 提供，不靠倒角。
-    # （`roundness: None` 就是界面上的 Sharp；两点直线没有拐角，不受影响。）
     el = _base(el_id, "arrow", x0, y0, max(xs) - min(xs), max(ys) - min(ys),
-               edge_style["stroke"], "transparent", stroke_style=edge_style["style"],
-               roundness=None, roughness=palette.roughness_of(
-                   palette.resolve_style(style)))
+               palette.edge_stroke_for(edge), "transparent", stroke_style=edge_style["style"],
+               roundness=_arrow_roundness(pts, edge_routing),
+               roughness=palette.roughness_of(resolved))
     el.update({
         "points": rel,
         "startArrowhead": None,
@@ -1162,48 +1160,31 @@ class SpecError(ValueError):
 
 
 def load_icons(spec: dict, library_path: str | None = None,
-               icon_height: float | None = None, full: bool = False):
+               icon_height: float | None = None, full: bool = False,
+               *, presentation=None):
     """把规格里用到的图标取出来。**一个都不要就完全不碰文件。**
 
-    返回 `(lookup, sizes)`：
-      - `lookup(name)` → 那一项的元素数组
-      - `sizes` → `{node_id: (宽, 高)}`，给布局算盒子用
-
-    名字不存在时**判失败不 fallback** —— 静默换一个图标，看图的人根本不知道
-    原本想要的是什么（与 `kind` / `shape` / `emphasis` 同一条规矩）。
-
-    名字分两个来源，**内置 sigil 优先**（见 `sigils.py`）：
-      1. `sigils.NAMES` 里的内置名 —— 由脚本自绘，不需要任何外部文件；
-      2. 其余名字 —— 照旧走 `.excalidrawlib` 素材库。
-    两源同名时永远取内置：静默挑另一个等于"我写了 A 出来的是 B"。
-    全部图标都是内置名时，素材库路径**完全不接触** —— "出图零依赖"不受影响。
+    支持：
+      1. 跨库引用 `库名:图标名`（始终从 `.excalidrawlib` 解析，允许同图混用多个库）；
+      2. 自动扫描显式 `--library`、配置库或本地全部已缓存 `.excalidrawlib`；
+      3. 兼容旧内置 `sigils.py` 名称（未带库前缀且命中内置名时免外部文件可用）。
     """
     wanted = {n["icon"] for n in spec.get("nodes", []) if n.get("icon")}
     if not wanted:
         return None, {}, {}
 
     lookup = {}
+    loaded_libs: dict[str, dict] = {}
     for name in sorted(wanted):
-        if sigils.is_builtin(name):
-            # 颜色用当前画布墨色 —— 调用时机在主题切定之后（emit 的顺序保证）。
+        lib_ref, _item = icons.split_library_ref(name)
+        if lib_ref is None and sigils.is_builtin(name):
             lookup[name] = sigils.glyph(name, palette.CANVAS.get("text", "#1f2937"))
+            continue
+        elements, _src = icons.resolve_across_libraries(
+            name, explicit_library=library_path, loaded=loaded_libs)
+        lookup[name] = list(elements) if full else icons.glyph_only(elements)
 
-    library_names = wanted - set(lookup)
-    if library_names:
-        path, source = icons.library_path(library_path)
-        if not path:
-            raise icons.LibraryError(
-                f"规格里有节点指定了图标 {sorted(library_names)}，其中没有内置 sigil，"
-                f"需要素材库但没找到（{source}）。用 --library 指定，或写一行路径到 "
-                f"~/.config/excalidraw-library-path，或改用内置名（scripts/sigils.py 可列）")
-        library = icons.load(path)
-        for name in sorted(library_names):
-            elements = icons.resolve(library, name)      # 找不到会抛错并列出可用名字
-            # 默认只留图形：节点自己已经有标签，素材自带的文字是冗余的，
-            # 而且缩到节点尺寸后只有几个像素（见 icons.glyph_only）。
-            lookup[name] = list(elements) if full else icons.glyph_only(elements)
-
-    # 每个节点算自己的图标高度 —— 用户要的"适配每一个元素"。
+    ctx = L.P.resolve(presentation)
     sizes = {}
     heights = {}
     for node in spec.get("nodes", []):
@@ -1213,6 +1194,8 @@ def load_icons(spec: dict, library_path: str | None = None,
         elements = lookup[name]
         if icon_height:
             want = icon_height
+        elif node.get("shape") == "icon":
+            want = round(L.ICON_NODE_HEIGHT * (ctx.node / 16.0), 2)
         else:
             text_box = tm.measure(node.get("label", ""),
                                   node.get("detail", "") if L.shows_node_detail(
@@ -1279,8 +1262,9 @@ def icon_contrast_issues(spec: dict, lookup: dict) -> list:
         if not name or name not in lookup:
             continue
         try:
-            fill = palette.fill_for(node.get("kind"),
-                                    node.get("emphasis", palette.DEFAULT_EMPHASIS))
+            fill = (palette.CANVAS["background"] if node.get("shape") == "icon"
+                    else palette.fill_for(node.get("kind"),
+                                          node.get("emphasis", palette.DEFAULT_EMPHASIS)))
         except KeyError:
             continue          # kind / emphasis 不合法的问题由 check_palette 报
         colours = icons.visible_colours(lookup[name])
@@ -1327,10 +1311,10 @@ def emit(spec: dict, *, params=None, library: str | None = None,
         palette.use_colors(colors, spec=spec)
         palette.check_pattern_text(spec)
 
+    ctx = L.P.resolve(preset)
     # 图标必须在算盒子**之前**解析出来 —— 它会影响节点尺寸（第一个外部尺寸来源）
     lookup, icon_sizes, icon_heights = load_icons(spec, library, icon_height,
-                                                  icon_full)
-    ctx = L.P.resolve(preset)
+                                                  icon_full, presentation=ctx)
     boxes = L.boxes_from_spec(spec, icon_sizes, presentation=ctx)
     result, outcome, attempts = _check_layout().layout_with_retry(spec, boxes, ctx.layout_params(params),
                                                                   **({"presentation": ctx} if preset != "fit" else {}))

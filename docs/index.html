@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Skills — 可执行、可验证的 Agent skill</title>
-<meta name="description" content="11 个可独立安装的 Agent skill：演示文稿、技术图、COSMIC、Obsidian、Git、PingCode、学习路线、邮件与工程基线。每个 skill 都带入口说明、可执行脚本和回归测试。">
+<meta name="description" content="17 个可独立安装的 Agent skill：演示文稿、技术图、COSMIC、Obsidian、Git、PingCode、学习路线、邮件、工程基线，以及需求规格、界面工艺、前后端研发、测试与黑盒验收。">
 <link rel="canonical" href="https://huangrx6.github.io/agent-skills/">
 <meta name="theme-color" content="#0f1012">
 <meta property="og:title" content="Agent Skills — 可执行、可验证的 Agent skill">
-<meta property="og:description" content="11 个可独立安装的 Agent skill：演示文稿、技术图、COSMIC、Obsidian、Git、PingCode、学习路线、邮件与工程基线。每个 skill 都带入口说明、可执行脚本和回归测试。">
+<meta property="og:description" content="17 个可独立安装的 Agent skill：演示文稿、技术图、COSMIC、Obsidian、Git、PingCode、学习路线、邮件、工程基线，以及需求规格、界面工艺、前后端研发、测试与黑盒验收。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://huangrx6.github.io/agent-skills/">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
@@ -57,7 +57,7 @@
     <div class="hero-copy">
       <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Agent Skills</p>
       <h1>把重复的工作方法，<br>写成 <em>Agent 能执行</em>、<br>也能验证的 skill。</h1>
-      <p class="hero-lede">11 个可独立安装的能力，覆盖内容表达、知识工作与开发流程。每个 skill 都带入口说明、可执行脚本和回归测试。</p>
+      <p class="hero-lede">17 个可独立安装的能力，覆盖内容表达、知识工作、开发流程与产品研发全链路。每个 skill 都带入口说明、可执行脚本或深入参考与验证门控。</p>
       <div class="hero-actions">
         <a class="btn btn-primary" href="docs/getting-started.html">开始使用</a>
         <a class="btn btn-ghost" href="docs/skills/index.html">浏览 Skills <span aria-hidden="true">→</span></a>
@@ -77,8 +77,8 @@ python3 tools/install_skills.py</code></pre>
   </section>
 
   <div class="wrap hero-meta" aria-label="项目概况">
-    <span><strong>11</strong> skills</span>
-    <span><strong>3</strong> 类场景</span>
+    <span><strong>17</strong> skills</span>
+    <span><strong>4</strong> 类场景</span>
     <span><strong>Python 3.10+</strong></span>
     <span><strong>MIT</strong></span>
   </div>
@@ -102,7 +102,7 @@ python3 tools/install_skills.py</code></pre>
     <span class="skill-arrow" aria-hidden="true">→</span>
   </div>
   <h4>diagram-authoring</h4>
-  <p>把结构描述变成可编辑的技术图，并检查布局与可读性</p>
+  <p>把结构描述变成可编辑的技术图，支持圆角/曲线/直连、无框图标与跨后端 `.excalidrawlib` 素材</p>
   <span class="skill-output">Excalidraw · draw.io · Mermaid · PNG</span>
 </a><a class="skill-card" href="docs/skills/cosmic-split.html">
   <div class="skill-card-head">
@@ -179,6 +179,55 @@ python3 tools/install_skills.py</code></pre>
   <p>把学习需求研究成一组独立笔记与离线入口页</p>
   <span class="skill-output">笔记 · HTML 入口 · 打印版 · PDF</span>
 </a></div></div>
+<div class="skill-group"><div class="group-head"><h3>产品、设计与研发</h3><span>6</span></div><div class="skill-grid"><a class="skill-card" href="docs/skills/product-spec.html">
+  <div class="skill-card-head">
+    <span class="skill-id">product-spec</span>
+    <span class="skill-arrow" aria-hidden="true">→</span>
+  </div>
+  <h4>产品需求澄清与规格收敛</h4>
+  <p>澄清模糊需求、收敛范围边界、对比方案并写可复测 AC</p>
+  <span class="skill-output">产品规格书 · 编号 AC · 异常矩阵</span>
+</a><a class="skill-card" href="docs/skills/ui-design-craft.html">
+  <div class="skill-card-head">
+    <span class="skill-id">ui-design-craft</span>
+    <span class="skill-arrow" aria-hidden="true">→</span>
+  </div>
+  <h4>界面设计工艺与可用性规范</h4>
+  <p>界面视觉与交互工艺、反模板审视、动效打磨与极端加固</p>
+  <span class="skill-output">设计调整方案 · 动效规范 · 5 维审计报告</span>
+</a><a class="skill-card" href="docs/skills/frontend-engineering.html">
+  <div class="skill-card-head">
+    <span class="skill-id">frontend-engineering</span>
+    <span class="skill-arrow" aria-hidden="true">→</span>
+  </div>
+  <h4>前端工程实现、性能优化与根因调试</h4>
+  <p>React/TS 组合架构、异步与重渲染优化、作用域 CSS 与根因调试</p>
+  <span class="skill-output">组合组件与纯模型 · 性能与样式修复</span>
+</a><a class="skill-card" href="docs/skills/arch-backend-craft.html">
+  <div class="skill-card-head">
+    <span class="skill-id">arch-backend-craft</span>
+    <span class="skill-arrow" aria-hidden="true">→</span>
+  </div>
+  <h4>架构设计、后端工程与代码评审</h4>
+  <p>跨语言（Node / Python / Java）系统架构、单源事实、后端安全契约、迁移回滚与分级评审</p>
+  <span class="skill-output">架构决策 · 迁移实现 · 分级评审报告</span>
+</a><a class="skill-card" href="docs/skills/tdd-testing.html">
+  <div class="skill-card-head">
+    <span class="skill-id">tdd-testing</span>
+    <span class="skill-arrow" aria-hidden="true">→</span>
+  </div>
+  <h4>TDD 与高质量自动化测试</h4>
+  <p>红绿重构 TDD、真实行为测试、测试隔离与污染定位、完成前验证门控</p>
+  <span class="skill-output">自动化测试 · 污染定位 · 验证报告</span>
+</a><a class="skill-card" href="docs/skills/ui-qa-acceptance.html">
+  <div class="skill-card-head">
+    <span class="skill-id">ui-qa-acceptance</span>
+    <span class="skill-arrow" aria-hidden="true">→</span>
+  </div>
+  <h4>黑盒交互验收与 UI 质检</h4>
+  <p>真实页面黑盒交互验收、7 维高压质检与本地多服务启停</p>
+  <span class="skill-output">验收结论 · AC 核对表 · 分级缺陷单</span>
+</a></div></div>
   </section>
 
   <section class="wrap section how" id="how">
@@ -233,7 +282,7 @@ python3 tools/install_skills.py</code></pre>
 
 <footer class="site-footer">
   <div class="wrap footer-inner">
-    <p>Agent Skills · 11 个可独立安装的 skill</p>
+    <p>Agent Skills · 17 个可独立安装的 skill</p>
     <nav aria-label="页脚">
       <a href="docs/index.html">文档</a>
       <a href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub</a>

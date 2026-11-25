@@ -43,8 +43,8 @@ BLOB = f"{REPO}/blob/main"
 SITE_URL = "https://huangrx6.github.io/agent-skills/"
 SITE_NAME = "Agent Skills"
 SITE_DESC = (
-    "11 个可独立安装的 Agent skill：演示文稿、技术图、COSMIC、Obsidian、Git、PingCode、"
-    "学习路线、邮件与工程基线。每个 skill 都带入口说明、可执行脚本和回归测试。"
+    "17 个可独立安装的 Agent skill：演示文稿、技术图、COSMIC、Obsidian、Git、PingCode、"
+    "学习路线、邮件、工程基线，以及需求规格、界面工艺、前后端研发、测试与黑盒验收。"
 )
 
 SKILL_ROW_RE = re.compile(
@@ -590,6 +590,7 @@ def build_landing(categories: list[dict], count: int) -> str:
         template,
         {
             "SKILL_COUNT": count,
+            "CATEGORY_COUNT": len(categories),
             "SKILL_GROUPS": skill_groups(categories, "docs/skills/", 3),
         },
     )
@@ -608,7 +609,7 @@ def build_landing(categories: list[dict], count: int) -> str:
 def build_docs_index(categories: list[dict], count: int) -> str:
     cards = [
         ("01", "开始使用", "getting-started.html", "安装到 agent 的发现目录，确认配置，然后从一条真实需求开始。"),
-        ("02", "Skill 目录", "skills/index.html", "按场景浏览 11 个 skill，查看各自的输入、产物与边界。"),
+        ("02", "Skill 目录", "skills/index.html", f"按场景浏览 {count} 个 skill，查看各自的输入、产物与边界。"),
         ("03", "编写 Skill", "guide.html", "从触发描述、最小流程到验证与交付，写一个能执行的 skill。"),
         ("04", "维护与验证", "maintenance.html", "结构检查、回归测试、锁文件与站点构建各自证明什么。"),
         ("05", "路线图", "roadmap.html", "当前优先解决的问题与后续扩展方向。"),
@@ -669,7 +670,9 @@ def build_getting_started(root_readme: str, categories: list[dict], count: int) 
 
 > 使用 `$deck-authoring` 把这份材料做成演示文稿。
 >
-> 使用 `$email-composer` 写一封上线申请邮件。
+> 使用 `$diagram-authoring` 画出带无框图标和圆角连线的网络拓扑图。
+>
+> 使用 `$product-spec` 把这条需求整理成可验收规格书。
 
 是否自动发现、如何显式调用，取决于使用的 Agent。
 """

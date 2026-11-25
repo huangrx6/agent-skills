@@ -80,6 +80,16 @@ surface 是普通分组/说明卡片混入墨色的比例，默认保持中性�
 但不覆盖 critical 的警示含义。色值检查包含这些背景上的文字与连线；三后端的流程图分区均支持。
 在结构规格的分组 `style.fill=solid` 可只将背景改为实心，也可以全图选实心画法。
 未指定的分组及说明卡片保持既有行为。见 [分区实例](../examples/regions/README.md)。
+
+当图内容包含多条含义不同的通信链路或双向通道（如网络拓扑中的上行/下行/回流/跨区链路）时，
+可按需在颜色文件增加 `by_edge_kind`（按 `sync`/`data`/`async`/`optional` 分配）或 `by_edge`（按边 `id` 或 `from->to` 分配）：
+
+```json
+"by_edge_kind": {"data": "accent", "async": "sage"},
+"by_edge": {"alert-hop": "critical", "gw->fw": "ink"}
+```
+
+未声明时边线默认保持克制的中性墨色；声明的边色同样会校验对画布与分组底色的对比度 ≥ 3:1，三后端均支持。
 字体和线条画法仍由原 visual / scheme / style 控制。自定义配色优先覆盖其颜色；
 draw.io 的 `--seed` 与 `--colors` 同时出现会报错，请在一个项目文件内修改，避免优先级含混。
 

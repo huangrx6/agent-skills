@@ -1,0 +1,20 @@
+{
+  "skill_name": "tdd-testing",
+  "triggers": [
+    {"id": 1, "query": "按 TDD 红绿重构流程给这个配置合并逻辑补齐单元测试和边界用例", "should_trigger": true},
+    {"id": 2, "query": "先写一条能复现这个 Bug 的失败回归测试，再修复并跑全量验证", "should_trigger": true},
+    {"id": 3, "query": "帮我审查这批测试有没有镜像断言、过度 Mock 或靠 sleep 碰运气的问题", "should_trigger": true},
+    {"id": 4, "query": "测试套件一起跑时会在仓库根目录留脏文件，帮我定位是哪个测试文件污染的", "should_trigger": true},
+    {"id": 5, "query": "交付前帮我核查完整测试验证门控，确认没有被 skip 或弱化的断言", "should_trigger": true},
+    {"id": 6, "query": "帮我打开浏览器把设置页和弹窗黑盒点一遍，检查切页复位和控制台报错", "should_trigger": false,
+     "note": "→ ui-qa-acceptance：真实页面黑盒交互验收"},
+    {"id": 7, "query": "给这个仓库补齐 Makefile、pre-commit 和 GitHub Actions 自动跑测试配置", "should_trigger": false,
+     "note": "→ repo-baseline：仓库工程基线与 CI 初始化"},
+    {"id": 8, "query": "帮我对这组后端迁移和 IPC 接口代码做一次架构与安全代码评审", "should_trigger": false,
+     "note": "→ arch-backend-craft：系统架构与代码评审"},
+    {"id": 9, "query": "这个 React 列表输入卡顿，帮我用组合模式和 useDeferredValue 优化", "should_trigger": false,
+     "note": "→ frontend-engineering：前端组件与渲染性能实现"},
+    {"id": 10, "query": "帮我把这次需求整理成范围边界和编号验收条件 AC", "should_trigger": false,
+     "note": "→ product-spec：产品规格与验收条件整理"}
+  ]
+}

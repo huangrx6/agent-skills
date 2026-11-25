@@ -28,13 +28,15 @@ class TestContentParsing(unittest.TestCase):
     def test_root_readme_yields_three_categories_and_all_skills(self):
         _, categories = site.load_skills()
         self.assertEqual(
-            ["内容与表达", "知识与工作", "开发与学习"],
+            ["内容与表达", "知识与工作", "开发与学习", "产品、设计与研发"],
             [category["name"] for category in categories],
         )
         names = [item["name"] for category in categories for item in category["skills"]]
-        self.assertEqual(11, len(names))
+        self.assertEqual(17, len(names))
         self.assertEqual(len(names), len(set(names)))
         self.assertIn("email-composer", names)
+        self.assertIn("product-spec", names)
+        self.assertIn("ui-qa-acceptance", names)
         deck = next(
             item
             for category in categories
@@ -109,7 +111,7 @@ class TestBuild(unittest.TestCase):
         cls.tmp.cleanup()
 
     def test_builds_expected_pages(self):
-        self.assertEqual(19, self.pages)
+        self.assertEqual(25, self.pages)
         for relative in (
             "index.html",
             "404.html",

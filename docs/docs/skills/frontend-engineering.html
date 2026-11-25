@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>frontend-engineering · 前端工程实现、性能优化与根因调试 · Agent Skills</title>
+<meta name="description" content="React / TypeScript / Next.js / Vite 旗舰级前端工程规范：完整覆盖异步瀑布消除、包体与懒加载优化、服务端/RSC 与客户端数据流、重渲染与 JS/渲染热点治理、复合组件与状态架构、作用域 CSS 工程化及四阶段根因调试。">
+<link rel="canonical" href="https://huangrx6.github.io/agent-skills/docs/skills/frontend-engineering.html">
+<meta name="theme-color" content="#0f1012">
+<meta property="og:title" content="frontend-engineering · 前端工程实现、性能优化与根因调试 · Agent Skills">
+<meta property="og:description" content="React / TypeScript / Next.js / Vite 旗舰级前端工程规范：完整覆盖异步瀑布消除、包体与懒加载优化、服务端/RSC 与客户端数据流、重渲染与 JS/渲染热点治理、复合组件与状态架构、作用域 CSS 工程化及四阶段根因调试。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://huangrx6.github.io/agent-skills/docs/skills/frontend-engineering.html">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<script>
+  (() => {
+    const root = document.documentElement;
+    let theme = 'dark';
+    try {
+      const stored = localStorage.getItem('agent-skills-theme');
+      if (stored === 'light' || stored === 'dark') theme = stored;
+    } catch (error) {}
+    root.dataset.theme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#0f1012' : '#f5f3ee';
+  })();
+</script>
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body class="docs">
+<a class="skip-link" href="#main">跳到正文</a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="../../index.html">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="2" y="14" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="14" width="8" height="8" rx="2" fill="currentColor" opacity=".45"/>
+      </svg>
+      <span>Agent Skills</span>
+    </a>
+    <div class="header-tools">
+      <nav class="site-nav" id="site-nav" aria-label="主导航">
+        <a href="../index.html">文档</a><a href="../skills/index.html" aria-current="page">Skills</a><a href="../guide.html">编写 Skill</a>
+        <a class="nav-github" href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </nav>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换白天/夜间模式" title="切换白天/夜间"><span class="when-light"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>夜间</span><span class="when-dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>白天</span></button>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="打开导航">
+        <span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="docs-shell has-toc">
+  <aside class="docs-sidebar" id="docs-sidebar">
+<nav aria-label="文档导航">
+<p class="side-label">文档</p>
+<a href="../index.html">文档首页</a>
+<a href="../getting-started.html">开始使用</a>
+<a href="../skills/index.html">Skill 目录</a>
+<a href="../guide.html">编写 Skill</a>
+<a href="../maintenance.html">维护与验证</a>
+<a href="../roadmap.html">路线图</a>
+<p class="side-label">Skills</p>
+<p class="side-cat">内容与表达</p>
+<a href="../skills/deck-authoring.html">deck-authoring</a>
+<a href="../skills/diagram-authoring.html">diagram-authoring</a>
+<a href="../skills/cosmic-split.html">cosmic-split</a>
+<a href="../skills/email-composer.html">email-composer</a>
+<p class="side-cat">知识与工作</p>
+<a href="../skills/obsidian-wiki.html">obsidian-wiki</a>
+<a href="../skills/obsidian-work.html">obsidian-work</a>
+<a href="../skills/pingcode.html">pingcode</a>
+<a href="../skills/pingcode-weekly.html">pingcode-weekly</a>
+<p class="side-cat">开发与学习</p>
+<a href="../skills/git-dev-workflow.html">git-dev-workflow</a>
+<a href="../skills/repo-baseline.html">repo-baseline</a>
+<a href="../skills/learning-scout.html">learning-scout</a>
+<p class="side-cat">产品、设计与研发</p>
+<a href="../skills/product-spec.html">product-spec</a>
+<a href="../skills/ui-design-craft.html">ui-design-craft</a>
+<a href="../skills/frontend-engineering.html" class="is-active" aria-current="page">frontend-engineering</a>
+<a href="../skills/arch-backend-craft.html">arch-backend-craft</a>
+<a href="../skills/tdd-testing.html">tdd-testing</a>
+<a href="../skills/ui-qa-acceptance.html">ui-qa-acceptance</a>
+</nav>
+</aside>
+  <div class="sidebar-backdrop" data-sidebar-close hidden></div>
+  <main id="main" class="docs-main">
+    <button class="sidebar-toggle" type="button" aria-expanded="false" aria-controls="docs-sidebar">
+      <span>文档导航</span><span class="sidebar-toggle-mark" aria-hidden="true">+</span>
+    </button>
+    <nav class="crumbs" aria-label="面包屑"><a href="../../index.html">Agent Skills</a><span aria-hidden="true">/</span><a href="../index.html">文档</a><span aria-hidden="true">/</span><a href="../skills/index.html">Skill 目录</a><span aria-hidden="true">/</span><span aria-current="page">frontend-engineering</span></nav>
+    <header class="page-head">
+      <p class="eyebrow">产品、设计与研发</p>
+      <h1>frontend-engineering · 前端工程实现、性能优化与根因调试</h1>
+      <p class="page-lede">React / TypeScript / Next.js / Vite 旗舰级前端工程规范：完整覆盖异步瀑布消除、包体与懒加载优化、服务端/RSC 与客户端数据流、重渲染与 JS/渲染热点治理、复合组件与状态架构、作用域 CSS 工程化及四阶段根因调试。</p>
+      <div class="page-meta"><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/frontend-engineering/SKILL.md" target="_blank" rel="noreferrer">SKILL.md</a><span aria-hidden="true">·</span><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/frontend-engineering/README.md" target="_blank" rel="noreferrer">README.md</a></div>
+    </header>
+    <article class="prose">
+      <div class="table-wrap"><table><thead>
+<tr>
+<th>适合</th>
+<th>产物</th>
+<th>依赖</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>React/TS 组件开发与重构、组合与状态架构、全链路前端性能治理、作用域 CSS 工程化、前端 Bug 根因调试</td>
+<td>干净可组合组件与纯函数模型 · 性能优化与竞态消除 · 样式隔离修复 · 回归用例与构建验证</td>
+<td>目标项目的前端工具链（Node.js / TypeScript / React / 打包器等）</td>
+</tr>
+</tbody>
+</table></div><p>Agent 的执行闸门、工程铁律与场景路由见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/frontend-engineering/SKILL.md">SKILL.md</a>，9 份高密度专题参考按其中的路由表按需直链读取。</p>
+<h2 id="快速使用">快速使用</h2>
+<ul>
+<li>“这个组件堆了七八个布尔 props，帮我用复合组件、显式变体和 <code>state/actions/meta</code> Context 干净重构。”</li>
+<li>“把这段接口与页面数据加载里的串行 <code>await</code> 瀑布改成并行，并把重型编辑器拆成按需加载与悬停预加载。”</li>
+<li>“列表输入搜索掉帧、偶尔旧请求覆盖新结果，帮我按重渲染治理与竞态守卫彻底重构。”</li>
+<li>“弹窗里的图标样式被另一个对话框的 CSS 覆盖了，按四阶段根因调试法定位源头并解决，不要加 <code>!important</code>。”</li>
+<li>“这个状态闪烁 Bug 已经改了三次 <code>useEffect</code> 还复发，请触发三连败熔断帮我重审状态归属与组件结构。”</li>
+</ul>
+<h2 id="目录结构">目录结构</h2>
+<ul>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/frontend-engineering/SKILL.md">SKILL.md</a>：工作闸门、工程铁律、按场景路由表、四阶段根因调试与一层参考索引</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/frontend-engineering/references/async-waterfalls.md">references/async-waterfalls.md</a>：消除异步瀑布（6 条，CRITICAL）</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/frontend-engineering/references/bundle-optimization.md">references/bundle-optimization.md</a>：包体大小与按需加载优化（6 条，CRITICAL）</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/frontend-engineering/references/server-and-client-data.md">references/server-and-client-data.md</a>：服务端 / RSC 性能与安全（10 条，HIGH）+ 客户端数据流与存储（4 条，MEDIUM-HIGH）</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/frontend-engineering/references/rerender-optimization.md">references/rerender-optimization.md</a>：React 重渲染治理（15 条，MEDIUM）</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/frontend-engineering/references/rendering-and-js-perf.md">references/rendering-and-js-perf.md</a>：浏览器渲染性能（11 条，MEDIUM）+ JS 热点性能（14 条，LOW-MEDIUM）</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/frontend-engineering/references/advanced-react-patterns.md">references/advanced-react-patterns.md</a>：高级 React 副作用与初始化模式（4 条）+ React 19 API 变更</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/frontend-engineering/references/composition-and-state.md">references/composition-and-state.md</a>：复合组件、<code>state/actions/meta</code> 依赖注入、UI/状态解耦、纯函数模型与状态复位（7 条 + 实践）</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/frontend-engineering/references/css-and-interaction-craft.md">references/css-and-interaction-craft.md</a>：作用域 CSS、Design Tokens、防撑破与粘性滚动模板、键盘焦点闭环与竞态/防双击守卫</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/frontend-engineering/references/frontend-debugging.md">references/frontend-debugging.md</a>：前端四阶段根因调试法、CSS/React 采证、三连败架构熔断与反合理化对照表</li>
+<li><code>evals/triggers.json</code> 与 <code>evals/evals.json</code>：触发边界与行为评判样例</li>
+</ul>
+<h2 id="边界">边界</h2>
+<ul>
+<li>负责前端代码架构、性能优化、样式工程化与缺陷根因修复；</li>
+<li>纯视觉审美方向与设计评审归 <code>ui-design-craft</code>，后端/Electron 主进程/数据库架构归 <code>arch-backend-craft</code>，独立 TDD 流程归 <code>tdd-testing</code>，黑盒浏览器交互验收归 <code>ui-qa-acceptance</code>，仓库工程基线配置归 <code>repo-baseline</code>；</li>
+<li>不在未完成复现与计算样式/状态采证前盲目修改样式或堆叠补丁。</li>
+</ul>
+<h2 id="验证">验证</h2>
+<p>本 skill 无可执行脚本，结构与引用校验在仓库根目录运行：</p>
+<pre><code class="language-sh">python3 tools/skill-builder/scripts/validate_skill.py skills/frontend-engineering
+python3 tools/skill-builder/scripts/check_pointers.py --root . skills/frontend-engineering
+</code></pre>
+
+    </article>
+    <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="../skills/ui-design-craft.html"><span>上一篇</span><strong>界面设计工艺与可用性规范</strong></a><a class="page-nav-link next" href="../skills/arch-backend-craft.html"><span>下一篇</span><strong>架构设计、后端工程与代码评审</strong></a></nav>
+  </main>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#快速使用">快速使用</a></li><li class="toc-2"><a href="#目录结构">目录结构</a></li><li class="toc-2"><a href="#边界">边界</a></li><li class="toc-2"><a href="#验证">验证</a></li></ul></aside>
+</div>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <p>Agent Skills · 17 个可独立安装的 skill</p>
+    <nav aria-label="页脚">
+      <a href="../index.html">文档</a>
+      <a href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="../../../">huangrx6.github.io</a>
+    </nav>
+  </div>
+</footer>
+<script src="../../assets/site.js" defer></script>
+</body>
+</html>

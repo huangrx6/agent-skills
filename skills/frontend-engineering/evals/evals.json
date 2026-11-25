@@ -1,0 +1,35 @@
+{
+  "skill_name": "frontend-engineering",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "我们的 Picker 组件现在有 isCompact、showSearch、showFooter、isDialog、isMulti 五个布尔 props，里面全是嵌套三元，帮我重构。",
+      "expected_output": "采用组合与显式变体拆分，建立共享 Context（state/actions/meta）的复合组件结构，并将过滤/显隐判断抽离为纯函数模块，消除布尔 prop 爆炸，同时保持既有设计变量与外部行为一致。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "这个组件里用 useEffect 同步 filteredItems，还在组件内部定义了 Row 子组件，并且先 await fetchUser 再 await fetchConfig，帮我指出问题并重构。",
+      "expected_output": "全部指出并修正：去掉 useEffect 同步派生状态改渲染期计算、把 Row 提到模块顶层避免重建与丢焦点、用 Promise.all 消除异步瀑布，并视需要补充 AbortController 或序号守卫防竞态。",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "有个对话框的图标突然变成了 32px，我觉得直接给它加个 !important 就能修好，帮我改一下。",
+      "expected_output": "拒绝盲加 !important，按四阶段根因调试法先全局搜索同名 CSS 选择器与层叠来源，定位样式碰撞源头，通过拆分功能作用域类名前缀彻底解决，并验证两处对话框都正常。",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "一个列表弹窗在数据超过 20 条时底部按钮会被顶出视口，而且超长文件名把右侧按钮挤没了，帮我给完整工程改法。",
+      "expected_output": "给出独立滚动主体（flex-direction: column + max-height: min(..., calc(100vh - ...)) + body min-height: 0 + overflow-y: auto + overscroll-behavior: contain）+ 粘性搜索与底栏，以及行内 min-width: 0 + ellipsis + 右侧 flex: 0 0 auto 防挤出，同时兼顾键盘 Esc 焦点归还。",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "这个状态闪烁 Bug 我已经改了三次 useEffect 还是反复出问题，你帮我再补第四个条件判断吧。",
+      "expected_output": "触发三连败熔断原则，停止继续往 useEffect 上叠补丁，退一步检查状态归属、派生关系和受控/非受控冲突，给出源头级状态流重构方案。",
+      "files": []
+    }
+  ]
+}

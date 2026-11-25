@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tdd-testing · TDD 与高质量自动化测试 · Agent Skills</title>
+<meta name="description" content="严格红-绿-重构 TDD 纪律、真实行为测试设计与突变自检、条件轮询等待、严格隔离与污染定位、按改动分层测试模板、完成前验证门控，附带零依赖跨平台污染定位脚本。">
+<link rel="canonical" href="https://huangrx6.github.io/agent-skills/docs/skills/tdd-testing.html">
+<meta name="theme-color" content="#0f1012">
+<meta property="og:title" content="tdd-testing · TDD 与高质量自动化测试 · Agent Skills">
+<meta property="og:description" content="严格红-绿-重构 TDD 纪律、真实行为测试设计与突变自检、条件轮询等待、严格隔离与污染定位、按改动分层测试模板、完成前验证门控，附带零依赖跨平台污染定位脚本。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://huangrx6.github.io/agent-skills/docs/skills/tdd-testing.html">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<script>
+  (() => {
+    const root = document.documentElement;
+    let theme = 'dark';
+    try {
+      const stored = localStorage.getItem('agent-skills-theme');
+      if (stored === 'light' || stored === 'dark') theme = stored;
+    } catch (error) {}
+    root.dataset.theme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#0f1012' : '#f5f3ee';
+  })();
+</script>
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body class="docs">
+<a class="skip-link" href="#main">跳到正文</a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="../../index.html">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="2" y="14" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="14" width="8" height="8" rx="2" fill="currentColor" opacity=".45"/>
+      </svg>
+      <span>Agent Skills</span>
+    </a>
+    <div class="header-tools">
+      <nav class="site-nav" id="site-nav" aria-label="主导航">
+        <a href="../index.html">文档</a><a href="../skills/index.html" aria-current="page">Skills</a><a href="../guide.html">编写 Skill</a>
+        <a class="nav-github" href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </nav>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换白天/夜间模式" title="切换白天/夜间"><span class="when-light"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>夜间</span><span class="when-dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>白天</span></button>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="打开导航">
+        <span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="docs-shell has-toc">
+  <aside class="docs-sidebar" id="docs-sidebar">
+<nav aria-label="文档导航">
+<p class="side-label">文档</p>
+<a href="../index.html">文档首页</a>
+<a href="../getting-started.html">开始使用</a>
+<a href="../skills/index.html">Skill 目录</a>
+<a href="../guide.html">编写 Skill</a>
+<a href="../maintenance.html">维护与验证</a>
+<a href="../roadmap.html">路线图</a>
+<p class="side-label">Skills</p>
+<p class="side-cat">内容与表达</p>
+<a href="../skills/deck-authoring.html">deck-authoring</a>
+<a href="../skills/diagram-authoring.html">diagram-authoring</a>
+<a href="../skills/cosmic-split.html">cosmic-split</a>
+<a href="../skills/email-composer.html">email-composer</a>
+<p class="side-cat">知识与工作</p>
+<a href="../skills/obsidian-wiki.html">obsidian-wiki</a>
+<a href="../skills/obsidian-work.html">obsidian-work</a>
+<a href="../skills/pingcode.html">pingcode</a>
+<a href="../skills/pingcode-weekly.html">pingcode-weekly</a>
+<p class="side-cat">开发与学习</p>
+<a href="../skills/git-dev-workflow.html">git-dev-workflow</a>
+<a href="../skills/repo-baseline.html">repo-baseline</a>
+<a href="../skills/learning-scout.html">learning-scout</a>
+<p class="side-cat">产品、设计与研发</p>
+<a href="../skills/product-spec.html">product-spec</a>
+<a href="../skills/ui-design-craft.html">ui-design-craft</a>
+<a href="../skills/frontend-engineering.html">frontend-engineering</a>
+<a href="../skills/arch-backend-craft.html">arch-backend-craft</a>
+<a href="../skills/tdd-testing.html" class="is-active" aria-current="page">tdd-testing</a>
+<a href="../skills/ui-qa-acceptance.html">ui-qa-acceptance</a>
+</nav>
+</aside>
+  <div class="sidebar-backdrop" data-sidebar-close hidden></div>
+  <main id="main" class="docs-main">
+    <button class="sidebar-toggle" type="button" aria-expanded="false" aria-controls="docs-sidebar">
+      <span>文档导航</span><span class="sidebar-toggle-mark" aria-hidden="true">+</span>
+    </button>
+    <nav class="crumbs" aria-label="面包屑"><a href="../../index.html">Agent Skills</a><span aria-hidden="true">/</span><a href="../index.html">文档</a><span aria-hidden="true">/</span><a href="../skills/index.html">Skill 目录</a><span aria-hidden="true">/</span><span aria-current="page">tdd-testing</span></nav>
+    <header class="page-head">
+      <p class="eyebrow">产品、设计与研发</p>
+      <h1>tdd-testing · TDD 与高质量自动化测试</h1>
+      <p class="page-lede">严格红-绿-重构 TDD 纪律、真实行为测试设计与突变自检、条件轮询等待、严格隔离与污染定位、按改动分层测试模板、完成前验证门控，附带零依赖跨平台污染定位脚本。</p>
+      <div class="page-meta"><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/tdd-testing/SKILL.md" target="_blank" rel="noreferrer">SKILL.md</a><span aria-hidden="true">·</span><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/tdd-testing/README.md" target="_blank" rel="noreferrer">README.md</a></div>
+    </header>
+    <article class="prose">
+      <div class="table-wrap"><table><thead>
+<tr>
+<th>适合</th>
+<th>产物</th>
+<th>依赖</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单元/集成测试编写、Bug 回归测试、测试质量审查、偶发 <code>sleep</code> 与污染排查、交付前门控</td>
+<td>自动化测试 · 污染定位结论 · 全量验证证据报告</td>
+<td>Python 3.10+（仅 <code>scripts/find_polluter.py</code> 需要）；执行测试依赖目标项目测试器</td>
+</tr>
+</tbody>
+</table></div><p>Agent 的执行铁律、门控表与参考路由见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/tdd-testing/SKILL.md">SKILL.md</a>，细则与正反代码例按需从对应参考手册加载。</p>
+<h2 id="快速使用">快速使用</h2>
+<p>在目标仓库根目录运行测试污染定位脚本（先清理已有残留产物；<code>{file}</code> 为单文件占位符）：</p>
+<pre><code class="language-sh">python3 skills/tdd-testing/scripts/find_polluter.py \
+  --artifact .unexpected-cache \
+  --cmd &quot;python3 -m unittest {file}&quot; \
+  --json \
+  cases/case_a.py cases/case_b.py
+</code></pre>
+<p>典型对话请求：</p>
+<ul>
+<li>“按 TDD 红绿重构方式给这个解析与迁移模块补齐单元测试和边界用例。”</li>
+<li>“先写一条能复现这个 Bug 的失败回归测试，再最小修复并做全量回归验证。”</li>
+<li>“审查一下这组新增测试有没有镜像断言、改动探测、过度 Mock 或脆弱 <code>sleep</code>。”</li>
+<li>“测试套件一起跑时会在工作区留下脏目录，帮我定位污染源并彻底隔离。”</li>
+</ul>
+<h2 id="目录结构">目录结构</h2>
+<ul>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/tdd-testing/SKILL.md">SKILL.md</a>：四条铁律、红-绿-重构门控表、好测试速查、工具入口、完成前验证红线与一层参考索引</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/tdd-testing/references/tdd-cycle-and-discipline.md">references/tdd-cycle-and-discipline.md</a>：红-绿-重构五关细则、代码先写重来规则、缺陷修复闭环、卡壳应对、12 条借口反驳与红旗清单</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/tdd-testing/references/writing-good-tests.md">references/writing-good-tests.md</a>：好测试双铁律与门控函数、TS/Python 正反例、Mock 分层策略、突变自检与 11 条警报信号</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/tdd-testing/references/condition-based-waiting.md">references/condition-based-waiting.md</a>：通用 <code>waitFor</code>、领域等待助手完整 TypeScript 实现、常见错误与允许固定等待的三条件</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/tdd-testing/references/isolation-and-polluters.md">references/isolation-and-polluters.md</a>：临时目录与环境变量隔离、逆序释放栈、零顺序依赖、<code>scripts/find_polluter.py</code> 实战与多文件组合污染二分排查法</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/tdd-testing/references/verification-gate.md">references/verification-gate.md</a>：证据先于声明铁律、五步门控、宣称 vs 证明对照、伪完成借口反驳与严禁弱化/删用例/跳过规范</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/tdd-testing/references/test-strategy-by-layer.md">references/test-strategy-by-layer.md</a>：按改动类型选测试层级（L1–L4）决策表及可复用 TypeScript/Python 测试模板</li>
+<li><code>scripts/find_polluter.py</code>：跨平台测试污染顺序定位脚本（仅依赖 Python 3.10+ 标准库）</li>
+<li><code>evals/triggers.json</code> 与 <code>evals/evals.json</code>：触发边界与行为评判样例</li>
+</ul>
+<h2 id="边界">边界</h2>
+<ul>
+<li>负责自动化测试设计与工程验证门控；真实页面黑盒交互验收归 <code>ui-qa-acceptance</code>，系统架构与纯代码评审归 <code>arch-backend-craft</code>，仓库 CI 与 lint 基线初始化归 <code>repo-baseline</code>。</li>
+<li><code>scripts/find_polluter.py</code> 按传入顺序逐个执行并在找到首个污染源后立刻早停，要求目标污染产物在开始前不存在（否则以退出码 <code>2</code> 拒绝执行）；若仅在多文件组合或并发执行时才出现污染，结合 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/tdd-testing/references/isolation-and-polluters.md">测试隔离、资源清理与污染排查</a> 的二分分组排查法定位。</li>
+</ul>
+<h2 id="维护与验证">维护与验证</h2>
+<p>从本仓库根目录运行全部三项校验（须全部退出码 <code>0</code>、0 失败、0 警告）：</p>
+<pre><code class="language-sh">python3 tools/skill-builder/scripts/validate_skill.py skills/tdd-testing
+python3 tools/skill-builder/scripts/check_pointers.py --root . skills/tdd-testing
+python3 -m unittest discover -s tests/tdd-testing -v
+</code></pre>
+
+    </article>
+    <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="../skills/arch-backend-craft.html"><span>上一篇</span><strong>架构设计、后端工程与代码评审</strong></a><a class="page-nav-link next" href="../skills/ui-qa-acceptance.html"><span>下一篇</span><strong>黑盒交互验收与 UI 质检</strong></a></nav>
+  </main>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#快速使用">快速使用</a></li><li class="toc-2"><a href="#目录结构">目录结构</a></li><li class="toc-2"><a href="#边界">边界</a></li><li class="toc-2"><a href="#维护与验证">维护与验证</a></li></ul></aside>
+</div>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <p>Agent Skills · 17 个可独立安装的 skill</p>
+    <nav aria-label="页脚">
+      <a href="../index.html">文档</a>
+      <a href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="../../../">huangrx6.github.io</a>
+    </nav>
+  </div>
+</footer>
+<script src="../../assets/site.js" defer></script>
+</body>
+</html>

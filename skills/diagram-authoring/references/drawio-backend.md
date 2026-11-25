@@ -24,10 +24,13 @@ python3 scripts/check_drawio.py system.drawio
 | `diamond` | 菱形 |
 | `cylinder` | 数据库圆柱 |
 | `note` | 折角便签 |
+| `icon` | 无框图标节点（矢量 SVG 置顶 + 下方居中文字） |
 
-这是封闭的基本形状映射，不是 draw.io 全部云/K8s/UML/BPMN/泳道库。
-当前 `icon` **报错退出**，不能声称图标也会随同一 spec 无损转换。
+这是封闭的基础形状映射，不是 draw.io 全部云/K8s/UML/BPMN/泳道库。
+`icon` 与 Excalidraw 共用同一套 `.excalidrawlib` 素材库（自动扫描本地缓存或通过 `--library` / `库名:图标名` 指定），
+由脚本直接将矢量元素转为内联 SVG 写入 draw.io，离线即可完整显示；找不到的图标会明确报错退出，不静默丢弃。
 Excalidraw 的 hachure/cross-hatch 在这里用实心填充表达。
+`style.edges` 映射：`rounded`（默认）使用正交加 12px 圆角；`curved` 启用原生贝塞尔曲线（`curved=1`）；`sharp` 为直角正交；`straight` 为无拐角直连。
 
 区域与标题在独立锁定图层，节点保留语义属性与 detail 提示；图层顺序、页面尺寸、背景由工具生成。
 节点文字按脚本折行写入；fit 保持同档字号，显式观看预设的 detail 使用较小字号。

@@ -77,6 +77,13 @@
 <a href="../skills/git-dev-workflow.html">git-dev-workflow</a>
 <a href="../skills/repo-baseline.html">repo-baseline</a>
 <a href="../skills/learning-scout.html">learning-scout</a>
+<p class="side-cat">产品、设计与研发</p>
+<a href="../skills/product-spec.html">product-spec</a>
+<a href="../skills/ui-design-craft.html">ui-design-craft</a>
+<a href="../skills/frontend-engineering.html">frontend-engineering</a>
+<a href="../skills/arch-backend-craft.html">arch-backend-craft</a>
+<a href="../skills/tdd-testing.html">tdd-testing</a>
+<a href="../skills/ui-qa-acceptance.html">ui-qa-acceptance</a>
 </nav>
 </aside>
   <div class="sidebar-backdrop" data-sidebar-close hidden></div>
@@ -151,8 +158,8 @@
 </tr>
 </tbody>
 </table></div><h2 id="作图前逐步确认">作图前逐步确认</h2>
-<p>默认按内容 → 配色 → Excalidraw 图标逐项提交具体方案，每个节点等用户回复后再继续，最后生成。
-draw.io/Mermaid 确认内容与配色，图标按当前能力标记为不适用；用户要求图标时先核对后端。
+<p>默认按内容 → 配色 → 图标（Excalidraw 与 draw.io 共用 <code>.excalidrawlib</code> 素材库）逐项提交具体方案，每个节点等用户回复后再继续，最后生成。
+Mermaid 确认内容与配色，图标按当前能力标记为不适用；用户要求图标时先核对后端。
 已确认且未变化的选择沿用，明确免确认的授权按其范围执行。参见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/references/decision-gates.md">逐步确认</a>。
 这是代理对话流程；底层 CLI 保持非交互，不伪称脚本能验证人类确认。</p>
 <h2 id="表达与观看">表达与观看</h2>
@@ -164,9 +171,16 @@ Excalidraw/draw.io 生成器 <code>--preset</code> 支持文档、投影与打�
 见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/references/reading-views.md">阅读视图</a>。需要同一画布内横竖混排时，用 <code>compose_panels.py</code> 做面板式组合，
 每个面板独立布局，跨面板连线不自动生成；见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/references/mixed-direction.md">混合方向</a>。
 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/examples/README.md">标准样例</a> 提供六类输入、可编辑产物与实际导出。</p>
+<h2 id="灵活布线与图标拓扑">灵活布线与图标拓扑</h2>
+<ul>
+<li><strong>四种连线风格（<code>style.edges</code>）</strong>：默认 <code>rounded</code>（正交走线 + 柔和圆角，Excalidraw 自动避开短腿钩子、draw.io 启用 12px 圆角、Mermaid 走 <code>monotoneX</code>/<code>monotoneY</code>）；需要更流畅的流程/拓扑可选 <code>curved</code>（无遮挡时输出避障校验过的自然弧线）；需要极简连线可选 <code>straight</code>；严格蓝图可选 <code>sharp</code>。</li>
+<li><strong>对称重心与少折点路由</strong>：分层布局自动做扇出/扇入重心均衡、对称分叉不偏斜、错位无遮挡优先走 1 折 L 型路线，同对节点间的平行/双向多条边自动并排错开。</li>
+<li><strong>无框图标节点与共享 <code>.excalidrawlib</code> 素材库</strong>：新增 <code>shape: &quot;icon&quot;</code>（图标居中放大置顶、标签居中在下方、无外框，适合网络/安全域/设备拓扑）。Excalidraw 与 draw.io 共用同一套外部 <code>.excalidrawlib</code> 素材库：不传 <code>--library</code> 时自动扫描本地全部已缓存库，支持 <code>&quot;库名:图标名&quot;</code> 跨库混用；draw.io 零依赖转为内联 SVG 嵌入，离线可编辑。见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/references/icons.md">图标说明</a>。</li>
+</ul>
 <h2 id="自由配色">自由配色</h2>
-<p>三后端支持 <code>--colors 项目.colors.json</code>，可使用任意 HEX、自由增添命名色，按节点角色或 ID 分配，
-并调整填充强度。颜色可来自网站、参考图、品牌材料或 <code>color_design.py --seed</code> 的任意主色候选。
+<p>三后端支持 <code>--colors 项目.colors.json</code>，可使用任意 HEX、自由增添命名色，按节点角色（<code>by_kind</code>）、节点 ID（<code>by_node</code>）、分区（<code>by_group</code>）分配，
+在多通道链路场景下也可按边类型（<code>by_edge_kind</code>）或单边（<code>by_edge</code>）分配语义边色，并自动校验对比度。
+颜色可来自网站、参考图、品牌材料或 <code>color_design.py --seed</code> 的任意主色候选。
 旧方向和方案保持兼容，不限制新设计。见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/references/color-design.md">配色方法与文件格式</a>、
 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/diagram-authoring/examples/colors/README.md">三种来源的同图实测</a>。</p>
 <h2 id="快速开始">快速开始</h2>
@@ -234,8 +248,8 @@ python3 scripts/check_presentation.py /project/docs/diagrams/system/system.excal
 <td>把多张已生成的 Excalidraw 按 row/column 拼到同一画布，隔离 ID 与引用</td>
 </tr>
 <tr>
-<td><code>scripts/sigils.py</code> / <code>icons.py</code> / <code>icons_fetch.py</code></td>
-<td>内置图标、本地素材和官方库查询</td>
+<td><code>scripts/icons.py</code> / <code>icons_fetch.py</code> / <code>sigils.py</code></td>
+<td><code>.excalidrawlib</code> 跨库自动扫描、离线 <code>--cached</code>/<code>--find</code> 检索、SVG 转换与兼容内置图标</td>
 </tr>
 <tr>
 <td><code>dev-tools/export_excalidraw.py</code> / <code>export_drawio.py</code> / <code>export_mermaid.py</code></td>
@@ -250,8 +264,8 @@ python3 scripts/check_presentation.py /project/docs/diagrams/system/system.excal
 <td>在真实浏览器核对单页官方 SVG；能力与限制见观看场景</td>
 </tr>
 </tbody>
-</table></div><p>默认 Excalidraw；draw.io 支持多份 spec 合成多页文件。两者共有七种基本形状，
-但 draw.io 当前拒绝图标、不支持完整云/UML/BPMN图元库。不要把“应用本身支持”当成“本生成器支持”。</p>
+</table></div><p>默认 Excalidraw；draw.io 支持多份 spec 合成多页文件。两者共有八种形状（含无框 <code>icon</code>），
+并共用同一套外部 <code>.excalidrawlib</code> 素材库（draw.io 自动转为内联 SVG 嵌入），不支持 draw.io 专用完整云/UML/BPMN 图元库。不要把“应用本身支持”当成“本生成器支持”。</p>
 <h2 id="质量边界">质量边界</h2>
 <p><code>standard</code> 允许部分连线警告；<code>showcase</code> 将结构类警告升级为阻塞。
 阻塞时 emit 不写成品，已有文件不会被半成品覆盖。默认仅交付原生图时不强制导出做检查，
@@ -279,12 +293,12 @@ draw.io 支持压缩文件回读、默认名义留白 80，多页图片需显式
     </article>
     <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="../skills/deck-authoring.html"><span>上一篇</span><strong>演示文稿制作</strong></a><a class="page-nav-link next" href="../skills/cosmic-split.html"><span>下一篇</span><strong>cosmic-split</strong></a></nav>
   </main>
-<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#成品示例">成品示例</a></li><li class="toc-2"><a href="#安装与依赖">安装与依赖</a></li><li class="toc-2"><a href="#作图前逐步确认">作图前逐步确认</a></li><li class="toc-2"><a href="#表达与观看">表达与观看</a></li><li class="toc-2"><a href="#自由配色">自由配色</a></li><li class="toc-2"><a href="#快速开始">快速开始</a></li><li class="toc-2"><a href="#质量边界">质量边界</a></li><li class="toc-2"><a href="#开发验证">开发验证</a></li><li class="toc-2"><a href="#mermaid-与-draw-io-的补齐">Mermaid 与 draw.io 的补齐</a></li></ul></aside>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#成品示例">成品示例</a></li><li class="toc-2"><a href="#安装与依赖">安装与依赖</a></li><li class="toc-2"><a href="#作图前逐步确认">作图前逐步确认</a></li><li class="toc-2"><a href="#表达与观看">表达与观看</a></li><li class="toc-2"><a href="#灵活布线与图标拓扑">灵活布线与图标拓扑</a></li><li class="toc-2"><a href="#自由配色">自由配色</a></li><li class="toc-2"><a href="#快速开始">快速开始</a></li><li class="toc-2"><a href="#质量边界">质量边界</a></li><li class="toc-2"><a href="#开发验证">开发验证</a></li><li class="toc-2"><a href="#mermaid-与-draw-io-的补齐">Mermaid 与 draw.io 的补齐</a></li></ul></aside>
 </div>
 
 <footer class="site-footer">
   <div class="wrap footer-inner">
-    <p>Agent Skills · 11 个可独立安装的 skill</p>
+    <p>Agent Skills · 17 个可独立安装的 skill</p>
     <nav aria-label="页脚">
       <a href="../index.html">文档</a>
       <a href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub</a>

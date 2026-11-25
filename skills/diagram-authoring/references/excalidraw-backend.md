@@ -16,6 +16,7 @@ python3 scripts/emit_excalidraw.py .source/system.diagram.json --quality showcas
 - 普通节点使用绑定文字，真实字体可能导致应用重新折行、撑大容器。
 - 带图标或 detail 的节点使用自由文字，并与形状归组；一个容器最多绑定一个文字元素。
 - 自由文字能保持脚本计算的位置，但手工改标签或调整框大小后不会自动重新排版。
+- `style.edges` 映射：`rounded`（默认）在每段足够长时启用平滑圆角，避免短腿出现钩子；`curved` 启用平滑曲线并优先输出 3 点自然弧线；`sharp` / `straight` 关闭倒角。
 
 因此布局模型通过检查之后，还要用实际编辑器或官方导出复核文字、关系和遮挡。
 

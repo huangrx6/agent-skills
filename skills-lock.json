@@ -1,5 +1,11 @@
 {
   "skills": {
+    "arch-backend-craft": {
+      "computedHash": "c73bec986f0f7b49f4a061423f9fe5736c8a2f665db700e7ea59baa01cd234d6",
+      "skillPath": "skills/arch-backend-craft/SKILL.md",
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github"
+    },
     "cosmic-split": {
       "computedHash": "6e193274feb180ed3c8b753864a2b70288479f4a27e627bc958b66ee1e244d04",
       "skillPath": "skills/cosmic-split/SKILL.md",
@@ -13,7 +19,7 @@
       "sourceType": "github"
     },
     "diagram-authoring": {
-      "computedHash": "935e0245350463a77476bdf1b83b3a225ec47d289cd4c1af2486b4cdd650b894",
+      "computedHash": "d014fb608eec9349ee970101738c79ffa5101aad23781eb0a59b1903982f80d5",
       "skillPath": "skills/diagram-authoring/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
@@ -21,6 +27,12 @@
     "email-composer": {
       "computedHash": "fe305bba2252b2efc01cd1507e1ed2f6ab348d9c4586e38a74e01803dea6ae38",
       "skillPath": "skills/email-composer/SKILL.md",
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github"
+    },
+    "frontend-engineering": {
+      "computedHash": "7c551c8cee58e377af867a8a79439ffd60a1ba3bc490751a339ec87e38381354",
+      "skillPath": "skills/frontend-engineering/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
@@ -60,9 +72,33 @@
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     },
+    "product-spec": {
+      "computedHash": "8859ea9d86767da065b3589bdf0f5aaf0ac200b78cd5b3a0bc4ef3669baac6c9",
+      "skillPath": "skills/product-spec/SKILL.md",
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github"
+    },
     "repo-baseline": {
       "computedHash": "25f369287e6563e02aa15959cdd7df92af9502f6a102c3883546698366071df0",
       "skillPath": "skills/repo-baseline/SKILL.md",
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github"
+    },
+    "tdd-testing": {
+      "computedHash": "2a7e2da54a4ac70d202b0aed79820f8126d621e0c107fa6c58618c488dd35d62",
+      "skillPath": "skills/tdd-testing/SKILL.md",
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github"
+    },
+    "ui-design-craft": {
+      "computedHash": "5b9405e88d67f37e1a954f07df18fe744db5e9bb9ad7e7e0055d3ddabea0188d",
+      "skillPath": "skills/ui-design-craft/SKILL.md",
+      "source": "huangrx6/agent-skills",
+      "sourceType": "github"
+    },
+    "ui-qa-acceptance": {
+      "computedHash": "e98204c06fbb5a954ffa97a231903228e740b2a8abbb7d0d25b406fe91cae9b3",
+      "skillPath": "skills/ui-qa-acceptance/SKILL.md",
       "source": "huangrx6/agent-skills",
       "sourceType": "github"
     }

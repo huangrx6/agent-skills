@@ -6,7 +6,7 @@
     {
       "id": "node-app",
       "type": "rectangle",
-      "x": 157.0,
+      "x": 10.0,
       "y": 0.0,
       "width": 214.0,
       "height": 71.8,
@@ -49,7 +49,7 @@
     {
       "id": "title-app",
       "type": "text",
-      "x": 179.0,
+      "x": 32.0,
       "y": 24.0,
       "width": 170.0,
       "height": 23.8,
@@ -86,7 +86,7 @@
     {
       "id": "node-contract",
       "type": "rectangle",
-      "x": -55.0,
+      "x": -132.0,
       "y": 191.8,
       "width": 204.0,
       "height": 70.4,
@@ -125,7 +125,7 @@
     {
       "id": "title-contract",
       "type": "text",
-      "x": -33.0,
+      "x": -110.0,
       "y": 215.8,
       "width": 160.0,
       "height": 22.4,
@@ -318,10 +318,10 @@
     {
       "id": "edge-app-contract",
       "type": "arrow",
-      "x": 225.48,
-      "y": 71.8,
-      "width": 178.48,
-      "height": 120.0,
+      "x": 10.0,
+      "y": 35.9,
+      "width": 40.0,
+      "height": 155.9,
       "angle": 0,
       "strokeColor": "#9D9C98",
       "backgroundColor": "transparent",
@@ -332,7 +332,9 @@
       "opacity": 100,
       "groupIds": [],
       "frameId": null,
-      "roundness": null,
+      "roundness": {
+        "type": 2
+      },
       "seed": 3923332618,
       "version": 1,
       "versionNonce": 973843372,
@@ -348,16 +350,12 @@
           0.0
         ],
         [
-          0.0,
-          60.0
+          -40.0,
+          0.0
         ],
         [
-          -178.48,
-          60.0
-        ],
-        [
-          -178.48,
-          120.0
+          -40.0,
+          155.9
         ]
       ],
       "startArrowhead": null,
@@ -376,8 +374,8 @@
     {
       "id": "elabel-app-contract",
       "type": "text",
-      "x": 124.24,
-      "y": 102.75,
+      "x": -62.65,
+      "y": 85.45,
       "width": 24.0,
       "height": 16.8,
       "angle": 0,
@@ -415,10 +413,10 @@
     {
       "id": "edge-app-adapter-1",
       "type": "arrow",
-      "x": 302.52,
-      "y": 71.8,
-      "width": 38.52,
-      "height": 120.0,
+      "x": 224.0,
+      "y": 35.9,
+      "width": 40.0,
+      "height": 155.9,
       "angle": 0,
       "strokeColor": "#9D9C98",
       "backgroundColor": "transparent",
@@ -429,7 +427,9 @@
       "opacity": 100,
       "groupIds": [],
       "frameId": null,
-      "roundness": null,
+      "roundness": {
+        "type": 2
+      },
       "seed": 1288701710,
       "version": 1,
       "versionNonce": 434652832,
@@ -445,16 +445,12 @@
           0.0
         ],
         [
-          0.0,
-          60.0
+          40.0,
+          0.0
         ],
         [
-          -38.52,
-          60.0
-        ],
-        [
-          -38.52,
-          120.0
+          40.0,
+          155.9
         ]
       ],
       "startArrowhead": null,
@@ -473,8 +469,8 @@
     {
       "id": "elabel-app-adapter-1",
       "type": "text",
-      "x": 271.26,
-      "y": 102.75,
+      "x": 231.35,
+      "y": 85.45,
       "width": 24.0,
       "height": 16.8,
       "angle": 0,
@@ -601,9 +597,9 @@
     {
       "id": "card-card-0",
       "type": "rectangle",
-      "x": -55.0,
+      "x": -123.0,
       "y": 516.6,
-      "width": 426.0,
+      "width": 480.0,
       "height": 95.6,
       "angle": 0,
       "strokeColor": "#908E8A",
@@ -633,7 +629,7 @@
     {
       "id": "card-title-card-0",
       "type": "text",
-      "x": -31.0,
+      "x": -99.0,
       "y": 534.6,
       "width": 64.0,
       "height": 22.4,
@@ -672,7 +668,7 @@
     {
       "id": "card-items-card-0",
       "type": "text",
-      "x": -31.0,
+      "x": -99.0,
       "y": 575.0,
       "width": 267.6,
       "height": 19.2,
@@ -711,7 +707,7 @@
     {
       "id": "diagram-title-x",
       "type": "text",
-      "x": -10.0,
+      "x": -51.0,
       "y": -69.6,
       "width": 336.0,
       "height": 33.6,
@@ -749,7 +745,7 @@
   "appState": {
     "gridSize": null,
     "viewBackgroundColor": "#FCFBF6",
-    "scrollX": 118.83,
+    "scrollX": 195.83,
     "scrollY": 186.62,
     "zoom": 0.94
   },

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>product-spec · 产品需求澄清与规格收敛 · Agent Skills</title>
+<meta name="description" content="把模糊诉求、用户反馈或零散想法，沿「探索 → 拆期 → 提问 → 方案权衡 → 分段规格 → 自审 → 计划桥接」七关收敛为可复测产品规格与可执行实施交接包。">
+<link rel="canonical" href="https://huangrx6.github.io/agent-skills/docs/skills/product-spec.html">
+<meta name="theme-color" content="#0f1012">
+<meta property="og:title" content="product-spec · 产品需求澄清与规格收敛 · Agent Skills">
+<meta property="og:description" content="把模糊诉求、用户反馈或零散想法，沿「探索 → 拆期 → 提问 → 方案权衡 → 分段规格 → 自审 → 计划桥接」七关收敛为可复测产品规格与可执行实施交接包。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://huangrx6.github.io/agent-skills/docs/skills/product-spec.html">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<script>
+  (() => {
+    const root = document.documentElement;
+    let theme = 'dark';
+    try {
+      const stored = localStorage.getItem('agent-skills-theme');
+      if (stored === 'light' || stored === 'dark') theme = stored;
+    } catch (error) {}
+    root.dataset.theme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#0f1012' : '#f5f3ee';
+  })();
+</script>
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body class="docs">
+<a class="skip-link" href="#main">跳到正文</a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="../../index.html">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="2" y="14" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="14" width="8" height="8" rx="2" fill="currentColor" opacity=".45"/>
+      </svg>
+      <span>Agent Skills</span>
+    </a>
+    <div class="header-tools">
+      <nav class="site-nav" id="site-nav" aria-label="主导航">
+        <a href="../index.html">文档</a><a href="../skills/index.html" aria-current="page">Skills</a><a href="../guide.html">编写 Skill</a>
+        <a class="nav-github" href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </nav>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换白天/夜间模式" title="切换白天/夜间"><span class="when-light"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>夜间</span><span class="when-dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>白天</span></button>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="打开导航">
+        <span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="docs-shell has-toc">
+  <aside class="docs-sidebar" id="docs-sidebar">
+<nav aria-label="文档导航">
+<p class="side-label">文档</p>
+<a href="../index.html">文档首页</a>
+<a href="../getting-started.html">开始使用</a>
+<a href="../skills/index.html">Skill 目录</a>
+<a href="../guide.html">编写 Skill</a>
+<a href="../maintenance.html">维护与验证</a>
+<a href="../roadmap.html">路线图</a>
+<p class="side-label">Skills</p>
+<p class="side-cat">内容与表达</p>
+<a href="../skills/deck-authoring.html">deck-authoring</a>
+<a href="../skills/diagram-authoring.html">diagram-authoring</a>
+<a href="../skills/cosmic-split.html">cosmic-split</a>
+<a href="../skills/email-composer.html">email-composer</a>
+<p class="side-cat">知识与工作</p>
+<a href="../skills/obsidian-wiki.html">obsidian-wiki</a>
+<a href="../skills/obsidian-work.html">obsidian-work</a>
+<a href="../skills/pingcode.html">pingcode</a>
+<a href="../skills/pingcode-weekly.html">pingcode-weekly</a>
+<p class="side-cat">开发与学习</p>
+<a href="../skills/git-dev-workflow.html">git-dev-workflow</a>
+<a href="../skills/repo-baseline.html">repo-baseline</a>
+<a href="../skills/learning-scout.html">learning-scout</a>
+<p class="side-cat">产品、设计与研发</p>
+<a href="../skills/product-spec.html" class="is-active" aria-current="page">product-spec</a>
+<a href="../skills/ui-design-craft.html">ui-design-craft</a>
+<a href="../skills/frontend-engineering.html">frontend-engineering</a>
+<a href="../skills/arch-backend-craft.html">arch-backend-craft</a>
+<a href="../skills/tdd-testing.html">tdd-testing</a>
+<a href="../skills/ui-qa-acceptance.html">ui-qa-acceptance</a>
+</nav>
+</aside>
+  <div class="sidebar-backdrop" data-sidebar-close hidden></div>
+  <main id="main" class="docs-main">
+    <button class="sidebar-toggle" type="button" aria-expanded="false" aria-controls="docs-sidebar">
+      <span>文档导航</span><span class="sidebar-toggle-mark" aria-hidden="true">+</span>
+    </button>
+    <nav class="crumbs" aria-label="面包屑"><a href="../../index.html">Agent Skills</a><span aria-hidden="true">/</span><a href="../index.html">文档</a><span aria-hidden="true">/</span><a href="../skills/index.html">Skill 目录</a><span aria-hidden="true">/</span><span aria-current="page">product-spec</span></nav>
+    <header class="page-head">
+      <p class="eyebrow">产品、设计与研发</p>
+      <h1>product-spec · 产品需求澄清与规格收敛</h1>
+      <p class="page-lede">把模糊诉求、用户反馈或零散想法，沿「探索 → 拆期 → 提问 → 方案权衡 → 分段规格 → 自审 → 计划桥接」七关收敛为可复测产品规格与可执行实施交接包。</p>
+      <div class="page-meta"><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/product-spec/SKILL.md" target="_blank" rel="noreferrer">SKILL.md</a><span aria-hidden="true">·</span><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/product-spec/README.md" target="_blank" rel="noreferrer">README.md</a></div>
+    </header>
+    <article class="prose">
+      <div class="table-wrap"><table><thead>
+<tr>
+<th>适合</th>
+<th>产物</th>
+<th>依赖</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>需求澄清、多子系统拆期、2–3 方案权衡、可复测 AC、边界矩阵、规格自审与实施计划桥接</td>
+<td>短规格 / 完整产品规格 · 编号 AC · 边界异常矩阵 · <code>Global Constraints</code> · <code>Review Focus</code> · 实施计划交接包</td>
+<td>无外部运行时依赖</td>
+</tr>
+</tbody>
+</table></div><p>Agent 的阶段闸门、硬拦截规则、场景判断表与反合理化清单见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/product-spec/SKILL.md">SKILL.md</a>，各阶段模板与方法按其中的一层参考链接按需读取。</p>
+<h2 id="典型用法">典型用法</h2>
+<p>直接给出模糊诉求、痛点反馈、待权衡方案或刚对齐待拆解的规格即可触发：</p>
+<ul>
+<li><strong>零散反馈收敛</strong>：「用户说扩展选择器装了十几个扩展之后很不好用，帮我查一下现有实现，收敛方案、范围边界和可复测 AC。」</li>
+<li><strong>打包需求拆期</strong>：「我想做一个插件市场、权限管理、自动更新和评价系统，先帮我拆期并定第一期 MVP 规格。」</li>
+<li><strong>方案对比取舍</strong>：「对比侧栏抽屉、独立弹窗和设置子页三种交互方案，按交互、维护成本和可逆性给推荐。」</li>
+<li><strong>模糊口径转 AC</strong>：「把『设置页更丝滑、报错更友好、窄窗不乱』改写成测试能直接照步复测的 Given/When/Then 验收标准。」</li>
+<li><strong>规格自审与研发交接</strong>：「这份规格刚确认完，准备交给前后端并行开发，帮我做构建者视角自审，补齐 Global Constraints、Review Focus 和实施计划交接。」</li>
+</ul>
+<h2 id="目录结构">目录结构</h2>
+<ul>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/product-spec/SKILL.md">SKILL.md</a>：七关阶段闸门、未确认前禁写代码硬闸门、场景判断表、反合理化清单与一层参考索引</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/product-spec/references/discovery-and-questioning.md">references/discovery-and-questioning.md</a>：上下文只读侦察清单、多子系统拆期与体量分级、首轮策略、1–3 关键提问、带推荐项选择题正反例、事实 vs 假设分离与「太简单不用设计」反驳</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/product-spec/references/options-and-tradeoffs.md">references/options-and-tradeoffs.md</a>：2–3 方案对比框架、交互/维护成本/演进风险/可逆性权衡矩阵、YAGNI 裁剪五问表与推荐理由论证写法</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/product-spec/references/spec-structure-and-ac.md">references/spec-structure-and-ac.md</a>：分段回放节奏、短规格/完整规格模板、Given/When/Then 编号 AC、18 条模糊主观词改写对照、状态生命周期契约与多层作用域 UI 继承/覆盖规范</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/product-spec/references/edge-and-exception-matrix.md">references/edge-and-exception-matrix.md</a>：0 项空态、无结果、单条、20+/100+ 高数量、超长混排/URL/Emoji、切页/关闭状态复位、并发竞态、4xx/5xx 保输入恢复、破坏性护栏与存量兼容完整矩阵</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/product-spec/references/review-focus-and-spec-audit.md">references/review-focus-and-spec-audit.md</a>：愿景文档原则、<code>Global Constraints</code> 提炼、五大隐含失效模式 <code>Review Focus</code>、独立构建者视角审查提示词与三堆分拣、6 维规格自审清单</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/product-spec/references/implementation-plan-bridge.md">references/implementation-plan-bridge.md</a>：文件归属地图、可独立验证的任务切分、<code>Consumes / Produces</code> 接口契约、无歧义步骤粒度与篇幅比例检查、执行方式交接与顺序执行核心纪律</li>
+<li><code>evals/triggers.json</code> 与 <code>evals/evals.json</code>：触发正反例与端到端行为评判样例</li>
+</ul>
+<h2 id="边界">边界</h2>
+<ul>
+<li><strong>只定「做什么、不做什么、怎么验收、如何切分交接」</strong>：不直接编写业务生产代码；不替代视觉样式打磨（归 <code>ui-design-craft</code>）、系统架构与表结构设计（归 <code>arch-backend-craft</code>）、黑盒 UI 验收执行（归 <code>ui-qa-acceptance</code>）或 COSMIC 功能点拆分（归 <code>cosmic-split</code>）。</li>
+<li><strong>硬闸门约束</strong>：规格未获用户明确批准前，不跳进编码、建脚手架或装依赖；一次性探路原型（Spike）须明确标为丢弃物，保留则须重回规格闸门。</li>
+<li><strong>跨领域协同</strong>：涉及复杂存储迁移、安全边界或跨服务协议时，规格中以约束和契约表达业务要求，技术实现细节交由架构与研发评审确认。</li>
+</ul>
+<h2 id="校验">校验</h2>
+<p>本 skill 无可执行脚本，结构、禁词与引用完整性校验在仓库根目录运行：</p>
+<pre><code class="language-sh">python3 tools/skill-builder/scripts/validate_skill.py skills/product-spec
+python3 tools/skill-builder/scripts/check_pointers.py --root . skills/product-spec
+</code></pre>
+
+    </article>
+    <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="../skills/learning-scout.html"><span>上一篇</span><strong>learning-scout</strong></a><a class="page-nav-link next" href="../skills/ui-design-craft.html"><span>下一篇</span><strong>界面设计工艺与可用性规范</strong></a></nav>
+  </main>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#典型用法">典型用法</a></li><li class="toc-2"><a href="#目录结构">目录结构</a></li><li class="toc-2"><a href="#边界">边界</a></li><li class="toc-2"><a href="#校验">校验</a></li></ul></aside>
+</div>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <p>Agent Skills · 17 个可独立安装的 skill</p>
+    <nav aria-label="页脚">
+      <a href="../index.html">文档</a>
+      <a href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="../../../">huangrx6.github.io</a>
+    </nav>
+  </div>
+</footer>
+<script src="../../assets/site.js" defer></script>
+</body>
+</html>

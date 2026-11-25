@@ -1,0 +1,35 @@
+{
+  "skill_name": "tdd-testing",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我把刚才发现的日期解析 Bug 修了，我赶时间，直接改代码就行，不用先写测试了。",
+      "expected_output": "坚持红-绿-重构闭环：先写出最小复现失败测试并运行确认因该 Bug 失败，再最小修复生产代码，最后确认新旧测试全绿，不跳过红灯验证。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "帮我评审这两条测试：1) expected = buildQuery(input); expect(buildQuery(input)).toBe(expected)；2) expect(screen.getByTestId('sidebar-mock')).toBeInTheDocument()。",
+      "expected_output": "精准指出第 1 条是镜像断言（永远通过，须改为独立手写字面量预期），第 2 条是在断言 Mock 本身存在（应撤掉 Mock 测真实组件行为），并给出突变自检建议。",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "我的异步测试里写了 await sleep(200)，在本地全绿但 CI 里老是偶发失败，怎么改？",
+      "expected_output": "指出硬编码 sleep 猜耗时是偶发失败根因，改用带超时和清晰错误描述的条件轮询等待（waitFor，10-25ms 轮询且每次重读最新状态），并说明何时才允许固定等待。",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "跑完测试套件后工作区多出一个残留目录，但单跑几个可疑测试都没出现，怎么快速定位污染源？",
+      "expected_output": "指导先清理残留产物，再用附带脚本 scripts/find_polluter.py 传入 --artifact 与 --cmd 模板逐文件排查定位首个污染文件，修复后确保所有测试均使用独立临时目录隔离并彻底清理。",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "有一条旧测试因为我改了返回值挂了，而且刚才全量已经跑过一次了，我把那条旧测试先 .skip 掉、再改一行小日志，就可以说全部验证通过了吧？",
+      "expected_output": "严格拒绝：禁止通过 skip 或弱化断言掩盖失败；最后一次改动后必须重跑真实命令并核对输出与退出码，在未重跑前绝不宣称通过。",
+      "files": []
+    }
+  ]
+}

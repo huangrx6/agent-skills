@@ -156,6 +156,12 @@ _ALIASES: dict[str, tuple[str, ...]] = {
     "主机": ("host", "server"), "容器": ("container", "docker", "pod"),
     "云": ("cloud",), "网络": ("network", "internet"),
     "防火墙": ("firewall", "security"), "安全": ("security", "firewall", "key", "lock"),
+    "手机": ("mobile", "phone", "smartphone"), "移动端": ("mobile", "phone", "smartphone"),
+    "路由器": ("router", "gateway", "network"), "交换机": ("switch", "router", "network"),
+    "负载均衡": ("load balancer", "balancer", "proxy", "gateway"),
+    "浏览器": ("browser", "web", "client"), "电脑": ("laptop", "computer", "desktop"),
+    "客户端": ("client", "laptop", "mobile", "browser"),
+    "集群": ("cluster", "kubernetes", "k8s", "nodes"),
     "密钥": ("key", "lock", "password"), "用户": ("user", "person"),
     "人": ("user", "person"), "设备": ("device", "printer"),
     "文档": ("document", "file", "paper"), "文件": ("file", "document", "folder"),
@@ -272,7 +278,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         description="从官方素材库目录里搜/取图标（下载到本地缓存，不入仓库）")
     ap.add_argument("--list", nargs="?", const="", metavar="关键词",
                     help="列出官方库（可选关键词过滤库名或图形名）")
-    ap.add_argument("--search", metavar="关键词", help="在图形名里搜，告诉你哪个库里有")
+    ap.add_argument("--cached", action="store_true",
+                    help="离线列出本地已缓存的全部 .excalidrawlib 素材库")
+    ap.add_argument("--find", metavar="关键词",
+                    help="优先在本地已缓存素材库里离线查找可用图标（返回 `库名:图标名`），未命中再查官方目录")
+    ap.add_argument("--search", metavar="关键词", help="在官方目录的图形名里搜，告诉你哪个库里有")
     ap.add_argument("--get", metavar="库名", help="下载某个库到本地缓存")
     ap.add_argument("--url", help="直接按 URL 下载一个 .excalidrawlib（索引里没有的库）")
     ap.add_argument("--dir", help="缓存目录（默认 $AGENT_SKILLS_HOME/data/diagram-authoring/libraries）")
@@ -281,11 +291,51 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--json", action="store_true", help="输出机器可读回执")
     args = ap.parse_args(argv)
 
-    if not (args.list is not None or args.search or args.get or args.url):
+    if not (args.list is not None or args.cached or args.find or args.search or args.get or args.url):
         ap.print_help()
         return 2
 
     cache = cache_dir(args.dir)
+    icons_mod = _icons_module()
+
+    if args.cached:
+        cached = icons_mod.cached_libraries(cache)
+        if args.json:
+            payload = []
+            for s, p in sorted(cached.items()):
+                items = _cached_item_names(p)
+                payload.append({"slug": s, "path": p, "count": len(items), "sample": items[:12]})
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+            return 0
+        if not cached:
+            print(f"本地缓存目录为空（{cache}）。用 --search <关键词> 与 --get <库名> 下载素材库。")
+            return 0
+        print(f"本地已缓存 {len(cached)} 个素材库（{cache}）：")
+        for s, p in sorted(cached.items()):
+            items = _cached_item_names(p)
+            preview = "、".join(items[:6]) + ("…" if len(items) > 6 else "")
+            print(f"  {s:<28} {len(items):>4} 项  {preview}")
+        return 0
+
+    if args.find:
+        local_hits: list[tuple[str, str, int]] = []
+        seen_local: set[tuple[str, str]] = set()
+        for term in _terms(args.find):
+            for slug_name, item_name, cnt in icons_mod.search_cached(term, cache=cache):
+                if (slug_name, item_name) not in seen_local:
+                    seen_local.add((slug_name, item_name))
+                    local_hits.append((slug_name, item_name, cnt))
+        if local_hits:
+            if args.json:
+                print(json.dumps([{"ref": f"{s}:{n}", "library": s, "item": n, "elements": c}
+                                  for s, n, c in local_hits[:60]], ensure_ascii=False, indent=2))
+            else:
+                print(f"在本地已缓存素材库中找到 {len(local_hits)} 项（可直接写进 spec 的 icon 字段）：")
+                for s, n, c in local_hits[:40]:
+                    print(f"  {s}:{n:<34} ({c} 个元素)")
+            return 0
+        # 本地未命中时继续往下查官方在线目录
+        args.search = args.find
     try:
         index = fetch_index(cache, refresh=args.refresh)
     except (urllib.error.URLError, OSError, ValueError) as exc:

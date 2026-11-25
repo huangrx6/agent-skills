@@ -65,16 +65,16 @@
 | 节点可选字段 | 取值与作用 |
 | --- | --- |
 | `kind`（必填） | `client` / `service` / `data` / `async` / `security` / `external` / `plain` |
-| `shape` | `rect` / `round` / `capsule` / `ellipse` / `diamond` / `cylinder` / `note` |
+| `shape` | `rect` / `round` / `capsule` / `ellipse` / `diamond` / `cylinder` / `note` / `icon` |
 | `emphasis` | `muted` / `normal`（默认）/ `primary` / `critical` |
 | `detail` | 次级说明字符串；不是顶层的信息量档位 |
 | `group` | 已声明区域的 ID |
-| `icon` | 内置或已确认的库项名称；仅 Excalidraw，见 [图标](icons.md) |
+| `icon` | `.excalidrawlib` 素材项名（支持 `库名:图标名` 跨库混用）或兼容内置名；Excalidraw 与 draw.io 均可用，见 [图标](icons.md) |
 | `rank` | 非负整数，分层图的明确层级约束；不是坐标 |
 | `pin` | `left` / `right` / `top` / `bottom`，分层图方向约束 |
 
 缺省形状按角色选：client→ellipse、data→cylinder、async→capsule、external→note，
-其余→round。用 diamond 表示实际判断点，不能仅为装饰而换形状。
+其余→round。用 diamond 表示实际判断点，用 `icon` 表示无外框图标节点（图标置顶放大、标签居中在下方，适合网络/系统拓扑与设备图），不能仅为装饰而换形状。
 `kind` 不决定重要性；默认节点均为中性，重点由 emphasis 决定。
 
 边必填 `from` / `to`，必须指向存在的节点，不接受自环；可选 `id`、`label`、`kind`。
@@ -111,8 +111,10 @@ draw.io 使用独立的 `--scheme`，见 [后端说明](drawio-backend.md)。
 | `corners` | `shape` / `sharp` / `round` | `shape` |
 | `line` | `straight` / `sketch` / `rough` | `sketch` |
 | `icons` | `auto` / `ink` / `native` | `auto` |
+| `edges` | `rounded` / `curved` / `sharp` / `straight` | `rounded` |
 
 `shape` 表示沿用形状本身的边角/描边；stroke 只管节点与区域，边虚实由边 kind 控制。
+`edges` 控制连线走法与拐角：`rounded`（默认）为正交走线加柔和圆角；`curved` 在无遮挡时走自然弧线、遇障碍柔和绕行；`sharp` 保留经典 90° 硬折角；`straight` 优先无遮挡直连。
 区域 style 覆盖顶层对应轴。draw.io 不支持 Excalidraw 的纹理填充，输出为实心；
 不要把选项存在理解为两个后端画法完全相同。
 

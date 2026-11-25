@@ -54,6 +54,14 @@ def emit(spec, *, colors=None):
         palette.use_colors(colors, spec=spec)
     layout = load('layout')
     detail = spec.get('detail', 'standard')
+    direction = spec.get('direction', 'LR' if kind in ('architecture', 'state') else 'TB')
+    edge_routing = palette.edge_style_of(palette.resolve_style(spec.get('style')))
+    if edge_routing == 'curved':
+        curve = 'basis'
+    elif edge_routing == 'rounded':
+        curve = 'monotoneX' if direction == 'LR' else 'monotoneY'
+    else:
+        curve = 'linear'
     config = {'theme': 'base', 'securityLevel': 'strict',
               'themeVariables': {'background': palette.CANVAS['background'],
                                 'primaryTextColor': palette.CANVAS['text'],
@@ -63,7 +71,7 @@ def emit(spec, *, colors=None):
               'themeCSS': '.diagram_note .label { text-align:left !important; } '
                           '.diagram_note text { text-anchor:start !important; '
                           'transform:translateX(-50%); transform-box:fill-box; }',
-              'flowchart': {'nodeSpacing': 56, 'rankSpacing': 100, 'curve': 'linear',
+              'flowchart': {'nodeSpacing': 56, 'rankSpacing': 100, 'curve': curve,
                             'wrappingWidth': 800,
                             'diagramPadding': 16, 'subGraphTitleMargin': {'top': 16, 'bottom': 24}},
               'state': {'padding': 24, 'nodeSpacing': 56, 'rankSpacing': 100}}
@@ -71,7 +79,6 @@ def emit(spec, *, colors=None):
     if spec.get('title'):
         lines.append('title: ' + json.dumps(spec['title'], ensure_ascii=False))
     lines += ['config: ' + json.dumps(config, ensure_ascii=False), '---']
-    direction = spec.get('direction', 'LR' if kind in ('architecture', 'state') else 'TB')
     cards = spec.get('cards', [])
     lines += ['stateDiagram-v2', '  direction ' + direction] if state else ['flowchart ' + ('TB' if cards else direction)]
     if cards:
@@ -84,7 +91,8 @@ def emit(spec, *, colors=None):
         return '\n'.join(metrics.wrap(text, units)[0])
     shapes = {'rect': ('["', '"]'), 'round': ('("', '")'),
               'capsule': ('(["', '"])'), 'ellipse': ('(["', '"])'),
-              'diamond': ('{"', '"}'), 'cylinder': ('[("', '")]'), 'note': ('["', '"]')}
+              'diamond': ('{"', '"}'), 'cylinder': ('[("', '")]'), 'note': ('["', '"]'),
+              'icon': ('["', '"]')}
 
     def node_line(node):
         nid = ident(node['id'])
@@ -118,7 +126,7 @@ def emit(spec, *, colors=None):
         lines.append('  end')
         color = palette.group_colors(group['id'], group.get('level', 'tint'))
         styles.append(f'  style {gid} fill:{color["fill"]},stroke:{color["stroke"]},color:{color["text"]}')
-    for edge in spec.get('edges', []):
+    for edge_index, edge in enumerate(spec.get('edges', [])):
         source, target = ident(edge['from']), ident(edge['to'])
         text = edge.get('label', '') if layout.shows_edge_label(edge, detail) else ''
         if not text and detail == 'diagnostic' and edge.get('kind', 'sync') != 'sync':
@@ -128,6 +136,9 @@ def emit(spec, *, colors=None):
         else:
             arrow = '-.->' if edge.get('kind') in ('async', 'optional') else '-->'
             lines.append(f'  {source} {arrow}' + (f'|"{label(text)}"|' if text else '') + f' {target}')
+            edge_stroke = palette.edge_stroke_for(edge)
+            if palette.has_custom_colors() and edge_stroke != palette.ROLES['edge']:
+                styles.append(f'  linkStyle {edge_index} stroke:{edge_stroke}')
     if cards:
         lines += ['  end', '  subgraph diagram_notes[" "]', '    direction LR']
     for index, card in enumerate(cards):

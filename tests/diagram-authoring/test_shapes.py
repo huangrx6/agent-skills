@@ -54,7 +54,7 @@ def inside_capsule(px, py, width, height):
 class TestShapeEnum(unittest.TestCase):
     def test_shape_names_are_a_closed_enum(self):
         self.assertEqual(
-            {"rect", "round", "capsule", "ellipse", "diamond", "cylinder", "note"},
+            {"rect", "round", "capsule", "ellipse", "diamond", "cylinder", "note", "icon"},
             set(sh.SHAPES))
 
     def test_every_shape_declares_name_type_and_roundness(self):

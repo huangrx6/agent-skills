@@ -1,0 +1,20 @@
+{
+  "skill_name": "ui-qa-acceptance",
+  "triggers": [
+    {"id": 1, "query": "帮我按真实用户路径把刚改好的设置页和弹窗黑盒复测一遍，输出带证据的验收报告", "should_trigger": true},
+    {"id": 2, "query": "启动本地前后端服务，检查页面切页返回后状态有没有复位、控制台和网络有没有报错", "should_trigger": true},
+    {"id": 3, "query": "帮我高压验收一下扩展选择器在 30 个扩展、窄窗口和纯键盘 Esc 下的表现", "should_trigger": true},
+    {"id": 4, "query": "发版前帮我把登录、创建和删除主路径在真实浏览器里点一遍，按阻断/高/中/低报缺陷", "should_trigger": true},
+    {"id": 5, "query": "检查这个 Web 应用在空态、长文本和双击提交时有没有 UI 裁切或卡死加载态", "should_trigger": true},
+    {"id": 6, "query": "帮我用 TDD 红绿重构方式给纯函数和数据库迁移补单元测试", "should_trigger": false,
+     "note": "→ tdd-testing：单元测试、TDD 与测试隔离"},
+    {"id": 7, "query": "这个页面的排版、配色和卡片层级显得像 AI 模板，帮我做设计评审和优化方案", "should_trigger": false,
+     "note": "→ ui-design-craft：视觉审美、排版与设计规范"},
+    {"id": 8, "query": "帮我把弹窗的 React 状态复位和 CSS 类名冲突直接改掉", "should_trigger": false,
+     "note": "→ frontend-engineering：前端组件与样式代码实现"},
+    {"id": 9, "query": "帮我把用户反馈整理成范围边界和编号验收条件 AC", "should_trigger": false,
+     "note": "→ product-spec：产品规格与验收条件起草"},
+    {"id": 10, "query": "查一下这个迭代里还有哪些缺陷单没关闭", "should_trigger": false,
+     "note": "→ pingcode：PingCode 迭代与缺陷工作项查询"}
+  ]
+}

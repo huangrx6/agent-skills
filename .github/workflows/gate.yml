@@ -80,6 +80,8 @@ jobs:
           - tests/pingcode-weekly
           - tests/repo-baseline
           - tests/learning-scout
+          - tests/tdd-testing
+          - tests/ui-qa-acceptance
           - tools/tests
         exclude:
           - python: "3.10"

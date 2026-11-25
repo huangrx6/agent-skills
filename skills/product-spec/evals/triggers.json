@@ -1,0 +1,20 @@
+{
+  "skill_name": "product-spec",
+  "triggers": [
+    {"id": 1, "query": "帮我把这几条模糊的用户反馈整理成本次迭代的产品规格和验收条件", "should_trigger": true},
+    {"id": 2, "query": "想给设置页加一个全局搜索，先帮我收敛一下范围边界和备选方案", "should_trigger": true},
+    {"id": 3, "query": "对比一下侧栏抽屉、弹窗和独立页面三种交互方案，帮我定范围和 AC", "should_trigger": true},
+    {"id": 4, "query": "这个需求还很散，帮我梳理一下要做和不做的内容，以及异常边界场景", "should_trigger": true},
+    {"id": 5, "query": "把我们的多账号切换想法写成可复测的 Given/When/Then 验收标准", "should_trigger": true},
+    {"id": 6, "query": "按 COSMIC 方法把这份需求文档拆分成功能过程和数据移动", "should_trigger": false,
+     "note": "→ cosmic-split：COSMIC 功能点度量与数据移动拆分"},
+    {"id": 7, "query": "这个弹窗的卡片样式和设置页不统一，帮我调整一下配色、圆角和间距", "should_trigger": false,
+     "note": "→ ui-design-craft：视觉风格、间距与样式一致性打磨"},
+    {"id": 8, "query": "帮我设计一下这个模块的 SQLite 表结构和 IPC 序列化契约", "should_trigger": false,
+     "note": "→ arch-backend-craft：系统架构、持久化表结构与接口契约设计"},
+    {"id": 9, "query": "帮我把刚才改好的功能点一遍，看看有没有 UI 状态残留和控制台报错", "should_trigger": false,
+     "note": "→ ui-qa-acceptance：黑盒交互复测与验收报告"},
+    {"id": 10, "query": "把这个需求的背景和路线做成一份 10 页的汇报 PPT", "should_trigger": false,
+     "note": "→ deck-authoring：演示文稿制作"}
+  ]
+}

@@ -31,16 +31,16 @@
           <mxGeometry x="656.5" y="314.44" width="204.0" height="70.4" as="geometry" />
           </mxCell>
         </UserObject>
-        <mxCell id="e-0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;noLabel=1;exitX=0.3843;exitY=0.0;exitPerimeter=1;entryX=0.5996;entryY=1.0;entryPerimeter=1" edge="1" source="n-root" target="n-facts" parent="1">
+        <mxCell id="e-0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=12;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;noLabel=1;exitX=0.3843;exitY=0.0;exitPerimeter=1;entryX=0.5996;entryY=1.0;entryPerimeter=1" edge="1" source="n-root" target="n-facts" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e-1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;noLabel=1;exitX=1.0;exitY=0.5;exitPerimeter=1;entryX=0.0;entryY=0.5;entryPerimeter=1" edge="1" source="n-root" target="n-structure" parent="1">
+        <mxCell id="e-1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=12;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;noLabel=1;exitX=1.0;exitY=0.5;exitPerimeter=1;entryX=0.0;entryY=0.5;entryPerimeter=1" edge="1" source="n-root" target="n-structure" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e-2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;noLabel=1;exitX=0.3843;exitY=1.0;exitPerimeter=1;entryX=0.5996;entryY=0.0;entryPerimeter=1" edge="1" source="n-root" target="n-visual" parent="1">
+        <mxCell id="e-2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=12;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;noLabel=1;exitX=0.3843;exitY=1.0;exitPerimeter=1;entryX=0.5996;entryY=0.0;entryPerimeter=1" edge="1" source="n-root" target="n-visual" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e-3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;noLabel=1;exitX=1.0;exitY=0.5;exitPerimeter=1;entryX=0.0;entryY=0.5;entryPerimeter=1" edge="1" source="n-structure" target="n-direction" parent="1">
+        <mxCell id="e-3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=12;html=1;endArrow=classic;endFill=1;strokeColor=#A5AAB1;strokeWidth=1;dashed=0;noLabel=1;exitX=1.0;exitY=0.5;exitPerimeter=1;entryX=0.0;entryY=0.5;entryPerimeter=1" edge="1" source="n-structure" target="n-direction" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="diagram-title" value="质量审查覆盖事实、结构与呈现" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;locked=1;movable=0;resizable=0;fontColor=#374151;fontSize=24;fontFamily=Helvetica" vertex="1" parent="1">

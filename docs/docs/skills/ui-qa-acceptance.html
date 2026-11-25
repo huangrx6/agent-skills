@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ui-qa-acceptance · 黑盒交互验收与 UI 质检 · Agent Skills</title>
+<meta name="description" content="面向 Web、SPA 与桌面 Electron/WebView 渲染页面的旗舰级黑盒交互验收流程：本地多服务安全启停、先侦察后操作、7 维度高压验收矩阵、DOM/几何客观巡检脚本、桌面 CDP 隔离验收与证据化缺陷报告模板。">
+<link rel="canonical" href="https://huangrx6.github.io/agent-skills/docs/skills/ui-qa-acceptance.html">
+<meta name="theme-color" content="#0f1012">
+<meta property="og:title" content="ui-qa-acceptance · 黑盒交互验收与 UI 质检 · Agent Skills">
+<meta property="og:description" content="面向 Web、SPA 与桌面 Electron/WebView 渲染页面的旗舰级黑盒交互验收流程：本地多服务安全启停、先侦察后操作、7 维度高压验收矩阵、DOM/几何客观巡检脚本、桌面 CDP 隔离验收与证据化缺陷报告模板。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://huangrx6.github.io/agent-skills/docs/skills/ui-qa-acceptance.html">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<script>
+  (() => {
+    const root = document.documentElement;
+    let theme = 'dark';
+    try {
+      const stored = localStorage.getItem('agent-skills-theme');
+      if (stored === 'light' || stored === 'dark') theme = stored;
+    } catch (error) {}
+    root.dataset.theme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#0f1012' : '#f5f3ee';
+  })();
+</script>
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body class="docs">
+<a class="skip-link" href="#main">跳到正文</a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="../../index.html">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="2" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="2" y="14" width="8" height="8" rx="2" fill="currentColor"/>
+        <rect x="14" y="14" width="8" height="8" rx="2" fill="currentColor" opacity=".45"/>
+      </svg>
+      <span>Agent Skills</span>
+    </a>
+    <div class="header-tools">
+      <nav class="site-nav" id="site-nav" aria-label="主导航">
+        <a href="../index.html">文档</a><a href="../skills/index.html" aria-current="page">Skills</a><a href="../guide.html">编写 Skill</a>
+        <a class="nav-github" href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      </nav>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换白天/夜间模式" title="切换白天/夜间"><span class="when-light"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7 7 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>夜间</span><span class="when-dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>白天</span></button>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="打开导航">
+        <span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="docs-shell has-toc">
+  <aside class="docs-sidebar" id="docs-sidebar">
+<nav aria-label="文档导航">
+<p class="side-label">文档</p>
+<a href="../index.html">文档首页</a>
+<a href="../getting-started.html">开始使用</a>
+<a href="../skills/index.html">Skill 目录</a>
+<a href="../guide.html">编写 Skill</a>
+<a href="../maintenance.html">维护与验证</a>
+<a href="../roadmap.html">路线图</a>
+<p class="side-label">Skills</p>
+<p class="side-cat">内容与表达</p>
+<a href="../skills/deck-authoring.html">deck-authoring</a>
+<a href="../skills/diagram-authoring.html">diagram-authoring</a>
+<a href="../skills/cosmic-split.html">cosmic-split</a>
+<a href="../skills/email-composer.html">email-composer</a>
+<p class="side-cat">知识与工作</p>
+<a href="../skills/obsidian-wiki.html">obsidian-wiki</a>
+<a href="../skills/obsidian-work.html">obsidian-work</a>
+<a href="../skills/pingcode.html">pingcode</a>
+<a href="../skills/pingcode-weekly.html">pingcode-weekly</a>
+<p class="side-cat">开发与学习</p>
+<a href="../skills/git-dev-workflow.html">git-dev-workflow</a>
+<a href="../skills/repo-baseline.html">repo-baseline</a>
+<a href="../skills/learning-scout.html">learning-scout</a>
+<p class="side-cat">产品、设计与研发</p>
+<a href="../skills/product-spec.html">product-spec</a>
+<a href="../skills/ui-design-craft.html">ui-design-craft</a>
+<a href="../skills/frontend-engineering.html">frontend-engineering</a>
+<a href="../skills/arch-backend-craft.html">arch-backend-craft</a>
+<a href="../skills/tdd-testing.html">tdd-testing</a>
+<a href="../skills/ui-qa-acceptance.html" class="is-active" aria-current="page">ui-qa-acceptance</a>
+</nav>
+</aside>
+  <div class="sidebar-backdrop" data-sidebar-close hidden></div>
+  <main id="main" class="docs-main">
+    <button class="sidebar-toggle" type="button" aria-expanded="false" aria-controls="docs-sidebar">
+      <span>文档导航</span><span class="sidebar-toggle-mark" aria-hidden="true">+</span>
+    </button>
+    <nav class="crumbs" aria-label="面包屑"><a href="../../index.html">Agent Skills</a><span aria-hidden="true">/</span><a href="../index.html">文档</a><span aria-hidden="true">/</span><a href="../skills/index.html">Skill 目录</a><span aria-hidden="true">/</span><span aria-current="page">ui-qa-acceptance</span></nav>
+    <header class="page-head">
+      <p class="eyebrow">产品、设计与研发</p>
+      <h1>ui-qa-acceptance · 黑盒交互验收与 UI 质检</h1>
+      <p class="page-lede">面向 Web、SPA 与桌面 Electron/WebView 渲染页面的旗舰级黑盒交互验收流程：本地多服务安全启停、先侦察后操作、7 维度高压验收矩阵、DOM/几何客观巡检脚本、桌面 CDP 隔离验收与证据化缺陷报告模板。</p>
+      <div class="page-meta"><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/ui-qa-acceptance/SKILL.md" target="_blank" rel="noreferrer">SKILL.md</a><span aria-hidden="true">·</span><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/ui-qa-acceptance/README.md" target="_blank" rel="noreferrer">README.md</a></div>
+    </header>
+    <article class="prose">
+      <div class="table-wrap"><table><thead>
+<tr>
+<th>适合</th>
+<th>产物</th>
+<th>依赖</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>发版前黑盒复测、切页与关闭状态复位检查、高数量与窄/矮窗压测、键盘焦点与手势中断检查、Electron CDP 实测、Console/Network 洁净度核查</td>
+<td>验收总结论 · AC 核对表 · 7 维度压测摘要 · 分级缺陷单与硬证据 · 未验证风险声明</td>
+<td>Python 3.10+（<code>scripts/with_server.py</code>）；页面实测依赖 Playwright 或环境可用的浏览器/CDP DevTools 能力</td>
+</tr>
+</tbody>
+</table></div><p>Agent 的四条验收铁律、决策树与主流程见 <a href="https://github.com/huangrx6/agent-skills/blob/main/skills/ui-qa-acceptance/SKILL.md">SKILL.md</a>，6 份高密度参考资料按其中的一层直链按需加载。</p>
+<h2 id="快速使用">快速使用</h2>
+<p>在仓库根目录通过 <code>scripts/with_server.py</code> 托管本地待测服务并运行黑盒验收脚本（单服务、前后端多服务及 HTTP 健康路径探测均开箱即用）：</p>
+<pre><code class="language-sh"># 1. 查看参数说明
+python3 skills/ui-qa-acceptance/scripts/with_server.py --help
+
+# 2. 单服务 + HTTP 就绪探测
+python3 skills/ui-qa-acceptance/scripts/with_server.py \
+  --server &quot;pnpm run dev&quot; --port 5173 --path / \
+  -- python3 path/to/qa_check.py
+
+# 3. 前后端双服务（先后端、后前端，结束自动回收全部进程组）
+python3 skills/ui-qa-acceptance/scripts/with_server.py \
+  --server &quot;python3 backend/server.py&quot; --port 3000 \
+  --server &quot;pnpm --dir web dev&quot; --port 5173 \
+  -- python3 path/to/verify_flow.py
+</code></pre>
+<p>典型对话请求：</p>
+<ul>
+<li>「帮我按真实用户路径把刚改好的设置页和扩展选择器黑盒复测一遍，输出带证据的验收报告。」</li>
+<li>「启动本地前后端服务，重点压测 30+ 列表项、窄/矮窗口、切页返回复位和纯键盘 Esc 焦点归还，并汇总 Console/Network 报错。」</li>
+<li>「用独立临时用户数据目录拉起 Electron 本地 CDP 端口，核查深浅色切换、弹窗过渡点击和 DOM 几何溢出。」</li>
+</ul>
+<h2 id="目录结构">目录结构</h2>
+<ul>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/ui-qa-acceptance/SKILL.md">SKILL.md</a>：黑盒验收四条铁律、环境决策树、<code>scripts/with_server.py</code> 命令表、先侦察后操作闸门、7 维度摘要与参考直链</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/ui-qa-acceptance/references/server-and-reconnaissance.md">references/server-and-reconnaissance.md</a>：环境决策树、<code>scripts/with_server.py</code> 单/多服务与 <code>--path</code> 探活、动态渲染稳定等待、语义定位器优先级与自动化误判陷阱</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/ui-qa-acceptance/references/qa-stress-matrix.md">references/qa-stress-matrix.md</a>：7 维度高压验收详单（每维度含具体测试载荷、操作步骤与量化通过/失败判据）</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/ui-qa-acceptance/references/dom-and-geometry-checks.md">references/dom-and-geometry-checks.md</a>：可直接在 DevTools / Playwright <code>evaluate</code> 运行的横向溢出、元素裁切、粘性栏遮挡、焦点归还、坏图/字体与 <code>prefers-reduced-motion</code>/CLS 扫描脚本</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/ui-qa-acceptance/references/electron-and-spa-qa.md">references/electron-and-spa-qa.md</a>：桌面 Electron/WebView 本地 CDP 验收、独立 <code>USER_DATA</code> 目录隔离卫生、SPA 水合与弹窗过渡期点击陷阱、明暗双主题切换残留核查</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/ui-qa-acceptance/references/evidence-and-bug-reporting.md">references/evidence-and-bug-reporting.md</a>：验证前四步门控与红旗词禁令、硬证据采集标准、Blocker/High/Medium/Low 分级量表、完整验收报告模板与 3 条真实缺陷单示范</li>
+<li><a href="https://github.com/huangrx6/agent-skills/blob/main/skills/ui-qa-acceptance/references/automation-script-patterns.md">references/automation-script-patterns.md</a>：Console/PageError/Network 监听采集、页面元素自动侦察、静态 HTML 与动态 SPA 自动化验收脚本模板与安全清理</li>
+<li><code>scripts/with_server.py</code>：跨平台单/多服务启停与 TCP/HTTP 就绪检查脚本（零第三方依赖）</li>
+<li><code>evals/triggers.json</code> 与 <code>evals/evals.json</code>：触发边界与行为评判样例</li>
+</ul>
+<h2 id="能力边界">能力边界</h2>
+<ul>
+<li>本 skill 专注<strong>真实渲染态黑盒交互验收与证据交付</strong>，不替代单元测试与 TDD（归 <code>tdd-testing</code>）、纯静态视觉审美评审（归 <code>ui-design-craft</code>）、前端业务源码修改（归 <code>frontend-engineering</code>）或产品 AC 起草（归 <code>product-spec</code>）。</li>
+<li>无法启动浏览器、缺少账号/外部令牌或目标平台无 CDP 暴露时，必须将对应项如实标为「未验证（原因）」，绝不凭读代码猜测结论。</li>
+</ul>
+<h2 id="维护与验证">维护与验证</h2>
+<p>从本仓库根目录运行以下三条校验命令（须全部退出码 0、0 失败、0 警告）：</p>
+<pre><code class="language-sh">python3 tools/skill-builder/scripts/validate_skill.py skills/ui-qa-acceptance
+python3 tools/skill-builder/scripts/check_pointers.py --root . skills/ui-qa-acceptance
+python3 -m unittest discover -s tests/ui-qa-acceptance -v
+</code></pre>
+
+    </article>
+    <nav class="page-nav" aria-label="上一篇与下一篇"><a class="page-nav-link" href="../skills/tdd-testing.html"><span>上一篇</span><strong>TDD 与高质量自动化测试</strong></a><a class="page-nav-link next" href="../guide.html"><span>下一篇</span><strong>编写 Skill</strong></a></nav>
+  </main>
+<aside class="docs-toc" aria-label="本页目录"><p class="side-label">本页目录</p><ul><li class="toc-2"><a href="#快速使用">快速使用</a></li><li class="toc-2"><a href="#目录结构">目录结构</a></li><li class="toc-2"><a href="#能力边界">能力边界</a></li><li class="toc-2"><a href="#维护与验证">维护与验证</a></li></ul></aside>
+</div>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <p>Agent Skills · 17 个可独立安装的 skill</p>
+    <nav aria-label="页脚">
+      <a href="../index.html">文档</a>
+      <a href="https://github.com/huangrx6/agent-skills" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="../../../">huangrx6.github.io</a>
+    </nav>
+  </div>
+</footer>
+<script src="../../assets/site.js" defer></script>
+</body>
+</html>

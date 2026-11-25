@@ -15,6 +15,7 @@
 - [安装与依赖](#安装与依赖)
 - [作图前逐步确认](#作图前逐步确认)
 - [表达与观看](#表达与观看)
+- [灵活布线与图标拓扑](#灵活布线与图标拓扑)
 - [自由配色](#自由配色)
 - [快速开始](#快速开始)
 - [质量边界](#质量边界)
@@ -62,8 +63,8 @@ python3 tools/install_skills.py
 
 ## 作图前逐步确认
 
-默认按内容 → 配色 → Excalidraw 图标逐项提交具体方案，每个节点等用户回复后再继续，最后生成。
-draw.io/Mermaid 确认内容与配色，图标按当前能力标记为不适用；用户要求图标时先核对后端。
+默认按内容 → 配色 → 图标（Excalidraw 与 draw.io 共用 `.excalidrawlib` 素材库）逐项提交具体方案，每个节点等用户回复后再继续，最后生成。
+Mermaid 确认内容与配色，图标按当前能力标记为不适用；用户要求图标时先核对后端。
 已确认且未变化的选择沿用，明确免确认的授权按其范围执行。参见 [逐步确认](references/decision-gates.md)。
 这是代理对话流程；底层 CLI 保持非交互，不伪称脚本能验证人类确认。
 
@@ -78,10 +79,17 @@ Excalidraw/draw.io 生成器 `--preset` 支持文档、投影与打印字号/间
 每个面板独立布局，跨面板连线不自动生成；见 [混合方向](references/mixed-direction.md)。
 [标准样例](examples/README.md) 提供六类输入、可编辑产物与实际导出。
 
+## 灵活布线与图标拓扑
+
+- **四种连线风格（`style.edges`）**：默认 `rounded`（正交走线 + 柔和圆角，Excalidraw 自动避开短腿钩子、draw.io 启用 12px 圆角、Mermaid 走 `monotoneX`/`monotoneY`）；需要更流畅的流程/拓扑可选 `curved`（无遮挡时输出避障校验过的自然弧线）；需要极简连线可选 `straight`；严格蓝图可选 `sharp`。
+- **对称重心与少折点路由**：分层布局自动做扇出/扇入重心均衡、对称分叉不偏斜、错位无遮挡优先走 1 折 L 型路线，同对节点间的平行/双向多条边自动并排错开。
+- **无框图标节点与共享 `.excalidrawlib` 素材库**：新增 `shape: "icon"`（图标居中放大置顶、标签居中在下方、无外框，适合网络/安全域/设备拓扑）。Excalidraw 与 draw.io 共用同一套外部 `.excalidrawlib` 素材库：不传 `--library` 时自动扫描本地全部已缓存库，支持 `"库名:图标名"` 跨库混用；draw.io 零依赖转为内联 SVG 嵌入，离线可编辑。见 [图标说明](references/icons.md)。
+
 ## 自由配色
 
-三后端支持 `--colors 项目.colors.json`，可使用任意 HEX、自由增添命名色，按节点角色或 ID 分配，
-并调整填充强度。颜色可来自网站、参考图、品牌材料或 `color_design.py --seed` 的任意主色候选。
+三后端支持 `--colors 项目.colors.json`，可使用任意 HEX、自由增添命名色，按节点角色（`by_kind`）、节点 ID（`by_node`）、分区（`by_group`）分配，
+在多通道链路场景下也可按边类型（`by_edge_kind`）或单边（`by_edge`）分配语义边色，并自动校验对比度。
+颜色可来自网站、参考图、品牌材料或 `color_design.py --seed` 的任意主色候选。
 旧方向和方案保持兼容，不限制新设计。见 [配色方法与文件格式](references/color-design.md)、
 [三种来源的同图实测](examples/colors/README.md)。
 
@@ -119,13 +127,13 @@ python3 scripts/check_presentation.py /project/docs/diagrams/system/system.excal
 | `scripts/emit_mermaid.py` / `check_mermaid.py` | 结构规格 → `.mmd`，并用官方解析器校验语法 |
 | `scripts/direction_preview.py` / `scheme_preview.py` | 按需比较视觉方向或 draw.io 配色 |
 | `scripts/compose_panels.py` | 把多张已生成的 Excalidraw 按 row/column 拼到同一画布，隔离 ID 与引用 |
-| `scripts/sigils.py` / `icons.py` / `icons_fetch.py` | 内置图标、本地素材和官方库查询 |
+| `scripts/icons.py` / `icons_fetch.py` / `sigils.py` | `.excalidrawlib` 跨库自动扫描、离线 `--cached`/`--find` 检索、SVG 转换与兼容内置图标 |
 | `dev-tools/export_excalidraw.py` / `export_drawio.py` / `export_mermaid.py` | 调用真实渲染器导出 |
 | `dev-tools/sync_exports.py` | 只刷新已有格式；显式 `--format` 才新增格式，保存导出参数 |
 | `dev-tools/check_render.py` | 在真实浏览器核对单页官方 SVG；能力与限制见观看场景 |
 
-默认 Excalidraw；draw.io 支持多份 spec 合成多页文件。两者共有七种基本形状，
-但 draw.io 当前拒绝图标、不支持完整云/UML/BPMN图元库。不要把“应用本身支持”当成“本生成器支持”。
+默认 Excalidraw；draw.io 支持多份 spec 合成多页文件。两者共有八种形状（含无框 `icon`），
+并共用同一套外部 `.excalidrawlib` 素材库（draw.io 自动转为内联 SVG 嵌入），不支持 draw.io 专用完整云/UML/BPMN 图元库。不要把“应用本身支持”当成“本生成器支持”。
 
 ## 质量边界
 

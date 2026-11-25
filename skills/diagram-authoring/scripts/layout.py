@@ -1465,6 +1465,73 @@ def assign_coordinates(order: dict[int, list[str]], boxes: dict[str, Box],
     return Coords(placed=placed, segments=segments, bands=tuple(bands))
 
 
+def _l_shape_candidates(src: Placed, dst: Placed, src_id: str, dst_id: str,
+                        direction: str, out_deg: dict[str, int],
+                        in_deg: dict[str, int],
+                        side_out: dict[tuple[str, str], int],
+                        side_in: dict[tuple[str, str], int]) -> list[list[list[float]]]:
+    """为错位的相邻/前向边生成干净的 1 折 L 型正交候选，避免无谓的 Z 字双拐弯。
+
+    仅在侧向出口/入口没有其他同侧边争抢时才提名，防止多条边在节点侧边重合。
+    是否采用仍由 `straighten` 按不穿节点、不穿自己、最小折点统一裁决。
+    """
+    out: list[list[list[float]]] = []
+    min_offset = NODE_CLEARANCE + EDGE_MIN
+    if direction == "LR":
+        if src.x + src.width + EDGE_MIN > dst.x:
+            return out
+        src_cy = src.y + src.height / 2.0
+        dst_cy = dst.y + dst.height / 2.0
+        if abs(dst_cy - src_cy) < min_offset:
+            return out
+        above = dst_cy < src_cy
+        # L1: 从 src 右边出 → 竖直进 dst 顶/底边
+        dst_face = "bottom" if above else "top"
+        if out_deg.get(src_id, 0) == 1 and side_in.get((dst_id, dst_face), 0) == 1:
+            start = [src.x + src.width, src_cy]
+            end = [dst.x + dst.width / 2.0,
+                   (dst.y + dst.height) if above else dst.y]
+            if (end[0] - start[0] >= EDGE_MIN
+                    and abs(end[1] - start[1]) >= EDGE_MIN):
+                out.append([start, [end[0], start[1]], end])
+        # L2: 从 src 顶/底边出 → 水平进 dst 左边
+        src_face = "top" if above else "bottom"
+        if side_out.get((src_id, src_face), 0) == 1 and in_deg.get(dst_id, 0) == 1:
+            start = [src.x + src.width / 2.0,
+                     src.y if above else (src.y + src.height)]
+            end = [dst.x, dst_cy]
+            if (end[0] - start[0] >= EDGE_MIN
+                    and abs(end[1] - start[1]) >= EDGE_MIN):
+                out.append([start, [start[0], end[1]], end])
+    else:
+        if src.y + src.height + EDGE_MIN > dst.y:
+            return out
+        src_cx = src.x + src.width / 2.0
+        dst_cx = dst.x + dst.width / 2.0
+        if abs(dst_cx - src_cx) < min_offset:
+            return out
+        left_side = dst_cx < src_cx
+        # L1: 从 src 底边出 → 水平进 dst 左/右边
+        dst_face = "right" if left_side else "left"
+        if out_deg.get(src_id, 0) == 1 and side_in.get((dst_id, dst_face), 0) == 1:
+            start = [src_cx, src.y + src.height]
+            end = [(dst.x + dst.width) if left_side else dst.x,
+                   dst.y + dst.height / 2.0]
+            if (end[1] - start[1] >= EDGE_MIN
+                    and abs(end[0] - start[0]) >= EDGE_MIN):
+                out.append([start, [start[0], end[1]], end])
+        # L2: 从 src 左/右边出 → 竖直进 dst 顶边
+        src_face = "left" if left_side else "right"
+        if side_out.get((src_id, src_face), 0) == 1 and in_deg.get(dst_id, 0) == 1:
+            start = [src.x if left_side else (src.x + src.width),
+                     src.y + src.height / 2.0]
+            end = [dst_cx, dst.y]
+            if (end[1] - start[1] >= EDGE_MIN
+                    and abs(end[0] - start[0]) >= EDGE_MIN):
+                out.append([start, [end[0], start[1]], end])
+    return out
+
+
 # ── 边路径 ──────────────────────────────────────────────────
 def route_edges(origins: list[dict], segments: list[dict],
                 placed: dict[str, Placed], direction: str,
@@ -1489,6 +1556,31 @@ def route_edges(origins: list[dict], segments: list[dict],
         _align_spine(placed, origins, direction)
     gaps = _rank_gaps(placed, direction)
     starts, ends = _anchor_slots(resolved, placed, direction)
+
+    # 统计每个节点的出/入度以及侧向出/入边数，用于安全提名 1 折 L 型候选
+    out_deg: dict[str, int] = {}
+    in_deg: dict[str, int] = {}
+    side_out: dict[tuple[str, str], int] = {}
+    side_in: dict[tuple[str, str], int] = {}
+    for _idx, chain in resolved:
+        s_id, d_id = chain[0], chain[-1]
+        out_deg[s_id] = out_deg.get(s_id, 0) + 1
+        in_deg[d_id] = in_deg.get(d_id, 0) + 1
+        sb, db = placed[s_id], placed[d_id]
+        if direction == "LR":
+            scy, dcy = sb.y + sb.height / 2.0, db.y + db.height / 2.0
+            if abs(dcy - scy) >= NODE_CLEARANCE + EDGE_MIN:
+                s_face = "top" if dcy < scy else "bottom"
+                d_face = "bottom" if dcy < scy else "top"
+                side_out[(s_id, s_face)] = side_out.get((s_id, s_face), 0) + 1
+                side_in[(d_id, d_face)] = side_in.get((d_id, d_face), 0) + 1
+        else:
+            scx, dcx = sb.x + sb.width / 2.0, db.x + db.width / 2.0
+            if abs(dcx - scx) >= NODE_CLEARANCE + EDGE_MIN:
+                s_face = "left" if dcx < scx else "right"
+                d_face = "right" if dcx < scx else "left"
+                side_out[(s_id, s_face)] = side_out.get((s_id, s_face), 0) + 1
+                side_in[(d_id, d_face)] = side_in.get((d_id, d_face), 0) + 1
 
     for idx, chain in resolved:
         e = origins[idx]
@@ -1527,6 +1619,10 @@ def route_edges(origins: list[dict], segments: list[dict],
             if alternative and alternative != waypoints:
                 variants.append(_orthogonal_path(pts[0], pts[-1], alternative, direction,
                                                  gaps, start_rank, end_rank))
+        # 1 折 L 型正交候选：错位且无遮挡时只需 1 个柔和拐角，不再强制走 Z 字双折
+        variants.extend(_l_shape_candidates(
+            placed[chain[0]], placed[chain[-1]], chain[0], chain[-1],
+            direction, out_deg, in_deg, side_out, side_in))
         pts = straighten(pts, placed, {chain[0], chain[-1]}, orthogonals=variants,
                          endpoints=(chain[0], chain[-1]))
         a, b = e["from"], e["to"]
@@ -1538,9 +1634,12 @@ def route_edges(origins: list[dict], segments: list[dict],
             # 下游照着 from→to 画箭头就会画反。
             a, b = b, a
             pts = list(reversed(pts))
-        out.append({"from": a, "to": b, "points": pts, "reversed": was_reversed,
-                    "origin": e.get("origin", idx),
-                    "label": e.get("label"), "kind": e.get("kind")})
+        rec = {"from": a, "to": b, "points": pts, "reversed": was_reversed,
+               "origin": e.get("origin", idx),
+               "label": e.get("label"), "kind": e.get("kind")}
+        if e.get("id") is not None:
+            rec["id"] = e["id"]
+        out.append(rec)
     return out
 
 
@@ -2521,7 +2620,11 @@ def _align_spine(placed: dict, edges: list, direction: str) -> int:
         if len(kids) == 1:
             main_child[parent] = kids[0]
         else:
-            main_child[parent] = max(kids, key=lambda k: (subtree_size(k), -kids.index(k)))
+            ranked = sorted(kids, key=lambda k: (-subtree_size(k), kids.index(k)))
+            # 只有明显存在“主干 vs 侧分支”（最大子树严格大于次大子树）时才强行拉直主干；
+            # 完全对称的等重分叉（如 是/否、左/右 两支）保持居中对称，不人为偏向第一支。
+            if subtree_size(ranked[0]) > subtree_size(ranked[1]):
+                main_child[parent] = ranked[0]
 
     def rank_gaps_ok(rank: int) -> bool:
         """这一层里任意两个真节点的间隙都不小于 NODE_CLEARANCE。"""
@@ -2607,6 +2710,312 @@ def _align_spine(placed: dict, edges: list, direction: str) -> int:
         if not changed:
             break
     return moved
+
+
+def _group_envelopes_clean(placed: dict[str, Placed], groups_of: dict[str, str]) -> bool:
+    """检查各分组包围盒是否保持干净（无非成员节点落入、无两不相交组重叠）。"""
+    if not groups_of:
+        return True
+    members_by_group: dict[str, list[str]] = {}
+    for nid, gid in groups_of.items():
+        if nid in placed and not nid.startswith(DUMMY_PREFIX):
+            members_by_group.setdefault(gid, []).append(nid)
+    boxes: list[tuple[str, set[str], float, float, float, float]] = []
+    for gid, mids in members_by_group.items():
+        pts = [placed[m] for m in mids]
+        x0 = min(p.x for p in pts) - REGION_PAD
+        y0 = min(p.y for p in pts) - REGION_PAD - REGION_HEAD
+        x1 = max(p.x + p.width for p in pts) + REGION_PAD
+        y1 = max(p.y + p.height for p in pts) + REGION_PAD
+        boxes.append((gid, set(mids), x0, y0, x1, y1))
+    for _gid, mset, x0, y0, x1, y1 in boxes:
+        for nid, p in placed.items():
+            if nid in mset or nid.startswith(DUMMY_PREFIX):
+                continue
+            if not (p.x + p.width <= x0 or p.x >= x1 or p.y + p.height <= y0 or p.y >= y1):
+                return False
+    for i, (_g1, _m1, ax0, ay0, ax1, ay1) in enumerate(boxes):
+        for _g2, _m2, bx0, by0, bx1, by1 in boxes[i + 1:]:
+            if not (ax1 + REGION_MIN_GAP <= bx0 or bx1 + REGION_MIN_GAP <= ax0
+                    or ay1 + REGION_MIN_GAP <= by0 or by1 + REGION_MIN_GAP <= ay0):
+                return False
+    return True
+
+
+def _balance_barycenters(placed: dict[str, Placed], edges: list,
+                         direction: str, pinned_ids: set[str],
+                         groups_of: dict[str, str],
+                         node_sep: float) -> int:
+    """有界重心均衡：让扇出父节点居中于子节点、扇入汇合点居中于父节点、分支向邻居靠拢。
+
+    严格保持：
+    - 同层相对顺序不变；
+    - 同层相邻节点最小间隙 >= max(NODE_CLEARANCE, node_sep * 0.75)；
+    - pin 节点不动；
+    - 不破坏任何分组包围盒（越界即单步回滚）。
+    """
+    parents: dict[str, list[str]] = {}
+    children: dict[str, list[str]] = {}
+    for e in edges:
+        if e["from"] in placed and e["to"] in placed:
+            parents.setdefault(e["to"], []).append(e["from"])
+            children.setdefault(e["from"], []).append(e["to"])
+
+    by_rank: dict[int, list[str]] = {}
+    for nid, p in placed.items():
+        if not nid.startswith(DUMMY_PREFIX):
+            by_rank.setdefault(p.rank, []).append(nid)
+    if len(by_rank) < 2:
+        return 0
+
+    def centre(nid: str) -> float:
+        q = placed[nid]
+        return (q.x + q.width / 2.0) if direction == "TB" else (q.y + q.height / 2.0)
+
+    def span(nid: str) -> float:
+        q = placed[nid]
+        return q.width if direction == "TB" else q.height
+
+    min_gap = max(NODE_CLEARANCE, node_sep * 0.75)
+    ranks = sorted(by_rank)
+    moved = 0
+    for sweep in range(4):
+        order_ranks = ranks if sweep % 2 == 0 else list(reversed(ranks))
+        changed = 0
+        for r in order_ranks:
+            row = sorted(by_rank[r], key=centre)
+            for idx, nid in enumerate(row):
+                if nid in pinned_ids:
+                    continue
+                ins = [p for p in parents.get(nid, []) if placed[p].rank != r]
+                outs = [c for c in children.get(nid, []) if placed[c].rank != r]
+                if not ins and not outs:
+                    continue
+                if len(outs) >= 2 and len(ins) <= 1:
+                    cs = [centre(c) for c in outs]
+                    desired = (min(cs) + max(cs)) / 2.0
+                elif len(ins) >= 2 and len(outs) <= 1:
+                    ps = [centre(p) for p in ins]
+                    desired = (min(ps) + max(ps)) / 2.0
+                else:
+                    nbrs = sorted(centre(n) for n in (ins + outs))
+                    mid = len(nbrs) // 2
+                    desired = (nbrs[mid] if len(nbrs) % 2 == 1
+                               else (nbrs[mid - 1] + nbrs[mid]) / 2.0)
+                cur = centre(nid)
+                half = span(nid) / 2.0
+                lo = -math.inf
+                hi = math.inf
+                if idx > 0:
+                    prev_id = row[idx - 1]
+                    lo = centre(prev_id) + span(prev_id) / 2.0 + min_gap + half
+                if idx + 1 < len(row):
+                    next_id = row[idx + 1]
+                    hi = centre(next_id) - span(next_id) / 2.0 - min_gap - half
+                if lo > hi:
+                    continue
+                target = min(max(desired, lo), hi)
+                if abs(target - cur) < 1.0:
+                    continue
+                old = placed[nid]
+                placed[nid] = (
+                    replace(old, x=round(target - old.width / 2.0, 2))
+                    if direction == "TB" else
+                    replace(old, y=round(target - old.height / 2.0, 2))
+                )
+                if groups_of and not _group_envelopes_clean(placed, groups_of):
+                    placed[nid] = old
+                    continue
+                changed += 1
+                moved += 1
+        if not changed:
+            break
+    return moved
+
+
+def _sample_quad_bezier(p0: list[float], p1: list[float], p2: list[float],
+                        steps: int = 16) -> list[list[float]]:
+    """沿二次 Bézier 曲线等距采样，用于严格检查曲线是否擦碰其他节点。"""
+    pts: list[list[float]] = []
+    for k in range(steps + 1):
+        t = k / steps
+        mt = 1.0 - t
+        x = mt * mt * p0[0] + 2.0 * mt * t * p1[0] + t * t * p2[0]
+        y = mt * mt * p0[1] + 2.0 * mt * t * p1[1] + t * t * p2[1]
+        pts.append([x, y])
+    return pts
+
+
+def _smooth_curved_edges(routed: list[dict], placed: dict[str, Placed],
+                         direction: str, edge_style: str) -> None:
+    """在 `curved` / `straight` 模式下，将无遮挡的机械折线转为柔和弧线或直连。
+
+    每条候选曲线同时校验：
+    1. 真实采样 Bézier 曲线与所有非端点节点保持净空（不会擦边/穿框）；
+    2. 不穿过源/目标自身盒子；
+    3. 控制折线同样不穿过任何非端点节点且每段 >= EDGE_MIN。
+    被节点挡住的边自动保留已验证的避障路径，保证“好看但不穿框”。
+    """
+    if edge_style not in ("curved", "straight"):
+        return
+    for e in routed:
+        pts = e.get("points") or []
+        if len(pts) < 2:
+            continue
+        src_id, dst_id = e["from"], e["to"]
+        if src_id not in placed or dst_id not in placed:
+            continue
+        start, end = list(pts[0]), list(pts[-1])
+        exclude = {src_id, dst_id}
+        chord = [start, end]
+        if edge_style == "straight":
+            if (math.dist(start, end) >= EDGE_MIN
+                    and not nodes_hit_by_polyline(chord, placed, exclude)
+                    and not _crosses_own_nodes(chord, placed, src_id, dst_id)):
+                e["points"] = [[round(start[0], 2), round(start[1], 2)],
+                               [round(end[0], 2), round(end[1], 2)]]
+            else:
+                pushed = avoid_nodes(chord, placed, exclude)
+                if (len(pushed) < len(pts)
+                        and all(math.dist(a, b) >= EDGE_MIN for a, b in zip(pushed, pushed[1:]))
+                        and not nodes_hit_by_polyline(pushed, placed, exclude)
+                        and not _crosses_own_nodes(pushed, placed, src_id, dst_id)):
+                    e["points"] = [[round(p[0], 2), round(p[1], 2)] for p in pushed]
+            continue
+
+        # curved 模式：轴对齐且无遮挡时保持 2 点直线；错位前向边优先生成柔和 3 点弧线
+        dx, dy = end[0] - start[0], end[1] - start[1]
+        if abs(dx) < 2.0 or abs(dy) < 2.0:
+            if (math.dist(start, end) >= EDGE_MIN
+                    and not nodes_hit_by_polyline(chord, placed, exclude)
+                    and not _crosses_own_nodes(chord, placed, src_id, dst_id)):
+                e["points"] = [[round(start[0], 2), round(start[1], 2)],
+                               [round(end[0], 2), round(end[1], 2)]]
+            continue
+
+        controls: list[list[float]] = []
+        if direction == "LR" and dx > EDGE_MIN:
+            controls = [
+                [start[0] + dx * 0.5, start[1] + dy * 0.18],
+                [start[0] + dx * 0.5, start[1] + dy * 0.82],
+                [start[0] + dx * 0.65, start[1] + dy * 0.25],
+            ]
+        elif direction == "TB" and dy > EDGE_MIN:
+            controls = [
+                [start[0] + dx * 0.18, start[1] + dy * 0.5],
+                [start[0] + dx * 0.82, start[1] + dy * 0.5],
+                [start[0] + dx * 0.25, start[1] + dy * 0.65],
+            ]
+        for ctrl in controls:
+            if math.dist(start, ctrl) < EDGE_MIN or math.dist(ctrl, end) < EDGE_MIN:
+                continue
+            poly = [start, ctrl, end]
+            if nodes_hit_by_polyline(poly, placed, exclude):
+                continue
+            sampled = _sample_quad_bezier(start, ctrl, end, 16)
+            if (_blocking_nodes(sampled, placed, exclude, NODE_CLEARANCE * 0.75)
+                    or _crosses_own_nodes(sampled, placed, src_id, dst_id)):
+                continue
+            e["points"] = [[round(p[0], 2), round(p[1], 2)] for p in poly]
+            break
+
+
+PARALLEL_EDGE_STEP = 14.0
+
+
+def _clamp_point_to_box(pt: list[float], box: Placed) -> list[float]:
+    """把偏移后的端点夹回节点对应边框上，避免端点脱框或跑到角上。"""
+    mx = min(PORT_SNAP_MARGIN, box.width / 4.0)
+    my = min(PORT_SNAP_MARGIN, box.height / 4.0)
+    normal = _outward_normal(pt, box)
+    if normal in ((1.0, 0.0), (-1.0, 0.0)):
+        x = (box.x + box.width) if normal[0] > 0 else box.x
+        y = min(max(pt[1], box.y + my), box.y + box.height - my)
+        return [round(x, 2), round(y, 2)]
+    if normal in ((0.0, 1.0), (0.0, -1.0)):
+        y = (box.y + box.height) if normal[1] > 0 else box.y
+        x = min(max(pt[0], box.x + mx), box.x + box.width - mx)
+        return [round(x, 2), round(y, 2)]
+    return [round(min(max(pt[0], box.x), box.x + box.width), 2),
+            round(min(max(pt[1], box.y), box.y + box.height), 2)]
+
+
+def _separate_parallel_edges(routed: list[dict], placed: dict[str, Placed],
+                             direction: str, edge_style: str) -> None:
+    """将同一对节点之间的多条平行边 / 双向边整齐并排错开，避免重叠成一根线。"""
+    groups: dict[frozenset[str], list[dict]] = {}
+    for e in routed:
+        if e["from"] in placed and e["to"] in placed and e["from"] != e["to"]:
+            groups.setdefault(frozenset((e["from"], e["to"])), []).append(e)
+
+    for pair, items in groups.items():
+        if len(items) < 2:
+            continue
+        u, v = sorted(pair)
+        bu, bv = placed[u], placed[v]
+        ux, uy = bu.x + bu.width / 2.0, bu.y + bu.height / 2.0
+        vx, vy = bv.x + bv.width / 2.0, bv.y + bv.height / 2.0
+        dx, dy = vx - ux, vy - uy
+        dist = math.hypot(dx, dy) or 1.0
+        # 统一规范法线（始终由 min(u,v) → max(u,v) 定向），确保双向边往相反两侧散开
+        nx, ny = -dy / dist, dx / dist
+        if abs(dx) >= abs(dy):
+            avail = min(bu.height, bv.height)
+        else:
+            avail = min(bu.width, bv.width)
+        m = len(items)
+        step = min(PARALLEL_EDGE_STEP, max(8.0, avail * 0.65 / max(1, m - 1)))
+
+        ordered = sorted(items, key=lambda e: (e["from"], e["to"], e.get("origin", 0)))
+        # 检查这组平行边是否已经足够分开（避免破坏正交模式下已经完美分开的锚点）
+        mids = []
+        for e in ordered:
+            pts = e.get("points") or []
+            if len(pts) >= 2:
+                mid = pts[len(pts) // 2] if len(pts) > 2 else [
+                    (pts[0][0] + pts[-1][0]) / 2.0, (pts[0][1] + pts[-1][1]) / 2.0]
+                mids.append(mid)
+        min_mid_gap = min(
+            (math.dist(mids[i], mids[j]) for i in range(len(mids)) for j in range(i + 1, len(mids))),
+            default=math.inf,
+        )
+        if edge_style not in ("curved", "straight") and min_mid_gap >= 8.0:
+            continue
+
+        for k, e in enumerate(ordered):
+            pts = e.get("points") or []
+            if len(pts) < 2:
+                continue
+            slot = k - (m - 1) / 2.0
+            delta = slot * step
+            if abs(delta) < 0.5:
+                continue
+            src_box, dst_box = placed[e["from"]], placed[e["to"]]
+            trial = [list(p) for p in pts]
+            # 端点沿法线偏移并夹回各自边框，中间控制点多偏一点让多条弧线清晰并排
+            start_shifted = [trial[0][0] + nx * delta, trial[0][1] + ny * delta]
+            end_shifted = [trial[-1][0] + nx * delta, trial[-1][1] + ny * delta]
+            # 保持与原锚点同一条边
+            n_src = _outward_normal(trial[0], src_box)
+            n_dst = _outward_normal(trial[-1], dst_box)
+            if n_src in ((1.0, 0.0), (-1.0, 0.0)):
+                start_shifted[0] = trial[0][0]
+            elif n_src in ((0.0, 1.0), (0.0, -1.0)):
+                start_shifted[1] = trial[0][1]
+            if n_dst in ((1.0, 0.0), (-1.0, 0.0)):
+                end_shifted[0] = trial[-1][0]
+            elif n_dst in ((0.0, 1.0), (0.0, -1.0)):
+                end_shifted[1] = trial[-1][1]
+            trial[0] = _clamp_point_to_box(start_shifted, src_box)
+            trial[-1] = _clamp_point_to_box(end_shifted, dst_box)
+            for idx in range(1, len(trial) - 1):
+                mult = 1.4 if len(trial) == 3 else 1.0
+                trial[idx] = [round(trial[idx][0] + nx * delta * mult, 2),
+                              round(trial[idx][1] + ny * delta * mult, 2)]
+            if (all(math.dist(a, b) >= EDGE_MIN for a, b in zip(trial, trial[1:]))
+                    and not nodes_hit_by_polyline(trial, placed, {e["from"], e["to"]})
+                    and not _crosses_own_nodes(trial, placed, e["from"], e["to"])):
+                e["points"] = trial
 
 
 def _rank_gaps(placed: dict, direction: str) -> dict[int, float]:
@@ -3128,7 +3537,8 @@ def layout(spec: dict, boxes: dict[str, Box],
 
     nodes = spec.get("nodes", [])
     node_ids = [n["id"] for n in nodes]
-    edges = [{"from": e["from"], "to": e["to"], "label": e.get("label"),
+    edges = [{**({"id": e["id"]} if e.get("id") is not None else {}),
+              "from": e["from"], "to": e["to"], "label": e.get("label"),
               "kind": e.get("kind")} for e in (spec.get("edges") or [])]
     pins = {n["id"]: n["pin"] for n in nodes if n.get("pin")}
     explicit = {n["id"]: n["rank"] for n in nodes if n.get("rank") is not None}
@@ -3186,23 +3596,22 @@ def layout(spec: dict, boxes: dict[str, Box],
         # Node gaps alone exclude the padding and title bands of both groups.
         placed = load_sibling("readable_routing").reserve_region_corridors(
             spec, placed, boxes, sys.modules[__name__], presentation)
-    # 主轴拉直是一把双刃剑：它让主流程直着走，但也可能把某条边推到别的节点上。
-    # **两种都算，挑更干净的** —— 判据是「连线穿节点的处数」，同分时留着拉直版
-    # （那是用户明确要的直）。这跟径向那次「只在遮挡真的变少时才换顺序」是同一套路：
-    # 用一个能量出来的指标决定要不要接受一次“看起来更好”的调整。
-    def quality(routed_edges: list, table: dict) -> tuple:
-        """评价一次路由：穿节点 → 穿自己 → 贴边滑 → 斜段占比。
+    raw_style = spec.get("style") if isinstance(spec, dict) else None
+    edge_style = (raw_style.get("edges") if isinstance(raw_style, dict) else None) or "rounded"
+    if edge_style not in ("rounded", "curved", "sharp", "straight"):
+        edge_style = "rounded"
+    pinned_ids = set(pins)
 
-        只卡穿节点是不够的 —— 对齐之后有些边的正交候选会被节点挡住，于是退回斜的直线弦。
-        实测：五层架构那张在“只卡穿节点”时选了拉直版，斜段从 0% 涨到 20.6%。
-        斜段是用户明确不要的东西，所以它也得进判据（同分时留拉直版 —— 那是要的直）。
+    # 主轴拉直是一把双刃剑：它让主流程直着走，但也可能把某条边推到别的节点上。
+    # **多种都算，挑更干净的** —— 判据是「连线穿节点的处数 → 穿自己 → 贴边滑 → 斜段 → 折点数」。
+    def quality(routed_edges: list, table: dict) -> tuple:
+        """评价一次路由：穿节点 → 穿自己 → 贴边滑 → 斜段占比 → 总折点数。
+
+        在 `curved` / `straight` 模式下允许柔和弧线与直连，不惩罚斜段；
+        在正交模式（`rounded` / `sharp`）下保持严格零斜段优先，同分时选折点更少的版本。
         """
         hit = sum(len(nodes_hit_by_polyline(e["points"], table, {e["from"], e["to"]}))
                   for e in routed_edges)
-        # 「穿自己」和「贴边滑」也在判据里（拉直后的路径会带出这两类）：
-        # 02-flow 就是这样 —— 一条边从源的底边出去却往上走，整条线穿过自己的盒子
-        # （图上就是线从框里冒出来），入口还贴着上边框滑进去（用户说"会和边框融合"）。
-        # 这两项现在参与挑版，和斜段一样属于"结构上不该出现"。
         own = sum(1 for e in routed_edges
                   if _crosses_own_nodes(e["points"], table, e["from"], e["to"]))
         slide = 0
@@ -3227,25 +3636,36 @@ def layout(spec: dict, boxes: dict[str, Box],
                 total += length
                 if dx > 0.5 and dy > 0.5:
                     diagonal += length
-        return (hit, own, slide, round(diagonal / total, 3) if total else 0.0)
+        diag_ratio = (0.0 if edge_style in ("curved", "straight")
+                      else (round(diagonal / total, 3) if total else 0.0))
+        bends = sum(max(0, len(e["points"]) - 2) for e in routed_edges)
+        return (hit, own, slide, diag_ratio, bends)
 
     def finish(table: dict[str, Placed]) -> tuple[dict[str, Placed], list[dict]]:
-        """从 `placed` 一路做到**成品**：选版 → 跨栏绕行 → 车道错开。
-
-        抽成函数是为了让「让路」（`_open_channels`）按**同一个阶段**评价候选 ——
-        判据和产物必须在同一阶段，不然会收下"中间量变好、最终却变差"的挪动
-        （同"标签落位必须在 emit 里定"的道理）。
-        """
+        """从 `placed` 一路做到**成品**：选版 → 跨栏绕行 → 车道错开 / 曲线平滑。"""
         plain_table = dict(table)
         plain_routed = route_edges(origins, segments, plain_table, direction,
                                    set(reversed_edges), align=False)
         aligned_table = dict(table)
         aligned_routed = route_edges(origins, segments, aligned_table, direction,
                                      set(reversed_edges), align=True)
-        if quality(aligned_routed, aligned_table) <= quality(plain_routed, plain_table):
-            use_table, routed = aligned_table, aligned_routed
-        else:
-            use_table, routed = plain_table, plain_routed
+        # 在主轴拉直基础上再尝试一版有界重心均衡（扇出居中、扇入居中），
+        # 仅在未折段且不破坏分组时参与竞争，由 quality 决定是否采纳。
+        candidates = [
+            (aligned_table, aligned_routed),
+            (plain_table, plain_routed),
+        ]
+        if not coords.bands:
+            balanced_table = dict(aligned_table)
+            if _balance_barycenters(balanced_table, origins, direction,
+                                    pinned_ids, groups_of, p["nodeSeparation"]) > 0:
+                balanced_routed = route_edges(origins, segments, balanced_table, direction,
+                                              set(reversed_edges), align=False)
+                candidates.insert(0, (balanced_table, balanced_routed))
+        use_table, routed = min(
+            candidates,
+            key=lambda item: quality(item[1], item[0]),
+        )
         # 折段之后，两端落在不同段的连线改走空档 —— 直连会横穿两栏。
         if coords.bands:
             lane_uses: dict[float, int] = {}
@@ -3256,10 +3676,7 @@ def layout(spec: dict, boxes: dict[str, Box],
                     continue
                 pa = use_table[e["from"]]
                 pb = use_table[e["to"]]
-                # 通道放在**源节点那一层的外缘之外**（主轴方向），不是源节点自己的中线 ——
-                # 同层里源节点旁边/下面可能还站着别的节点。留 30px 余量。
                 peers = [q for q in use_table.values() if q.rank == pa.rank]
-                # 目标在哪一侧就往哪一侧绕，别绕反了。
                 if direction == "TB":
                     far = max(q.y + q.height for q in peers) + 30.0
                     near = min(q.y for q in peers) - 30.0
@@ -3269,21 +3686,17 @@ def layout(spec: dict, boxes: dict[str, Box],
                     near = min(q.x for q in peers) - 30.0
                     lane = far if pb.x >= pa.x else near
                 band = coords.bands[min(sa, sb)]
-                # **分车道**：同一个空档里已经走过 n 条边，就往外让 n 个步长 ——
-                # 否则两条边会精确重叠，图上看起来是一根线（实测踩过）。
                 used = lane_uses.get(band, 0)
                 lane_uses[band] = used + 1
-                # **对称往两边散**（-1、+1、-2、+2…），不是一路往右挤 ——
-                # 空档本来就夹在左右两块之间，只往一边让会把后面那条挤到右边那块身上去。
                 offset = WRAP_LANE_STEP * (used // 2 + 1) * (-1 if used % 2 == 0 else 1)
                 e["points"] = wrap_route(pa, use_table[e["to"]], band + offset, lane, direction)
 
-        # 最后一道：**把叠在同一条线上的段错开**（见 `_spread_lanes`）。
-        # 必须放在**折段那一块之后** —— 跨栏连线的走法是那里才定下来的，
-        # 早一步做就等于对着一份还没成形的点表算（02-flow 的 `scan→stage` 就是这样漏掉的：
-        # `route_edges` 里它还是一根两点斜线，折段回来后才是最终那个五折点路径）。
-        # 也只在这里做：重叠是**边与边之间**的事，单看一条边永远看不出来。
-        _spread_lanes(routed, use_table, direction)
+        # 最后一道：正交模式错开叠段；曲线/直连模式对无遮挡边平滑化；平行/双向边并排错开
+        if edge_style in ("curved", "straight"):
+            _smooth_curved_edges(routed, use_table, direction, edge_style)
+        else:
+            _spread_lanes(routed, use_table, direction)
+        _separate_parallel_edges(routed, use_table, direction, edge_style)
         return use_table, routed
 
     # 「让路」：折点超标的边多半不是路由选错，而是**直线弦上堵着节点** ——
@@ -3590,6 +4003,12 @@ def shows_edge_label(edge: dict, level: str | None) -> bool:
     return level != "executive"
 
 
+ICON_NODE_HEIGHT = 48.0   # shape="icon" 无框图标节点的主图标高度（图内单位，按字号等比缩放）
+ICON_NODE_GAP = 8.0       # 无框图标节点里，图标底边到下方标签顶边的间距
+ICON_NODE_PAD_X = 8.0     # 无框图标节点左右最小留白
+ICON_NODE_PAD_Y = 4.0     # 无框图标节点上下最小留白
+
+
 def boxes_from_spec(spec: dict, icon_sizes: dict | None = None, *, presentation=None) -> dict[str, Any]:
     """由文字 + 形状反推每个节点的尺寸。**尺寸不由模型给。**
 
@@ -3638,18 +4057,34 @@ def boxes_from_spec(spec: dict, icon_sizes: dict | None = None, *, presentation=
             width += extra
         else:
             height += extra
-        if n.get("icon"):
-            # 图标放左边，文字排在它右边（见 emit 的 node_elements）。
+        if shape == "icon":
+            # 无框图标节点：图标居中放大置顶，文字居中排在下方（不画外框）
+            default_h = round(ICON_NODE_HEIGHT * (ctx.node / 16.0), 2)
+            visible = max(
+                max([tm.weighted_units(line) for line in text.lines] or [0.0]) * text.font_size,
+                max([tm.weighted_units(line) for line in text.detail_lines] or [0.0]) * ctx.detail,
+            )
+            text_block_h = (len(text.lines) * text.font_size * tm.LINE_HEIGHT
+                            + len(text.detail_lines) * ctx.detail * tm.LINE_HEIGHT)
+            if n.get("icon"):
+                icon_w, icon_h = sizes.get(n["id"], (default_h, default_h))
+                icon_w = icon_w or default_h
+                icon_h = icon_h or default_h
+                width = max(text.width, max(icon_w, visible) + 2 * ICON_NODE_PAD_X) * scale
+                height = max(text.height, icon_h + ICON_NODE_GAP + text_block_h + 2 * ICON_NODE_PAD_Y) * scale
+            else:
+                width = max(text.width, visible + 2 * ICON_NODE_PAD_X) * scale
+                height = max(text.height, text_block_h + 2 * ICON_NODE_PAD_Y) * scale
+            if cross_axis_is_width:
+                width += extra
+            else:
+                height += extra
+        elif n.get("icon"):
+            # 带框节点内的图标：放左边，文字排在它右边（见 emit 的 node_elements）。
             # 拿不到尺寸就用一个保守的占位 —— 宁可多留白，也不能让图标盖住文字。
             icon_w, icon_h = sizes.get(n["id"], (0.0, 0.0))
             width += (icon_w or ICON_RESERVE) + ICON_GAP
             height = max(height, icon_h + 2 * ICON_VERTICAL_PAD)
-            # **框自动适配内容**：宽到“内边距 + 图标 + 间隔 + 可见文字”一定放得下。
-            # 为什么必须在这里保证：图标的位置是从"整组居中"推出来的
-            # （emit：icon_left = 文字中心 − 可见宽/2 − 间隔 − 图标宽），
-            # 框不够宽的话它就会越出左边框 —— 而用钳位去救会把图标推到文字底下
-            # （看起来像"图标没了"）。用户原话："你应该考虑的是将框弄的自动适配宽度
-            # 而不是删除icon"。
             visible = max(
                 max([tm.weighted_units(line) for line in text.lines] or [0.0]) * text.font_size,
                 max([tm.weighted_units(line) for line in text.detail_lines] or [0.0]) * ctx.detail,

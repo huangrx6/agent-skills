@@ -553,22 +553,23 @@ def check_bends(result: ResultT, threshold: int = BEND_MAX) -> list[Issue]:
     return out
 
 
-def check_edge_slant(result: ResultT) -> list[Issue]:
+def check_edge_slant(result: ResultT, spec: dict | None = None) -> list[Issue]:
     """连线上出现了**斜段**（既不水平也不竖直）—— 可调项。
 
-    用户对这件事的原话是「就是那种 90 度拐弯的线不行吗」。分层图里每一条边
-    都有正交候选（`layout._orthogonal_path`），只有当**全部候选都不可用**时
-    才会退回到两点直弦 —— 所以一条斜段出现，就意味着“这一段路真的过不去”，
-    应当在报告里说清楚，而不是让它悄悄地出图。
-
-    为什么从前没报：斜段以前**不在检查表里** —— 生成侧把一条 1475px 的斜线当作“避开
-    3px 毛刺”的选择，而校验对两者都无话可说。现在两边都管上了。
+    分层图在正交连线模式（`rounded` / `sharp`）下，每一条边都有正交候选，
+    只有当全部候选都不可用时才会退回到两点直弦 —— 此时应报出斜段提示。
+    若作者明确选择了 `style.edges = "curved"` 或 `"straight"`，平滑弧线与直连是
+    预期画法，不按斜段报错（穿节点、相交、最短边长等硬检查仍全部生效）。
 
     只查**分层图**（LR / TB）：径向与力导向的连线**就该是**两点直辐条，
     那是它们的画法，不是缺陷。
     """
     if str(getattr(result, "direction", "")) not in ("LR", "TB"):
         return []
+    if isinstance(spec, dict):
+        raw_style = spec.get("style")
+        if isinstance(raw_style, dict) and raw_style.get("edges") in ("curved", "straight"):
+            return []
     out: list[Issue] = []
     for edge in result.edges:
         pts = edge["points"]
@@ -737,7 +738,7 @@ def check(spec: dict, result: ResultT,
         *check_crossings(spec, result),
         *check_edges_through_nodes(spec, result),
         *check_edge_overlap(result),
-        *check_edge_slant(result),
+        *check_edge_slant(result, spec),
         *check_bends(result),
         *check_geometric_crossings(spec, result),
         *check_regions(spec, result, boxes, presentation=presentation),

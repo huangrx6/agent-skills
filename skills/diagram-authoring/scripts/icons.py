@@ -35,12 +35,15 @@ v1 没有名字，只能按序号索引 —— 这种项一律用 `#<序号>` �
 from __future__ import annotations
 
 import argparse
+import base64
 import copy
 import json
 import math
 import os
+import re
 import sys
 import zlib
+from xml.sax.saxutils import escape as _xml_escape
 
 # 图标放进节点盒子里的默认高度（没有给具体节点时用）。
 ICON_HEIGHT = 28.0
@@ -468,14 +471,273 @@ def readability(elements: list, target_height: float = ICON_HEIGHT
     return min(sizes), fit_scale(elements, target_height)
 
 
+def _norm_token(text: str) -> str:
+    """规范化图标名用于无损宽松匹配（忽略大小写、空格、横杠、下划线）。"""
+    return re.sub(r"[^a-z0-9\u4e00-\u9fff]+", "", text.strip().lower())
+
+
 def resolve(library: dict, name: str) -> list:
-    """按名字取一项。找不到就抛错并**列出可用的名字** —— 不 fallback。"""
+    """按名字取一项：精确匹配 → 忽略大小写唯一匹配 → 规范化分隔符唯一匹配。
+
+    找不到或出现多个重名歧义时抛错并列出候选项 —— 绝不静默错换。
+    """
     items = library["items"]
-    if name not in items:
-        hint = "（这个库是 v1 格式，项没有名字，只能用 `#序号`）" if not library["named"] else ""
+    if name in items:
+        return items[name]
+    low = name.strip().lower()
+    ci_hits = [k for k in items if k.strip().lower() == low]
+    if len(ci_hits) == 1:
+        return items[ci_hits[0]]
+    norm = _norm_token(name)
+    if norm:
+        norm_hits = [k for k in items if _norm_token(k) == norm]
+        if len(norm_hits) == 1:
+            return items[norm_hits[0]]
+        if len(norm_hits) > 1:
+            raise LibraryError(
+                f"素材库里 {name!r} 命中多个同名项：{sorted(norm_hits)[:8]}；请写完整名称")
+    hint = "（这个库是 v1 格式，项没有名字，只能用 `#序号`）" if not library["named"] else ""
+    near = [k for k in names(library) if low and low in k.lower()][:8]
+    sample = near or names(library)[:12]
+    raise LibraryError(
+        f"素材库里没有 {name!r}；可用 {len(items)} 项里的：{sample}…{hint}")
+
+
+def split_library_ref(name: str) -> tuple[str | None, str]:
+    """解析跨库引用语法 `库名:图标名`。不带冒号时返回 `(None, name)`。"""
+    if ":" in name:
+        lib_ref, item_name = name.split(":", 1)
+        if lib_ref.strip() and item_name.strip():
+            return lib_ref.strip(), item_name.strip()
+    return None, name
+
+
+def resolve_across_libraries(name: str, explicit_library: str | None = None,
+                             *, cache: str | None = None,
+                             loaded: dict[str, dict] | None = None) -> tuple[list, str]:
+    """从显式库、配置库或全部本地缓存 `.excalidrawlib` 中解析图标。
+
+    支持：
+    1. `"库名:图标名"` 跨库直连（同一张图可混用多个 `.excalidrawlib`）；
+    2. 显式 `--library` 指定的库文件或缓存库名；
+    3. 未传 `--library` 时自动扫描配置库与本地缓存目录内全部 `.excalidrawlib`。
+    """
+    store = loaded if loaded is not None else {}
+
+    def _get_lib(path: str) -> dict:
+        if path not in store:
+            store[path] = load(path)
+        return store[path]
+
+    cached = cached_libraries(cache)
+    lib_ref, item_name = split_library_ref(name)
+    if lib_ref is not None:
+        if os.path.isfile(lib_ref):
+            return resolve(_get_lib(lib_ref), item_name), os.path.basename(lib_ref)
+        hit = cached.get(lib_ref) or cached.get(lib_ref.lower())
+        if hit:
+            return resolve(_get_lib(hit), item_name), lib_ref
+        have = "、".join(sorted(cached)) or "（本地缓存为空）"
         raise LibraryError(
-            f"素材库里没有 {name!r}；可用 {len(items)} 项里的：{names(library)[:12]}…{hint}")
-    return items[name]
+            f"图标 {name!r} 指定的素材库 {lib_ref!r} 未找到；本地已缓存：{have}。"
+            f"用 python3 scripts/icons_fetch.py --get {lib_ref!r} 下载")
+
+    if explicit_library:
+        path, source = library_path(explicit_library)
+        if not path:
+            raise LibraryError(f"找不到图标素材库（{source}）")
+        return resolve(_get_lib(path), name), os.path.basename(path)
+
+    # 先查环境变量 / 配置文件指定的默认库
+    cfg_path, _cfg_src = library_path(None)
+    if cfg_path and os.path.isfile(cfg_path):
+        try:
+            return resolve(_get_lib(cfg_path), name), os.path.basename(cfg_path)
+        except LibraryError:
+            if not cached:
+                raise
+
+    # 自动扫描全部本地缓存的 .excalidrawlib
+    if not cached:
+        raise LibraryError(
+            f"找不到图标 {name!r}：未配置素材库且本地缓存为空。"
+            f"运行 python3 scripts/icons_fetch.py --find <关键词> 查找并 --get <库名> 下载")
+
+    exact_hits: list[tuple[str, list]] = []
+    fuzzy_hits: list[tuple[str, str, list]] = []
+    for slug_name, path in sorted(cached.items()):
+        try:
+            lib = _get_lib(path)
+        except LibraryError:
+            continue
+        if name in lib["items"]:
+            exact_hits.append((slug_name, lib["items"][name]))
+            continue
+        try:
+            els = resolve(lib, name)
+            # 找出匹配到的真实项名用于歧义提示
+            norm = _norm_token(name)
+            real = next((k for k in lib["items"] if k.lower() == name.lower()
+                         or _norm_token(k) == norm), name)
+            fuzzy_hits.append((slug_name, real, els))
+        except LibraryError:
+            continue
+
+    if len(exact_hits) == 1:
+        return exact_hits[0][1], exact_hits[0][0]
+    if len(exact_hits) > 1:
+        choices = [f"{s}:{name}" for s, _ in exact_hits]
+        raise LibraryError(
+            f"图标 {name!r} 在多个缓存库中均存在，请写成库名前缀消歧：{choices}")
+    if len(fuzzy_hits) == 1:
+        return fuzzy_hits[0][2], fuzzy_hits[0][0]
+    if len(fuzzy_hits) > 1:
+        choices = [f"{s}:{real}" for s, real, _ in fuzzy_hits]
+        raise LibraryError(
+            f"图标 {name!r} 在多个缓存库中匹配到候选项，请写成库名前缀消歧：{choices}")
+
+    raise LibraryError(
+        f"图标 {name!r} 在本地已缓存的 {len(cached)} 个素材库（{', '.join(sorted(cached))}）里都未找到。"
+        f"用 python3 scripts/icons_fetch.py --find {name!r} 查找具体项名或下载新库")
+
+
+def search_cached(keyword: str, *, cache: str | None = None) -> list[tuple[str, str, int]]:
+    """离线在全部已缓存 `.excalidrawlib` 里搜索图标名，返回 `[(slug, item_name, element_count)]`。"""
+    low = keyword.strip().lower()
+    norm = _norm_token(keyword)
+    hits: list[tuple[str, str, int]] = []
+    for slug_name, path in sorted(cached_libraries(cache).items()):
+        try:
+            lib = load(path)
+        except LibraryError:
+            continue
+        for item_name, elements in sorted(lib["items"].items()):
+            if (not low or low in item_name.lower() or low in slug_name.lower()
+                    or (norm and norm in _norm_token(item_name))):
+                hits.append((slug_name, item_name, len(elements)))
+    return hits
+
+
+def _svg_stroke_dasharray(style: str | None) -> str:
+    if style == "dashed":
+        return ' stroke-dasharray="6 4"'
+    if style == "dotted":
+        return ' stroke-dasharray="2 3"'
+    return ""
+
+
+def to_svg(elements: list, *, target_height: float = ICON_HEIGHT,
+           stroke: str | None = None, canvas: str | None = None,
+           colours: str = "auto") -> str:
+    """将任意 `.excalidrawlib` 或内置 sigil 元素列表渲染为独立 `<svg>` 字符串。
+
+    复用 `place()` 的缩放、描边统一与 `auto/ink/native` 配色规则，
+    让 draw.io 与 Excalidraw 使用同一套 `.excalidrawlib` 素材且观感一致。
+    """
+    placed = place(elements, 0.0, 0.0, key="svg", target_height=target_height,
+                   stroke=stroke, canvas=canvas, colours=colours)
+    if not placed:
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"/>'
+
+    xs: list[float] = []
+    ys: list[float] = []
+    for el in placed:
+        ex, ey = float(el.get("x", 0.0)), float(el.get("y", 0.0))
+        ew, eh = float(el.get("width", 0.0)), float(el.get("height", 0.0))
+        pts = el.get("points")
+        if isinstance(pts, list) and pts:
+            for px, py in pts:
+                xs.append(ex + float(px))
+                ys.append(ey + float(py))
+        else:
+            xs.extend([ex, ex + ew])
+            ys.extend([ey, ey + eh])
+
+    pad = ICON_STROKE_WIDTH + 2.0
+    min_x, max_x = min(xs) - pad, max(xs) + pad
+    min_y, max_y = min(ys) - pad, max(ys) + pad
+    vb_w = max(1.0, round(max_x - min_x, 2))
+    vb_h = max(1.0, round(max_y - min_y, 2))
+
+    parts: list[str] = []
+    for el in placed:
+        etype = el.get("type")
+        ex, ey = float(el.get("x", 0.0)), float(el.get("y", 0.0))
+        ew, eh = float(el.get("width", 0.0)), float(el.get("height", 0.0))
+        sc = _xml_escape(str(el.get("strokeColor") or "#1f2937"))
+        bg = str(el.get("backgroundColor") or "transparent")
+        fill = "none" if bg in ("transparent", "none", "") else _xml_escape(bg)
+        sw = round(float(el.get("strokeWidth", ICON_STROKE_WIDTH)), 2)
+        dash = _svg_stroke_dasharray(el.get("strokeStyle"))
+        angle = float(el.get("angle") or 0.0)
+        transform = ""
+        if abs(angle) > 1e-4:
+            deg = round(math.degrees(angle), 2)
+            cx, cy = round(ex + ew / 2.0, 2), round(ey + eh / 2.0, 2)
+            transform = f' transform="rotate({deg} {cx} {cy})"'
+
+        if etype == "rectangle":
+            rx = ""
+            if el.get("roundness"):
+                r = round(min(ew, eh) * 0.16, 2)
+                rx = f' rx="{r}" ry="{r}"'
+            parts.append(
+                f'<rect x="{ex:.2f}" y="{ey:.2f}" width="{ew:.2f}" height="{eh:.2f}"{rx}'
+                f' fill="{fill}" stroke="{sc}" stroke-width="{sw}"{dash}{transform}/>'
+            )
+        elif etype == "ellipse":
+            cx, cy = ex + ew / 2.0, ey + eh / 2.0
+            rx, ry = max(0.5, ew / 2.0), max(0.5, eh / 2.0)
+            parts.append(
+                f'<ellipse cx="{cx:.2f}" cy="{cy:.2f}" rx="{rx:.2f}" ry="{ry:.2f}"'
+                f' fill="{fill}" stroke="{sc}" stroke-width="{sw}"{dash}{transform}/>'
+            )
+        elif etype == "diamond":
+            pts_str = (f"{ex + ew / 2.0:.2f},{ey:.2f} {ex + ew:.2f},{ey + eh / 2.0:.2f} "
+                       f"{ex + ew / 2.0:.2f},{ey + eh:.2f} {ex:.2f},{ey + eh / 2.0:.2f}")
+            parts.append(
+                f'<polygon points="{pts_str}" fill="{fill}" stroke="{sc}"'
+                f' stroke-width="{sw}" stroke-linejoin="round"{dash}{transform}/>'
+            )
+        elif etype in ("line", "arrow", "freedraw"):
+            pts = el.get("points") or []
+            if len(pts) < 2:
+                continue
+            abs_pts = [(ex + float(p[0]), ey + float(p[1])) for p in pts]
+            pts_str = " ".join(f"{x:.2f},{y:.2f}" for x, y in abs_pts)
+            closed = (math.dist(abs_pts[0], abs_pts[-1]) < 1.5 and len(abs_pts) >= 3)
+            if closed:
+                parts.append(
+                    f'<polygon points="{pts_str}" fill="{fill}" stroke="{sc}"'
+                    f' stroke-width="{sw}" stroke-linejoin="round"{dash}{transform}/>'
+                )
+            else:
+                parts.append(
+                    f'<polyline points="{pts_str}" fill="{fill}" stroke="{sc}"'
+                    f' stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round"{dash}{transform}/>'
+                )
+        elif etype == "text":
+            txt = _xml_escape(str(el.get("text") or ""))
+            fs = round(float(el.get("fontSize") or 12.0), 2)
+            parts.append(
+                f'<text x="{ex + ew / 2.0:.2f}" y="{ey + eh * 0.78:.2f}" text-anchor="middle"'
+                f' font-family="sans-serif" font-size="{fs}" fill="{sc}"{transform}>{txt}</text>'
+            )
+
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" '
+            f'viewBox="{min_x:.2f} {min_y:.2f} {vb_w:.2f} {vb_h:.2f}" '
+            f'width="{vb_w:.2f}" height="{vb_h:.2f}">'
+            + "".join(parts) + "</svg>")
+
+
+def to_svg_data_uri(elements: list, *, target_height: float = ICON_HEIGHT,
+                    stroke: str | None = None, canvas: str | None = None,
+                    colours: str = "auto") -> str:
+    """生成 draw.io/mxGraph 兼容的 SVG data URI（逗号分隔、无 `;base64` 分号冲突）。"""
+    svg = to_svg(elements, target_height=target_height, stroke=stroke,
+                 canvas=canvas, colours=colours)
+    payload = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    return f"data:image/svg+xml,{payload}"
 
 
 def _main(argv: list[str] | None = None) -> int:

@@ -55,6 +55,8 @@ L = _load_sibling("layout")
 palette = _load_sibling("palette")
 shapes = _load_sibling("shapes")
 tm = _load_sibling("text_metrics")
+icons = _load_sibling("icons")
+sigils = _load_sibling("sigils")
 
 XML_DECL = '<?xml version="1.0" encoding="UTF-8"?>\n'
 PAGE_PAD = 24.0          # 画布四周留白：内容平移到这里开始
@@ -90,6 +92,7 @@ SHAPE_STYLE: dict[str, str] = {
     "diamond": "rhombus",
     "cylinder": "shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=12",
     "note": "shape=note;size=12;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6",
+    "icon": "shape=label;strokeColor=none;fillColor=none",
 }
 
 # 强调档 → 线宽。drawio 的 strokeWidth 是数值；Excalidraw 那边是 1/1.5/2 的花样，
@@ -191,20 +194,52 @@ class Frame:
         return (self.x(xy[0]), self.y(xy[1]))
 
 
+def load_icons(spec: dict, library_path: str | None = None, *, presentation=None):
+    """解析规格里声明的 `.excalidrawlib` / 兼容内置图标，供 draw.io 以内联 SVG 渲染。"""
+    wanted = {n["icon"] for n in spec.get("nodes", []) if n.get("icon")}
+    if not wanted:
+        return {}, {}, {}
+    lookup: dict[str, list] = {}
+    loaded_libs: dict[str, dict] = {}
+    for name in sorted(wanted):
+        lib_ref, _item = icons.split_library_ref(name)
+        if lib_ref is None and sigils.is_builtin(name):
+            lookup[name] = sigils.glyph(name, palette.CANVAS.get("text", "#1f2937"))
+            continue
+        try:
+            elements, _src = icons.resolve_across_libraries(
+                name, explicit_library=library_path, loaded=loaded_libs)
+        except icons.LibraryError as exc:
+            raise SpecError(f"图标解析失败：{exc}") from None
+        lookup[name] = icons.glyph_only(elements)
+
+    ctx = L.P.resolve(presentation)
+    sizes: dict[str, tuple[float, float]] = {}
+    heights: dict[str, float] = {}
+    for node in spec.get("nodes", []):
+        name = node.get("icon")
+        if not name:
+            continue
+        elements = lookup[name]
+        if node.get("shape") == "icon":
+            want = round(L.ICON_NODE_HEIGHT * (ctx.node / 16.0), 2)
+        else:
+            text_box = tm.measure(node.get("label", ""),
+                                  node.get("detail", "") if L.shows_node_detail(
+                                      node, spec.get("detail", L.DEFAULT_DETAIL)) else "")
+            want = icons.height_for(text_box.height)
+        heights[node["id"]] = want
+        width, height = icons.intrinsic_size(elements)
+        scale = icons.fit_scale(elements, want)
+        sizes[node["id"]] = (width * scale, height * scale)
+    return lookup, sizes, heights
+
+
 def node_cell(node: dict, placed, box, detail_level: str | None,
-              frame: Frame, *, presentation=None) -> str:
-    """一个节点 = 一个 `<UserObject>` 包着一个 mxCell（形状与文字都在里面）。
-
-    文字用**我们量好的折行**（见 `label_value`）；`detail` 行按 layout 那份判据决定
-    要不要画 —— 和 Excalidraw 后端同一个判据，两边的信息量必须一致。
-
-    **为什么要 `<UserObject>`**：drawio 的“编辑数据”与悬停提示都存在它上面
-    （这是官方格式，不是我们的发明）。存了它才有两件事：
-
-    - 悬停看得到 `detail` 与角色信息（图面不必为了“可追溯”而堆字）；
-    - 将来“读回用户改过的 .drawio”（P1）有**锚点** —— 否则只能靠标签字符串
-      去猜哪个框原来是哪个节点。
-    """
+              frame: Frame, *, presentation=None, icon_src: list | None = None,
+              icon_size: tuple[float, float] | None = None,
+              style: dict | None = None) -> str:
+    """一个节点 = 一个 `<UserObject>` 包着一个 mxCell（形状、内联 SVG 图标与文字都在里面）。"""
     kind = node.get("kind")
     emphasis = node.get("emphasis", palette.DEFAULT_EMPHASIS)
     shape_name = box.shape
@@ -218,26 +253,65 @@ def node_cell(node: dict, placed, box, detail_level: str | None,
     lines = list(text.lines)
     shown_detail = bool(node.get("detail")) and L.shows_node_detail(node, detail_level)
     if shown_detail:
-        # detail 是次要说明：drawio 一个 cell 只有一档字号，所以这里同字号换行，
-        # 不像 Excalidraw 那样单独一块小字。见 references/drawio-backend.md。
         lines += list(text.detail_lines)
 
     label = label_value(lines)
     if shown_detail and L.P.resolve(presentation).preset != "fit":
-        # Explicit presets use the measured secondary font, including wrapping.
         size = round(text.detail_font_size * knobs['font_scale'])
         label = (label_value(text.lines) + '&lt;br&gt;'
                  + f'&lt;span style=&quot;font-size:{size}px&quot;&gt;'
                  + label_value(text.detail_lines) + '&lt;/span&gt;')
-    parts = [_shape_style(shape_name, knobs), "whiteSpace=wrap", "html=1",
-             f"fillColor={palette.fill_for(kind, emphasis, node["id"])}",
-             f"strokeColor={palette.stroke_for(kind, emphasis, node["id"])}",
-             f"strokeWidth={EMPHASIS_STROKE_WIDTH.get(emphasis, 2)}",
-             f"fontSize={round(text.font_size * knobs['font_scale'])}",
-             f"fontFamily={knobs['font_family']}"]
-    parts += _font_colors(palette.text_for(kind, emphasis, node["id"]))
-    if shapes.stroke_style_for(shape_name) == "dashed":
-        parts.append("dashed=1")
+
+    stroke_color = palette.stroke_for(kind, emphasis, node["id"])
+    resolved_style = palette.resolve_style(style)
+    icon_uri = None
+    if icon_src:
+        target_h = icon_size[1] if icon_size else (
+            L.ICON_NODE_HEIGHT if shape_name == "icon" else icons.ICON_HEIGHT)
+        icon_uri = icons.to_svg_data_uri(
+            icon_src, target_height=target_h, stroke=stroke_color,
+            canvas=palette.CANVAS["background"],
+            colours=resolved_style.get("icons", "auto"),
+        )
+
+    if shape_name == "icon":
+        parts = ["shape=label", "whiteSpace=wrap", "html=1",
+                 "strokeColor=none", "fillColor=none", "align=center",
+                 f"fontSize={round(text.font_size * knobs['font_scale'])}",
+                 f"fontFamily={knobs['font_family']}"]
+        if icon_uri:
+            iw = round(icon_size[0] if icon_size else L.ICON_NODE_HEIGHT)
+            ih = round(icon_size[1] if icon_size else L.ICON_NODE_HEIGHT)
+            parts += [f"image={icon_uri}", "imageAlign=center", "imageVerticalAlign=top",
+                      "verticalAlign=bottom", f"imageWidth={iw}", f"imageHeight={ih}",
+                      f"spacingTop={round(L.ICON_NODE_PAD_Y)}",
+                      f"spacingBottom={round(L.ICON_NODE_PAD_Y)}"]
+        parts += _font_colors(palette.CANVAS["text"])
+    else:
+        base_shape = _shape_style(shape_name, knobs)
+        if icon_uri:
+            iw = round(icon_size[0] if icon_size else icons.ICON_HEIGHT)
+            ih = round(icon_size[1] if icon_size else icons.ICON_HEIGHT)
+            shape_part = (f"shape=label;{base_shape}" if base_shape else "shape=label")
+            parts = [shape_part, "whiteSpace=wrap", "html=1",
+                     f"image={icon_uri}", "imageAlign=left", "imageVerticalAlign=middle",
+                     f"imageWidth={iw}", f"imageHeight={ih}",
+                     f"spacingLeft={round(iw + L.ICON_GAP)}",
+                     f"fillColor={palette.fill_for(kind, emphasis, node['id'])}",
+                     f"strokeColor={stroke_color}",
+                     f"strokeWidth={EMPHASIS_STROKE_WIDTH.get(emphasis, 2)}",
+                     f"fontSize={round(text.font_size * knobs['font_scale'])}",
+                     f"fontFamily={knobs['font_family']}"]
+        else:
+            parts = [base_shape, "whiteSpace=wrap", "html=1",
+                     f"fillColor={palette.fill_for(kind, emphasis, node['id'])}",
+                     f"strokeColor={stroke_color}",
+                     f"strokeWidth={EMPHASIS_STROKE_WIDTH.get(emphasis, 2)}",
+                     f"fontSize={round(text.font_size * knobs['font_scale'])}",
+                     f"fontFamily={knobs['font_family']}"]
+        parts += _font_colors(palette.text_for(kind, emphasis, node["id"]))
+        if shapes.stroke_style_for(shape_name) == "dashed":
+            parts.append("dashed=1")
     cell_style = ";".join(part for part in parts if part)
 
     geometry = _rect_geometry(frame.x(placed.x), frame.y(placed.y),
@@ -413,18 +487,35 @@ def edge_kind_label(edge: dict, level: str | None) -> str | None:
     return palette.EDGE_KINDS.get(kind, {}).get("zh")
 
 
+def _drawio_edge_routing_parts(edge_routing: str, inner: list) -> list[str]:
+    """把 style.edges 映射为 draw.io 的连线路由与倒角样式。"""
+    if edge_routing == "curved":
+        if len(inner) <= 1:
+            return ["edgeStyle=none", "curved=1", "rounded=1"]
+        return ["edgeStyle=orthogonalEdgeStyle", "curved=1", "rounded=1"]
+    if edge_routing == "straight":
+        return ["edgeStyle=none", "rounded=0"]
+    if edge_routing == "sharp":
+        return ["edgeStyle=orthogonalEdgeStyle", "rounded=0"]
+    # 默认 rounded：正交路线 + 12px 柔和圆角
+    return ["edgeStyle=orthogonalEdgeStyle", "rounded=1", "arcSize=12"]
+
+
 def edge_cell(edge: dict, index: int, placed: dict,
-              detail_level: str | None, frame: Frame, *, presentation=None, label_offset=None) -> str:
+              detail_level: str | None, frame: Frame, *, presentation=None,
+              label_offset=None, style: dict | None = None) -> str:
     src, dst, (ex, ey), (nx, ny), inner = edge_path(edge, placed)
     kind = edge.get("kind") or palette.DEFAULT_EDGE_KIND
     spec = palette.EDGE_KINDS.get(kind, palette.EDGE_KINDS[palette.DEFAULT_EDGE_KIND])
     label = edge_label(edge, detail_level)
+    edge_routing = palette.edge_style_of(style)
 
     knobs = palette.knobs()
     style_parts = [
-        "edgeStyle=orthogonalEdgeStyle", "rounded=0", "html=1",
+        *_drawio_edge_routing_parts(edge_routing, inner),
+        "html=1",
         f"endArrow={knobs.get('arrow') or 'classic'}", "endFill=1",
-        f"strokeColor={spec['stroke']}",
+        f"strokeColor={palette.edge_stroke_for(edge)}",
         f"strokeWidth={knobs.get('edge_width') or EDGE_STROKE_WIDTH}",
         f"dashed={'1' if spec['style'] == 'dashed' else '0'}",
     ]
@@ -552,7 +643,8 @@ def card_cells(laid: list[dict], knobs: dict, frame: Frame | None = None, *, pre
 
 
 def build_page(spec: dict, result: Any, boxes: dict,
-               detail_level: str | None = None, *, presentation=None) -> str:
+               detail_level: str | None = None, *, presentation=None,
+               icon_lookup: dict | None = None, icon_sizes: dict | None = None) -> str:
     """一页 = 一个 `<diagram>` 块（含它自己的 mxGraphModel）。
 
     页尺寸与背景都是**每页各算**的 —— 多页文件里每张图的宽高差很远，
@@ -589,7 +681,13 @@ def build_page(spec: dict, result: Any, boxes: dict,
     for node_id, placed in result.placed.items():
         if node_id not in by_id:
             continue          # 虚节点（为折线插入的），drawio 里不需要画出来
-        body.append(node_cell(by_id[node_id], placed, boxes[node_id], level, frame, presentation=ctx))
+        node = by_id[node_id]
+        icon_name = node.get("icon")
+        icon_src = (icon_lookup or {}).get(icon_name) if icon_name else None
+        icon_size = (icon_sizes or {}).get(node_id) if icon_name else None
+        body.append(node_cell(node, placed, boxes[node_id], level, frame,
+                              presentation=ctx, icon_src=icon_src,
+                              icon_size=icon_size, style=style))
     for index, edge in enumerate(result.edges):
         offset = None
         label = edge_label(edge, level)
@@ -600,7 +698,8 @@ def build_page(spec: dict, result: Any, boxes: dict,
             centre = router.path_midpoint(edge["points"])
             offset = (x + width / 2 - centre[0], y + height / 2 - centre[1])
             keepouts.append((x, y, width, height))
-        body.append(edge_cell(edge, index, result.placed, level, frame, presentation=ctx, label_offset=offset))
+        body.append(edge_cell(edge, index, result.placed, level, frame,
+                              presentation=ctx, label_offset=offset, style=style))
     body += card_cells(cards, palette.knobs(), frame, presentation=ctx)
     if rect and title:
         # 标题最后加：和 Excalidraw 侧一样画在最上层（它是 chrome，不是内容）
@@ -657,7 +756,7 @@ def _font_colors(color: str) -> list[str]:
 
 
 def emit_page(spec: dict, *, params: dict | None = None, scheme: str | None = None,
-              seeds: dict[str, str] | None = None,
+              seeds: dict[str, str] | None = None, library: str | None = None,
               quality: str = "standard", preset: str = "fit", colors=None) -> tuple[str, Any, Any, list]:
     """跑完整条流水线并返回 XML。**校验有阻塞项就不出图。**
 
@@ -683,22 +782,17 @@ def emit_page(spec: dict, *, params: dict | None = None, scheme: str | None = No
     if colors is not None:
         palette.use_colors(colors, spec=spec)
 
-    icons_used = [n["id"] for n in spec.get("nodes", []) if n.get("icon")]
-    if icons_used:
-        raise SpecError(
-            f"drawio 后端还不支持图标（用到的节点：{'、'.join(icons_used[:5])}）。"
-            "内置 sigil 与素材库图标目前只在 Excalidraw 后端可用；"
-            "先用 Excalidraw 后端出这张图，或者把 icon 去掉。")
-
     ctx = L.P.resolve(preset)
-    boxes = L.boxes_from_spec(spec, presentation=ctx)
+    icon_lookup, icon_sizes, _icon_heights = load_icons(spec, library, presentation=ctx)
+    boxes = L.boxes_from_spec(spec, icon_sizes, presentation=ctx)
     result, outcome, attempts = _load_sibling("check_layout").layout_with_retry(
         spec, boxes, ctx.layout_params(params), **({"presentation": ctx} if preset != "fit" else {}))
     # showcase 升级在调参之后（与 Excalidraw 后端同一条语义）。
     outcome = outcome.promote(quality)
     if outcome.blocking:
         return "", result, outcome, attempts
-    page = build_page(spec, result, boxes, presentation=ctx)
+    page = build_page(spec, result, boxes, presentation=ctx,
+                      icon_lookup=icon_lookup, icon_sizes=icon_sizes)
     if preset != "fit":
         review = _load_sibling("check_presentation")
         assessment = review.assess(review.drawio(build_file([page])), preset)
@@ -707,11 +801,12 @@ def emit_page(spec: dict, *, params: dict | None = None, scheme: str | None = No
 
 
 def emit(spec: dict, *, params: dict | None = None, scheme: str | None = None,
-         seeds: dict[str, str] | None = None,
+         seeds: dict[str, str] | None = None, library: str | None = None,
          quality: str = "standard", preset: str = "fit", colors=None) -> tuple[str, Any, Any, list]:
     """单份规格 → 整个 `.drawio` 文件（一页）。多份请用 `build_file` 拼。"""
     page, result, outcome, attempts = emit_page(spec, params=params, scheme=scheme,
-                                                seeds=seeds, quality=quality, preset=preset, colors=colors)
+                                                seeds=seeds, library=library,
+                                                quality=quality, preset=preset, colors=colors)
     return (build_file([page]) if page else ""), result, outcome, attempts
 
 
@@ -745,6 +840,7 @@ def main(argv: list[str] | None = None) -> int:
                     help="在选定方案之上改种子色，可重复：canvas / ink / accent / critical。"
                          "例如 --seed accent=#0B5FFF")
     ap.add_argument("--colors", help="项目配色 JSON；覆盖 scheme 的颜色，保留其字体与线型")
+    ap.add_argument("--library", help=".excalidrawlib 素材库路径或本地缓存库名（不传时自动扫描缓存库）")
     ap.add_argument("--preset", choices=L.P.NAMES, default="fit", help="生成字号与间距场景；fit 保持旧默认")
     ap.add_argument("--quality", choices=("standard", "showcase"), default="standard",
                     help="showcase=交付档：结构类软项升级为阻塞，有残留就不出图")
@@ -775,7 +871,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         try:
             page, _result, outcome, attempts = emit_page(spec, scheme=args.scheme,
-                                                         seeds=seeds,
+                                                         seeds=seeds, library=args.library,
                                                          quality=args.quality, preset=args.preset, colors=args.colors)
         except (SpecError, KeyError, ValueError, OSError) as exc:
             print(f"{path}：{exc}", file=sys.stderr)

@@ -3,41 +3,39 @@
 图标只帮助辨识真实角色。相同角色尽量使用相同图标；不要给每个节点加装饰，
 也不要用特定厂商 logo 表示与该厂商无关的系统。
 
-当前只有 Excalidraw 后端支持 `icon`；draw.io/Mermaid 生成器会明确拒绝。
+**Excalidraw 与 draw.io 均支持同一套 `.excalidrawlib` 素材库**（draw.io 自动将素材矢量元素转为内联 SVG 嵌入，离线可编辑）；Mermaid 生成器仍会明确拒绝 `icon`。
 
-在内容与配色确认后执行 [图标确认](decision-gates.md)：提交是否使用、实际素材来源/种类、节点覆盖清单与比例、
-相对大小/位置和颜色处理，停止等待用户回复。Excalidraw 不必使用外部素材，也允许明确选择无图标；
-不要把“未提图标”理解为已确认无图标。覆盖节点比例不同于面积占比，当前没有任意面积百分比的 CLI 参数。
+在内容与配色确认后执行 [图标确认](decision-gates.md)：提交是否使用、实际素材来源/库名、节点覆盖清单、
+是否使用无框 `shape: "icon"`（拓扑/设备图优先）以及颜色处理，停止等待用户回复。允许明确选择无图标；
+不要把“未提图标”理解为已确认无图标。
 
-## 选取与使用
+## 选取与使用（优先外部 `.excalidrawlib` 素材库）
 
-内置 sigil 无需外部库，覆盖 user/api/database/queue/shield/cloud/external/plain 等常见语义：
-
-```sh
-python3 scripts/sigils.py
-python3 scripts/sigils.py --name database
-```
-
-节点可写 `"icon": "database"`。内置名称优先于同名外部库项。
-需要更丰富或真实品牌图标时，先查目录，不猜项名：
+推荐直接使用社区 `.excalidrawlib` 素材库，先查本地缓存再查官方目录，不猜项名：
 
 ```sh
-python3 scripts/icons_fetch.py --search 数据库
-python3 scripts/icons_fetch.py --get "IT icons"
-python3 scripts/icons.py --library it-icons --grep database
-python3 scripts/emit_excalidraw.py system.diagram.json --library it-icons
+python3 scripts/icons_fetch.py --cached                  # 离线列出本地已缓存的全部素材库
+python3 scripts/icons_fetch.py --find 防火墙              # 优先离线搜本地缓存，未命中再查官方目录
+python3 scripts/icons_fetch.py --get "IT icons"          # 下载到本地缓存
+python3 scripts/emit_excalidraw.py system.diagram.json   # 自动扫描全部本地缓存库，无需每次传 --library
+python3 scripts/emit_drawio.py system.diagram.json       # draw.io 同样自动扫描并转内联 SVG
 ```
+
+- **自动跨库发现**：不传 `--library` 时，生成器会自动扫描本地缓存目录内的全部 `*.excalidrawlib`；支持忽略大小写与连字符/空格差异的唯一匹配。
+- **跨库混用语法**：同一张图需混用多个库（或重名消歧）时，直接写 `"icon": "库名:图标名"`（例如 `"it-icons:Firewall"`），无需受限于单一 `--library`。
+- **无框图标节点**：网络/系统拓扑、安全域/设备图优先给设备节点设 `"shape": "icon"`（图标居中放大至约 48 图内单位、标签居中在下方、无外框），外层仅用 `groups` 画安全域/网段边界，画面更通透。
+- 旧内置 sigil（`scripts/sigils.py`）仅作无库离线兼容保留；写 `"库名:图标名"` 时始终走外部 `.excalidrawlib`。
 
 查询/下载使用官方社区素材目录，需要网络。缓存默认在
 `~/.agent-skills/data/diagram-authoring/libraries/`，旁边元数据记录作者和来源。
 目录中的作品不等于已获任意用途许可；按具体库许可使用，不把下载缓存写入 skill。
 
-本地库选择顺序：`--library` 路径或缓存库名 → `EXCALIDRAW_LIBRARY` →
-`~/.agent-skills/config/excalidraw-library-path`。`icons.py --size <项名>` 可检查尺寸。
-未知项名会报错并列出可用项，不能静默换成另一个图标。
+显式覆盖顺序：`库名:图标名` → `--library` 路径或缓存库名 → `EXCALIDRAW_LIBRARY` →
+`~/.agent-skills/config/excalidraw-library-path` → 自动扫描本地全部缓存库。
+未知或重名歧义项会报错并列出候选项，绝不静默错换。
 
 支持 `.excalidrawlib` v1 与 v2：v2 有名称；v1 没有名称，只能按 `#序号` 引用。
-生成文件直接含素材元素，不必先在用户的编辑器中安装库。
+生成文件直接含素材矢量元素（Excalidraw）或内联 SVG（draw.io），不必先在用户的编辑器中安装库。
 
 ## 视觉与颜色
 
